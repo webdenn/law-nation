@@ -261,8 +261,10 @@ NODE_ENV=local
 ## 13. Getting Started (Backend)
 
 ```bash
+docker compose up -d
 npm install
-npm run dev
+npx prisma migrate dev
+npm run start:dev
 ```
 
 API available at:
