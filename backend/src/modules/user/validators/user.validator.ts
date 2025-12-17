@@ -6,5 +6,4 @@ export const createUserSchema = z.object({
   email: z.email(),
   password: z.string().min(6),
   roleIds: z.array(z.uuid()).nonempty(), // multiple roles
-  teamId: z.uuid().optional(),
 });
