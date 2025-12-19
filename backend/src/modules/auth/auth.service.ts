@@ -7,10 +7,13 @@ import {
   revokeRefreshToken,
 } from "@/utils/jwt.utils.js";
 import type { Response } from "express";
-import { NotFoundError, UnauthorizedError } from "@/utils/http-errors.util.js";
+import { NotFoundError, UnauthorizedError, BadRequestError } from "@/utils/http-errors.util.js";
+
+const SALT = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
 
 // /src/modules/auth/auth.service.ts
 export const AuthService = {
+  signup,
   login,
   refresh,
   logout,
@@ -19,7 +22,72 @@ export const AuthService = {
 
 export default AuthService;
 
-// === Auth Service Functions ===
+//  Auth Service Functions
+async function signup(data: {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string | undefined;
+}) {
+  // Check if user already exists
+  const existingUser = await prisma.user.findUnique({
+    where: { email: data.email },
+  });
+
+  if (existingUser) {
+    throw new BadRequestError("User with this email already exists");
+  }
+
+  // Hash password
+  const passwordHash = await bcrypt.hash(data.password, SALT);
+
+  // Get default "user" role (create it if it doesn't exist)
+  let defaultRole = await prisma.role.findUnique({
+    where: { name: "user" },
+  });
+
+  // If default role doesn't exist, create it
+  if (!defaultRole) {
+    defaultRole = await prisma.role.create({
+      data: {
+        name: "user",
+        description: "Default user role for registered users",
+      },
+    });
+  }
+
+  // Create user with default role
+  const user = await prisma.user.create({
+    data: {
+      name: data.name,
+      email: data.email,
+      phone: data.phone ?? null,
+      passwordHash,
+      roles: {
+        create: {
+          roleId: defaultRole.id,
+        },
+      },
+    },
+    include: {
+      roles: {
+        include: {
+          role: true,
+        },
+      },
+    },
+  });
+
+  return {
+    message: "User registered successfully.",
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    },
+  };
+}
+
 async function login(email: string, password: string, res: Response) {
   const user = await prisma.user.findUnique({
     where: { email },

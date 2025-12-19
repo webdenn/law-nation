@@ -4,12 +4,30 @@ import { AuthService } from "./auth.service.js";
 import { type AuthRequest } from "@/types/auth-request.js";
 import {
   loginSchema,
+  signupSchema,
   refreshSchema,
   logoutSchema,
 } from "./validators/auth.validator.js";
 import { UnauthorizedError } from "@/utils/http-errors.util.js";
 
 // /src/controllers/auth.controller.ts
+export async function signupHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = signupSchema.parse(req.body);
+    const result = await AuthService.signup(data);
+    return res.status(201).json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: z.treeifyError(err) });
+    }
+    next(err);
+  }
+}
+
 export async function loginHandler(
   req: Request,
   res: Response,
