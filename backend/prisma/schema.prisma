@@ -23,9 +23,10 @@ model User {
   version      Int      @default(1)
 
   // RBAC relations
-  roles       UserRole[]
-  refreshTokens          RefreshToken[]
-  auditLogs  AuditLog[]
+  roles             UserRole[]
+  refreshTokens     RefreshToken[]
+  auditLogs         AuditLog[]
+  assignedArticles  Article[]
 }
 
 /// ---------- roles ----------
@@ -102,4 +103,71 @@ model RefreshToken {
 
   user User @relation(fields: [userId], references: [id])
 }
+
+//ARTICLE SUBMISSION MODULE
+
+enum ArticleStatus {
+  PENDING_ADMIN_REVIEW
+  ASSIGNED_TO_EDITOR
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+model Article {
+  id                String        @id @default(cuid())
+  
+  // Author Info (Guest Submission)
+  authorName        String
+  authorEmail       String
+  authorPhone       String?
+  authorOrganization String?
+  
+  // Article Details
+  title             String
+  category          String
+  abstract          String        @db.Text
+  keywords          String?
+  coAuthors         String?       @db.Text
+  remarksToEditor   String?       @db.Text
+  
+  // File Management
+  originalPdfUrl    String
+  currentPdfUrl     String        // Can be updated by editor
+  
+  // Workflow
+  status            ArticleStatus @default(PENDING_ADMIN_REVIEW)
+  assignedEditorId  String?
+  assignedEditor    User?         @relation(fields: [assignedEditorId], references: [id])
+  
+  // Timestamps
+  submittedAt       DateTime      @default(now())
+  reviewedAt        DateTime?
+  approvedAt        DateTime?
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  // Revisions
+  revisions         ArticleRevision[]
+  
+  @@index([status])
+  @@index([assignedEditorId])
+  @@index([authorEmail])
+}
+
+model ArticleRevision {
+  id          String   @id @default(cuid())
+  articleId   String
+  article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  
+  pdfUrl      String
+  uploadedBy  String?  // Editor ID if uploaded by editor
+  comments    String?  @db.Text
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([articleId])
+}
+
 

@@ -23,65 +23,52 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const isLocal = process.env.NODE_ENV === "local";
 
-// ---------- IMAGE VALIDATION ----------
-const allowedMime = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
-const MAX_FILE_SIZE = parseInt(
-  process.env.MAX_IMAGE_SIZE_BYTES ?? String(5 * 1024 * 1024),
+// ---------- PDF VALIDATION ----------
+const allowedPdfMime = ["application/pdf"];
+const MAX_PDF_SIZE = parseInt(
+  process.env.MAX_PDF_SIZE_BYTES ?? String(10 * 1024 * 1024),
   10
-); // default 5MB
-const MAX_IMAGES = parseInt(process.env.MAX_IMAGES_UPLOAD ?? "10", 10);
+); // default 10MB
 
-const fileFilter = (req: Request, file: Express.Multer.File, cb: any) => {
-  if (allowedMime.includes(file.mimetype)) cb(null, true);
-  else cb(new Error("Only JPG, PNG, WEBP images allowed"), false);
+const pdfFileFilter = (req: Request, file: Express.Multer.File, cb: any) => {
+  if (allowedPdfMime.includes(file.mimetype)) cb(null, true);
+  else cb(new Error("Only PDF files are allowed"), false);
 };
 
 // ---------- ENSURE UPLOAD DIRECTORY ----------
 if (isLocal) {
-  const dir = "uploads/";
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const pdfDir = "uploads/pdfs/";
+  if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
 }
 
-// ---------- MULTER CONFIG ----------
-const localStorage = multer.diskStorage({
-  destination: "uploads/",
+// ---------- PDF UPLOAD CONFIG ----------
+const localPdfStorage = multer.diskStorage({
+  destination: "uploads/pdfs/",
   filename: (_req, file, cb) => {
     const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, unique + path.extname(file.originalname));
   },
 });
 
-const localUploadSingle = multer({
-  storage: localStorage,
-  fileFilter,
-  limits: { fileSize: MAX_FILE_SIZE },
+const localUploadPdf = multer({
+  storage: localPdfStorage,
+  fileFilter: pdfFileFilter,
+  limits: { fileSize: MAX_PDF_SIZE },
 });
 
-const localUploadMulti = multer({
-  storage: localStorage,
-  fileFilter,
-  limits: { fileSize: MAX_FILE_SIZE },
-});
-
-const supabaseMemorySingle = multer({
+const supabaseMemoryPdf = multer({
   storage: multer.memoryStorage(),
-  fileFilter,
-  limits: { fileSize: MAX_FILE_SIZE },
+  fileFilter: pdfFileFilter,
+  limits: { fileSize: MAX_PDF_SIZE },
 });
 
-const supabaseMemoryMulti = multer({
-  storage: multer.memoryStorage(),
-  fileFilter,
-  limits: { fileSize: MAX_FILE_SIZE },
-});
-
-// ---------- SUPABASE UPLOAD HELPERS ----------
+// ---------- SUPABASE UPLOAD HELPER ----------
 async function uploadBufferToSupabase(
   buffer: Buffer,
   originalname: string,
   mimetype: string
 ): Promise<{ url: string; storageKey: string }> {
-  const storageKey = `inventory/${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(originalname)}`;
+  const storageKey = `articles/${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(originalname)}`;
   const { data, error } = await supabase.storage
     .from(SUPABASE_BUCKET)
     .upload(storageKey, buffer, {
@@ -99,23 +86,23 @@ async function uploadBufferToSupabase(
   return { url: pub.publicUrl, storageKey };
 }
 
-// ---------- SINGLE IMAGE HANDLER (keeps existing API) ----------
-export const upload = (req: Request, res: Response, next: NextFunction) => {
+// ---------- SINGLE PDF UPLOAD HANDLER ----------
+export const uploadPdf = (req: Request, res: Response, next: NextFunction) => {
   if (isLocal) {
-    localUploadSingle.single("image")(req, res, (err) => {
+    localUploadPdf.single("pdf")(req, res, (err) => {
       if (err) return res.status(400).json({ error: err.message });
       if (!req.file)
-        return res.status(400).json({ error: "Image file required" });
-      const url = `/uploads/${req.file.filename}`;
+        return res.status(400).json({ error: "PDF file required" });
+      const url = `/uploads/pdfs/${req.file.filename}`;
       req.fileUrl = url;
-      req.fileMeta = { url, storageKey: req.file.filename }; // store filename as storageKey for deletion
+      req.fileMeta = { url, storageKey: req.file.filename };
       next();
     });
   } else {
-    supabaseMemorySingle.single("image")(req, res, (err) => {
+    supabaseMemoryPdf.single("pdf")(req, res, (err) => {
       if (err) return res.status(400).json({ error: err.message });
       const file = req.file as Express.Multer.File | undefined;
-      if (!file) return res.status(400).json({ error: "Image file required" });
+      if (!file) return res.status(400).json({ error: "PDF file required" });
       uploadBufferToSupabase(file.buffer, file.originalname, file.mimetype)
         .then(({ url, storageKey }) => {
           req.fileUrl = url;
@@ -123,34 +110,34 @@ export const upload = (req: Request, res: Response, next: NextFunction) => {
           next();
         })
         .catch((e) => {
-          console.error("Supabase upload error:", e);
-          res.status(500).json({ error: "Upload failed" });
+          console.error("Supabase PDF upload error:", e);
+          res.status(500).json({ error: "PDF upload failed" });
         });
     });
   }
 };
 
-// ---------- MULTI IMAGE HANDLER ----------
-export const uploadMulti = (fieldName = "images", maxCount = MAX_IMAGES) => {
+// ---------- MULTIPLE PDF UPLOAD HANDLER ----------
+export const uploadMultiplePdfs = (fieldName = "pdfs", maxCount = 5) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (isLocal) {
-      localUploadMulti.array(fieldName, maxCount)(req, res, async (err) => {
+      localUploadPdf.array(fieldName, maxCount)(req, res, async (err) => {
         if (err) return res.status(400).json({ error: err.message });
         const files = (req.files as Express.Multer.File[] | undefined) ?? [];
         if (!files.length)
-          return res.status(400).json({ error: "Image files required" });
+          return res.status(400).json({ error: "PDF files required" });
         req.fileUrls = files.map((f) => ({
-          url: `/uploads/${f.filename}`,
+          url: `/uploads/pdfs/${f.filename}`,
           storageKey: f.filename,
         }));
         next();
       });
     } else {
-      supabaseMemoryMulti.array(fieldName, maxCount)(req, res, async (err) => {
+      supabaseMemoryPdf.array(fieldName, maxCount)(req, res, async (err) => {
         if (err) return res.status(400).json({ error: err.message });
         const files = (req.files as Express.Multer.File[] | undefined) ?? [];
         if (!files.length)
-          return res.status(400).json({ error: "Image files required" });
+          return res.status(400).json({ error: "PDF files required" });
         try {
           const out: Array<{ url: string; storageKey: string }> = [];
           for (const f of files) {
@@ -164,8 +151,8 @@ export const uploadMulti = (fieldName = "images", maxCount = MAX_IMAGES) => {
           req.fileUrls = out;
           next();
         } catch (e) {
-          console.error("Supabase upload error:", e);
-          return res.status(500).json({ error: "Upload failed" });
+          console.error("Supabase PDF upload error:", e);
+          return res.status(500).json({ error: "PDF upload failed" });
         }
       });
     }
