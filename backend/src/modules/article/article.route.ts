@@ -45,7 +45,20 @@ router.get(
   articleController.listArticles.bind(articleController)
 );
 
-// Get article details
+// PUBLIC: Get article preview (no auth required)
+router.get(
+  "/:id/preview",
+  articleController.getArticlePreview.bind(articleController)
+);
+
+// PROTECTED: Download article PDF (auth required)
+router.get(
+  "/:id/download",
+  requireAuth,
+  articleController.downloadArticlePdf.bind(articleController)
+);
+
+// PROTECTED: Get full article details (auth required)
 router.get(
   "/:id",
   requirePermission("article", "read"),

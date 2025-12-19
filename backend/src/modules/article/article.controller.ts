@@ -131,7 +131,26 @@ export class ArticleController {
     }
   }
 
-  // Get article details
+  // Get article preview (public - no auth required)
+  async getArticlePreview(req: AuthRequest, res: Response) {
+    try {
+      const articleId = req.params.id;
+      if (!articleId) {
+        throw new BadRequestError("Article ID is required");
+      }
+
+      const article = await articleService.getArticlePreview(articleId);
+
+      res.json({ 
+        article,
+        message: "Login to read full article and download PDF" 
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Get full article details (protected - auth required)
   async getArticleById(req: AuthRequest, res: Response) {
     try {
       const articleId = req.params.id;
@@ -142,6 +161,26 @@ export class ArticleController {
       const article = await articleService.getArticleById(articleId);
 
       res.json({ article });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Download article PDF (protected - auth required)
+  async downloadArticlePdf(req: AuthRequest, res: Response) {
+    try {
+      const articleId = req.params.id;
+      if (!articleId) {
+        throw new BadRequestError("Article ID is required");
+      }
+
+      const article = await articleService.getArticlePdfUrl(articleId);
+
+      res.json({
+        pdfUrl: article.currentPdfUrl,
+        title: article.title,
+        message: "PDF ready for download",
+      });
     } catch (error) {
       throw error;
     }

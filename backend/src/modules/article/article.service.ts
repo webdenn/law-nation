@@ -140,7 +140,7 @@ export class ArticleService {
     return updatedArticle;
   }
 
-  // Step 3 - Option C: Editor uploads corrected PDF
+  // Step 3 - Editor uploads corrected PDF
   async uploadCorrectedPdf(
     articleId: string,
     editorId: string,
@@ -232,10 +232,13 @@ export class ArticleService {
     };
   }
 
-  // Get single article details
+  // Get single article details (full access - for logged-in users)
   async getArticleById(articleId: string) {
     const article = await prisma.article.findUnique({
-      where: { id: articleId },
+      where: { 
+        id: articleId,
+        status: "APPROVED"  // Only show approved articles
+      },
       include: {
         assignedEditor: {
           select: { id: true, name: true, email: true },
@@ -247,7 +250,56 @@ export class ArticleService {
     });
 
     if (!article) {
-      throw new NotFoundError("Article not found");
+      throw new NotFoundError("Article not found or not published");
+    }
+
+    return article;
+  }
+
+  // Get article preview (limited access - for non-logged-in users)
+  async getArticlePreview(articleId: string) {
+    const article = await prisma.article.findUnique({
+      where: { 
+        id: articleId, 
+        status: "APPROVED" // Only show approved articles
+      },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        abstract: true,
+        authorName: true,
+        authorOrganization: true,
+        keywords: true,
+        submittedAt: true,
+        // NO PDF URLs - this is the key difference
+        // NO revisions
+        // NO assigned editor
+      },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found or not published");
+    }
+
+    return article;
+  }
+
+  // Get PDF URL for download (for logged-in users)
+  async getArticlePdfUrl(articleId: string) {
+    const article = await prisma.article.findUnique({
+      where: { 
+        id: articleId, 
+        status: "APPROVED" 
+      },
+      select: { 
+        currentPdfUrl: true,
+        title: true 
+      },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found or not published");
     }
 
     return article;
