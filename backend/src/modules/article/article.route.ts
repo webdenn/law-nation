@@ -6,11 +6,17 @@ import { articleController } from "./article.controller.js";
 
 const router = Router();
 
-// Public route - Guest submission (no auth)
+// Public routes - No authentication required
 router.post(
   "/submit",
   uploadPdf,
   articleController.submitArticle.bind(articleController)
+);
+
+// PUBLIC: Get article preview (no auth required)
+router.get(
+  "/:id/preview",
+  articleController.getArticlePreview.bind(articleController)
 );
 
 // Protected routes - Require authentication
@@ -43,12 +49,6 @@ router.get(
   "/",
   requirePermission("article", "read"),
   articleController.listArticles.bind(articleController)
-);
-
-// PUBLIC: Get article preview (no auth required)
-router.get(
-  "/:id/preview",
-  articleController.getArticlePreview.bind(articleController)
 );
 
 // PROTECTED: Download article PDF (auth required)
