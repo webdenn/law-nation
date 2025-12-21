@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 const StatCard = ({ title, count }) => (
@@ -10,23 +10,82 @@ const StatCard = ({ title, count }) => (
 );
 
 export default function AdminDashboard() {
-  const [editors] = useState(["Rahul Jha", "Priya Singh", "Karan Roy"]);
+  const [editors] = useState(["Rahul Jha", "Priya Singh", "Karan Roy"]); // Editors abhi static hain (baad me dynamic kar lenge)
   
-  const [articles, setArticles] = useState([
-    { id: 1, title: "Criminal Law Reform 2024", author: "Siddharth M.", status: "Pending", assignedTo: "", date: "2024-03-15", abstract: "Detailed analysis of criminal law amendments..." },
-    { id: 2, title: "Property Rights Case Study", author: "Anjali Sharma", status: "In Review", assignedTo: "Priya Singh", date: "2024-03-12", abstract: "Review of urban property rights under constitution..." }
-  ]);
+  // Real articles state
+  const [articles, setArticles] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // States for New Features
+  // API Config
+  const API_BASE_URL = "http://localhost:4000"; // Backend URL
+
+  // --- FETCH DATA FROM BACKEND ---
+  useEffect(() => {
+    const fetchArticles = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/articles`);
+        if (!response.ok) throw new Error("Failed to fetch");
+        
+        const data = await response.json();
+        
+        // Backend data ko Frontend format me map karna
+        // Assuming backend returns an array or { articles: [...] }
+        // Adjust logic based on your exact list controller response
+        const articleList = Array.isArray(data) ? data : (data.articles || []);
+
+        const formattedArticles = articleList.map(item => ({
+            id: item.id,
+            title: item.title,
+            author: item.authorName,
+            status: mapBackendStatus(item.status), // Helper function below
+            assignedTo: "", // Abhi backend se assignedEditor nahi aa raha hai shayad
+            date: new Date(item.createdAt).toLocaleDateString('en-GB'), // DD/MM/YYYY
+            abstract: item.abstract,
+            pdfUrl: item.currentPdfUrl // Ye /uploads/pdfs/... hoga
+        }));
+
+        setArticles(formattedArticles);
+      } catch (error) {
+        console.error("Error fetching articles:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchArticles();
+  }, []);
+
+  // Helper to make status look nice
+  const mapBackendStatus = (status) => {
+      // Backend enum: PENDING_ADMIN_REVIEW, ASSIGNED_TO_EDITOR, etc.
+      if (status === 'PENDING_ADMIN_REVIEW') return 'Pending';
+      if (status === 'APPROVED') return 'Published';
+      if (status === 'ASSIGNED_TO_EDITOR') return 'In Review';
+      return status;
+  };
+
+  const handlePdfClick = (relativeUrl) => {
+    if (!relativeUrl) {
+        alert("PDF not found");
+        return;
+    }
+    // Backend URL + Relative Path (e.g. http://localhost:4000/uploads/pdfs/xyz.pdf)
+    const fullUrl = `${API_BASE_URL}${relativeUrl}`;
+    window.open(fullUrl, '_blank');
+  };
+
+  // States for Features
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [showAbstract, setShowAbstract] = useState(null);
 
   const assignArticle = (id, editor) => {
+    // Yahan baad me API call lagegi to assign editor
     setArticles(articles.map(a => a.id === id ? { ...a, assignedTo: editor, status: "In Review" } : a));
   };
 
   const overrideAndPublish = (id) => {
+    // Yahan API call lagegi to publish
     setArticles(articles.map(a => a.id === id ? { ...a, status: "Published", assignedTo: "Admin Override" } : a));
   };
 
@@ -48,12 +107,11 @@ export default function AdminDashboard() {
         <nav className="flex-1 px-4 mt-6 space-y-2">
           <button className="w-full text-left p-3 bg-red-800 rounded-lg font-bold">Dashboard</button>
           <Link href="/admin/add-editor" className="block w-full text-left p-3 hover:bg-red-600 rounded-lg text-red-100">Add New Editor</Link>
-         {/* Sidebar ka button change karein */}
-<Link href="/admin/live-database" className="block w-full">
-  <button className="w-full text-left p-3 hover:bg-red-600 rounded-lg text-red-100 transition-all">
-    Live Database
-  </button>
-</Link>
+          <Link href="/admin/live-database" className="block w-full">
+            <button className="w-full text-left p-3 hover:bg-red-600 rounded-lg text-red-100 transition-all">
+              Live Database
+            </button>
+          </Link>
         </nav>
         <div className="p-4 border-t border-red-800"><button className="w-full p-2 text-sm bg-red-900 rounded font-bold uppercase">Logout</button></div>
       </aside>
@@ -74,8 +132,6 @@ export default function AdminDashboard() {
             <StatCard title="Editors" count={editors.length} />
             <StatCard title="Published" count={articles.filter(a => a.status === 'Published').length} />
           </div>
-
-          
 
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
             <div className="bg-gray-50 p-5 border-b flex flex-col md:flex-row justify-between items-center gap-4">
@@ -113,10 +169,21 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {filteredArticles.map(art => (
+                  {isLoading ? (
+                      <tr>
+                          <td colSpan="5" className="p-10 text-center font-bold text-gray-500">Loading articles...</td>
+                      </tr>
+                  ) : filteredArticles.map(art => (
                     <tr key={art.id} className="hover:bg-red-50/30 transition-all">
                       <td className="p-5">
-                        <p className="font-bold text-gray-800 underline cursor-pointer hover:text-red-600">{art.title}</p>
+                        {/* Title Click opens PDF */}
+                        <p 
+                            onClick={() => handlePdfClick(art.pdfUrl)}
+                            className="font-bold text-gray-800 underline cursor-pointer hover:text-red-600"
+                            title="Click to view PDF"
+                        >
+                            {art.title}
+                        </p>
                         <button onClick={() => setShowAbstract(art)} className="text-[10px] text-red-600 font-bold uppercase mt-1 hover:underline">View Abstract</button>
                       </td>
                       <td className="p-5">
@@ -142,17 +209,17 @@ export default function AdminDashboard() {
                         </select>
                       </td>
                       <td className="p-5 text-right flex justify-end gap-2 items-center">
-                         {/* Publish Button */}
+                        {/* Publish Button */}
                         <button onClick={() => overrideAndPublish(art.id)} className="bg-black text-white px-4 py-2 rounded text-[10px] font-black hover:bg-red-600 uppercase transition-colors">Publish</button>
                         
-                        {/* NEW: Action Dropdown (Simplified as a button for now) */}
+                        {/* Action Dropdown */}
                         <button className="text-gray-400 hover:text-black font-bold p-2 text-lg">⋮</button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {filteredArticles.length === 0 && (
+              {!isLoading && filteredArticles.length === 0 && (
                 <div className="p-10 text-center text-gray-400 font-bold">No articles found matching your criteria.</div>
               )}
             </div>
