@@ -1,16 +1,23 @@
 import { Router } from "express";
-import { requireAuth } from "@/middlewares/auth.middleware.js";
+import { requireAuth, optionalAuth } from "@/middlewares/auth.middleware.js";
 import { requirePermission } from "@/middlewares/require-premission.middleware.js";
 import { uploadPdf } from "@/middlewares/upload.middleware.js";
 import { articleController } from "./article.controller.js";
 
 const router = Router();
 
-// Public routes - No authentication required
+// Public/Optional Auth routes - Works for both guest and logged-in users
 router.post(
   "/submit",
+  optionalAuth, // Check auth but don't require it
   uploadPdf,
   articleController.submitArticle.bind(articleController)
+);
+
+// PUBLIC: Verify email and create article
+router.get(
+  "/verify/:token",
+  articleController.verifyArticleSubmission.bind(articleController)
 );
 
 // PUBLIC: Get article preview (no auth required)

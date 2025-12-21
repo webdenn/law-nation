@@ -8,6 +8,7 @@ import {
 } from "@/utils/jwt.utils.js";
 import type { Response } from "express";
 import { NotFoundError, UnauthorizedError, BadRequestError } from "@/utils/http-errors.util.js";
+import { sendOtpEmail } from "@/utils/email.utils.js";
 
 const SALT = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
 
@@ -18,6 +19,8 @@ export const AuthService = {
   refresh,
   logout,
   getCurrentUser,
+  sendVerificationOtp,
+  verifyOtp,
 };
 
 export default AuthService;
@@ -220,5 +223,92 @@ async function getCurrentUser(userId: string) {
         name: r.role.name,
       })),
     },
+  };
+}
+
+// OTP Email Verification Functions
+async function sendVerificationOtp(email: string) {
+  // Check if user already exists
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (existingUser) {
+    throw new BadRequestError("User with this email already exists");
+  }
+
+  // Generate 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  // Set expiration to 10 minutes from now
+  const ttl = new Date();
+  ttl.setMinutes(ttl.getMinutes() + 10);
+
+  // Delete any existing unverified OTP for this email
+  await prisma.emailVerification.deleteMany({
+    where: {
+      email,
+      resourceType: "USER_REGISTRATION",
+      isVerified: false,
+    },
+  });
+
+  // Create new verification record
+  await prisma.emailVerification.create({
+    data: {
+      resourceId: email, // Using email as resourceId for user registration
+      resourceType: "USER_REGISTRATION",
+      email,
+      token: otp,
+      ttl,
+      metadata: {},
+    },
+  });
+
+  // Send OTP via email
+  await sendOtpEmail(email, otp);
+
+  return {
+    success: true,
+    message: "Verification code sent to your email",
+  };
+}
+
+async function verifyOtp(email: string, otp: string) {
+  // Find verification record
+  const verification = await prisma.emailVerification.findFirst({
+    where: {
+      email,
+      token: otp,
+      resourceType: "USER_REGISTRATION",
+    },
+  });
+
+  if (!verification) {
+    throw new BadRequestError("Invalid verification code");
+  }
+
+  // Check if already verified
+  if (verification.isVerified) {
+    throw new BadRequestError("Verification code already used");
+  }
+
+  // Check if expired
+  if (new Date() > verification.ttl) {
+    throw new BadRequestError("Verification code expired. Please request a new one");
+  }
+
+  // Mark as verified
+  await prisma.emailVerification.update({
+    where: { id: verification.id },
+    data: {
+      isVerified: true,
+      verifiedAt: new Date(),
+    },
+  });
+
+  return {
+    success: true,
+    message: "Email verified successfully",
   };
 }

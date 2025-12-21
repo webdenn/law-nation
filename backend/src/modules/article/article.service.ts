@@ -6,17 +6,32 @@ import {
   sendAuthorAssignmentNotification,
   sendArticleApprovalNotification,
   sendArticleCorrectionNotification,
+  sendArticleVerificationEmail,
 } from "@/utils/email.utils.js";
+import { VerificationService } from "@/utils/verification.utils.js";
 import type {
   ArticleSubmissionData,
+  ArticleVerificationMetadata,
   ArticleListFilters,
   AssignEditorData,
   UploadCorrectedPdfData,
 } from "./types/article-submission.type.js";
 
 export class ArticleService {
-  // Step 1: Guest submits article
-  async submitArticle(data: ArticleSubmissionData) {
+  // Step 1: Submit article (with or without verification based on user status)
+  async submitArticle(data: ArticleSubmissionData, userId?: string) {
+    // If user is logged in, create article directly (skip verification)
+    if (userId) {
+      return await this.createArticleDirectly(data, userId);
+    }
+
+    // Guest user - require email verification
+    return await this.createVerificationRecord(data);
+  }
+
+  // Create article directly for logged-in users (no verification needed)
+  private async createArticleDirectly(data: ArticleSubmissionData, userId: string) {
+    // Create article in database immediately
     const article = await prisma.article.create({
       data: {
         authorName: data.authorName,
@@ -35,11 +50,97 @@ export class ArticleService {
       },
     });
 
-    // Send confirmation email
-    sendArticleSubmissionConfirmation(
+    // Send immediate confirmation email
+    await sendArticleSubmissionConfirmation(
       data.authorEmail,
       data.authorName,
       data.title,
+      article.id
+    );
+
+    return {
+      message: 'Article submitted successfully',
+      article,
+      requiresVerification: false,
+    };
+  }
+
+  // Create verification record for guest users
+  private async createVerificationRecord(data: ArticleSubmissionData) {
+    // Create verification record with 48-hour TTL
+    const { token, expiresAt } = await VerificationService.createVerificationRecord(
+      data.authorEmail,
+      'ARTICLE',
+      {
+        ...data,
+        tempPdfPath: data.pdfUrl, // Store temp file path
+      } as ArticleVerificationMetadata
+    );
+
+    // Send verification email
+    await sendArticleVerificationEmail(
+      data.authorEmail,
+      data.authorName,
+      token
+    );
+
+    return {
+      message: 'Verification email sent. Please check your inbox.',
+      expiresAt,
+      requiresVerification: true,
+    };
+  }
+
+  // Step 1.5: Confirm article submission after email verification
+  async confirmArticleSubmission(token: string) {
+    // Verify token
+    const verification = await VerificationService.verifyToken(token);
+
+    if (!verification.valid) {
+      throw new BadRequestError(verification.error || 'Invalid verification token');
+    }
+
+    const metadata = verification.data as unknown as ArticleVerificationMetadata;
+
+    // Move file from temp to permanent directory
+    let permanentPdfUrl = metadata.pdfUrl;
+    if (metadata.tempPdfPath && metadata.tempPdfPath.includes('/temp/')) {
+      try {
+        permanentPdfUrl = await VerificationService.moveTempFile(metadata.tempPdfPath);
+      } catch (error) {
+        console.error('Failed to move temp file:', error);
+        // Continue with temp path if move fails
+      }
+    }
+
+    // Create article in database
+    const article = await prisma.article.create({
+      data: {
+        authorName: metadata.authorName,
+        authorEmail: metadata.authorEmail,
+        ...(metadata.authorPhone && { authorPhone: metadata.authorPhone }),
+        ...(metadata.authorOrganization && { authorOrganization: metadata.authorOrganization }),
+        title: metadata.title,
+        category: metadata.category,
+        abstract: metadata.abstract,
+        ...(metadata.keywords && { keywords: metadata.keywords }),
+        ...(metadata.coAuthors && { coAuthors: metadata.coAuthors }),
+        ...(metadata.remarksToEditor && { remarksToEditor: metadata.remarksToEditor }),
+        originalPdfUrl: permanentPdfUrl,
+        currentPdfUrl: permanentPdfUrl,
+        status: "PENDING_ADMIN_REVIEW",
+      },
+    });
+
+    // Mark verification as complete and delete record
+    await VerificationService.markAsVerified(token);
+    await VerificationService.deleteVerification(token);
+
+    // Send confirmation email
+    await sendArticleSubmissionConfirmation(
+      metadata.authorEmail,
+      metadata.authorName,
+      metadata.title,
       article.id
     );
 

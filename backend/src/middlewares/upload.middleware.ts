@@ -41,13 +41,23 @@ const pdfFileFilter = (req: Request, file: Express.Multer.File, cb: any) => {
 
 // ---------- ENSURE UPLOAD DIRECTORY ----------
 if (isLocal) {
+  const tempDir = "uploads/temp/";
   const pdfDir = "uploads/pdfs/";
+  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
   if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
 }
 
 // ---------- PDF UPLOAD CONFIG ----------
 const localPdfStorage = multer.diskStorage({
-  destination: "uploads/pdfs/",
+  destination: (req, _file, cb) => {
+    // Check if user is logged in (set by optionalAuth middleware)
+    const isLoggedIn = !!(req as any).user?.id;
+    
+    // Logged-in users: upload directly to permanent directory
+    // Guest users: upload to temp directory (requires verification)
+    const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+    cb(null, directory);
+  },
   filename: (_req, file, cb) => {
     const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, unique + path.extname(file.originalname));
@@ -101,7 +111,12 @@ export const uploadPdf = (req: Request, res: Response, next: NextFunction) => {
       if (err) return res.status(400).json({ error: err.message });
       if (!req.file)
         return res.status(400).json({ error: "PDF file required" });
-      const url = `/uploads/pdfs/${req.file.filename}`;
+      
+      // Determine the path based on user authentication status
+      const isLoggedIn = !!(req as any).user?.id;
+      const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+      const url = `/${directory}${req.file.filename}`;
+      
       req.fileUrl = url;
       req.fileMeta = { url, storageKey: req.file.filename };
       next();

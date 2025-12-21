@@ -20,3 +20,13 @@ export const refreshSchema = z.object({
 export const logoutSchema = z.object({
   refreshToken: z.string().optional(),
 });
+
+// OTP verification schemas
+export const sendOtpSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+export const verifyOtpSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  otp: z.string().length(6, "OTP must be 6 digits"),
+});

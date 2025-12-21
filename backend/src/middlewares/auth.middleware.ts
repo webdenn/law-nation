@@ -62,3 +62,82 @@ export async function requireAuth(
 
   return next();
 }
+
+/**
+ * Optional Authentication Middleware
+ * Checks for auth token but doesn't fail if missing
+ * Used for endpoints that work for both guest and logged-in users
+ */
+export async function optionalAuth(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) {
+  const auth = req.headers.authorization;
+  
+  // No token provided - continue as guest
+  if (!auth || !auth.startsWith("Bearer ")) {
+    delete req.user;
+    req.permissions = new Set<string>();
+    return next();
+  }
+
+  const token = auth.split(" ")[1];
+  
+  // Empty token - continue as guest
+  if (!token) {
+    delete req.user;
+    req.permissions = new Set<string>();
+    return next();
+  }
+
+  try {
+    // Try to verify token
+    const payload = verifyAccessToken(token);
+    
+    // Fetch user with roles and permissions
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: {
+        roles: {
+          include: {
+            role: {
+              include: {
+                permissions: {
+                  include: { permission: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (user) {
+      // Flatten permissions from all roles
+      const permissionSet = new Set<string>();
+      for (const userRole of user.roles) {
+        for (const rolePerm of userRole.role.permissions) {
+          permissionSet.add(rolePerm.permission.key);
+        }
+      }
+
+      // Attach user to request
+      req.user = {
+        id: user.id,
+        roleIds: user.roles.map((r) => r.roleId),
+      };
+      req.permissions = permissionSet;
+    } else {
+      // User not found - continue as guest
+      delete req.user;
+      req.permissions = new Set<string>();
+    }
+  } catch (error) {
+    // Token invalid or expired - continue as guest
+    delete req.user;
+    req.permissions = new Set<string>();
+  }
+
+  return next();
+}

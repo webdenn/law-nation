@@ -2,11 +2,14 @@ import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 import { AuthService } from "./auth.service.js";
 import { type AuthRequest } from "@/types/auth-request.js";
+import { sendAuthNotification } from "@/utils/email.utils.js"; 
 import {
   loginSchema,
   signupSchema,
   refreshSchema,
   logoutSchema,
+  sendOtpSchema,
+  verifyOtpSchema,
 } from "./validators/auth.validator.js";
 import { UnauthorizedError } from "@/utils/http-errors.util.js";
 
@@ -19,6 +22,7 @@ export async function signupHandler(
   try {
     const data = signupSchema.parse(req.body);
     const result = await AuthService.signup(data);
+    sendAuthNotification(data.email, data.name); 
     return res.status(201).json(result);
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -92,6 +96,41 @@ export async function meHandler(
     const result = await AuthService.getCurrentUser(req.user.id);
     return res.json(result);
   } catch (err) {
+    next(err);
+  }
+}
+
+// OTP handlers
+export async function sendOtpHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = sendOtpSchema.parse(req.body);
+    const result = await AuthService.sendVerificationOtp(data.email);
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: z.treeifyError(err) });
+    }
+    next(err);
+  }
+}
+
+export async function verifyOtpHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = verifyOtpSchema.parse(req.body);
+    const result = await AuthService.verifyOtp(data.email, data.otp);
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: z.treeifyError(err) });
+    }
     next(err);
   }
 }

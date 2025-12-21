@@ -15,7 +15,7 @@ import type {
 } from "./types/article-submission.type.js";
 
 export class ArticleController {
-  // Guest submission (no auth required)
+  // Article submission (works for both guest and logged-in users)
   async submitArticle(req: AuthRequest, res: Response) {
     try {
       if (!req.fileMeta?.url) {
@@ -30,11 +30,50 @@ export class ArticleController {
         pdfUrl: req.fileMeta.url,
       };
 
-      const article = await articleService.submitArticle(data);
+      // Pass user ID if logged in (null for guests)
+      const userId = req.user?.id;
+      const result = await articleService.submitArticle(data, userId);
 
-      res.status(201).json({
-        message: "Article submitted successfully",
-        article,
+      // Different response based on whether verification is required
+      // Use property checking to narrow the type
+      if ('expiresAt' in result) {
+        // Guest user - verification email sent
+        res.status(200).json({
+          message: result.message,
+          expiresAt: result.expiresAt,
+          requiresVerification: true,
+        });
+      } else {
+        // Logged-in user - article created directly
+        res.status(201).json({
+          message: result.message,
+          article: result.article,
+          requiresVerification: false,
+        });
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Verify email and create article (public endpoint)
+  async verifyArticleSubmission(req: AuthRequest, res: Response) {
+    try {
+      const { token } = req.params;
+
+      if (!token) {
+        throw new BadRequestError("Verification token is required");
+      }
+
+      const article = await articleService.confirmArticleSubmission(token);
+
+      res.status(200).json({
+        message: "Email verified! Your article has been submitted successfully.",
+        article: {
+          id: article.id,
+          title: article.title,
+          status: article.status,
+        },
       });
     } catch (error) {
       throw error;
