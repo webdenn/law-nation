@@ -30,3 +30,9 @@ export const verifyOtpSchema = z.object({
   email: z.string().email("Invalid email address"),
   otp: z.string().length(6, "OTP must be 6 digits"),
 });
+
+// Setup password schema (for editor invitation)
+export const setupPasswordSchema = z.object({
+  token: z.string().min(1, "Token is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});

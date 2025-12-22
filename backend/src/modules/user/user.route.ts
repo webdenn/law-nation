@@ -20,6 +20,13 @@ UserRouter.post(
   UserController.createUserHandler
 );
 
+// Invite an editor (sends email with password setup link)
+UserRouter.post(
+  "/invite-editor",
+  requirePermission("user", "write"),
+  UserController.inviteEditorHandler
+);
+
 // List all users
 UserRouter.get(
   "/",

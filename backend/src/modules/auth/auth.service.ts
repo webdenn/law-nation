@@ -21,6 +21,7 @@ export const AuthService = {
   getCurrentUser,
   sendVerificationOtp,
   verifyOtp,
+  setupPassword,
 };
 
 export default AuthService;
@@ -310,5 +311,96 @@ async function verifyOtp(email: string, otp: string) {
   return {
     success: true,
     message: "Email verified successfully",
+  };
+}
+
+/**
+ * Setup password for invited editor
+ * Verifies token, creates user with editor role, and sets password
+ */
+async function setupPassword(token: string, password: string) {
+  // Find verification record
+  const verification = await prisma.emailVerification.findUnique({
+    where: { token },
+  });
+
+  if (!verification) {
+    throw new BadRequestError("Invalid invitation token");
+  }
+
+  // Check if already verified
+  if (verification.isVerified) {
+    throw new BadRequestError("This invitation has already been used");
+  }
+
+  // Check if expired
+  if (new Date() > verification.ttl) {
+    throw new BadRequestError("Invitation link expired. Please contact admin for a new invitation.");
+  }
+
+  // Check if this is an editor invitation
+  if (verification.resourceType !== "EDITOR_INVITE") {
+    throw new BadRequestError("Invalid invitation type");
+  }
+
+  // Get metadata
+  const metadata = verification.metadata as any;
+  const { name, email, roleId } = metadata;
+
+  if (!name || !email || !roleId) {
+    throw new BadRequestError("Invalid invitation data");
+  }
+
+  // Check if user already exists
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (existingUser) {
+    throw new BadRequestError("User with this email already exists");
+  }
+
+  // Hash password
+  const passwordHash = await bcrypt.hash(password, SALT);
+
+  // Create user with editor role
+  const user = await prisma.user.create({
+    data: {
+      name,
+      email,
+      passwordHash,
+      roles: {
+        create: {
+          roleId,
+        },
+      },
+    },
+    include: {
+      roles: {
+        include: {
+          role: true,
+        },
+      },
+    },
+  });
+
+  // Mark verification as complete
+  await prisma.emailVerification.update({
+    where: { id: verification.id },
+    data: {
+      isVerified: true,
+      verifiedAt: new Date(),
+    },
+  });
+
+  return {
+    success: true,
+    message: "Password set successfully. You can now log in with your credentials.",
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      roles: user.roles.map((r) => r.role.name),
+    },
   };
 }

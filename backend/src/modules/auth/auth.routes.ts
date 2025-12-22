@@ -7,6 +7,7 @@ import {
   logoutHandler,
   sendOtpHandler,
   verifyOtpHandler,
+  setupPasswordHandler,
 } from "./auth.controller.js";
 import { requireAuth } from "@/middlewares/auth.middleware.js";
 
@@ -22,5 +23,8 @@ AuthRouter.post("/logout", logoutHandler);
 // OTP verification routes
 AuthRouter.post("/send-otp", sendOtpHandler);
 AuthRouter.post("/verify-otp", verifyOtpHandler);
+
+// Setup password route (for editor invitation)
+AuthRouter.post("/setup-password", setupPasswordHandler);
 
 export default AuthRouter;

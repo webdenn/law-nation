@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 import { UserService } from "./user.service.js";
-import { createUserSchema } from "@/modules/user/validators/user.validator.js";
+import { createUserSchema, inviteEditorSchema } from "@/modules/user/validators/user.validator.js";
 import type { AuthRequest } from "@/types/auth-request.js";
 import {
   BadRequestError,
@@ -15,6 +15,7 @@ export const UserController = {
   createUserHandler,
   listUsersHandler,
   findUserByIdHandler,
+  inviteEditorHandler,
   // add more handlers as needed
 };
 
@@ -73,6 +74,27 @@ async function findUserByIdHandler(
     const result = await UserService.findUserById(id, currentUser);
     return res.json(result);
   } catch (err) {
+    next(err);
+  }
+}
+
+async function inviteEditorHandler(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = inviteEditorSchema.parse(req.body);
+    const currentUser = req.user;
+    if (!currentUser) {
+      throw new UnauthorizedError("Authenticated user not found");
+    }
+    const result = await UserService.inviteEditor(data, currentUser);
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: z.treeifyError(err) });
+    }
     next(err);
   }
 }

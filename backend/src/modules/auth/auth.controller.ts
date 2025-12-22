@@ -10,6 +10,7 @@ import {
   logoutSchema,
   sendOtpSchema,
   verifyOtpSchema,
+  setupPasswordSchema,
 } from "./validators/auth.validator.js";
 import { UnauthorizedError } from "@/utils/http-errors.util.js";
 
@@ -139,6 +140,24 @@ export async function verifyOtpHandler(
     const data = verifyOtpSchema.parse(req.body);
     const result = await AuthService.verifyOtp(data.email, data.otp);
     return res.json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: z.treeifyError(err) });
+    }
+    next(err);
+  }
+}
+
+// Setup password handler (for editor invitation)
+export async function setupPasswordHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = setupPasswordSchema.parse(req.body);
+    const result = await AuthService.setupPassword(data.token, data.password);
+    return res.status(200).json(result);
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: z.treeifyError(err) });
