@@ -5,6 +5,8 @@ import {
   refreshHandler,
   meHandler,
   logoutHandler,
+  sendOtpHandler,
+  verifyOtpHandler,
 } from "./auth.controller.js";
 import { requireAuth } from "@/middlewares/auth.middleware.js";
 
@@ -16,5 +18,9 @@ AuthRouter.post("/login", loginHandler);
 AuthRouter.post("/refresh", refreshHandler);
 AuthRouter.get("/me", requireAuth, meHandler);
 AuthRouter.post("/logout", logoutHandler);
+
+// OTP verification routes
+AuthRouter.post("/send-otp", sendOtpHandler);
+AuthRouter.post("/verify-otp", verifyOtpHandler);
 
 export default AuthRouter;

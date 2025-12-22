@@ -14,6 +14,11 @@ export interface ArticleSubmissionData {
   pdfUrl: string;
 }
 
+// Extended type for verification metadata (includes temp file path)
+export interface ArticleVerificationMetadata extends ArticleSubmissionData {
+  tempPdfPath?: string;
+}
+
 export interface ArticleListFilters {
   status?: ArticleStatus;
   category?: string;

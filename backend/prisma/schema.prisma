@@ -170,4 +170,24 @@ model ArticleRevision {
   @@index([articleId])
 }
 
+// EMAIL VERIFICATION MODULE
+model EmailVerification {
+  id            String    @id @default(cuid())
+  resourceId    String    // Temporary ID for the resource being verified
+  resourceType  String    // Type: "ARTICLE", "USER", etc.
+  email         String    // Email to be verified
+  token         String    @unique // Verification token
+  isVerified    Boolean   @default(false)
+  verifiedAt    DateTime?
+  ttl           DateTime  // Time-to-live (expiration timestamp - 48 hours)
+  metadata      Json?     // Store temporary data (article details, file paths)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([token])
+  @@index([email])
+  @@index([ttl])
+  @@index([isVerified])
+}
+
 

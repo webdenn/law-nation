@@ -14,7 +14,7 @@ export interface AuthUser {
 }
 
 export interface AuthRequest extends Request {
-  user?: AuthUser;
+  user?: AuthUser | undefined;
   // optionally attach permission set for downstream handlers
   permissions?: Set<string>;
 }

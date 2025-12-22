@@ -1,15 +1,15 @@
 "use client"
-import { useState } from "react"
+
+import React, { useState } from "react" // React import kiya TS error bachane ke liye
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-// ✅ Toastify Imports
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function JoinUsPage() {
   const router = useRouter()
   
-  // ✅ Functional State
+  // States
   const [formData, setFormData] = useState({
     name: "", 
     email: "",
@@ -18,16 +18,22 @@ export default function JoinUsPage() {
     confirmPassword: ""
   })
   
+  // OTP States
+  const [otp, setOtp] = useState("") 
+  const [isOtpSent, setIsOtpSent] = useState(false) 
+
+  // UI States
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  // ✅ FIX: TypeScript Type added for Input Change
+  // ✅ Fixed: TypeScript Type for Input Change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
+  // Form Validation
   const validateForm = () => {
     if (!formData.name.trim()) { toast.error("Full Name is required"); return false; }
     if (!formData.email) { toast.error("Email is required"); return false; }
@@ -37,13 +43,59 @@ export default function JoinUsPage() {
     return true;
   }
 
-  // ✅ FIX: TypeScript Type added for Form Submit
-  const handleSubmit = async (e: React.FormEvent) => {
+  // ✅ STEP 1: Send OTP Logic
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateForm()) return
 
     setIsLoading(true)
     try {
+      // Backend Send OTP Endpoint (Port 4000)
+      const response = await fetch("http://localhost:4000/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("OTP Sent to your email!", { position: "top-right", theme: "colored" });
+        setIsOtpSent(true) // UI Change: Show OTP Input
+      } else {
+        toast.error(data.message || "Failed to send OTP", { position: "top-right", theme: "colored" });
+      }
+    } catch (error) {
+      console.error("Network Error:", error)
+      toast.error("Server Error. Check Backend is running on 4000.", { position: "top-right", theme: "colored" });
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // ✅ STEP 2: Verify OTP & Signup Logic
+  const handleVerifyAndSignup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!otp) { toast.error("Please enter the OTP"); return; }
+
+    setIsLoading(true)
+    try {
+      // 1. Verify OTP Call
+      const verifyResponse = await fetch("http://localhost:4000/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email, otp: otp }),
+      })
+
+      const verifyData = await verifyResponse.json()
+
+      if (!verifyResponse.ok) {
+        toast.error(verifyData.message || "Invalid OTP", { position: "top-right", theme: "colored" });
+        setIsLoading(false)
+        return
+      }
+
+      // 2. Agar OTP sahi hai -> Call Signup
       const payload = {
         name: formData.name,
         email: formData.email,
@@ -51,16 +103,16 @@ export default function JoinUsPage() {
         phone: formData.phone
       }
       
-      const response = await fetch("http://localhost:4000/api/auth/signup", {
+      const signupResponse = await fetch("http://localhost:4000/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       })
 
-      const data = await response.json()
+      const signupData = await signupResponse.json()
 
-      if (response.ok) {
-        toast.success("Account Created Successfully! Please Login.", {
+      if (signupResponse.ok) {
+        toast.success("Account Verified & Created! Please Login.", {
           position: "top-right",
           autoClose: 2000,
           theme: "colored",
@@ -69,13 +121,13 @@ export default function JoinUsPage() {
         setTimeout(() => {
           router.push("/login") 
         }, 2000)
-
       } else {
-        toast.error(data.message || "Signup failed", { position: "top-right", theme: "colored" });
+        toast.error(signupData.message || "Signup failed", { position: "top-right", theme: "colored" });
       }
+
     } catch (error) {
       console.error("Network Error:", error)
-      toast.error("Something went wrong. Check Backend.", { position: "top-right", theme: "colored" });
+      toast.error("Something went wrong.", { position: "top-right", theme: "colored" });
     } finally {
       setIsLoading(false)
     }
@@ -83,10 +135,10 @@ export default function JoinUsPage() {
 
   return (
     <div className="h-screen flex overflow-hidden">
-      {/* ✅ Toast Container */}
+      {/* Toast Container */}
       <ToastContainer />
 
-      {/* Left Side - Visual Section (Design Code) */}
+      {/* Left Side - Visual Section */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-red-800 relative overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
@@ -113,7 +165,7 @@ export default function JoinUsPage() {
         </div>
       </div>
 
-      {/* Right Side - Form Section (Design Structure + Functional Logic) */}
+      {/* Right Side - Form Section */}
       <div className="w-full lg:w-1/2 flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-10 xl:px-12 py-6 overflow-y-auto">
         <div className="w-full max-w-md">
           {/* Mobile Header */}
@@ -130,14 +182,13 @@ export default function JoinUsPage() {
 
           {/* Form Card */}
           <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-5 sm:p-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={isOtpSent ? handleVerifyAndSignup : handleSendOtp} className="space-y-4">
               
               {/* Name Field */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    {/* User Icon */}
                     <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
@@ -148,7 +199,8 @@ export default function JoinUsPage() {
                     value={formData.name}
                     onChange={handleInputChange}
                     placeholder="John Doe"
-                    className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50"
+                    disabled={isOtpSent} 
+                    className={`w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50 ${isOtpSent ? 'opacity-70 cursor-not-allowed' : ''}`}
                     required
                   />
                 </div>
@@ -172,7 +224,8 @@ export default function JoinUsPage() {
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder="Enter your email"
-                    className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50"
+                    disabled={isOtpSent} 
+                    className={`w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50 ${isOtpSent ? 'opacity-70 cursor-not-allowed' : ''}`}
                     required
                   />
                 </div>
@@ -183,7 +236,6 @@ export default function JoinUsPage() {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    {/* Phone Icon */}
                     <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                     </svg>
@@ -194,7 +246,8 @@ export default function JoinUsPage() {
                     value={formData.phone}
                     onChange={handleInputChange}
                     placeholder="+1234567890"
-                    className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50"
+                    disabled={isOtpSent} 
+                    className={`w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50 ${isOtpSent ? 'opacity-70 cursor-not-allowed' : ''}`}
                     required
                   />
                 </div>
@@ -218,14 +271,14 @@ export default function JoinUsPage() {
                     value={formData.password}
                     onChange={handleInputChange}
                     placeholder="Create a password"
-                    className="w-full pl-10 pr-12 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50"
+                    disabled={isOtpSent} 
+                    className={`w-full pl-10 pr-12 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50 ${isOtpSent ? 'opacity-70 cursor-not-allowed' : ''}`}
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? (
                       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,14 +313,14 @@ export default function JoinUsPage() {
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
                     placeholder="Confirm your password"
-                    className="w-full pl-10 pr-12 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50"
+                    disabled={isOtpSent} 
+                    className={`w-full pl-10 pr-12 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50 ${isOtpSent ? 'opacity-70 cursor-not-allowed' : ''}`}
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                   >
                     {showConfirmPassword ? (
                       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -282,6 +335,32 @@ export default function JoinUsPage() {
                   </button>
                 </div>
               </div>
+
+              {/* OTP Input Field */}
+              {isOtpSent && (
+                <div className="animate-fade-in-down">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Enter Verification Code
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      placeholder="Enter 6-digit OTP"
+                      maxLength={6}
+                      className="w-full pl-10 pr-4 py-2.5 border-2 border-green-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 transition-all text-sm bg-green-50 tracking-widest font-bold"
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-green-600 mt-1">OTP sent to {formData.email}</p>
+                </div>
+              )}
 
               {/* Terms and Conditions */}
               <div className="flex items-start">
@@ -309,10 +388,13 @@ export default function JoinUsPage() {
                 type="submit"
                 disabled={isLoading}
                 className={`w-full px-6 py-2.5 bg-red-600 text-white rounded-lg font-semibold text-sm shadow-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-all duration-200 transform hover:scale-[1.02] ${
-                    isLoading ? "opacity-70 cursor-not-allowed" : ""
+                  isLoading ? "opacity-70 cursor-not-allowed" : ""
                 }`}
               >
-                {isLoading ? "Creating Account..." : "Create Account"}
+                {isLoading 
+                  ? (isOtpSent ? "Verifying..." : "Sending OTP...") 
+                  : (isOtpSent ? "Verify & Create Account" : "Send OTP & Create Account")
+                }
               </button>
             </form>
 
