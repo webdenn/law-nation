@@ -1,16 +1,24 @@
 "use client"
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "react-toastify"
 
 export default function Adminlogin() {
   const router = useRouter()
   
+  // ✅ 1. FIXED: Automatic Redirect (Check for BOTH tokens)
   useEffect(() => {
-    const token = localStorage.getItem("adminToken")
-    if (token) {
-      router.push("/admin")
+    // Pehle Editor Token check karo
+    const editorToken = localStorage.getItem("editorToken");
+    if (editorToken) {
+        router.push("/editor");
+        return; // Yahi rok do
+    }
+
+    // Fir Admin Token check karo
+    const adminToken = localStorage.getItem("adminToken");
+    if (adminToken) {
+        router.push("/admin");
     }
   }, [router])
 
@@ -38,8 +46,8 @@ export default function Adminlogin() {
     
     if (!formData.password) {
       newErrors.password = "Password is required"
-    } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters"
+    } else if (formData.password.length < 6) { 
+      newErrors.password = "Password must be at least 6 characters"
     }
 
     setErrors(newErrors)
@@ -71,21 +79,42 @@ export default function Adminlogin() {
         throw new Error(data.message || "Login failed")
       }
 
-      localStorage.setItem("adminToken", data.token)
-      localStorage.setItem("adminUser", JSON.stringify(data.user))
-
-      toast.success("Admin Access Granted!", { 
+      toast.success("Login Successful!", { 
         toastId: "success-login"
       })
       
+      // ✅ 2. FIXED: Role Based Token Storage
+      const userRoles = data.user.roles || []
+      const isEditor = userRoles.some(role => role.name.toLowerCase() === "editor")
+      const tokenToSave = data.accessToken || data.token;
+
+      // Thoda delay taaki toast dikh sake
       setTimeout(() => {
-        router.push("/admin")
-      }, 1500)
+        if (isEditor) {
+          // 🚨 AGAR EDITOR HAI -> Save as 'editorToken'
+          localStorage.setItem("editorToken", tokenToSave)
+          localStorage.setItem("editorUser", JSON.stringify(data.user))
+          
+          // Safety: Purana admin token hata do taaki confusion na ho
+          localStorage.removeItem("adminToken");
+          localStorage.removeItem("adminUser");
+
+          router.push("/editor")
+        } else {
+          // 🚨 AGAR ADMIN HAI -> Save as 'adminToken'
+          localStorage.setItem("adminToken", tokenToSave)
+          localStorage.setItem("adminUser", JSON.stringify(data.user))
+          
+          // Safety: Purana editor token hata do
+          localStorage.removeItem("editorToken");
+          localStorage.removeItem("editorUser");
+
+          router.push("/admin")
+        }
+      }, 1000)
 
     } catch (error) {
-      // ✅ Yahan change kiya hai: console.error hata diya taaki popup na aaye
       console.warn("Login Failed:", error.message)
-      
       toast.error(error.message || "Invalid Credentials", { 
         toastId: "error-login"
       })
@@ -173,7 +202,7 @@ export default function Adminlogin() {
                   </button>
                 </div>
                 {errors.password && <p className="mt-1 text-xs text-red-600 flex items-center gap-1">{errors.password}</p>}
-                <p className="mt-1 text-xs text-gray-500">Must be at least 8 characters</p>
+                <p className="mt-1 text-xs text-gray-500">Must be at least 6 characters</p>
               </div>
 
               <button

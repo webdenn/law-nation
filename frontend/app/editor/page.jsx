@@ -1,7 +1,8 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation'; 
 
-// Editor specific Stat Card
+// Editor specific Stat Card Component
 const EditorStatCard = ({ title, count, color }) => (
   <div className={`bg-white p-6 rounded-xl border-l-4 ${color} shadow-md`}>
     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{title}</p>
@@ -10,8 +11,15 @@ const EditorStatCard = ({ title, count, color }) => (
 );
 
 export default function EditorDashboard() {
+  const router = useRouter(); 
+
+  // ==============================
+  // 1. STATE MANAGEMENT
+  // ==============================
+  const [isAuthorized, setIsAuthorized] = useState(false); // Default Blocked
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [activeTab, setActiveTab] = useState('tasks'); // 'tasks', 'profile', 'edit-profile'
+  
   const [profile, setProfile] = useState({
     name: "Editor Name",
     email: "editor@lawnation.com",
@@ -20,19 +28,73 @@ export default function EditorDashboard() {
     department: "Constitutional Law"
   });
 
-  // Handle profile update
+  // ==============================
+  // 2. SECURITY CHECK (Listen for 'editorToken')
+  // ==============================
+  useEffect(() => {
+    // ✅ Yahan hum specifically 'editorToken' check kar rahe hain
+    // Jo naye Login Page ne set kiya hai
+    const token = localStorage.getItem("editorToken");
+    const editorData = localStorage.getItem("editorUser");
+
+    if (!token) {
+        console.warn("No editor token found. Redirecting...");
+        // Agar token nahi mila, wapas Login Page par
+        router.push("/admin-login");
+    } else {
+        // Token mil gaya, data load karo
+        if (editorData) {
+            try {
+                const parsedData = JSON.parse(editorData);
+                setProfile(prev => ({ ...prev, ...parsedData }));
+            } catch (e) {
+                console.error("Error parsing user data", e);
+            }
+        }
+        setIsAuthorized(true); // Access Granted
+    }
+  }, [router]);
+
+  // ==============================
+  // 3. LOGOUT LOGIC
+  // ==============================
+  const handleLogout = () => {
+    // Sirf Editor keys delete karo
+    localStorage.removeItem("editorToken");
+    localStorage.removeItem("editorUser");
+    
+    // Wapas Login page par bhejo
+    router.push("/admin-login"); 
+  };
+
+  // Profile Update Handler (Simulation)
   const handleProfileUpdate = (e) => {
     e.preventDefault();
-    // Here you would typically send data to backend
     alert("Profile updated successfully!");
     setActiveTab('profile');
   };
 
+  // ==============================
+  // 4. RENDERING LOGIC
+  // ==============================
+
+  // Step A: Show Loading until Authorized
+  if (!isAuthorized) {
+    return (
+        <div className="flex h-screen items-center justify-center bg-gray-50">
+            <div className="text-center">
+                <h2 className="text-xl font-bold text-red-700 animate-pulse">Verifying Editor Access...</h2>
+            </div>
+        </div>
+    );
+  }
+
+  // Step B: Show Dashboard
   return (
     <div className="flex min-h-screen bg-gray-50 flex-col md:flex-row">
       
       {/* SIDEBAR */}
-      <aside className="hidden md:flex w-72 bg-red-700 text-white flex-col shadow-2xl">
+      <aside className="hidden md:flex w-72 bg-red-700 text-white flex-col shadow-2xl sticky top-0 h-screen">
         <div className="p-8 border-b border-red-800">
           <h1 className="text-2xl font-black italic tracking-tighter">LAW NATION</h1>
           <span className="text-[10px] bg-white text-red-700 px-2 py-0.5 rounded-full font-bold uppercase">
@@ -59,14 +121,18 @@ export default function EditorDashboard() {
         </nav>
 
         <div className="p-4 border-t border-red-800">
-          <button className="w-full p-2 text-sm bg-red-900 hover:bg-black rounded transition-colors font-medium">
+          <button 
+            onClick={handleLogout} 
+            className="w-full p-2 text-sm bg-red-900 hover:bg-black rounded transition-colors font-medium uppercase"
+          >
             Logout
           </button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 overflow-y-auto">
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 overflow-y-auto h-screen">
+        {/* TOP HEADER */}
         <header className="bg-white h-20 border-b flex items-center justify-between px-6 md:px-10 shadow-sm sticky top-0 z-10">
           <h2 className="text-lg md:text-xl font-bold text-gray-700">
             {activeTab === 'tasks' ? 'Editor Workspace' : 
@@ -77,28 +143,28 @@ export default function EditorDashboard() {
             onClick={() => setActiveTab('profile')}
             className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
           >
-            <div className="text-right">
+            <div className="text-right hidden sm:block">
               <p className="text-sm font-bold text-gray-800">{profile.name}</p>
               <p className="text-[10px] text-red-600 font-bold uppercase">{profile.role}</p>
             </div>
             <div className="w-10 h-10 bg-red-100 border-2 border-red-600 rounded-full flex items-center justify-center text-red-700 font-black">
-              ED
+              {profile.name.charAt(0)}
             </div>
           </button>
         </header>
 
-        {/* CONTENT AREA */}
-        <div className="p-6 md:p-10">
-          {activeTab === 'tasks' ? (
+        {/* DYNAMIC CONTENT */}
+        <div className="p-6 md:p-10 pb-20">
+          
+          {/* TAB 1: ASSIGNED TASKS */}
+          {activeTab === 'tasks' && (
             <>
-              {/* STATS CARDS */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
                 <EditorStatCard title="Pending Review" count="05" color="border-red-600" />
                 <EditorStatCard title="Corrections Sent" count="02" color="border-yellow-500" />
                 <EditorStatCard title="Approved by Me" count="14" color="border-green-600" />
               </div>
 
-              {/* ARTICLES TABLE */}
               <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
                 <div className="bg-red-50 p-5 border-b border-red-100">
                   <h3 className="font-bold text-red-800 text-lg">Articles Assigned to You</h3>
@@ -143,8 +209,10 @@ export default function EditorDashboard() {
                 </div>
               </div>
             </>
-          ) : activeTab === 'profile' ? (
-            /* PROFILE SETTINGS PAGE */
+          )}
+
+          {/* TAB 2: PROFILE VIEW */}
+          {activeTab === 'profile' && (
             <div className="max-w-4xl mx-auto">
               <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-6">
                 <div className="bg-red-50 p-5 border-b border-red-100">
@@ -153,10 +221,10 @@ export default function EditorDashboard() {
                 
                 <div className="p-8">
                   <div className="flex flex-col md:flex-row gap-8">
-                    {/* PROFILE IMAGE SECTION */}
+                    {/* Image & Edit Button */}
                     <div className="md:w-1/3 flex flex-col items-center">
                       <div className="w-40 h-40 bg-red-100 border-4 border-red-600 rounded-full flex items-center justify-center text-red-700 font-black text-4xl mb-4">
-                        ED
+                        {profile.name.charAt(0)}
                       </div>
                       <button 
                         onClick={() => setActiveTab('edit-profile')}
@@ -166,62 +234,22 @@ export default function EditorDashboard() {
                       </button>
                     </div>
 
-                    {/* PROFILE DETAILS */}
-                    <div className="md:w-2/3">
-                      <div className="space-y-6">
-                        <div className="border-b pb-4">
-                          <p className="text-xs font-bold text-gray-500 uppercase">Full Name</p>
-                          <p className="text-xl font-bold text-gray-800 mt-1">{profile.name}</p>
-                        </div>
-
-                        <div className="border-b pb-4">
-                          <p className="text-xs font-bold text-gray-500 uppercase">Email Address</p>
-                          <p className="text-lg text-gray-700 mt-1">{profile.email}</p>
-                        </div>
-
-                        <div className="border-b pb-4">
-                          <p className="text-xs font-bold text-gray-500 uppercase">Role</p>
-                          <p className="text-lg text-gray-700 mt-1">{profile.role}</p>
-                        </div>
-
-                        <div className="border-b pb-4">
-                          <p className="text-xs font-bold text-gray-500 uppercase">Phone Number</p>
-                          <p className="text-lg text-gray-700 mt-1">{profile.phone}</p>
-                        </div>
-
-                        <div className="border-b pb-4">
-                          <p className="text-xs font-bold text-gray-500 uppercase">Department</p>
-                          <p className="text-lg text-gray-700 mt-1">{profile.department}</p>
-                        </div>
-
-                        <div>
-                          <p className="text-xs font-bold text-gray-500 uppercase">Member Since</p>
-                          <p className="text-lg text-gray-700 mt-1">January 2023</p>
-                        </div>
-                      </div>
+                    {/* Details */}
+                    <div className="md:w-2/3 space-y-6">
+                      <div className="border-b pb-4"><p className="text-xs font-bold text-gray-500 uppercase">Full Name</p><p className="text-xl font-bold text-gray-800 mt-1">{profile.name}</p></div>
+                      <div className="border-b pb-4"><p className="text-xs font-bold text-gray-500 uppercase">Email Address</p><p className="text-lg text-gray-700 mt-1">{profile.email}</p></div>
+                      <div className="border-b pb-4"><p className="text-xs font-bold text-gray-500 uppercase">Role</p><p className="text-lg text-gray-700 mt-1">{profile.role}</p></div>
+                      <div className="border-b pb-4"><p className="text-xs font-bold text-gray-500 uppercase">Department</p><p className="text-lg text-gray-700 mt-1">{profile.department}</p></div>
+                      <div className="border-b pb-4"><p className="text-xs font-bold text-gray-500 uppercase">Phone</p><p className="text-lg text-gray-700 mt-1">{profile.phone}</p></div>
                     </div>
                   </div>
                 </div>
               </div>
-
-              {/* STATS IN PROFILE VIEW */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow border border-gray-100">
-                  <p className="text-xs font-bold text-gray-500 uppercase">Total Reviews</p>
-                  <h3 className="text-3xl font-black text-gray-800 mt-2">21</h3>
-                </div>
-                <div className="bg-white p-6 rounded-2xl shadow border border-gray-100">
-                  <p className="text-xs font-bold text-gray-500 uppercase">Average Rating</p>
-                  <h3 className="text-3xl font-black text-gray-800 mt-2">4.7★</h3>
-                </div>
-                <div className="bg-white p-6 rounded-2xl shadow border border-gray-100">
-                  <p className="text-xs font-bold text-gray-500 uppercase">On-time Reviews</p>
-                  <h3 className="text-3xl font-black text-gray-800 mt-2">92%</h3>
-                </div>
-              </div>
             </div>
-          ) : (
-            /* EDIT PROFILE PAGE */
+          )}
+
+          {/* TAB 3: EDIT PROFILE */}
+          {activeTab === 'edit-profile' && (
             <div className="max-w-3xl mx-auto">
               <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
                 <div className="bg-red-50 p-5 border-b border-red-100">
@@ -238,20 +266,6 @@ export default function EditorDashboard() {
                 
                 <form onSubmit={handleProfileUpdate} className="p-8">
                   <div className="space-y-6">
-                    {/* PROFILE IMAGE UPLOAD */}
-                    <div className="flex flex-col items-center mb-8">
-                      <div className="w-32 h-32 bg-red-100 border-4 border-red-600 rounded-full flex items-center justify-center text-red-700 font-black text-2xl mb-4">
-                        ED
-                      </div>
-                      <button 
-                        type="button"
-                        className="text-sm text-red-600 font-semibold hover:text-red-800"
-                      >
-                        Change Profile Picture
-                      </button>
-                    </div>
-
-                    {/* FORM FIELDS */}
                     <div className="grid md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">Full Name</label>
@@ -263,7 +277,6 @@ export default function EditorDashboard() {
                           required
                         />
                       </div>
-
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">Email Address</label>
                         <input 
@@ -274,9 +287,8 @@ export default function EditorDashboard() {
                           required
                         />
                       </div>
-
                       <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Phone Number</label>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Phone</label>
                         <input 
                           type="tel" 
                           value={profile.phone}
@@ -285,7 +297,6 @@ export default function EditorDashboard() {
                           required
                         />
                       </div>
-
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">Department</label>
                         <select 
@@ -297,20 +308,10 @@ export default function EditorDashboard() {
                           <option value="Criminal Law">Criminal Law</option>
                           <option value="Civil Law">Civil Law</option>
                           <option value="Corporate Law">Corporate Law</option>
-                          <option value="International Law">International Law</option>
                         </select>
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">Bio/Description</label>
-                      <textarea 
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-100 outline-none transition-all h-32"
-                        placeholder="Tell us about yourself..."
-                      ></textarea>
-                    </div>
-
-                    {/* ACTION BUTTONS */}
                     <div className="flex gap-4 pt-6 border-t">
                       <button 
                         type="submit"
@@ -331,10 +332,11 @@ export default function EditorDashboard() {
               </div>
             </div>
           )}
+
         </div>
       </main>
 
-      {/* MINIMAL REVIEW MODAL - SAME AS BEFORE */}
+      {/* FULL REVIEW MODAL */}
       {selectedArticle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="w-full max-w-6xl h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-gray-300">
@@ -346,12 +348,11 @@ export default function EditorDashboard() {
                 <button onClick={() => setSelectedArticle(null)} className="text-gray-500 hover:text-red-600 font-bold">CLOSE ✕</button>
               </div>
               <div className="flex-1 p-6 overflow-y-auto">
-                <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200">
+                <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 min-h-full">
                   <h1 className="text-2xl font-bold text-gray-900 mb-2">{selectedArticle.title}</h1>
                   <p className="text-gray-600 mb-6">Author: {selectedArticle.author}</p>
                   <div className="text-gray-700 space-y-4">
                     <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                    <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
                   </div>
                 </div>
               </div>
@@ -361,7 +362,6 @@ export default function EditorDashboard() {
             <div className="w-full md:w-[400px] flex flex-col bg-white">
               <div className="p-6 bg-red-600 text-white">
                 <h2 className="text-lg font-bold uppercase">{selectedArticle.title}</h2>
-                <p className="text-xs opacity-90 mt-1">Author: {selectedArticle.author}</p>
               </div>
 
               <div className="p-6 flex-1 space-y-6 overflow-y-auto">
@@ -372,28 +372,19 @@ export default function EditorDashboard() {
                     placeholder="Describe any required corrections..."
                   ></textarea>
                 </div>
-
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm font-bold text-gray-700 mb-3">SELF-CORRECTION (PRO OPTION)</p>
-                  <input type="file" className="text-xs w-full" />
-                </div>
               </div>
 
               <div className="p-6 border-t bg-gray-50 space-y-3">
                 <button className="w-full py-3 bg-red-600 text-white font-bold rounded-lg text-sm uppercase hover:bg-black transition-all">
                   Approve & Publish
                 </button>
-                
                 <div className="flex gap-2">
-                  <button className="flex-1 py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg text-sm hover:bg-gray-50 transition-all">
-                    Correction
-                  </button>
-                  <button className="flex-1 py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg text-sm hover:bg-gray-50 transition-all">
-                    Reject
-                  </button>
+                    <button className="flex-1 py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg text-sm hover:bg-gray-50 transition-all">Correction</button>
+                    <button className="flex-1 py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg text-sm hover:bg-gray-50 transition-all">Reject</button>
                 </div>
               </div>
             </div>
+
           </div>
         </div>
       )}
