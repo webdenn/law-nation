@@ -189,6 +189,27 @@ export class ArticleController {
     }
   }
 
+  // ✅ Is function ko ArticleController class ke andar add karo
+async listArticlesByEditor(req: AuthRequest, res: Response) {
+  try {
+    const { editorId } = req.params;
+
+    if (!editorId) {
+      throw new BadRequestError("Editor ID is required");
+    }
+
+    // Aapke service layer ka use karte hue data fetch karein
+    // Hum filters mein assignedEditorId bhej rahe hain
+    const result = await articleService.listArticles({ 
+      assignedEditorId: editorId 
+    } as any);
+
+    res.json(result);
+  } catch (error) {
+    throw error; // Global error handler ise handle kar lega
+  }
+}
+
   // Get full article details (protected - auth required)
   async getArticleById(req: AuthRequest, res: Response) {
     try {

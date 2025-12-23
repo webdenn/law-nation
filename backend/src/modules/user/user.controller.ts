@@ -99,16 +99,14 @@ async function inviteEditorHandler(
   }
 }
 
-
-// user.controller.ts ke sabse neeche
 async function listEditorsHandler(
   req: AuthRequest,
   res: Response,
   next: NextFunction
 ) {
   try {
-    const result = await UserService.listEditors();
-    return res.status(200).json(result);
+    const editors = await UserService.listEditors();
+    return res.json(editors);
   } catch (err) {
     next(err);
   }

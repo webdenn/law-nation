@@ -104,6 +104,33 @@ async function findUserById(id: string, currentUser?: AuthUser) {
 }
 
 /**
+ * List all users who have the 'editor' role
+ */
+// async function listEditors() {
+//   const editors = await prisma.user.findMany({
+//     where: {
+//       roles: {
+//         some: {
+//           role: {
+//             name: "editor"
+//           }
+//         }
+//       }
+//     },
+//     select: {
+//       id: true,
+//       name: true,
+//       email: true,
+//     },
+//     orderBy: {
+//       createdAt: "desc"
+//     }
+//   });
+
+//   return editors;
+// }
+
+/**
  * Invite an editor - sends invitation email with password setup link
  */
 async function inviteEditor(data: { name: string; email: string }, currentUser?: AuthUser) {

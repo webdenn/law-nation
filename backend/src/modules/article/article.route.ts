@@ -40,6 +40,13 @@ router.get(
 // ==================================================
 router.use(requireAuth);
 
+// ✅ Editor Dashboard ke liye assigned articles fetch karne ka route
+router.get(
+  "/editor/:editorId",
+  requirePermission("article", "read"), // Editor ke paas read permission honi chahiye
+  articleController.listArticlesByEditor.bind(articleController) 
+);
+
 // ==================================================
 // 🔒 PROTECTED ROUTES (Login Required)
 // ==================================================

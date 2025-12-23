@@ -44,6 +44,13 @@ UserRouter.get(
   UserController.listUsersHandler
 );
 
+// List all editors (for dropdown in assign editor feature)
+UserRouter.get(
+  "/editors",
+  requirePermission("user", "read"),
+  UserController.listEditorsHandler
+);
+
 // Get a single user by ID
 UserRouter.get(
   "/:id",

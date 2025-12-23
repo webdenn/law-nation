@@ -1,8 +1,8 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation'; 
+import { toast } from "react-toastify";
 
-// Editor specific Stat Card Component
 const EditorStatCard = ({ title, count, color }) => (
   <div className={`bg-white p-6 rounded-xl border-l-4 ${color} shadow-md`}>
     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{title}</p>
@@ -13,378 +13,227 @@ const EditorStatCard = ({ title, count, color }) => (
 export default function EditorDashboard() {
   const router = useRouter(); 
 
-  // ==============================
-  // 1. STATE MANAGEMENT
-  // ==============================
-  const [isAuthorized, setIsAuthorized] = useState(false); // Default Blocked
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState(null);
-  const [activeTab, setActiveTab] = useState('tasks'); // 'tasks', 'profile', 'edit-profile'
+  const [activeTab, setActiveTab] = useState('tasks');
+  const [articles, setArticles] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [feedback, setFeedback] = useState(""); // ✅ New: To store textarea input
+  const API_BASE_URL = "http://localhost:4000"; 
   
   const [profile, setProfile] = useState({
-    name: "Editor Name",
-    email: "editor@lawnation.com",
-    role: "Content Reviewer",
-    phone: "+91 98765 43210",
-    department: "Constitutional Law"
+    id: "", name: "Editor Name", email: "", role: "Editor"
   });
 
-  // ==============================
-  // 2. SECURITY CHECK (Listen for 'editorToken')
-  // ==============================
-  useEffect(() => {
-    // ✅ Yahan hum specifically 'editorToken' check kar rahe hain
-    // Jo naye Login Page ne set kiya hai
-    const token = localStorage.getItem("editorToken");
-    const editorData = localStorage.getItem("editorUser");
+ useEffect(() => {
+  const token = localStorage.getItem("editorToken");
+  const adminToken = localStorage.getItem("adminToken");
+  const userData = localStorage.getItem("editorUser");
 
-    if (!token) {
-        console.warn("No editor token found. Redirecting...");
-        // Agar token nahi mila, wapas Login Page par
-        router.push("/admin-login");
-    } else {
-        // Token mil gaya, data load karo
-        if (editorData) {
-            try {
-                const parsedData = JSON.parse(editorData);
-                setProfile(prev => ({ ...prev, ...parsedData }));
-            } catch (e) {
-                console.error("Error parsing user data", e);
-            }
-        }
-        setIsAuthorized(true); // Access Granted
+  // ✅ Fix 1: Pehle check karo ki kya Editor token hai. 
+  // Agar Editor login hai, to use Admin token ki wajah se mat roko.
+  if (token && userData) {
+    try {
+      const parsedUser = JSON.parse(userData);
+      
+      // Agar editor logged in hai, to data fetch karo aur baaki checks skip karo
+      setProfile(prev => ({ ...prev, ...parsedUser }));
+      fetchAssignedArticles(parsedUser.id || parsedUser._id, token);
+      setIsAuthorized(true);
+      return; // 👈 Yahan se return ho jao, aage ke redirect checks ki zaroorat nahi
+    } catch (e) {
+      console.error("Error", e);
     }
-  }, [router]);
+  }
 
-  // ==============================
-  // 3. LOGOUT LOGIC
-  // ==============================
+  // ✅ Fix 2: Agar editor token nahi hai TAB admin check karo
+  if (adminToken) {
+    // Check karo tumhara admin ka sahi URL kya hai (/admin ya /admin-dashboard)
+    router.push("/admin"); 
+    return;
+  }
+
+  // ✅ Fix 3: Agar kuch bhi nahi hai
+  if (!token) {
+    router.push("/admin-login");
+  }
+}, [router]);
+
+  const fetchAssignedArticles = async (editorId, token) => {
+    try {
+      setIsLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/articles/editor/${editorId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setArticles(Array.isArray(data) ? data : data.articles || []);
+      }
+    } catch (err) {
+      console.error("Fetch Error:", err);
+      toast.error("Failed to load tasks");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ✅ HANDLER: Approve/Reject/Correction
+  const handleArticleAction = async (articleId, actionType) => {
+    try {
+      const token = localStorage.getItem("editorToken");
+      
+      // Backend map: "approve" -> PATCH /:id/approve
+      // Abhi ke liye hum approval ka handle kar rahe hain
+      const endpoint = actionType === 'approve' ? 'approve' : 'reject'; 
+      
+      const res = await fetch(`${API_BASE_URL}/api/articles/${articleId}/${endpoint}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ feedback: feedback })
+      });
+
+      if (res.ok) {
+        toast.success(`Article ${actionType}ed successfully!`);
+        setSelectedArticle(null);
+        setFeedback("");
+        // Refresh list
+        fetchAssignedArticles(profile.id || profile._id, token);
+      } else {
+        toast.error("Failed to process action");
+      }
+    } catch (err) {
+      toast.error("Server error");
+    }
+  };
+
   const handleLogout = () => {
-    // Sirf Editor keys delete karo
     localStorage.removeItem("editorToken");
     localStorage.removeItem("editorUser");
-    
-    // Wapas Login page par bhejo
     router.push("/admin-login"); 
   };
 
-  // Profile Update Handler (Simulation)
-  const handleProfileUpdate = (e) => {
-    e.preventDefault();
-    alert("Profile updated successfully!");
-    setActiveTab('profile');
-  };
+  if (!isAuthorized) return <div className="h-screen flex items-center justify-center">Verifying...</div>;
 
-  // ==============================
-  // 4. RENDERING LOGIC
-  // ==============================
-
-  // Step A: Show Loading until Authorized
-  if (!isAuthorized) {
-    return (
-        <div className="flex h-screen items-center justify-center bg-gray-50">
-            <div className="text-center">
-                <h2 className="text-xl font-bold text-red-700 animate-pulse">Verifying Editor Access...</h2>
-            </div>
-        </div>
-    );
-  }
-
-  // Step B: Show Dashboard
   return (
     <div className="flex min-h-screen bg-gray-50 flex-col md:flex-row">
-      
       {/* SIDEBAR */}
       <aside className="hidden md:flex w-72 bg-red-700 text-white flex-col shadow-2xl sticky top-0 h-screen">
         <div className="p-8 border-b border-red-800">
           <h1 className="text-2xl font-black italic tracking-tighter">LAW NATION</h1>
-          <span className="text-[10px] bg-white text-red-700 px-2 py-0.5 rounded-full font-bold uppercase">
-            Editor Panel
-          </span>
+          <span className="text-[10px] bg-white text-red-700 px-2 py-0.5 rounded-full font-bold uppercase">Editor Panel</span>
         </div>
-        
         <nav className="flex-1 px-4 mt-6 space-y-2">
-          <button 
-            onClick={() => setActiveTab('tasks')}
-            className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${activeTab === 'tasks' ? 'bg-red-800 shadow-inner' : 'hover:bg-red-600'}`}
-          >
-            Assigned Tasks
-          </button>
-          <button 
-            onClick={() => setActiveTab('profile')}
-            className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${activeTab === 'profile' ? 'bg-red-800 shadow-inner' : 'hover:bg-red-600'}`}
-          >
-            Profile Settings
-          </button>
-          <button className="w-full text-left p-3 hover:bg-red-600 rounded-lg transition-all">
-            Review History
-          </button>
+          <button onClick={() => setActiveTab('tasks')} className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${activeTab === 'tasks' ? 'bg-red-800' : 'hover:bg-red-600'}`}>Assigned Tasks</button>
+          <button onClick={() => setActiveTab('profile')} className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${activeTab === 'profile' ? 'bg-red-800' : 'hover:bg-red-600'}`}>Profile Settings</button>
         </nav>
-
         <div className="p-4 border-t border-red-800">
-          <button 
-            onClick={handleLogout} 
-            className="w-full p-2 text-sm bg-red-900 hover:bg-black rounded transition-colors font-medium uppercase"
-          >
-            Logout
-          </button>
+          <button onClick={handleLogout} className="w-full p-2 text-sm bg-red-900 rounded font-medium uppercase">Logout</button>
         </div>
       </aside>
 
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 overflow-y-auto h-screen">
-        {/* TOP HEADER */}
-        <header className="bg-white h-20 border-b flex items-center justify-between px-6 md:px-10 shadow-sm sticky top-0 z-10">
-          <h2 className="text-lg md:text-xl font-bold text-gray-700">
-            {activeTab === 'tasks' ? 'Editor Workspace' : 
-             activeTab === 'profile' ? 'Profile Settings' : 
-             'Edit Profile'}
-          </h2>
-          <button 
-            onClick={() => setActiveTab('profile')}
-            className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
-          >
+        <header className="bg-white h-20 border-b flex items-center justify-between px-6 md:px-10 sticky top-0 z-10">
+          <h2 className="text-xl font-bold text-gray-700">{activeTab === 'tasks' ? 'Editor Workspace' : 'Profile'}</h2>
+          <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
               <p className="text-sm font-bold text-gray-800">{profile.name}</p>
               <p className="text-[10px] text-red-600 font-bold uppercase">{profile.role}</p>
             </div>
-            <div className="w-10 h-10 bg-red-100 border-2 border-red-600 rounded-full flex items-center justify-center text-red-700 font-black">
-              {profile.name.charAt(0)}
-            </div>
-          </button>
+            <div className="w-10 h-10 bg-red-100 border-2 border-red-600 rounded-full flex items-center justify-center text-red-700 font-black">{profile.name.charAt(0)}</div>
+          </div>
         </header>
 
-        {/* DYNAMIC CONTENT */}
         <div className="p-6 md:p-10 pb-20">
-          
-          {/* TAB 1: ASSIGNED TASKS */}
           {activeTab === 'tasks' && (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-                <EditorStatCard title="Pending Review" count="05" color="border-red-600" />
-                <EditorStatCard title="Corrections Sent" count="02" color="border-yellow-500" />
-                <EditorStatCard title="Approved by Me" count="14" color="border-green-600" />
+                <EditorStatCard title="Total Assigned" count={articles.length} color="border-red-600" />
+                <EditorStatCard title="Pending" count={articles.filter(a => a.status !== "Published").length} color="border-yellow-500" />
+                <EditorStatCard title="Approved" count={articles.filter(a => a.status === "Published").length} color="border-green-600" />
               </div>
 
               <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                <div className="bg-red-50 p-5 border-b border-red-100">
-                  <h3 className="font-bold text-red-800 text-lg">Articles Assigned to You</h3>
-                </div>
-                
+                <div className="bg-red-50 p-5 border-b border-red-100"><h3 className="font-bold text-red-800 text-lg">My Tasks</h3></div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[700px]">
+                  <table className="w-full text-left">
                     <thead>
                       <tr className="text-xs uppercase bg-gray-50 text-gray-400">
-                        <th className="p-5 font-semibold">Article</th>
-                        <th className="p-5 font-semibold">Deadline</th>
-                        <th className="p-5 font-semibold">Status</th>
-                        <th className="p-5 font-semibold text-right">Review Action</th>
+                        <th className="p-5">Article</th>
+                        <th className="p-5">Author</th>
+                        <th className="p-5">Status</th>
+                        <th className="p-5 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      <tr className="hover:bg-gray-50 transition-colors">
-                        <td className="p-5">
-                          <p className="font-medium text-gray-700">Constitutional Rights Study</p>
-                          <p className="text-xs text-gray-400">Author: Amit Verma</p>
-                        </td>
-                        <td className="p-5 text-sm text-gray-600 font-medium">18 Dec 2024</td>
-                        <td className="p-5">
-                          <span className="px-3 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded-full uppercase">In Review</span>
-                        </td>
-                        <td className="p-5 text-right">
-                          <button 
-                            onClick={() => setSelectedArticle({ 
-                              title: "Constitutional Rights Study", 
-                              author: "Amit Verma",
-                              status: "In Review",
-                              deadline: "18 Dec 2024"
-                            })}
-                            className="px-5 py-2 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 shadow-md transition-all"
-                          >
-                            Open Review Panel
-                          </button>
-                        </td>
-                      </tr>
+                      {isLoading ? (
+                        <tr><td colSpan="4" className="p-10 text-center">Loading...</td></tr>
+                      ) : articles.map((art) => (
+                        <tr key={art._id || art.id} className="hover:bg-gray-50">
+                          <td className="p-5 font-medium">{art.title}</td>
+                          <td className="p-5 text-sm">{art.authorName || "Author"}</td>
+                          <td className="p-5"><span className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded-full">{art.status}</span></td>
+                          <td className="p-5 text-right">
+                            <button onClick={() => setSelectedArticle(art)} className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-lg">Open Review</button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               </div>
             </>
           )}
-
-          {/* TAB 2: PROFILE VIEW */}
-          {activeTab === 'profile' && (
-            <div className="max-w-4xl mx-auto">
-              <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-6">
-                <div className="bg-red-50 p-5 border-b border-red-100">
-                  <h3 className="font-bold text-red-800 text-lg">My Profile</h3>
-                </div>
-                
-                <div className="p-8">
-                  <div className="flex flex-col md:flex-row gap-8">
-                    {/* Image & Edit Button */}
-                    <div className="md:w-1/3 flex flex-col items-center">
-                      <div className="w-40 h-40 bg-red-100 border-4 border-red-600 rounded-full flex items-center justify-center text-red-700 font-black text-4xl mb-4">
-                        {profile.name.charAt(0)}
-                      </div>
-                      <button 
-                        onClick={() => setActiveTab('edit-profile')}
-                        className="w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors shadow-md"
-                      >
-                        Edit Profile
-                      </button>
-                    </div>
-
-                    {/* Details */}
-                    <div className="md:w-2/3 space-y-6">
-                      <div className="border-b pb-4"><p className="text-xs font-bold text-gray-500 uppercase">Full Name</p><p className="text-xl font-bold text-gray-800 mt-1">{profile.name}</p></div>
-                      <div className="border-b pb-4"><p className="text-xs font-bold text-gray-500 uppercase">Email Address</p><p className="text-lg text-gray-700 mt-1">{profile.email}</p></div>
-                      <div className="border-b pb-4"><p className="text-xs font-bold text-gray-500 uppercase">Role</p><p className="text-lg text-gray-700 mt-1">{profile.role}</p></div>
-                      <div className="border-b pb-4"><p className="text-xs font-bold text-gray-500 uppercase">Department</p><p className="text-lg text-gray-700 mt-1">{profile.department}</p></div>
-                      <div className="border-b pb-4"><p className="text-xs font-bold text-gray-500 uppercase">Phone</p><p className="text-lg text-gray-700 mt-1">{profile.phone}</p></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: EDIT PROFILE */}
-          {activeTab === 'edit-profile' && (
-            <div className="max-w-3xl mx-auto">
-              <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                <div className="bg-red-50 p-5 border-b border-red-100">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-bold text-red-800 text-lg">Edit Profile</h3>
-                    <button 
-                      onClick={() => setActiveTab('profile')}
-                      className="text-sm text-gray-600 hover:text-red-600 font-medium"
-                    >
-                      ← Back to Profile
-                    </button>
-                  </div>
-                </div>
-                
-                <form onSubmit={handleProfileUpdate} className="p-8">
-                  <div className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Full Name</label>
-                        <input 
-                          type="text" 
-                          value={profile.name}
-                          onChange={(e) => setProfile({...profile, name: e.target.value})}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-100 outline-none transition-all"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Email Address</label>
-                        <input 
-                          type="email" 
-                          value={profile.email}
-                          onChange={(e) => setProfile({...profile, email: e.target.value})}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-100 outline-none transition-all"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Phone</label>
-                        <input 
-                          type="tel" 
-                          value={profile.phone}
-                          onChange={(e) => setProfile({...profile, phone: e.target.value})}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-100 outline-none transition-all"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Department</label>
-                        <select 
-                          value={profile.department}
-                          onChange={(e) => setProfile({...profile, department: e.target.value})}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-100 outline-none transition-all"
-                        >
-                          <option value="Constitutional Law">Constitutional Law</option>
-                          <option value="Criminal Law">Criminal Law</option>
-                          <option value="Civil Law">Civil Law</option>
-                          <option value="Corporate Law">Corporate Law</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-4 pt-6 border-t">
-                      <button 
-                        type="submit"
-                        className="px-8 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors shadow-md"
-                      >
-                        Save Changes
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setActiveTab('profile')}
-                        className="px-8 py-3 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
         </div>
       </main>
 
       {/* FULL REVIEW MODAL */}
       {selectedArticle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-6xl h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-gray-300">
-            
-            {/* LEFT: DOCUMENT PREVIEW */}
+          <div className="w-full max-w-6xl h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row">
+            {/* LEFT: PREVIEW */}
             <div className="flex-1 bg-gray-50 flex flex-col border-r border-gray-300">
-              <div className="p-4 bg-white border-b flex justify-between items-center">
-                <span className="text-xs font-black text-red-600 uppercase tracking-widest">DOCUMENT VIEWER</span>
-                <button onClick={() => setSelectedArticle(null)} className="text-gray-500 hover:text-red-600 font-bold">CLOSE ✕</button>
+              <div className="p-4 bg-white border-b flex justify-between">
+                <span className="text-xs font-black text-red-600">DOCUMENT VIEWER</span>
+                <button onClick={() => setSelectedArticle(null)}>CLOSE ✕</button>
               </div>
-              <div className="flex-1 p-6 overflow-y-auto">
-                <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 min-h-full">
-                  <h1 className="text-2xl font-bold text-gray-900 mb-2">{selectedArticle.title}</h1>
-                  <p className="text-gray-600 mb-6">Author: {selectedArticle.author}</p>
-                  <div className="text-gray-700 space-y-4">
-                    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                  </div>
-                </div>
+              <div className="flex-1 p-8 overflow-y-auto bg-white m-4 rounded shadow-sm">
+                <h1 className="text-2xl font-bold mb-4">{selectedArticle.title}</h1>
+                <p className="mb-6 text-gray-600 italic">"{selectedArticle.abstract}"</p>
+                {selectedArticle.currentPdfUrl && (
+                    <button onClick={() => window.open(`${API_BASE_URL}${selectedArticle.currentPdfUrl}`, "_blank")} className="bg-black text-white px-6 py-2 rounded text-xs">VIEW FULL PDF</button>
+                )}
               </div>
             </div>
 
-            {/* RIGHT: REVIEW PANEL */}
+            {/* RIGHT: ACTIONS */}
             <div className="w-full md:w-[400px] flex flex-col bg-white">
-              <div className="p-6 bg-red-600 text-white">
-                <h2 className="text-lg font-bold uppercase">{selectedArticle.title}</h2>
+              <div className="p-6 bg-red-600 text-white"><h2 className="font-bold uppercase truncate">{selectedArticle.title}</h2></div>
+              <div className="p-6 flex-1 space-y-4">
+                <label className="text-xs font-bold text-gray-500 uppercase">Reviewer Feedback</label>
+                <textarea 
+                  value={feedback} 
+                  onChange={(e) => setFeedback(e.target.value)}
+                  className="w-full h-40 p-4 bg-gray-50 border rounded-lg text-sm outline-none focus:border-red-500" 
+                  placeholder="Type your notes here..."
+                />
               </div>
-
-              <div className="p-6 flex-1 space-y-6 overflow-y-auto">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-3">REVIEWER FEEDBACK</label>
-                  <textarea 
-                    className="w-full h-48 p-4 bg-gray-50 border border-gray-300 rounded-lg text-sm outline-none focus:border-red-500 transition-all resize-none"
-                    placeholder="Describe any required corrections..."
-                  ></textarea>
-                </div>
-              </div>
-
               <div className="p-6 border-t bg-gray-50 space-y-3">
-                <button className="w-full py-3 bg-red-600 text-white font-bold rounded-lg text-sm uppercase hover:bg-black transition-all">
+                <button 
+                   onClick={() => handleArticleAction(selectedArticle._id, 'approve')}
+                   className="w-full py-3 bg-red-600 text-white font-bold rounded-lg text-sm hover:bg-black transition-all"
+                >
                   Approve & Publish
                 </button>
                 <div className="flex gap-2">
-                    <button className="flex-1 py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg text-sm hover:bg-gray-50 transition-all">Correction</button>
-                    <button className="flex-1 py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg text-sm hover:bg-gray-50 transition-all">Reject</button>
+                  <button onClick={() => handleArticleAction(selectedArticle._id, 'correction')} className="flex-1 py-3 bg-white border text-gray-700 font-bold rounded-lg text-xs">Correction</button>
+                  <button onClick={() => handleArticleAction(selectedArticle._id, 'reject')} className="flex-1 py-3 bg-white border text-gray-700 font-bold rounded-lg text-xs">Reject</button>
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       )}

@@ -8,16 +8,16 @@ import 'react-toastify/dist/ReactToastify.css';
 function SetupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get("token"); // URL se token nikalega
+  const token = searchParams.get("token");
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   
-  // Backend URL verify kr lena
+  // Backend URL (Make sure this matches your server port)
   const API_BASE_URL = "http://localhost:4000";
 
-  // Agar token nahi hai URL me
+  // Agar URL mein token nahi hai
   if (!token) {
     return (
       <div className="text-center p-10">
@@ -30,7 +30,7 @@ function SetupForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Client side validation
+    // 1. Client Side Validation
     if (password.length < 6) {
       toast.error("Password must be at least 6 characters long");
       return;
@@ -43,7 +43,7 @@ function SetupForm() {
     setLoading(true);
 
     try {
-      // Backend API Call
+      // 2. Backend API Call
       const response = await fetch(`${API_BASE_URL}/api/auth/setup-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -53,17 +53,23 @@ function SetupForm() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        toast.success("Account created successfully!");
+        toast.success("Password set successfully!");
         
-        // 2 second baad Login page par bhej do
+        // 🚨 3. REDIRECT FIX: Saara purana local storage saaf karein
+        // Taaki pehle se save koi Admin Token interference na kare
+        localStorage.clear(); 
+        sessionStorage.clear();
+
+        // 4. Forceful Redirect to Login Page
         setTimeout(() => {
-          router.push("/admin-login"); // Ya "/login" jo bhi tumhara login route hai
+          // window.location use karne se page refresh hota hai aur state clean ho jati hai
+          window.location.href = "/law/admin-login"; 
         }, 2000);
       } else {
         toast.error(data.message || "Link expired or invalid");
       }
     } catch (error) {
-      console.error(error);
+      console.error("Setup Password Error:", error);
       toast.error("Server error. Please try again.");
     } finally {
       setLoading(false);
@@ -78,7 +84,6 @@ function SetupForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Password Field */}
         <div>
           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">New Password</label>
           <input
@@ -92,7 +97,6 @@ function SetupForm() {
           />
         </div>
 
-        {/* Confirm Password Field */}
         <div>
           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Confirm Password</label>
           <input
@@ -120,7 +124,7 @@ function SetupForm() {
   );
 }
 
-// Main Page Component (Required for Suspense)
+// Main Page Component
 export default function SetupPasswordPage() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
