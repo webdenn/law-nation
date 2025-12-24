@@ -92,7 +92,7 @@ async function signup(data: {
   };
 }
 
-async function login(email: string, password: string, res: Response) {
+async function login(email: string, password: string, res: Response, requireAdminAccess: boolean = false) {
   const user = await prisma.user.findUnique({
     where: { email },
     include: {
@@ -114,6 +114,17 @@ async function login(email: string, password: string, res: Response) {
 
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) throw new UnauthorizedError("invalid credentials");
+
+  // Check if admin access is required (for admin/editor login)
+  if (requireAdminAccess) {
+    const hasAdminAccess = user.roles.some(r => 
+      r.role.name === 'admin' || r.role.name === 'editor'
+    );
+
+    if (!hasAdminAccess) {
+      throw new UnauthorizedError("Access denied. Admin or Editor privileges required.");
+    }
+  }
 
   const accessToken = signAccessToken(user.id);
   const refreshToken = await createRefreshTokenForUser(user.id);

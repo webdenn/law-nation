@@ -114,13 +114,21 @@ export default function AdminDashboard() {
   };
 
   const handlePdfClick = (relativeUrl) => {
-    if (!relativeUrl) {
-      toast.warning("PDF not found");
-      return;
-    }
-    const fullUrl = `${API_BASE_URL}${relativeUrl}`;
-    window.open(fullUrl, "_blank");
-  };
+  if (!relativeUrl) {
+    toast.warning("PDF not found");
+    return;
+  }
+
+  // ✅ Fix: Check karo ki URL '/' se shuru ho raha hai ya nahi
+  // Agar relativeUrl "uploads/pdfs/..." hai, toh ye use "/uploads/pdfs/..." bana dega
+  const cleanPath = relativeUrl.startsWith('/') ? relativeUrl : `/${relativeUrl}`;
+  
+  // ✅ Ab URL hamesha sahi banega: http://localhost:4000/uploads/pdfs/...
+  const fullUrl = `${API_BASE_URL}${cleanPath}`;
+  
+  console.log("Opening Corrected URL:", fullUrl); // Browser console me check karne ke liye
+  window.open(fullUrl, "_blank");
+};
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState("");
@@ -166,27 +174,32 @@ const assignArticle = async (articleId, editorId) => {
   }
 };
 
-  const overrideAndPublish = async (id) => {
-    try {
-      const token = localStorage.getItem("adminToken");
-      const response = await fetch(`${API_BASE_URL}/api/articles/publish/${id}`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+ const overrideAndPublish = async (id) => {
+  try {
+    const token = localStorage.getItem("adminToken");
+    
+    // ✅ FIX: Endpoint badal kar '/approve' karein aur method 'PATCH'
+    const response = await fetch(`${API_BASE_URL}/api/articles/${id}/approve`, {
+      method: "PATCH", // Backend mein .patch use ho raha hai
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      if (response.ok) {
-        setArticles(prev =>
-          prev.map((a) =>
-            a.id === id ? { ...a, status: "Published", assignedTo: "Admin Override" } : a
-          )
-        );
-        toast.success("Article Published!");
-      }
-    } catch (e) {
-      console.error(e);
-      toast.error("Error publishing");
+    if (response.ok) {
+      setArticles(prev =>
+        prev.map((a) =>
+          a.id === id ? { ...a, status: "Published" } : a
+        )
+      );
+      toast.success("Article Approved & Published!");
+    } else {
+      const errorData = await response.json();
+      toast.error(errorData.message || "Approval failed");
     }
-  };
+  } catch (e) {
+    console.error(e);
+    toast.error("Error publishing");
+  }
+};
 
   const filteredArticles = articles.filter((art) => {
     const matchesSearch =

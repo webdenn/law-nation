@@ -66,24 +66,22 @@ async verifyArticleSubmission(req: AuthRequest, res: Response) {
       throw new BadRequestError("Verification token is required");
     }
 
-    // Token verify karke article DB mein create ho jayega
-    await articleService.confirmArticleSubmission(token);
+      // Verify token and create article in database
+      await articleService.confirmArticleSubmission(token);
 
-    // Frontend ka home URL (Next.js ka path)
-    // Agar production mein hai to environment variable use karein
-    const frontendHomeUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+      // Frontend home URL - use environment variable for production
+      const frontendHomeUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
-    // ✅ Ab user JSON nahi dekhega, seedha home page par redirect ho jayega
-    return res.redirect(`${frontendHomeUrl}/law/home?verified=true`);
+      // Redirect user to home page with success message
+      return res.redirect(`${frontendHomeUrl}/law/home?verified=true`);
+    } catch (error) {
+      console.error("Verification Error:", error);
+      const frontendHomeUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
-  } catch (error) {
-    console.error("Verification Error:", error);
-    const frontendHomeUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-    
-    // Error hone par bhi home par bhejein message ke sath
-    return res.redirect(`${frontendHomeUrl}/law/home?error=verification-failed`);
+      // On error, redirect to home with error message
+      return res.redirect(`${frontendHomeUrl}/law/home?error=verification-failed`);
+    }
   }
-}
 
   // Admin assigns editor
   async assignEditor(req: AuthRequest, res: Response) {
@@ -110,25 +108,32 @@ async verifyArticleSubmission(req: AuthRequest, res: Response) {
   }
 
   // Editor approves article (Option A)
-  async approveArticle(req: AuthRequest, res: Response) {
-    try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+ // backend/src/modules/article/article.controller.ts
 
-      const editorId = req.user!.id;
-
-      const article = await articleService.approveArticle(articleId, editorId);
-
-      res.json({
-        message: "Article approved successfully",
-        article,
-      });
-    } catch (error) {
-      throw error;
+async approveArticle(req: AuthRequest, res: Response) {
+  try {
+    const articleId = req.params.id;
+    if (!articleId) {
+      throw new BadRequestError("Article ID is required");
     }
+
+    const editorId = req.user!.id;
+
+    // 1. Check karein ki user Admin hai ya nahi
+    const isAdmin = req.user?.role === "ADMIN";
+
+    // 2. 🛑 FIX: Teesri value (isAdmin) yahan pass karein
+    // Taaki service layer ko pata chale ki bypass karna hai ya nahi
+    const article = await articleService.approveArticle(articleId, editorId, isAdmin);
+
+    res.json({
+      message: "Article approved successfully",
+      article,
+    });
+  } catch (error) {
+    throw error;
   }
+}
 
   // Editor uploads corrected PDF (Option C - Step 1)
   async uploadCorrectedPdf(req: AuthRequest, res: Response) {

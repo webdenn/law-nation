@@ -195,7 +195,7 @@ export async function sendArticleVerificationEmail(
   authorName: string,
   token: string
 ) {
-  const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:4000'}/api/articles/verify/${token}`;
+  const verificationUrl = `${process.env.BACKEND_URL || 'http://localhost:4000'}/api/articles/verify/${token}`;
   
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #d32f2f; border-radius: 8px; overflow: hidden;">

@@ -201,45 +201,47 @@ export class ArticleService {
   }
 
   // Step 3 - Option A: Editor approves directly
-  async approveArticle(articleId: string, editorId: string) {
-    const article = await prisma.article.findUnique({
-      where: { id: articleId },
-    });
+  // backend/src/modules/article/article.service.ts
 
-    if (!article) {
-      throw new NotFoundError("Article not found");
-    }
+async approveArticle(articleId: string, editorId: string, isAdmin: boolean = false) {
+  const article = await prisma.article.findUnique({
+    where: { id: articleId },
+  });
 
-    if (article.assignedEditorId !== editorId) {
-      throw new ForbiddenError("You are not assigned to this article");
-    }
-
-    if (
-      article.status !== "ASSIGNED_TO_EDITOR" &&
-      article.status !== "PENDING_APPROVAL"
-    ) {
-      throw new BadRequestError("Article cannot be approved in current status");
-    }
-
-    const updatedArticle = await prisma.article.update({
-      where: { id: articleId },
-      data: {
-        status: "APPROVED",
-        approvedAt: new Date(),
-        reviewedAt: new Date(),
-      },
-    });
-
-    // Send approval email
-    sendArticleApprovalNotification(
-      article.authorEmail,
-      article.authorName,
-      article.title,
-      article.id
-    );
-
-    return updatedArticle;
+  if (!article) {
+    throw new NotFoundError("Article not found");
   }
+
+  // ✅ LOGIC UPDATE: Agar admin hai toh assignedEditorId ki zaroorat nahi
+  if (!isAdmin && article.assignedEditorId !== editorId) {
+    throw new ForbiddenError("You are not assigned to this article");
+  }
+
+  // ✅ Admin ko kisi bhi status se approve karne ki permission dein
+  const validStatuses = ["ASSIGNED_TO_EDITOR", "PENDING_APPROVAL", "PENDING_ADMIN_REVIEW"];
+  if (!validStatuses.includes(article.status)) {
+    throw new BadRequestError("Article cannot be approved in current status");
+  }
+
+  const updatedArticle = await prisma.article.update({
+    where: { id: articleId },
+    data: {
+      status: "APPROVED",
+      approvedAt: new Date(),
+      reviewedAt: new Date(),
+    },
+  });
+
+  // Approval notification email bhejiye
+  sendArticleApprovalNotification(
+    article.authorEmail,
+    article.authorName,
+    article.title,
+    article.id
+  );
+
+  return updatedArticle;
+}
 
   // Step 3 - Editor uploads corrected PDF
   async uploadCorrectedPdf(
