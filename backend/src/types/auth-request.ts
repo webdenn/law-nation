@@ -10,6 +10,7 @@ export interface AuthUser {
   id: string;
   // optional convenience: cached role ids or names (if your auth populates it)
   roleIds?: string[];
+  roles?: { name: string }[];
   [k: string]: any;
 }
 

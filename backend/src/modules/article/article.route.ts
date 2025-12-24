@@ -26,6 +26,12 @@ router.get(
   articleController.getArticlePreview.bind(articleController)
 );
 
+// PUBLIC: Search articles (no auth required)
+router.get(
+  "/search",
+  articleController.searchArticles.bind(articleController)
+);
+
 // Protected routes - Require authentication
 router.use(requireAuth);
 

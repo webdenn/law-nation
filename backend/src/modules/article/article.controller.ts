@@ -115,7 +115,7 @@ export class ArticleController {
       }
 
       const userId = req.user!.id;
-      const userRoles = req.user!.roles.map((role: { name: string }) => role.name);
+      const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
 
       const article = await articleService.approveArticle(articleId, userId, userRoles);
 
@@ -239,6 +239,40 @@ export class ArticleController {
       const result = await articleService.deleteArticle(articleId);
 
       res.json(result);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Search articles (public endpoint)
+  async searchArticles(req: AuthRequest, res: Response) {
+    try {
+      const { q, category, page, limit } = req.query;
+
+      if (!q || typeof q !== "string") {
+        throw new BadRequestError("Search query 'q' is required");
+      }
+
+      const filters: {
+        category?: string;
+        page?: number;
+        limit?: number;
+      } = {
+        page: page ? parseInt(page as string) : 1,
+        limit: limit ? parseInt(limit as string) : 20,
+      };
+
+      // Only add category if it exists
+      if (category && typeof category === "string") {
+        filters.category = category;
+      }
+
+      const result = await articleService.searchArticles(q, filters);
+
+      res.json({
+        message: "Search completed successfully",
+        ...result,
+      });
     } catch (error) {
       throw error;
     }

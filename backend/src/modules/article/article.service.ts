@@ -1,4 +1,5 @@
 import { prisma } from "@/db/db.js";
+import { Prisma } from "@prisma/client";
 import { NotFoundError, BadRequestError, ForbiddenError } from "@/utils/http-errors.util.js";
 import {
   sendArticleSubmissionConfirmation,
@@ -437,6 +438,87 @@ export class ArticleService {
     });
 
     return { message: "Article deleted successfully" };
+  }
+
+  // Search articles using PostgreSQL Full-Text Search
+  async searchArticles(
+    searchQuery: string,
+    filters: {
+      category?: string;
+      page?: number;
+      limit?: number;
+    }
+  ) {
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const skip = (page - 1) * limit;
+
+    // Build category filter
+    const categoryFilter = filters.category
+      ? Prisma.sql`AND category = ${filters.category}`
+      : Prisma.empty;
+
+    // PostgreSQL Full-Text Search query with relevance ranking
+    const searchResults = await prisma.$queryRaw<any[]>`
+      SELECT 
+        id, 
+        title, 
+        abstract, 
+        category, 
+        keywords, 
+        "authorName", 
+        "authorOrganization", 
+        "submittedAt",
+        "approvedAt",
+        ts_rank(
+          to_tsvector('english', 
+            coalesce(title, '') || ' ' || 
+            coalesce(abstract, '') || ' ' || 
+            coalesce(array_to_string(keywords, ' '), '') || ' ' ||
+            coalesce(category, '')
+          ),
+          plainto_tsquery('english', ${searchQuery})
+        ) as relevance
+      FROM "Article"
+      WHERE status = 'APPROVED'
+        AND to_tsvector('english', 
+          coalesce(title, '') || ' ' || 
+          coalesce(abstract, '') || ' ' || 
+          coalesce(array_to_string(keywords, ' '), '') || ' ' ||
+          coalesce(category, '')
+        ) @@ plainto_tsquery('english', ${searchQuery})
+        ${categoryFilter}
+      ORDER BY relevance DESC, "approvedAt" DESC
+      LIMIT ${limit}
+      OFFSET ${skip}
+    `;
+
+    // Get total count for pagination
+    const countResult = await prisma.$queryRaw<{ total: bigint }[]>`
+      SELECT COUNT(*) as total
+      FROM "Article"
+      WHERE status = 'APPROVED'
+        AND to_tsvector('english', 
+          coalesce(title, '') || ' ' || 
+          coalesce(abstract, '') || ' ' || 
+          coalesce(array_to_string(keywords, ' '), '') || ' ' ||
+          coalesce(category, '')
+        ) @@ plainto_tsquery('english', ${searchQuery})
+        ${categoryFilter}
+    `;
+
+    const total = Number(countResult[0]?.total || 0);
+
+    return {
+      results: searchResults,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      query: searchQuery,
+    };
   }
 }
 

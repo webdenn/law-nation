@@ -17,7 +17,7 @@ AppRouter.use("/articles", ArticleRouter);
 
 // Health check
 AppRouter.get("/health", (_req, res) => {
-  res.json({ message: "Welcome to the CRM Backend API" });
+  res.json({ message: "Welcome to the  LAW NATION Backend API" });
 });
 
 export default AppRouter;

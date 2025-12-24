@@ -56,6 +56,7 @@ export async function requireAuth(
   req.user = {
     id: user.id,
     roleIds: user.roles.map((r) => r.roleId),
+    roles: user.roles.map((r) => ({ name: r.role.name })),
   };
 
   req.permissions = permissionSet;
@@ -126,6 +127,7 @@ export async function optionalAuth(
       req.user = {
         id: user.id,
         roleIds: user.roles.map((r) => r.roleId),
+        roles: user.roles.map((r) => ({ name: r.role.name })),
       };
       req.permissions = permissionSet;
     } else {
