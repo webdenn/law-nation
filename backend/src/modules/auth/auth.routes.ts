@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   signupHandler,
   loginHandler,
+  adminLoginHandler,
   refreshHandler,
   meHandler,
   logoutHandler,
@@ -16,6 +17,7 @@ export const AuthRouter: Router = Router();
 
 AuthRouter.post("/signup", signupHandler);
 AuthRouter.post("/login", loginHandler);
+AuthRouter.post("/admin-login", adminLoginHandler);
 AuthRouter.post("/refresh", refreshHandler);
 AuthRouter.get("/me", requireAuth, meHandler);
 AuthRouter.post("/logout", logoutHandler);

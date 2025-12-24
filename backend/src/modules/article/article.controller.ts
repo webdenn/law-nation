@@ -65,18 +65,20 @@ export class ArticleController {
         throw new BadRequestError("Verification token is required");
       }
 
-      const article = await articleService.confirmArticleSubmission(token);
+      // Verify token and create article in database
+      await articleService.confirmArticleSubmission(token);
 
-      res.status(200).json({
-        message: "Email verified! Your article has been submitted successfully.",
-        article: {
-          id: article.id,
-          title: article.title,
-          status: article.status,
-        },
-      });
+      // Frontend home URL - use environment variable for production
+      const frontendHomeUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+
+      // Redirect user to home page with success message
+      return res.redirect(`${frontendHomeUrl}/law/home?verified=true`);
     } catch (error) {
-      throw error;
+      console.error("Verification Error:", error);
+      const frontendHomeUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+
+      // On error, redirect to home with error message
+      return res.redirect(`${frontendHomeUrl}/law/home?error=verification-failed`);
     }
   }
 

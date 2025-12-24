@@ -40,7 +40,25 @@ export async function loginHandler(
 ) {
   try {
     const data = loginSchema.parse(req.body);
-    const result = await AuthService.login(data.email, data.password, res);
+    const result = await AuthService.login(data.email, data.password, res, false);
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: z.treeifyError(err) });
+    }
+    next(err);
+  }
+}
+
+export async function adminLoginHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = loginSchema.parse(req.body);
+    // Pass true to require admin/editor access
+    const result = await AuthService.login(data.email, data.password, res, true);
     return res.json(result);
   } catch (err) {
     if (err instanceof z.ZodError) {
