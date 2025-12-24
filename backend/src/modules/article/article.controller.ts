@@ -106,7 +106,7 @@ export class ArticleController {
     }
   }
 
-  // Editor approves article (Option A)
+  // Editor or Admin approves article (Option A)
   async approveArticle(req: AuthRequest, res: Response) {
     try {
       const articleId = req.params.id;
@@ -114,9 +114,10 @@ export class ArticleController {
         throw new BadRequestError("Article ID is required");
       }
 
-      const editorId = req.user!.id;
+      const userId = req.user!.id;
+      const userRoles = req.user!.roles.map((role: { name: string }) => role.name);
 
-      const article = await articleService.approveArticle(articleId, editorId);
+      const article = await articleService.approveArticle(articleId, userId, userRoles);
 
       res.json({
         message: "Article approved successfully",

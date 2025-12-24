@@ -200,8 +200,8 @@ export class ArticleService {
     return updatedArticle;
   }
 
-  // Step 3 - Option A: Editor approves directly
-  async approveArticle(articleId: string, editorId: string) {
+  // Step 3 - Option A: Editor or Admin approves directly
+  async approveArticle(articleId: string, userId: string, userRoles: string[]) {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
     });
@@ -210,15 +210,31 @@ export class ArticleService {
       throw new NotFoundError("Article not found");
     }
 
-    if (article.assignedEditorId !== editorId) {
-      throw new ForbiddenError("You are not assigned to this article");
+    // Check if user has permission to approve
+    const isAdmin = userRoles.includes("admin");
+    const isAssignedEditor = article.assignedEditorId === userId;
+
+    if (!isAdmin && !isAssignedEditor) {
+      throw new ForbiddenError("You do not have permission to approve this article");
     }
 
-    if (
-      article.status !== "ASSIGNED_TO_EDITOR" &&
-      article.status !== "PENDING_APPROVAL"
-    ) {
-      throw new BadRequestError("Article cannot be approved in current status");
+    // Admin can approve from any status, Editor only from specific statuses
+    if (!isAdmin) {
+      if (
+        article.status !== "ASSIGNED_TO_EDITOR" &&
+        article.status !== "PENDING_APPROVAL"
+      ) {
+        throw new BadRequestError("Article cannot be approved in current status");
+      }
+    } else {
+      // Admin can approve from PENDING_ADMIN_REVIEW, ASSIGNED_TO_EDITOR, or PENDING_APPROVAL
+      if (
+        article.status !== "PENDING_ADMIN_REVIEW" &&
+        article.status !== "ASSIGNED_TO_EDITOR" &&
+        article.status !== "PENDING_APPROVAL"
+      ) {
+        throw new BadRequestError("Article cannot be approved in current status");
+      }
     }
 
     const updatedArticle = await prisma.article.update({
