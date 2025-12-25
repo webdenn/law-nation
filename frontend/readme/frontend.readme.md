@@ -24,13 +24,24 @@ The project follows a standard Next.js structure with modular folders for differ
 
 ```text
 /app
-  /admin            # Admin Dashboard (Live Data Integrated)
-  /admin-login      # Dedicated login for Administrators
-  /editor           # Editor Dashboard (Review System)
-  /components       # UI Components (Navbar, StoreProvider)
-  /lib
-    /store          # Redux Store, authSlice
-  /login            # Standard User Authentication Page
-  /home             # Main Home page
-  /submit-paper     # Guest Article Submission Page (Public)
-  layout.tsx        # Root layout with StoreProvider & Toaster
+  |-- layout.tsx            # ROOT LAYOUT: Global Styles, StoreProvider, ToastContainer
+  |
+  |-- (main)                # PUBLIC ROUTES GROUP (With Navbar & Footer)
+  |   |-- layout.tsx        # Public Layout: Common Navbar and Footer
+  |   |-- page.tsx          # Main Landing Page (Search Engine)
+  |   |-- home/             # Home Dashboard
+  |   |-- about/            # About Page
+  |   |-- login/            # Standard User Login
+  |   |-- submit-paper/     # Public Article Submission
+  |   |-- join-us/          # Registration
+  |
+  |-- (dashboard)           # INTERNAL PORTAL GROUP (No Footer, Sidebar Based)
+  |   |-- layout.tsx        # Portal Layout: Clean UI, No Footer, Private Header
+  |   |-- admin/            # Admin Dashboard (Live Data Integrated)
+  |   |-- editor/           # Editor Dashboard (Review System)
+  |   |-- admin-login/      # Dedicated Admin Authentication
+  |   |-- live-database/    # System Monitoring
+  |
+  |-- components/           # Reusable UI (Navbar, Footer, Sidebar)
+  |-- lib/                  # Utilities & API Config
+  |   |-- store/            # Redux Store, authSlice

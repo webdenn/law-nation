@@ -129,7 +129,7 @@ export default function Adminlogin() {
       <div className="w-full lg:w-1/2 flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-10 xl:px-12 py-6 overflow-y-auto">
         <div className="w-full max-w-md">
           <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-5 sm:p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Sign In As Admin</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Management Login</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>

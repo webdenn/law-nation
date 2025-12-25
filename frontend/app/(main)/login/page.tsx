@@ -7,7 +7,7 @@ import { toast } from 'react-toastify';
 
 // ✅ Redux Integration
 import { useDispatch } from "react-redux";
-import { setCredentials } from "../lib/store/authSlice"; 
+import { setCredentials } from "../../lib/store/authSlice"; 
 
 export default function Login() {
   const router = useRouter()
