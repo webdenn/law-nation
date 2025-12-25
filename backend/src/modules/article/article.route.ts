@@ -20,16 +20,16 @@ router.get(
   articleController.verifyArticleSubmission.bind(articleController)
 );
 
+// PUBLIC: Search articles (no auth required) - Must come before dynamic routes
+router.get(
+  "/search",
+  articleController.searchArticles.bind(articleController)
+);
+
 // PUBLIC: Get article preview (no auth required)
 router.get(
   "/:id/preview",
   articleController.getArticlePreview.bind(articleController)
-);
-
-// PUBLIC: Search articles (no auth required)
-router.get(
-  "/search",
-  articleController.searchArticles.bind(articleController)
 );
 
 // Protected routes - Require authentication
