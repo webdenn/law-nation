@@ -264,7 +264,7 @@ export class ArticleService {
     const updatedArticle = await prisma.article.update({
       where: { id: articleId },
       data: {
-        status: "APPROVED",
+        status: "PUBLISHED",
         approvedAt: new Date(),
         reviewedAt: new Date(),
       },
@@ -389,7 +389,7 @@ export class ArticleService {
     const article = await prisma.article.findUnique({
       where: { 
         id: articleId,
-        status: "APPROVED"  // Only show approved articles
+        status: "PUBLISHED"  // Only show published articles
       },
       include: {
         assignedEditor: {
@@ -413,7 +413,7 @@ export class ArticleService {
     const article = await prisma.article.findUnique({
       where: { 
         id: articleId, 
-        status: "APPROVED" // Only show approved articles
+        status: "PUBLISHED" // Only show published articles
       },
       select: {
         id: true,
@@ -442,7 +442,7 @@ export class ArticleService {
     const article = await prisma.article.findUnique({
       where: { 
         id: articleId, 
-        status: "APPROVED" 
+        status: "PUBLISHED" 
       },
       select: { 
         currentPdfUrl: true,
@@ -479,7 +479,7 @@ export class ArticleService {
     const article = await prisma.article.findUnique({
       where: {
         id: articleId,
-        status: "APPROVED", // Only approved articles
+        status: "PUBLISHED", // Only published articles
       },
       select: {
         id: true,
@@ -651,7 +651,7 @@ export class ArticleService {
           plainto_tsquery('english', ${searchQuery})
         ) as relevance
       FROM "Article"
-      WHERE status = 'APPROVED'
+      WHERE status = 'PUBLISHED'
         AND to_tsvector('english', 
           coalesce(title, '') || ' ' || 
           coalesce(abstract, '') || ' ' || 
@@ -668,7 +668,7 @@ export class ArticleService {
     const countResult = await prisma.$queryRaw<{ total: bigint }[]>`
       SELECT COUNT(*) as total
       FROM "Article"
-      WHERE status = 'APPROVED'
+      WHERE status = 'PUBLISHED'
         AND to_tsvector('english', 
           coalesce(title, '') || ' ' || 
           coalesce(abstract, '') || ' ' || 
