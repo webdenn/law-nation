@@ -244,6 +244,44 @@ export class ArticleController {
     }
   }
 
+  // Get article content for reading (public endpoint)
+  async getArticleContent(req: AuthRequest, res: Response) {
+    try {
+      const articleId = req.params.id;
+      if (!articleId) {
+        throw new BadRequestError("Article ID is required");
+      }
+
+      const article = await articleService.getArticleContent(articleId);
+
+      res.json({
+        message: "Article content retrieved successfully",
+        article,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Get article upload history (protected endpoint)
+  async getArticleHistory(req: AuthRequest, res: Response) {
+    try {
+      const articleId = req.params.id;
+      if (!articleId) {
+        throw new BadRequestError("Article ID is required");
+      }
+
+      const result = await articleService.getArticleHistory(articleId);
+
+      res.json({
+        message: "Article history retrieved successfully",
+        ...result,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Search articles (public endpoint)
   async searchArticles(req: AuthRequest, res: Response) {
     try {

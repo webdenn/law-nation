@@ -135,6 +135,10 @@ model Article {
   originalPdfUrl    String
   currentPdfUrl     String        // Can be updated by editor
   
+  // PDF Content Extraction (for web display)
+  content           String?       @db.Text  // Extracted text from PDF
+  contentHtml       String?       @db.Text  // Optional: formatted HTML version
+  
   // Workflow
   status            ArticleStatus @default(PENDING_ADMIN_REVIEW)
   assignedEditorId  String?

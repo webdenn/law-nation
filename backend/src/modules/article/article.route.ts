@@ -26,10 +26,24 @@ router.get(
   articleController.searchArticles.bind(articleController)
 );
 
+// PUBLIC: Get article content for reading (no auth required)
+router.get(
+  "/:id/content",
+  articleController.getArticleContent.bind(articleController)
+);
+
 // PUBLIC: Get article preview (no auth required)
 router.get(
   "/:id/preview",
   articleController.getArticlePreview.bind(articleController)
+);
+
+// PROTECTED: Get article upload history (auth required)
+router.get(
+  "/:id/history",
+  requireAuth,
+  requirePermission("article", "read"),
+  articleController.getArticleHistory.bind(articleController)
 );
 
 // Protected routes - Require authentication

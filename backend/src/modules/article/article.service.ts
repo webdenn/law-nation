@@ -10,6 +10,7 @@ import {
   sendArticleVerificationEmail,
 } from "@/utils/email.utils.js";
 import { VerificationService } from "@/utils/verification.utils.js";
+import { extractPdfContent } from "@/utils/pdf-extract.utils.js";
 import type {
   ArticleSubmissionData,
   ArticleVerificationMetadata,
@@ -32,6 +33,15 @@ export class ArticleService {
 
   // Create article directly for logged-in users (no verification needed)
   private async createArticleDirectly(data: ArticleSubmissionData, userId: string) {
+    // Extract text content from PDF
+    let pdfContent = { text: "", html: "" };
+    try {
+      pdfContent = await extractPdfContent(data.pdfUrl);
+    } catch (error) {
+      console.error("Failed to extract PDF content:", error);
+      // Continue without content - PDF will still be available for download
+    }
+
     // Create article in database immediately
     const article = await prisma.article.create({
       data: {
@@ -47,6 +57,8 @@ export class ArticleService {
         ...(data.remarksToEditor && { remarksToEditor: data.remarksToEditor }),
         originalPdfUrl: data.pdfUrl,
         currentPdfUrl: data.pdfUrl,
+        content: pdfContent.text || null,
+        contentHtml: pdfContent.html || null,
         status: "PENDING_ADMIN_REVIEW",
       },
     });
@@ -114,6 +126,15 @@ export class ArticleService {
       }
     }
 
+    // Extract text content from PDF
+    let pdfContent = { text: "", html: "" };
+    try {
+      pdfContent = await extractPdfContent(permanentPdfUrl);
+    } catch (error) {
+      console.error("Failed to extract PDF content:", error);
+      // Continue without content - PDF will still be available for download
+    }
+
     // Create article in database
     const article = await prisma.article.create({
       data: {
@@ -129,6 +150,8 @@ export class ArticleService {
         ...(metadata.remarksToEditor && { remarksToEditor: metadata.remarksToEditor }),
         originalPdfUrl: permanentPdfUrl,
         currentPdfUrl: permanentPdfUrl,
+        content: pdfContent.text || null,
+        contentHtml: pdfContent.html || null,
         status: "PENDING_ADMIN_REVIEW",
       },
     });
@@ -280,6 +303,15 @@ export class ArticleService {
       throw new BadRequestError("Article is not in correct status for corrections");
     }
 
+    // Extract text from corrected PDF
+    let pdfContent = { text: "", html: "" };
+    try {
+      pdfContent = await extractPdfContent(data.pdfUrl);
+    } catch (error) {
+      console.error("Failed to extract PDF content:", error);
+      // Continue without content - PDF will still be available for download
+    }
+
     // Create revision record
     await prisma.articleRevision.create({
       data: {
@@ -290,11 +322,13 @@ export class ArticleService {
       },
     });
 
-    // Update article with corrected PDF
+    // Update article with corrected PDF and extracted text
     const updatedArticle = await prisma.article.update({
       where: { id: articleId },
       data: {
         currentPdfUrl: data.pdfUrl,
+        content: pdfContent.text || null,
+        contentHtml: pdfContent.html || null,
         status: "PENDING_APPROVAL",
         reviewedAt: new Date(),
       },
@@ -440,6 +474,143 @@ export class ArticleService {
     return { message: "Article deleted successfully" };
   }
 
+  // Get article content for reading (text + HTML format)
+  async getArticleContent(articleId: string) {
+    const article = await prisma.article.findUnique({
+      where: {
+        id: articleId,
+        status: "APPROVED", // Only approved articles
+      },
+      select: {
+        id: true,
+        title: true,
+        abstract: true,
+        category: true,
+        keywords: true,
+        authorName: true,
+        authorOrganization: true,
+        content: true,
+        contentHtml: true,
+        currentPdfUrl: true,
+        submittedAt: true,
+        approvedAt: true,
+      },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found or not published");
+    }
+
+    return article;
+  }
+
+  // Get article upload history (revisions)
+  async getArticleHistory(articleId: string) {
+    // Get article details
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        originalPdfUrl: true,
+        currentPdfUrl: true,
+        authorName: true,
+        authorEmail: true,
+        submittedAt: true,
+      },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
+
+    // Get all revisions with editor info
+    const revisions = await prisma.articleRevision.findMany({
+      where: { articleId },
+      include: {
+        article: {
+          select: {
+            assignedEditor: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    // Get editor info for each revision
+    const revisionsWithEditor = await Promise.all(
+      revisions.map(async (rev) => {
+        let editorInfo = null;
+        if (rev.uploadedBy) {
+          const editor = await prisma.user.findUnique({
+            where: { id: rev.uploadedBy },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          });
+          editorInfo = editor;
+        }
+        return {
+          ...rev,
+          uploadedByUser: editorInfo,
+        };
+      })
+    );
+
+    // Build history array
+    const history = [
+      // Original submission (version 1)
+      {
+        version: 1,
+        type: "original",
+        uploadedBy: {
+          name: article.authorName,
+          email: article.authorEmail,
+          role: "Author",
+        },
+        uploadedAt: article.submittedAt,
+        pdfUrl: article.originalPdfUrl,
+        comments: null,
+        isCurrent: article.currentPdfUrl === article.originalPdfUrl,
+      },
+      // All revisions (version 2, 3, 4...)
+      ...revisionsWithEditor.map((rev, index) => ({
+        version: index + 2,
+        type: "revision",
+        uploadedBy: {
+          id: rev.uploadedByUser?.id,
+          name: rev.uploadedByUser?.name || "Unknown Editor",
+          email: rev.uploadedByUser?.email,
+          role: "Editor",
+        },
+        uploadedAt: rev.createdAt,
+        pdfUrl: rev.pdfUrl,
+        comments: rev.comments,
+        isCurrent: article.currentPdfUrl === rev.pdfUrl,
+      })),
+    ];
+
+    return {
+      article: {
+        id: article.id,
+        title: article.title,
+        status: article.status,
+        currentPdfUrl: article.currentPdfUrl,
+      },
+      history,
+      totalVersions: history.length,
+    };
+  }
+
   // Search articles using PostgreSQL Full-Text Search
   async searchArticles(
     searchQuery: string,
@@ -474,7 +645,7 @@ export class ArticleService {
           to_tsvector('english', 
             coalesce(title, '') || ' ' || 
             coalesce(abstract, '') || ' ' || 
-            coalesce(array_to_string(keywords, ' '), '') || ' ' ||
+            coalesce(keywords, '') || ' ' ||
             coalesce(category, '')
           ),
           plainto_tsquery('english', ${searchQuery})
@@ -484,7 +655,7 @@ export class ArticleService {
         AND to_tsvector('english', 
           coalesce(title, '') || ' ' || 
           coalesce(abstract, '') || ' ' || 
-          coalesce(array_to_string(keywords, ' '), '') || ' ' ||
+          coalesce(keywords, '') || ' ' ||
           coalesce(category, '')
         ) @@ plainto_tsquery('english', ${searchQuery})
         ${categoryFilter}
@@ -501,7 +672,7 @@ export class ArticleService {
         AND to_tsvector('english', 
           coalesce(title, '') || ' ' || 
           coalesce(abstract, '') || ' ' || 
-          coalesce(array_to_string(keywords, ' '), '') || ' ' ||
+          coalesce(keywords, '') || ' ' ||
           coalesce(category, '')
         ) @@ plainto_tsquery('english', ${searchQuery})
         ${categoryFilter}
