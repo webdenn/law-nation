@@ -315,6 +315,36 @@ export class ArticleController {
       throw error;
     }
   }
+
+  // List published articles (public endpoint - for home page)
+  async listPublishedArticles(req: AuthRequest, res: Response) {
+    try {
+      const { category, page, limit } = req.query;
+
+      const filters: {
+        category?: string;
+        page?: number;
+        limit?: number;
+      } = {
+        page: page ? parseInt(page as string) : 1,
+        limit: limit ? parseInt(limit as string) : 20,
+      };
+
+      // Only add category if it exists
+      if (category && typeof category === "string") {
+        filters.category = category;
+      }
+
+      const result = await articleService.listPublishedArticles(filters);
+
+      res.json({
+        message: "Published articles retrieved successfully",
+        ...result,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 export const articleController = new ArticleController();

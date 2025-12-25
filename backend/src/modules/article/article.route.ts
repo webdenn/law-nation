@@ -26,6 +26,12 @@ router.get(
   articleController.searchArticles.bind(articleController)
 );
 
+// PUBLIC: List published articles (no auth required) - For home page
+router.get(
+  "/published",
+  articleController.listPublishedArticles.bind(articleController)
+);
+
 // PUBLIC: Get article content for reading (no auth required)
 router.get(
   "/:id/content",

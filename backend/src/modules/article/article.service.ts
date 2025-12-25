@@ -691,6 +691,57 @@ export class ArticleService {
       query: searchQuery,
     };
   }
+
+  // List published articles (public endpoint - for home page)
+  async listPublishedArticles(filters: {
+    category?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      status: "PUBLISHED", // Only published articles
+    };
+
+    // Add category filter if provided
+    if (filters.category) {
+      where.category = filters.category;
+    }
+
+    const [articles, total] = await Promise.all([
+      prisma.article.findMany({
+        where,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          abstract: true,
+          category: true,
+          keywords: true,
+          authorName: true,
+          authorOrganization: true,
+          submittedAt: true,
+          approvedAt: true,
+        },
+        orderBy: { approvedAt: "desc" }, // Newest published first
+      }),
+      prisma.article.count({ where }),
+    ]);
+
+    return {
+      articles,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
 }
 
 export const articleService = new ArticleService();
