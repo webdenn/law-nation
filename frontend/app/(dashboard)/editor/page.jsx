@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 
+// Helper Component for Stats
 const EditorStatCard = ({ title, count, color }) => (
   <div className={`bg-white p-6 rounded-xl border-l-4 ${color} shadow-md`}>
     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -22,7 +23,10 @@ export default function EditorDashboard() {
   const [activeTab, setActiveTab] = useState("tasks");
   const [articles, setArticles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [feedback, setFeedback] = useState(""); // ✅ New: To store textarea input
+  
+  // ✅ CHANGED: Feedback hata kar File state add kiya
+  const [uploadedFile, setUploadedFile] = useState(null);
+  
   const API_BASE_URL = "http://localhost:4000";
 
   const [profile, setProfile] = useState({
@@ -37,30 +41,23 @@ export default function EditorDashboard() {
     const adminToken = localStorage.getItem("adminToken");
     const userData = localStorage.getItem("editorUser");
 
-    // ✅ Fix 1: Pehle check karo ki kya Editor token hai.
-    // Agar Editor login hai, to use Admin token ki wajah se mat roko.
     if (token && userData) {
       try {
         const parsedUser = JSON.parse(userData);
-
-        // Agar editor logged in hai, to data fetch karo aur baaki checks skip karo
         setProfile((prev) => ({ ...prev, ...parsedUser }));
         fetchAssignedArticles(parsedUser.id || parsedUser._id, token);
         setIsAuthorized(true);
-        return; // 👈 Yahan se return ho jao, aage ke redirect checks ki zaroorat nahi
+        return;
       } catch (e) {
         console.error("Error", e);
       }
     }
 
-    // ✅ Fix 2: Agar editor token nahi hai TAB admin check karo
     if (adminToken) {
-      // Check karo tumhara admin ka sahi URL kya hai (/admin ya /admin-dashboard)
       router.push("/admin");
       return;
     }
 
-    // ✅ Fix 3: Agar kuch bhi nahi hai
     if (!token) {
       router.push("/admin-login");
     }
@@ -69,9 +66,6 @@ export default function EditorDashboard() {
   const fetchAssignedArticles = async (editorId, token) => {
     try {
       setIsLoading(true);
-
-      // ✅ FIX: Sahi endpoint use karein jo backend support karta hai
-      // Backend 'listArticles' assignedEditorId filter leta hai
       const res = await fetch(
         `${API_BASE_URL}/api/articles?assignedEditorId=${editorId}`,
         {
@@ -81,8 +75,6 @@ export default function EditorDashboard() {
 
       if (res.ok) {
         const data = await res.json();
-
-        // ✅ FIX: Backend data.articles ke andar array bhejta hai
         const list = data.articles || (Array.isArray(data) ? data : []);
         setArticles(list);
       } else {
@@ -96,13 +88,11 @@ export default function EditorDashboard() {
     }
   };
 
-  // ✅ HANDLER: Approve/Reject/Correction
-  const handleArticleAction = async (articleId, actionType) => {
+ const handleArticleAction = async (articleId, actionType) => {
     try {
       const token = localStorage.getItem("editorToken");
-
-      // Backend map: "approve" -> PATCH /:id/approve
-      // Abhi ke liye hum approval ka handle kar rahe hain
+      
+      // ✅ Agar approve hai to backend ka same /approve endpoint hit hoga jo Admin use karta hai
       const endpoint = actionType === "approve" ? "approve" : "reject";
 
       const res = await fetch(
@@ -113,21 +103,29 @@ export default function EditorDashboard() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ feedback: feedback }),
+           
         }
       );
 
       if (res.ok) {
-        toast.success(`Article ${actionType}ed successfully!`);
+        // ✅ UI Update: Message exactly Admin jaisa kar diya
+        const successMsg = actionType === "approve" 
+            ? "Article Approved & Published Successfully!" 
+            : "Article Rejected";
+            
+        toast.success(successMsg);
+        
         setSelectedArticle(null);
-        setFeedback("");
-        // Refresh list
+        setUploadedFile(null); 
+        // List refresh karein taaki status update dikhe
         fetchAssignedArticles(profile.id || profile._id, token);
       } else {
-        toast.error("Failed to process action");
+        const errorData = await res.json();
+        toast.error(errorData.message || "Failed to process action");
       }
     } catch (err) {
-      toast.error("Server error");
+      console.error(err);
+      toast.error("Server error while publishing");
     }
   };
 
@@ -135,6 +133,13 @@ export default function EditorDashboard() {
     localStorage.removeItem("editorToken");
     localStorage.removeItem("editorUser");
     router.push("/admin-login");
+  };
+
+  // Helper to handle file selection
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setUploadedFile(e.target.files[0]);
+    }
   };
 
   if (!isAuthorized)
@@ -214,16 +219,12 @@ export default function EditorDashboard() {
                 />
                 <EditorStatCard
                   title="Pending"
-                  count={
-                    articles.filter((a) => a.status !== "Published").length
-                  }
+                  count={articles.filter((a) => a.status !== "Published").length}
                   color="border-yellow-500"
                 />
                 <EditorStatCard
                   title="Approved"
-                  count={
-                    articles.filter((a) => a.status === "Published").length
-                  }
+                  count={articles.filter((a) => a.status === "Published").length}
                   color="border-green-600"
                 />
               </div>
@@ -294,7 +295,10 @@ export default function EditorDashboard() {
                 <span className="text-xs font-black text-red-600">
                   DOCUMENT VIEWER
                 </span>
-                <button onClick={() => setSelectedArticle(null)}>
+                <button onClick={() => {
+                    setSelectedArticle(null);
+                    setUploadedFile(null);
+                }}>
                   CLOSE ✕
                 </button>
               </div>
@@ -305,17 +309,12 @@ export default function EditorDashboard() {
                 <p className="mb-6 text-gray-600 italic">
                   "{selectedArticle.abstract}"
                 </p>
-                {/* Editor Dashboard Modal ke andar yahan change karein */}
                 {selectedArticle.currentPdfUrl && (
                   <button
                     onClick={() => {
                       const path = selectedArticle.currentPdfUrl;
-                      // ✅ Fix: Slash '/' check taaki URL invalid na ho
-                      const cleanPath = path.startsWith("/")
-                        ? path
-                        : `/${path}`;
+                      const cleanPath = path.startsWith("/") ? path : `/${path}`;
                       const fullUrl = `${API_BASE_URL}${cleanPath}`;
-
                       window.open(fullUrl, "_blank");
                     }}
                     className="bg-black text-white px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all"
@@ -326,52 +325,68 @@ export default function EditorDashboard() {
               </div>
             </div>
 
-            {/* RIGHT: ACTIONS */}
+            {/* RIGHT: ACTIONS (MODIFIED SECTION) */}
             <div className="w-full md:w-[400px] flex flex-col bg-white">
               <div className="p-6 bg-red-600 text-white">
                 <h2 className="font-bold uppercase truncate">
                   {selectedArticle.title}
                 </h2>
               </div>
-              <div className="p-6 flex-1 space-y-4">
+              
+              {/* ✅ NEW: File Upload Section (Replaced Feedback) */}
+              <div className="p-6 flex-1 flex flex-col gap-4">
                 <label className="text-xs font-bold text-gray-500 uppercase">
-                  Reviewer Feedback
+                  Upload Reviewed Document
                 </label>
-                <textarea
-                  value={feedback}
-                  onChange={(e) => setFeedback(e.target.value)}
-                  className="w-full h-40 p-4 bg-gray-50 border rounded-lg text-sm outline-none focus:border-red-500"
-                  placeholder="Type your notes here..."
-                />
-              </div>
-              <div className="p-6 border-t bg-gray-50 space-y-3">
-                <button
-                  onClick={() =>
-                    handleArticleAction(selectedArticle._id, "approve")
-                  }
-                  className="w-full py-3 bg-red-600 text-white font-bold rounded-lg text-sm hover:bg-black transition-all"
-                >
-                  Approve & Publish
-                </button>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() =>
-                      handleArticleAction(selectedArticle._id, "correction")
-                    }
-                    className="flex-1 py-3 bg-white border text-gray-700 font-bold rounded-lg text-xs"
-                  >
-                    Correction
-                  </button>
-                  <button
-                    onClick={() =>
-                      handleArticleAction(selectedArticle._id, "reject")
-                    }
-                    className="flex-1 py-3 bg-white border text-gray-700 font-bold rounded-lg text-xs"
-                  >
-                    Reject
-                  </button>
+                
+                <div className="flex-1 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:bg-red-50 hover:border-red-300 transition-colors relative flex flex-col items-center justify-center text-center p-4">
+                  <input 
+                    type="file" 
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={handleFileChange}
+                  />
+                  
+                  {uploadedFile ? (
+                    <div className="flex flex-col items-center animate-pulse">
+                        <span className="text-3xl mb-2">📄</span>
+                        <p className="text-sm font-bold text-gray-800 break-all px-2">
+                           {uploadedFile.name}
+                        </p>
+                        <p className="text-xs text-green-600 font-bold mt-1">Ready to upload</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center text-gray-400">
+                        <svg className="w-10 h-10 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p className="text-sm font-medium">Click to upload file</p>
+                        <p className="text-xs mt-1">PDF, DOCX supported</p>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* ✅ MODIFIED: Buttons (Removed Correction) */}
+             {/* ✅ MODIFIED: Buttons (Fixed ID Issue) */}
+<div className="p-6 border-t bg-gray-50 space-y-3">
+  <button
+    onClick={() =>
+      // 👇 FIX: Yahan check lagaya hai ki '_id' use kare ya 'id' taaki undefined na ho
+      handleArticleAction(selectedArticle._id || selectedArticle.id, "approve")
+    }
+    className="w-full py-3 bg-red-600 text-white font-bold rounded-lg text-sm hover:bg-black transition-all shadow-lg hover:shadow-xl"
+  >
+    Approve & Publish
+  </button>
+  
+  <button
+    onClick={() =>
+      // 👇 FIX: Same fix yahan bhi
+      handleArticleAction(selectedArticle._id || selectedArticle.id, "reject")
+    }
+    className="w-full py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg text-sm hover:bg-gray-100 transition-all"
+  >
+    Reject Article
+  </button>
+</div>
             </div>
           </div>
         </div>

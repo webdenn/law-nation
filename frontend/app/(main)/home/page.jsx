@@ -42,10 +42,8 @@ export default function HomePage() {
     try {
       // Backend ko 'query' param chahiye
       let url = searchQuery
-        ? `${API_BASE_URL}/api/articles/search?query=${encodeURIComponent(
-            searchQuery
-          )}`
-        : `${API_BASE_URL}/api/articles?status=PUBLISHED`;
+        ? `${API_BASE_URL}/api/articles/search?q=${encodeURIComponent(searchQuery)}`
+        : `${API_BASE_URL}/api/articles/published`;
 
       const res = await fetch(url);
       const data = await res.json();

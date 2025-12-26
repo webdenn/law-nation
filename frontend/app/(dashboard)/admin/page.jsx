@@ -2,7 +2,9 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "react-toastify";
+// import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 // Stat Card Component
 const StatCard = ({ title, count }) => (
@@ -191,27 +193,38 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem("adminToken");
 
-      // ✅ FIX: Endpoint badal kar '/approve' karein aur method 'PATCH'
+      // Check agar token nahi hai
+      if (!token) {
+        toast.error("Admin token missing! Please login again.");
+        return;
+      }
+
       const response = await fetch(
         `${API_BASE_URL}/api/articles/${id}/approve`,
         {
-          method: "PATCH", // Backend mein .patch use ho raha hai
-          headers: { Authorization: `Bearer ${token}` },
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json", // 👈 YE MISSING THA (Zaroori hai)
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 
       if (response.ok) {
+        // UI Update (Optimistic Update)
         setArticles((prev) =>
           prev.map((a) => (a.id === id ? { ...a, status: "Published" } : a))
         );
         toast.success("Article Approved & Published!");
       } else {
         const errorData = await response.json();
+        // Server jo error bhej raha hai wo dikhao
+        console.error("Server Error:", errorData); 
         toast.error(errorData.message || "Approval failed");
       }
     } catch (e) {
-      console.error(e);
-      toast.error("Error publishing");
+      console.error("Network Error:", e);
+      toast.error("Something went wrong while publishing.");
     }
   };
 
@@ -510,7 +523,9 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+        
       )}
+      <ToastContainer position="top-right" autoClose={3000} theme="colored" />
     </div>
   );
 }

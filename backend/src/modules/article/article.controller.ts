@@ -128,6 +128,24 @@ export class ArticleController {
     }
   }
 
+  // SPECIAL FUNCTION: Sirf Published articles laane ke liye (Homepage ke liye)
+  async getPublishedArticles(req: AuthRequest, res: Response) {
+    try {
+      // Hum yahan zabardasti 'status' ko PUBLISHED set kar rahe hain
+      // Taaki Pending articles galti se bhi na aayein
+      const filters: ArticleListFilters = {
+        ...req.query,       // Baaki filters (page, limit) user se lo
+        status: "PUBLISHED" // Lekin status hum fix kar denge
+      };
+
+      const result = await articleService.listArticles(filters);
+
+      res.json(result);
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Editor uploads corrected PDF (Option C - Step 1)
   async uploadCorrectedPdf(req: AuthRequest, res: Response) {
     try {
