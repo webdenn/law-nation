@@ -128,6 +128,24 @@ export class ArticleController {
     }
   }
 
+  // SPECIAL FUNCTION: Sirf Published articles laane ke liye (Homepage ke liye)
+  async getPublishedArticles(req: AuthRequest, res: Response) {
+    try {
+      // Hum yahan zabardasti 'status' ko PUBLISHED set kar rahe hain
+      // Taaki Pending articles galti se bhi na aayein
+      const filters: ArticleListFilters = {
+        ...req.query,       // Baaki filters (page, limit) user se lo
+        status: "PUBLISHED" // Lekin status hum fix kar denge
+      };
+
+      const result = await articleService.listArticles(filters);
+
+      res.json(result);
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Editor uploads corrected PDF (Option C - Step 1)
   async uploadCorrectedPdf(req: AuthRequest, res: Response) {
     try {
@@ -309,36 +327,6 @@ export class ArticleController {
 
       res.json({
         message: "Search completed successfully",
-        ...result,
-      });
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  // List published articles (public endpoint - for home page)
-  async listPublishedArticles(req: AuthRequest, res: Response) {
-    try {
-      const { category, page, limit } = req.query;
-
-      const filters: {
-        category?: string;
-        page?: number;
-        limit?: number;
-      } = {
-        page: page ? parseInt(page as string) : 1,
-        limit: limit ? parseInt(limit as string) : 20,
-      };
-
-      // Only add category if it exists
-      if (category && typeof category === "string") {
-        filters.category = category;
-      }
-
-      const result = await articleService.listPublishedArticles(filters);
-
-      res.json({
-        message: "Published articles retrieved successfully",
         ...result,
       });
     } catch (error) {

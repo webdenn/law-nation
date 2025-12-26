@@ -20,16 +20,16 @@ router.get(
   articleController.verifyArticleSubmission.bind(articleController)
 );
 
+// PUBLIC: Get ONLY published articles (Updated Fix)
+router.get(
+  "/published",
+  articleController.getPublishedArticles.bind(articleController)
+);
+
 // PUBLIC: Search articles (no auth required) - Must come before dynamic routes
 router.get(
   "/search",
   articleController.searchArticles.bind(articleController)
-);
-
-// PUBLIC: List published articles (no auth required) - For home page
-router.get(
-  "/published",
-  articleController.listPublishedArticles.bind(articleController)
 );
 
 // PUBLIC: Get article content for reading (no auth required)
