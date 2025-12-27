@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth, optionalAuth } from "@/middlewares/auth.middleware.js";
 import { requirePermission } from "@/middlewares/require-premission.middleware.js";
-import { uploadPdf } from "@/middlewares/upload.middleware.js";
+import { uploadPdf ,uploadOptionalPdf } from "@/middlewares/upload.middleware.js";
 import { articleController } from "./article.controller.js";
 
 const router = Router();
@@ -66,6 +66,7 @@ router.patch(
 router.patch(
   "/:id/approve",
   requirePermission("article", "write"),
+  uploadOptionalPdf,
   articleController.approveArticle.bind(articleController)
 );
 
