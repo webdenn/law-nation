@@ -32,12 +32,6 @@ router.get(
   articleController.searchArticles.bind(articleController)
 );
 
-// PUBLIC: Get article content for reading (no auth required)
-router.get(
-  "/:id/content",
-  articleController.getArticleContent.bind(articleController)
-);
-
 // PUBLIC: Get article preview (no auth required)
 router.get(
   "/:id/preview",
@@ -54,6 +48,12 @@ router.get(
 
 // Protected routes - Require authentication
 router.use(requireAuth);
+
+// PROTECTED: Get article content for reading (auth required)
+router.get(
+  "/:id/content",
+  articleController.getArticleContent.bind(articleController)
+);
 
 // Admin: Assign editor to article
 router.patch(

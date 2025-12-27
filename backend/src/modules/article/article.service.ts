@@ -474,35 +474,67 @@ export class ArticleService {
     return { message: "Article deleted successfully" };
   }
 
-  // Get article content for reading (text + HTML format)
-  async getArticleContent(articleId: string) {
-    const article = await prisma.article.findUnique({
-      where: {
-        id: articleId,
-        status: "PUBLISHED", // Only published articles
-      },
-      select: {
-        id: true,
-        title: true,
-        abstract: true,
-        category: true,
-        keywords: true,
-        authorName: true,
-        authorOrganization: true,
-        content: true,
-        contentHtml: true,
-        currentPdfUrl: true,
-        submittedAt: true,
-        approvedAt: true,
-      },
-    });
+  // Get article content for reading (public endpoint)
+async getArticleContent(articleId: string) {
+  const article = await prisma.article.findUnique({
+    where: {
+      id: articleId,
+      status: "PUBLISHED",
+    },
+    select: {
+      id: true,
+      title: true,
+      abstract: true,
+      category: true,
+      keywords: true,
+      authorName: true,
+      authorOrganization: true,
+      content: true,
+      contentHtml: true,
+      currentPdfUrl: true,
+      submittedAt: true,
+      approvedAt: true,
+    },
+  });
 
-    if (!article) {
-      throw new NotFoundError("Article not found or not published");
-    }
-
-    return article;
+  if (!article) {
+    throw new NotFoundError("Article not found or not published");
   }
+
+  // ✅ NEW: Lazy extraction - extract content on-demand if missing
+  if (!article.content || article.content.trim().length === 0) {
+    console.log(`⚡ [Lazy Extract] Content missing for article ${articleId}, extracting now...`);
+    
+    try {
+      const pdfContent = await extractPdfContent(article.currentPdfUrl);
+      
+      if (pdfContent.text && pdfContent.text.length > 0) {
+        console.log(`✅ [Lazy Extract] Extracted ${pdfContent.text.length} characters`);
+        
+        // Update database with extracted content
+        await prisma.article.update({
+          where: { id: articleId },
+          data: {
+            content: pdfContent.text,
+            contentHtml: pdfContent.html,
+          },
+        });
+        
+        // Update the article object to return
+        article.content = pdfContent.text;
+        article.contentHtml = pdfContent.html;
+      } else {
+        console.warn(`⚠️ [Lazy Extract] No text extracted (might be scanned PDF)`);
+      }
+    } catch (error) {
+      console.error(`❌ [Lazy Extract] Failed:`, error);
+      // Continue without content - frontend will show "Preview unavailable"
+    }
+  }
+
+  return article;
+}
+
 
   // Get article upload history (revisions)
   async getArticleHistory(articleId: string) {
