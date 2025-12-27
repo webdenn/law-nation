@@ -497,7 +497,6 @@ export class ArticleService {
     return { message: "Article deleted successfully" };
   }
 
-  // Get article content for reading (text + HTML format)
   // Get article content for reading (public endpoint)
 async getArticleContent(articleId: string) {
   const article = await prisma.article.findUnique({
@@ -558,6 +557,7 @@ async getArticleContent(articleId: string) {
 
   return article;
 }
+
 
   // Get article upload history (revisions)
   async getArticleHistory(articleId: string) {

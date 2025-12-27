@@ -183,15 +183,11 @@ export const uploadMultiplePdfs = (fieldName = "pdfs", maxCount = 5) => {
 };
 
 
-// ✅ NEW: Optional PDF Upload Handler (Approve ke liye)
+// ✅ NEW: Optional PDF Upload Handler 
 export const uploadOptionalPdf = (req: Request, res: Response, next: NextFunction) => {
   if (isLocal) {
     localUploadPdf.single("pdf")(req, res, (err) => {
       if (err) return res.status(400).json({ error: err.message });
-      
-      // ❌ Yahan se strict check hata diya (if !req.file ...)
-      
-      // Agar file hai tabhi process karo
       if (req.file) {
         const isLoggedIn = !!(req as any).user?.id;
         const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
@@ -208,13 +204,9 @@ export const uploadOptionalPdf = (req: Request, res: Response, next: NextFunctio
       if (err) return res.status(400).json({ error: err.message });
       
       const file = req.file as Express.Multer.File | undefined;
-      
-      // ✅ Agar file nahi hai, to seedha next() call karo bina error ke
       if (!file) {
         return next();
       }
-
-      // Agar file hai to Supabase pe upload karo
       uploadBufferToSupabase(file.buffer, file.originalname, file.mimetype)
         .then(({ url, storageKey }) => {
           req.fileUrl = url;
