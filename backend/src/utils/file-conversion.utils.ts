@@ -55,15 +55,19 @@ export async function convertPdfToWord(
     
     // For PDF to Word, we'll use pdf-parse to extract text
     // and create a simple Word document
-    const pdfParse = require('pdf-parse');
+    const { PDFParse } = require('pdf-parse');
     const pdfBuffer = await fs.readFile(fullPdfPath);
-    const pdfData = await pdfParse(pdfBuffer);
+    
+    // Create parser instance and extract text
+    const parser = new PDFParse({ data: pdfBuffer });
+    const result = await parser.getText();
+    await parser.destroy();
     
     // Create a simple Word document with the extracted text
     const { Document, Packer, Paragraph, TextRun } = await import('docx');
     
     // Split text into paragraphs
-    const paragraphs = pdfData.text.split('\n\n').map((text: string) => 
+    const paragraphs = result.text.split('\n\n').map((text: string) => 
       new Paragraph({
         children: [new TextRun(text.trim())],
       })
