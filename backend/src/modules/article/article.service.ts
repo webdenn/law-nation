@@ -595,6 +595,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       content: true,
       contentHtml: true,
       currentPdfUrl: true,
+      currentWordUrl: true,
+      thumbnailUrl: true,
       imageUrls: true,
       submittedAt: true,
       approvedAt: true,
@@ -776,6 +778,7 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
   }
 
   // Search articles using PostgreSQL Full-Text Search with enhanced filters
+ // Search articles using PostgreSQL Full-Text Search with enhanced filters
   async searchArticles(
     searchQuery: string,
     filters: {
@@ -862,7 +865,7 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
         break;
     }
 
-    // PostgreSQL Full-Text Search query with relevance ranking and all filters
+    // ✅ MAJOR UPDATE: Added "authorName" to the search vector below
     const searchResults = await prisma.$queryRaw<any[]>`
       SELECT 
         id, 
@@ -879,7 +882,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
             coalesce(title, '') || ' ' || 
             coalesce(abstract, '') || ' ' || 
             coalesce(keywords, '') || ' ' ||
-            coalesce(category, '')
+            coalesce(category, '') || ' ' ||
+            coalesce("authorName", '')  -- ✅ Added Author here
           ),
           plainto_tsquery('english', ${searchQuery})
         ) as relevance
@@ -889,7 +893,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
           coalesce(title, '') || ' ' || 
           coalesce(abstract, '') || ' ' || 
           coalesce(keywords, '') || ' ' ||
-          coalesce(category, '')
+          coalesce(category, '') || ' ' ||
+          coalesce("authorName", '') -- ✅ Added Author here too
         ) @@ plainto_tsquery('english', ${searchQuery})
         ${categoryFilter}
         ${authorFilter}
@@ -912,7 +917,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
           coalesce(title, '') || ' ' || 
           coalesce(abstract, '') || ' ' || 
           coalesce(keywords, '') || ' ' ||
-          coalesce(category, '')
+          coalesce(category, '') || ' ' ||
+          coalesce("authorName", '') -- ✅ Added Author here too
         ) @@ plainto_tsquery('english', ${searchQuery})
         ${categoryFilter}
         ${authorFilter}

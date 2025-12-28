@@ -21,13 +21,8 @@ export default function HomePage() {
 
   // 2. Protected Read Logic
  const handleProtectedRead = (item) => {
-    if (!user) {
-      toast.warning("🔒 Please login first to read the full article!");
-      return;
-    }
-    
-    // Ab hum window.open nahi karenge, balki internal route par bhejenge
-    // item._id ya item.id jo bhi aapka backend de raha hai use use karein
+   
+   
     const articleId = item._id || item.id;
     router.push(`/article/${articleId}`);
   };
@@ -35,34 +30,40 @@ export default function HomePage() {
   // 2. Updated useEffect
   // Isse useEffect ke upar (BAHAR) rakho taaki Search button bhi ise use kar sake
   // Purane fetchArticles ki jagah ye naya wala paste karein
- const fetchArticles = async (searchQuery = "", currentFilters = {}) => {
+ // 2. Updated fetchArticles Function
+  // Is code ko purane fetchArticles ki jagah replace karein
+// 2. Updated fetchArticles Function (Replace Old One)
+  const fetchArticles = async (searchQuery = "", currentFilters = {}) => {
     setIsLoading(true);
-    if (searchQuery) setIsSearching(true);
+
+    // Check agar koi bhi search active hai
+    const hasSearch = searchQuery.trim() || currentFilters.keywords || currentFilters.authors;
+    if (hasSearch) setIsSearching(true);
 
     try {
       let url;
 
-      // Agar search query ya koi filter hai
-      if (searchQuery.trim() || currentFilters.keywords || currentFilters.authors) {
+      if (hasSearch) {
         const params = new URLSearchParams();
-        
-        // Backend requirement: 'q' is mostly required for search endpoint, 
-        // lekin agar sirf filter hai toh bhi hum empty 'q' bhej sakte hain ya handle kar sakte hain.
-        // Aapka backend code kehta hai: if (!q) throw Error. 
-        // Isliye hum ensure karenge ki 'q' hamesha jaye, chahe empty string ho.
-        params.append("q", searchQuery || ""); 
 
-        // Mapping: Frontend State -> Backend Param
-        if (currentFilters.keywords) {
-             params.append("keyword", currentFilters.keywords);
-        }
-        if (currentFilters.authors) {
-             params.append("author", currentFilters.authors);
-        }
+        // LOGIC: Backend ko 'q' chahiye hota hai search ke liye.
+        // Agar Main Search (searchQuery) khali hai, toh hum Author ya Keyword ko hi 'q' bana kar bhejenge
+        // taaki backend ka "Text Match" fail na ho.
+        const fallbackQuery = currentFilters.authors || currentFilters.keywords || "all";
+        params.append("q", searchQuery.trim() || fallbackQuery);
+
+        // Advance Filters pass karein
+        if (currentFilters.keywords) params.append("keyword", currentFilters.keywords);
+        if (currentFilters.authors) params.append("author", currentFilters.authors);
         
+        // Agar Category filter hai
+        if (currentFilters.category && currentFilters.category !== "all") {
+             params.append("category", currentFilters.category);
+        }
+
         url = `${API_BASE_URL}/api/articles/search?${params.toString()}`;
       } else {
-        // Agar sab khali hai -> Normal Published Articles
+        // Normal Load (No Search)
         url = `${API_BASE_URL}/api/articles/published`;
       }
 
@@ -70,13 +71,12 @@ export default function HomePage() {
 
       const res = await fetch(url);
       const data = await res.json();
-
-      const list = data.results || data.articles || data.data || [];
+      
+      const list = data.results || data.articles || [];
       setPublishedArticles(list);
 
-      // Agar user ne search kiya aur list khali aayi
-      if ((searchQuery || currentFilters.keywords || currentFilters.authors) && list.length === 0) {
-        toast.info("No articles found matching your criteria.");
+      if (hasSearch && list.length === 0) {
+        toast.info("No articles found.");
       }
 
     } catch (error) {
@@ -372,6 +372,21 @@ export default function HomePage() {
                   key={item._id || item.id}
                   className="bg-white border border-gray-200 rounded-lg p-8 flex flex-col h-full overflow-hidden"
                 >
+
+                 {item.thumbnailUrl && item.thumbnailUrl !== "null" && item.thumbnailUrl !== "undefined" && (
+                    <div className="w-full h-48 mb-6 rounded-md overflow-hidden bg-gray-100">
+                      <img 
+                        src={item.thumbnailUrl.startsWith("http") ? item.thumbnailUrl : `${API_BASE_URL}${item.thumbnailUrl}`} 
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Agar image load fail ho jaye, toh parent div ko hi gayab kar do
+                          e.target.parentElement.style.display = 'none';
+                        }} 
+                      />
+                    </div>
+                  )}
+
                   <div className="space-y-4">
                     {/* Title - Black, breaks long words, moves to next line */}
                     <h3 className="text-xl font-bold text-black leading-snug break-words overflow-wrap-anywhere">

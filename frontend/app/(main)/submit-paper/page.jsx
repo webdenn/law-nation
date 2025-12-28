@@ -17,6 +17,7 @@ export default function SubmitPaperPage() {
     email: "",
     phone: "",
     articleTitle: "",
+    authorImage: null,
     detailedDescription: "", 
     keywords: [],
     file: null,
@@ -110,6 +111,7 @@ export default function SubmitPaperPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
+    // Validation
     if (!formData.file || !formData.contentFormat) {
       toast.error("Please select a content format and upload a PDF file.")
       return
@@ -120,6 +122,8 @@ export default function SubmitPaperPage() {
 
     try {
       const data = new FormData()
+      
+      // Basic Fields
       data.append("authorName", formData.fullName)
       data.append("authorEmail", formData.email)
       data.append("authorPhone", formData.phone)
@@ -127,35 +131,48 @@ export default function SubmitPaperPage() {
       data.append("category", formData.contentFormat)
       data.append("abstract", formData.detailedDescription)
       data.append("keywords", formData.keywords.join(", ")) 
-      data.append("document", formData.file)
+      
+      // ✅ CHANGE 1: Naam 'document' ki jagah 'pdf' hona chahiye (Backend yehi maangta hai)
+      data.append("pdf", formData.file)
 
-      // --- YE CHANGE HAI BAS ---
+      // ✅ CHANGE 2: Thumbnail Image Append
+      if (formData.authorImage) {
+        data.append("thumbnail", formData.authorImage) 
+      }
+
+      // Token Check
       const token = localStorage.getItem("authToken"); 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/articles"
       
-      const response = await fetch(`${API_URL}/submit`, {
+      // ✅ CHANGE 3: URL '/submit-with-images' hona chahiye
+      const response = await fetch(`${API_URL}/submit-with-images`, {
         method: "POST",
         headers: {
           ...(token ? { "Authorization": `Bearer ${token}` } : {}),
         },
         body: data,
       })
-      // ------------------------
 
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.message || "Submission failed")
+        // Error message dikhayein
+        throw new Error(result.message || result.error || "Submission failed")
       }
 
-      // Agar result me requiresVerification hai to Guest wala message, warna success
+      // Success Logic
       if (result.requiresVerification) {
         toast.info("Verification code sent to your email.")
       } else {
         toast.success("Article submitted successfully!")
+        
+        // Reset Form
         setFormData(initialFormState)
         setCurrentStep(1)
         if(fileInputRef.current) fileInputRef.current.value = ""
+        // Author image input bhi reset karein
+        const imgInput = document.getElementById('authorImage')
+        if(imgInput) imgInput.value = ""
       }
 
     } catch (error) {
@@ -284,6 +301,66 @@ export default function SubmitPaperPage() {
                   <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
                     Please provide your contact information. This will be used for correspondence regarding your submission.
                   </p>
+
+                 {/* --- NEW THUMBNAIL UPLOAD DESIGN (REPLACE OLD CIRCLE CODE) --- */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Author Thumbnail</label>
+                    
+                    <div className="flex items-start gap-5">
+                      {/* Thumbnail Preview Box */}
+                      <div className="w-32 h-32 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+                        {formData.authorImage ? (
+                          <img 
+                            src={URL.createObjectURL(formData.authorImage)} 
+                            alt="Thumbnail Preview" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="text-center">
+                            <span className="text-2xl text-gray-400">📷</span>
+                            <span className="text-xs text-gray-400 block mt-1">No image</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Upload Button & Info */}
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-600 mb-3">
+                          Upload a clear photo. This will be displayed on the article page.
+                        </p>
+                        
+                        <div className="flex gap-3">
+                          <label 
+                            htmlFor="authorImage" 
+                            className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                          >
+                            Select Image
+                          </label>
+                          
+                          {formData.authorImage && (
+                             <button
+                               type="button"
+                               onClick={() => setFormData(prev => ({...prev, authorImage: null}))}
+                               className="text-sm text-red-600 hover:text-red-800 font-medium"
+                             >
+                               Remove
+                             </button>
+                          )}
+                        </div>
+
+                        <input 
+                          id="authorImage" 
+                          name="authorImage" 
+                          type="file" 
+                          accept="image/*"
+                          className="hidden" 
+                          onChange={handleInputChange} 
+                        />
+                        <p className="mt-2 text-xs text-gray-500">Supported: JPG, PNG. Max 5MB.</p>
+                      </div>
+                    </div>
+                  </div>
+                  {/* --- END NEW DESIGN --- */}
 
                   <div>
                     <label htmlFor="fullName" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">Full Name</label>

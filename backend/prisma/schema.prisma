@@ -6,51 +6,43 @@ datasource db {
   provider = "postgresql"
 }
 
-/// ==============================
-/// RBAC MODULE
-/// ==============================
-
 /// ---------- core user model ----------
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  phone        String?
-  passwordHash String
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  version      Int      @default(1)
-
-  // RBAC relations
-  roles             UserRole[]
-  refreshTokens     RefreshToken[]
-  auditLogs         AuditLog[]
-  assignedArticles  Article[]
+  id               String         @id @default(cuid())
+  name             String
+  email            String         @unique
+  phone            String?
+  passwordHash     String
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  version          Int            @default(1)
+  assignedArticles Article[]
+  auditLogs        AuditLog[]
+  refreshTokens    RefreshToken[]
+  roles            UserRole[]
 }
 
 /// ---------- roles ----------
 model Role {
-  id          String   @id @default(cuid())
-  name        String   @unique
+  id          String           @id @default(cuid())
+  name        String           @unique
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  users       UserRole[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
   permissions RolePermission[]
+  users       UserRole[]
 }
 
 /// ---------- permissions ----------
 model Permission {
-  id          String   @id @default(cuid())
-  key         String   @unique
+  id          String           @id @default(cuid())
+  key         String           @unique
   description String?
-  module      String? // optional grouping (e.g. "leads", "inventory", "auth")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  roles RolePermission[]
+  module      String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  roles       RolePermission[]
 }
 
 /// ---------- user <-> role ----------
@@ -58,9 +50,8 @@ model UserRole {
   userId     String
   roleId     String
   assignedAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
   @@index([roleId])
@@ -70,10 +61,9 @@ model UserRole {
 model RolePermission {
   roleId       String
   permissionId String
-  assignedAt   DateTime @default(now())
-
-  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  assignedAt   DateTime   @default(now())
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
   @@index([permissionId])
@@ -83,14 +73,13 @@ model RolePermission {
 model AuditLog {
   id         String   @id @default(cuid())
   userId     String?
-  roleName   String? // snapshot of role at time of action
-  action     String  // e.g. "ROLE_ASSIGNED", "LOGIN", "PERMISSION_REVOKED"
-  resource   String  // e.g. "user", "role", "permission"
+  roleName   String?
+  action     String
+  resource   String
   resourceId String?
   payload    Json?
   createdAt  DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id])
+  user       User?    @relation(fields: [userId], references: [id])
 }
 
 model RefreshToken {
@@ -100,105 +89,82 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
   revoked   Boolean  @default(false)
-
-  user User @relation(fields: [userId], references: [id])
-}
-
-//ARTICLE SUBMISSION MODULE
-
-enum ArticleStatus {
-  PENDING_ADMIN_REVIEW
-  ASSIGNED_TO_EDITOR
-  PENDING_APPROVAL
-  APPROVED
-  PUBLISHED
-  REJECTED
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Article {
-  id                String        @id @default(cuid())
-  
-  // Author Info (Guest Submission)
-  authorName        String
-  authorEmail       String
-  authorPhone       String?
+  id                 String            @id @default(cuid())
+  authorName         String
+  authorEmail        String
+  authorPhone        String?
   authorOrganization String?
-  
-  // Article Details
-  title             String
-  category          String
-  abstract          String        @db.Text
-  keywords          String?
-  coAuthors         String?       @db.Text
-  remarksToEditor   String?       @db.Text
-  
-  // File Management - Store both PDF and Word versions
-  originalPdfUrl    String        // Original PDF (or converted from Word)
-  currentPdfUrl     String        // Current PDF (can be updated by editor)
-  originalWordUrl   String?       // Original Word (or converted from PDF)
-  currentWordUrl    String?       // Current Word (can be updated by editor)
-  originalFileType  String        @default("pdf") // What user originally uploaded: "pdf" or "docx"
-  
-  // Image Management
-  thumbnailUrl      String?       // Article thumbnail/cover image
-  imageUrls         String[]      // Multiple images (for gallery or inline images)
-  
-  // PDF Content Extraction (for web display)
-  content           String?       @db.Text  // Extracted text from PDF
-  contentHtml       String?       @db.Text  // Optional: formatted HTML version
-  
-  // Workflow
-  status            ArticleStatus @default(PENDING_ADMIN_REVIEW)
-  assignedEditorId  String?
-  assignedEditor    User?         @relation(fields: [assignedEditorId], references: [id])
-  
-  // Timestamps
-  submittedAt       DateTime      @default(now())
-  reviewedAt        DateTime?
-  approvedAt        DateTime?
-  
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  
-  // Revisions
-  revisions         ArticleRevision[]
-  
+  title              String
+  category           String
+  abstract           String
+  keywords           String?
+  coAuthors          String?
+  remarksToEditor    String?
+  originalPdfUrl     String
+  currentPdfUrl      String
+  status             ArticleStatus     @default(PENDING_ADMIN_REVIEW)
+  assignedEditorId   String?
+  submittedAt        DateTime          @default(now())
+  reviewedAt         DateTime?
+  approvedAt         DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  content            String?
+  contentHtml        String?
+  imageUrls          String[]
+  thumbnailUrl       String?
+  currentWordUrl     String?
+  originalFileType   String            @default("pdf")
+  originalWordUrl    String?
+  assignedEditor     User?             @relation(fields: [assignedEditorId], references: [id])
+  revisions          ArticleRevision[]
+
   @@index([status])
   @@index([assignedEditorId])
   @@index([authorEmail])
 }
 
 model ArticleRevision {
-  id          String   @id @default(cuid())
-  articleId   String
-  article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  
-  pdfUrl      String
-  wordUrl     String?  // Store Word version if editor uploads it
-  uploadedBy  String?  // Editor ID if uploaded by editor
-  comments    String?  @db.Text
-  
-  createdAt   DateTime @default(now())
-  
+  id         String   @id @default(cuid())
+  articleId  String
+  pdfUrl     String
+  uploadedBy String?
+  comments   String?
+  createdAt  DateTime @default(now())
+  wordUrl    String?
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
   @@index([articleId])
 }
 
-// EMAIL VERIFICATION MODULE
 model EmailVerification {
-  id            String    @id @default(cuid())
-  resourceId    String    // Temporary ID for the resource being verified
-  resourceType  String    // Type: "ARTICLE", "USER", etc.
-  email         String    // Email to be verified
-  token         String    @unique // Verification token
-  isVerified    Boolean   @default(false)
-  verifiedAt    DateTime?
-  ttl           DateTime  // Time-to-live (expiration timestamp - 48 hours)
-  metadata      Json?     // Store temporary data (article details, file paths)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
+  id           String    @id @default(cuid())
+  resourceId   String
+  resourceType String
+  email        String
+  token        String    @unique
+  isVerified   Boolean   @default(false)
+  verifiedAt   DateTime?
+  ttl          DateTime
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
   @@index([token])
   @@index([email])
   @@index([ttl])
   @@index([isVerified])
+}
+
+enum ArticleStatus {
+  PENDING_ADMIN_REVIEW
+  ASSIGNED_TO_EDITOR
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PUBLISHED
 }

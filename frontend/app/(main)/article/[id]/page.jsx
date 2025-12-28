@@ -13,55 +13,67 @@ const ArrowLeftIcon = () => (
 const DownloadIcon = () => (
   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
 );
+const WordIcon = () => (
+  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+);
+const LockIcon = () => (
+  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+);
 
 export default function ArticlePage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id;
 
-  // Backend URL define karein (Taaki PDF sahi jagah se uthaye)
   const API_BASE_URL = "http://localhost:4000";
-
   const { token } = useSelector((state) => state.auth);
 
   const [article, setArticle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  
+  // New State: Backend batayega ki limited view hai ya full
+  const [isLimited, setIsLimited] = useState(false);
 
-  // ✅ HELPER FUNCTION: PDF ka sahi URL banane ke liye
   const getPdfUrl = (url) => {
     if (!url) return "#";
-    // Agar URL pehle se full hai (Cloudinary/S3 wagera), toh wahi return karo
     if (url.startsWith("http")) return url;
-    // Agar local path hai, toh uske aage http://localhost:4000 jodo
     return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
   useEffect(() => {
     if (!id) return;
 
-    if (!token) {
-        toast.warning("Please login to read the full article.");
-        router.push("/login"); 
-        return;
-    }
+    // ❌ Redirect Logic Hata Diya (Ab Guest bhi dekh sakta hai)
 
     const fetchArticleData = async () => {
       try {
         setLoading(true);
-        // Backend API call
+        
+        // ✅ Change 1: Headers conditionally banayein
+        const headers = {
+            "Content-Type": "application/json",
+        };
+        // Agar token hai to bhejo, warna mat bhejo (Guest Mode)
+        if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+        }
+
         const res = await fetch(`${API_BASE_URL}/api/articles/${id}/content`, {
             method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
-            }
+            headers: headers
         });
         
         const data = await res.json();
 
         if (res.ok && data.article) {
           setArticle(data.article);
+          // ✅ Change 2: Check karein agar content limited hai
+          if (data.requiresLogin || data.article.isLimited) {
+             setIsLimited(true);
+          } else {
+             setIsLimited(false);
+          }
         } else {
           console.error("Error from backend:", data.message);
           setError(true);
@@ -75,20 +87,62 @@ export default function ArticlePage() {
     };
 
     fetchArticleData();
-  }, [id, token, router]);
+  }, [id, token]); // Router dependency hata di
+
+  const handleDownload = async (type) => {
+    if (!token) {
+      toast.warning("Please login to download.");
+      router.push("/login");
+      return;
+    }
+
+    try {
+      // Toast dikhao ki download shuru ho raha hai
+      toast.info(`Downloading ${type.toUpperCase()}...`);
+
+      // Backend API endpoint decide karo
+      const endpoint = type === 'word' ? 'download/word' : 'download/pdf';
+      
+      // Fetch request with Token
+      const res = await fetch(`${API_BASE_URL}/api/articles/${id}/${endpoint}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`, // 👈 Ye zaroori hai
+        },
+      });
+
+      if (!res.ok) throw new Error("Download failed");
+
+      // File ko Blob (binary data) mein convert karo
+      const blob = await res.blob();
+      
+      // Temporary link bana kar download trigger karo
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${article.title}.${type === 'word' ? 'docx' : 'pdf'}`; // Filename set karo
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Download complete!");
+
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to download file. Please try again.");
+    }
+  };
 
   if (loading) return (
     <div className="max-w-3xl mx-auto py-20 px-6 animate-pulse">
       <div className="h-4 bg-gray-200 rounded w-1/4 mb-6"></div>
       <div className="h-12 bg-gray-200 rounded w-3/4 mb-6"></div>
-      <div className="flex gap-4 mb-12">
-        <div className="h-10 w-10 bg-gray-200 rounded-full"></div>
-        <div className="h-10 bg-gray-200 rounded w-1/3"></div>
-      </div>
-      <div className="space-y-4">
+      <div className="space-y-4 mt-10">
+        <div className="h-4 bg-gray-200 rounded w-full"></div>
         <div className="h-4 bg-gray-200 rounded w-full"></div>
         <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-        <div className="h-4 bg-gray-200 rounded w-full"></div>
       </div>
     </div>
   );
@@ -96,7 +150,6 @@ export default function ArticlePage() {
   if (error || !article) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
       <h2 className="text-2xl font-semibold text-gray-900 mb-2">Article unavailable</h2>
-      <p className="text-gray-500 mb-6">The article you are looking for has been moved, deleted, or you don't have permission to view it.</p>
       <Link href="/law/home" className="flex items-center text-sm font-medium text-gray-900 hover:underline">
         <ArrowLeftIcon /> Back to Library
       </Link>
@@ -125,6 +178,16 @@ export default function ArticlePage() {
             </span>
           </div>
 
+          {article.thumbnailUrl && (
+            <div className="w-full h-[300px] sm:h-[400px] mb-8 rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
+              <img 
+                src={article.thumbnailUrl.startsWith("http") ? article.thumbnailUrl : `${API_BASE_URL}${article.thumbnailUrl}`} 
+                alt={article.title} 
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
           <h1 className="text-3xl sm:text-5xl font-bold tracking-tight leading-[1.1] mb-8 text-gray-900">
             {article.title}
           </h1>
@@ -140,16 +203,24 @@ export default function ArticlePage() {
               </div>
             </div>
 
-            {/* ✅ FIX: PDF URL function use kiya */}
-            {article.currentPdfUrl && (
-              <a 
-                href={getPdfUrl(article.currentPdfUrl)} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="hidden sm:flex items-center text-sm font-medium text-gray-600 hover:text-black border border-gray-200 rounded-full px-4 py-2 hover:border-gray-400 transition-all"
+            {/* Only show PDF button if NOT limited */}
+            {!isLimited && article.currentPdfUrl && (
+              <button 
+                onClick={() => handleDownload('pdf')} // 👈 PDF ke liye function call
+                className="hidden sm:flex items-center text-sm font-medium text-gray-600 hover:text-black border border-gray-200 rounded-full px-4 py-2 hover:border-gray-400 transition-all cursor-pointer"
               >
                 <DownloadIcon /> PDF
-              </a>
+              </button>
+            )}
+
+           {/* ✅ FIXED: Desktop Word Button (Now using onClick) */}
+            {!isLimited && article.currentWordUrl && (
+              <button 
+                onClick={() => handleDownload('word')}
+                className="hidden sm:flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 border border-blue-200 rounded-full px-4 py-2 hover:border-blue-400 transition-all ml-3"
+              >
+                <WordIcon /> Word
+              </button>
             )}
           </div>
         </header>
@@ -160,7 +231,10 @@ export default function ArticlePage() {
           </div>
         )}
 
-        <div className="prose prose-lg prose-slate max-w-none prose-headings:font-bold prose-a:text-blue-600 hover:prose-a:text-blue-500 prose-img:rounded-xl">
+        {/* Content Body */}
+        <div className={`prose prose-lg prose-slate max-w-none prose-headings:font-bold prose-a:text-blue-600 hover:prose-a:text-blue-500 prose-img:rounded-xl ${isLimited ? 'relative' : ''}`}>
+          
+          {/* HTML or Text Content */}
           {article.contentHtml ? (
             <div dangerouslySetInnerHTML={{ __html: article.contentHtml }} />
           ) : article.content ? (
@@ -169,13 +243,29 @@ export default function ArticlePage() {
             </div>
           ) : (
             <div className="p-6 bg-gray-50 rounded-lg text-center text-gray-500 text-sm">
-              Preview text unavailable. Please download the PDF.
+              Preview text unavailable.
             </div>
           )}
+
+          {/* ✅ Change 3: Fade Out Effect & Login Button for Guests */}
+          {isLimited && (
+            <div className="absolute bottom-0 left-0 w-full h-48 bg-gradient-to-t from-white via-white/90 to-transparent flex items-end justify-center pb-0">
+               <div className="w-full text-center bg-white pt-4">
+                  <p className="text-gray-600 mb-4">You are reading a preview.</p>
+                  <Link 
+                    href="/login"
+                    className="inline-flex items-center justify-center bg-red-700 text-white font-semibold px-8 py-3 rounded-full hover:bg-red-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  >
+                    <LockIcon /> Login to Read Full Article
+                  </Link>
+               </div>
+            </div>
+          )}
+
         </div>
 
-        {/* ✅ FIX: Mobile button me bhi URL fix kiya */}
-        {article.currentPdfUrl && (
+        {/* Download Button at Bottom (Only for Logged In users) */}
+        {!isLimited && article.currentPdfUrl && (
             <div className="mt-16 pt-8 border-t border-gray-100 sm:hidden">
                  <a 
                 href={getPdfUrl(article.currentPdfUrl)} 
@@ -187,6 +277,16 @@ export default function ArticlePage() {
               </a>
             </div>
         )}
+
+          {/* Word Button for Mobile ONLY */}
+            {article.currentWordUrl && (
+              <button 
+                onClick={() => handleDownload('word')}
+                className="flex sm:hidden items-center justify-center w-full bg-blue-600 text-white text-sm font-medium px-6 py-4 rounded-lg"
+              >
+                <WordIcon /> Download Word
+              </button>
+            )}
 
       </div>
     </article>
