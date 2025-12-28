@@ -35,25 +35,50 @@ export default function HomePage() {
   // 2. Updated useEffect
   // Isse useEffect ke upar (BAHAR) rakho taaki Search button bhi ise use kar sake
   // Purane fetchArticles ki jagah ye naya wala paste karein
-  const fetchArticles = async (searchQuery = "") => {
+ const fetchArticles = async (searchQuery = "", currentFilters = {}) => {
     setIsLoading(true);
     if (searchQuery) setIsSearching(true);
 
     try {
-      // Backend ko 'query' param chahiye
-      let url = searchQuery
-        ? `${API_BASE_URL}/api/articles/search?q=${encodeURIComponent(searchQuery)}`
-        : `${API_BASE_URL}/api/articles/published`;
+      let url;
+
+      // Agar search query ya koi filter hai
+      if (searchQuery.trim() || currentFilters.keywords || currentFilters.authors) {
+        const params = new URLSearchParams();
+        
+        // Backend requirement: 'q' is mostly required for search endpoint, 
+        // lekin agar sirf filter hai toh bhi hum empty 'q' bhej sakte hain ya handle kar sakte hain.
+        // Aapka backend code kehta hai: if (!q) throw Error. 
+        // Isliye hum ensure karenge ki 'q' hamesha jaye, chahe empty string ho.
+        params.append("q", searchQuery || ""); 
+
+        // Mapping: Frontend State -> Backend Param
+        if (currentFilters.keywords) {
+             params.append("keyword", currentFilters.keywords);
+        }
+        if (currentFilters.authors) {
+             params.append("author", currentFilters.authors);
+        }
+        
+        url = `${API_BASE_URL}/api/articles/search?${params.toString()}`;
+      } else {
+        // Agar sab khali hai -> Normal Published Articles
+        url = `${API_BASE_URL}/api/articles/published`;
+      }
+
+      console.log("Fetching URL:", url);
 
       const res = await fetch(url);
       const data = await res.json();
 
-      // DEBUG: Console mein zaroor check karein ki data aa raha hai
-      console.log("Backend Response:", data);
-
-      // Backend 'results' bhej raha hai search ke liye, hum usey yahan catch kar rahe hain
       const list = data.results || data.articles || data.data || [];
       setPublishedArticles(list);
+
+      // Agar user ne search kiya aur list khali aayi
+      if ((searchQuery || currentFilters.keywords || currentFilters.authors) && list.length === 0) {
+        toast.info("No articles found matching your criteria.");
+      }
+
     } catch (error) {
       console.error("Fetch error:", error);
       toast.error("Failed to load articles");
@@ -180,14 +205,8 @@ export default function HomePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!query.trim()) {
-      fetchArticles(); // Khali search par default list dikhao
-      return;
-    }
-
-    // Ab ye fetchArticles ko dhoond lega kyunki wo bahar define hai
-    await fetchArticles(query);
+    // Query aur Filters dono pass karo
+    await fetchArticles(query, filters);
   };
 
   const updateFilter = (name, value) => {

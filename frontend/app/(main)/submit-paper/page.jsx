@@ -127,7 +127,7 @@ export default function SubmitPaperPage() {
       data.append("category", formData.contentFormat)
       data.append("abstract", formData.detailedDescription)
       data.append("keywords", formData.keywords.join(", ")) 
-      data.append("pdf", formData.file) 
+      data.append("document", formData.file)
 
       // --- YE CHANGE HAI BAS ---
       const token = localStorage.getItem("authToken"); 
