@@ -58,6 +58,7 @@ export class ArticleService {
         originalWordUrl: wordPath,
         currentWordUrl: wordPath,
         originalFileType: fileType,
+        thumbnailUrl: data.thumbnailUrl || null,
         status: "PENDING_ADMIN_REVIEW",
       },
     });
@@ -71,13 +72,19 @@ export class ArticleService {
       // Continue without content - PDF will still be available for download
     }
 
+    // Combine uploaded images with extracted images
+    const allImageUrls = [
+      ...(data.imageUrls || []),
+      ...(pdfContent.images || [])
+    ];
+
     // Update article with extracted content and images
     const updatedArticle = await prisma.article.update({
       where: { id: article.id },
       data: {
         content: pdfContent.text || null,
         contentHtml: pdfContent.html || null,
-        imageUrls: pdfContent.images || [],
+        imageUrls: allImageUrls,
       },
     });
 
@@ -167,6 +174,7 @@ export class ArticleService {
         originalWordUrl: wordPath,
         currentWordUrl: wordPath,
         originalFileType: fileType,
+        thumbnailUrl: metadata.thumbnailUrl || null,
         status: "PENDING_ADMIN_REVIEW",
       },
     });
@@ -180,13 +188,19 @@ export class ArticleService {
       // Continue without content - PDF will still be available for download
     }
 
+    // Combine uploaded images with extracted images
+    const allImageUrls = [
+      ...(metadata.imageUrls || []),
+      ...(pdfContent.images || [])
+    ];
+
     // Update article with extracted content and images
     const updatedArticle = await prisma.article.update({
       where: { id: article.id },
       data: {
         content: pdfContent.text || null,
         contentHtml: pdfContent.html || null,
-        imageUrls: pdfContent.images || [],
+        imageUrls: allImageUrls,
       },
     });
 

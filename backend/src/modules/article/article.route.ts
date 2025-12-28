@@ -14,6 +14,14 @@ router.post(
   articleController.submitArticle.bind(articleController)
 );
 
+// Alternative: Submit with PDF + images together
+router.post(
+  "/submit-with-images",
+  optionalAuth,
+  uploadArticleFiles, // Handles PDF + thumbnail + multiple images
+  articleController.submitArticle.bind(articleController)
+);
+
 // PUBLIC: Verify email and create article
 router.get(
   "/verify/:token",

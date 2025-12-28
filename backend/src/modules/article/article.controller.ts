@@ -30,6 +30,9 @@ export class ArticleController {
       const data: ArticleSubmissionData = {
         ...validatedData,
         pdfUrl: req.fileMeta.url,
+        // Include image URLs if they were uploaded via uploadArticleFiles middleware
+        thumbnailUrl: req.body.thumbnailUrl || undefined,
+        imageUrls: req.body.imageUrls || undefined,
       };
 
       // Pass user ID if logged in (null for guests)

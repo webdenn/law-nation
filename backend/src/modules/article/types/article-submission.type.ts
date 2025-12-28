@@ -12,6 +12,8 @@ export interface ArticleSubmissionData {
   coAuthors?: string | undefined;
   remarksToEditor?: string | undefined;
   pdfUrl: string;
+  thumbnailUrl?: string | undefined;
+  imageUrls?: string[] | undefined;
 }
 
 // Extended type for verification metadata (includes temp file path)

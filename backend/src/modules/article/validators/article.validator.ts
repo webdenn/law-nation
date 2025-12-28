@@ -12,6 +12,8 @@ export const articleSubmissionSchema = z.object({
   keywords: z.string().optional(),
   coAuthors: z.string().optional(),
   remarksToEditor: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
+  imageUrls: z.array(z.string()).optional(),
 });
 
 export const assignEditorSchema = z.object({
