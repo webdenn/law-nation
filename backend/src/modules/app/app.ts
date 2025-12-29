@@ -8,11 +8,13 @@ import { nonExistingRoutesErrorHandler } from "@/error-handlers/non-existing-rou
 import { jwtErrorHandler } from "@/error-handlers/jwt.error-handler.js";
 import { globalErrorHandler } from "@/error-handlers/global.error-handler.js";
 import AppRouter from "./app.route.js";
+import dotenv from "dotenv";
 
+dotenv.config();
 // /src/app.ts
 const app: express.Application = express();
 app.use(cors({
-  origin: "http://localhost:3000", // Frontend URL specifically batayein (Best Practice)
+  origin: process.env.CORS_ORIGIN, // Frontend URL specifically batayein (Best Practice)
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], // ✅ PATCH allow kiya
   allowedHeaders: ["Content-Type", "Authorization"] // ✅ Token aur JSON headers allow kiye
