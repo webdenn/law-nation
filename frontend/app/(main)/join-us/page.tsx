@@ -18,7 +18,7 @@ export default function JoinUsPage() {
     confirmPassword: ""
   })
   
-  const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:4000";
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
   // OTP States
   const [otp, setOtp] = useState("") 
   const [isOtpSent, setIsOtpSent] = useState(false) 

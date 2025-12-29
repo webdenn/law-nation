@@ -3,8 +3,6 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import dotenv from 'dotenv';
-dotenv.config();
 
 export default function AddEditorPage() {
   const router = useRouter();
@@ -14,7 +12,7 @@ export default function AddEditorPage() {
   const [loading, setLoading] = useState(false);
   
   // Backend URL
-  const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:4000";
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 
   const handleInvite = async (e) => {
     e.preventDefault();

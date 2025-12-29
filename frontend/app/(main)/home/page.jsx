@@ -14,7 +14,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
 
-  const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:4000";
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 
   // 1. Redux se login status check karna
   const { user } = useSelector((state) => state.auth);

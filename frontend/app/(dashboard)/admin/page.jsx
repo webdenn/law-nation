@@ -64,7 +64,7 @@ export default function AdminDashboard() {
   const [editors, setEditors] = useState([]);
   const [articles, setArticles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:4000";
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 
   // ✅ FETCH DATA (Articles + Editors)
   useEffect(() => {

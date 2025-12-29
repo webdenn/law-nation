@@ -3,8 +3,6 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { toast, ToastContainer } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
-import dotenv from 'dotenv';
-dotenv.config();
 
 export default function Adminlogin() {
   const router = useRouter()
@@ -63,7 +61,7 @@ export default function Adminlogin() {
     setIsLoading(true)
 
     try {
-      const API_URL = process.env.API_BASE_URL || "http://localhost:4000";
+      const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
       console.log("Using API URL:", API_URL); 
       const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",

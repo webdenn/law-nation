@@ -142,7 +142,7 @@ export default function SubmitPaperPage() {
 
       // Token Check
       const token = localStorage.getItem("authToken"); 
-      const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:4000";
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
       const API_URL = `${API_BASE_URL}/api/articles`
       
       // ✅ CHANGE 3: URL '/submit-with-images' hona chahiye
