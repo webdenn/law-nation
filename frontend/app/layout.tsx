@@ -4,6 +4,8 @@ import "./globals.css";
 import StoreProvider from "./components/storeProvider"; 
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import dotenv from 'dotenv';
+dotenv.config();
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });

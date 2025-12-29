@@ -20,7 +20,7 @@ export default function Login() {
   
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-
+  const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:4000";
   // ✅ Fix 1: TypeScript Type added for Input Change
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -33,7 +33,7 @@ export default function Login() {
     setIsLoading(true)
 
     try {
-      const response = await fetch("http://localhost:4000/api/auth/login", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

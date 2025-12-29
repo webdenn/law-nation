@@ -33,7 +33,7 @@ export default function EditorDashboard() {
   const pendingTasks = articles.filter(a => a.status !== "Published").length || 0;
   const efficiency = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  const API_BASE_URL = "http://localhost:4000";
+  const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:4000";
 
   const [profile, setProfile] = useState({
     id: "",

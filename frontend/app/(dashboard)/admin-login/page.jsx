@@ -61,7 +61,7 @@ export default function Adminlogin() {
     setIsLoading(true)
 
     try {
-      const API_URL = "http://localhost:4000/api"
+      const API_URL = process.env.API_BASE_URL || "http://localhost:4000";
       
       const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",

@@ -18,6 +18,7 @@ export default function JoinUsPage() {
     confirmPassword: ""
   })
   
+  const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:4000";
   // OTP States
   const [otp, setOtp] = useState("") 
   const [isOtpSent, setIsOtpSent] = useState(false) 
@@ -51,7 +52,7 @@ export default function JoinUsPage() {
     setIsLoading(true)
     try {
       // Backend Send OTP Endpoint (Port 4000)
-      const response = await fetch("http://localhost:4000/api/auth/send-otp", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
@@ -81,7 +82,7 @@ export default function JoinUsPage() {
     setIsLoading(true)
     try {
       // 1. Verify OTP Call
-      const verifyResponse = await fetch("http://localhost:4000/api/auth/verify-otp", {
+      const verifyResponse = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email, otp: otp }),
@@ -102,8 +103,8 @@ export default function JoinUsPage() {
         password: formData.password,
         phone: formData.phone
       }
-      
-      const signupResponse = await fetch("http://localhost:4000/api/auth/signup", {
+
+      const signupResponse = await fetch(`${API_BASE_URL}/api/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

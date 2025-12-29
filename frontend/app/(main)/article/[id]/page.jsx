@@ -25,7 +25,7 @@ export default function ArticlePage() {
   const router = useRouter();
   const id = params?.id;
 
-  const API_BASE_URL = "http://localhost:4000";
+  const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:4000";
   const { token } = useSelector((state) => state.auth);
 
   const [article, setArticle] = useState(null);
