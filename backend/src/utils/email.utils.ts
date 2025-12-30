@@ -1,5 +1,16 @@
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import { generateOtpEmailHtml } from "@/templates/email/auth/otp.template.js";
+import { generateWelcomeEmailHtml } from "@/templates/email/auth/welcome.template.js";
+import { generateArticleSubmissionHtml } from "@/templates/email/article/submission.template.js";
+import { generateArticleVerificationHtml } from "@/templates/email/article/verification.template.js";
+import { generateArticleVerificationCodeHtml } from "@/templates/email/article/verification-code.template.js";
+import { generateAuthorAssignmentHtml } from "@/templates/email/article/assignment.template.js";
+import { generateArticleApprovalHtml } from "@/templates/email/article/approval.template.js";
+import { generateArticleCorrectionHtml } from "@/templates/email/article/correction.template.js";
+import { generateEditorInvitationHtml } from "@/templates/email/editor/invitation.template.js";
+import { generateEditorTaskAssignedHtml } from "@/templates/email/editor/task-assigned.template.js";
+import { generateCoAuthorNotificationHtml } from "@/templates/email/article/coauthor-notification.template.js";
 
 dotenv.config();
 
@@ -26,7 +37,7 @@ export async function sendEmail(options: EmailOptions) {
       throw new Error("Missing EMAIL_USER or EMAIL_PASS in .env file");
     }
     await transporter.sendMail({
-      from: `"Law Nation" <${process.env.EMAIL_USER}>`,
+      from: process.env.SMTP_FROM || `"Law Nation" <${process.env.EMAIL_USER}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -39,154 +50,78 @@ export async function sendEmail(options: EmailOptions) {
 }
 
 // --- AUTH EMAILS ---
-// --- PROFESSIONAL AUTH EMAILS (Signup/Login) ---
-// --- RED & WHITE PROFESSIONAL THEME ---
 
-// --- OTP EMAIL VERIFICATION ---
 export async function sendOtpEmail(userEmail: string, otp: string) {
-  const subject = "Your Email Verification Code - Law Nation";
-  
-  const htmlContent = `
-    <div style="font-family: 'Helvetica', Arial, sans-serif; max-width: 600px; margin: auto; border: 2px solid #d32f2f; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
-      
-      <div style="background-color: #d32f2f; padding: 30px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 32px; letter-spacing: 2px; font-weight: bold; text-transform: uppercase;">LAW NATION</h1>
-        <p style="color: #ffcdd2; margin: 5px 0 0 0; font-size: 12px; letter-spacing: 1px;">EMAIL VERIFICATION</p>
-      </div>
-      
-      <div style="padding: 40px 30px; color: #333; line-height: 1.8; text-align: center;">
-        <h2 style="color: #d32f2f; font-size: 26px; margin-bottom: 20px;">Verify Your Email</h2>
-        
-        <p style="font-size: 17px; color: #444;">
-          Enter this verification code to complete your registration:
-        </p>
-        
-        <div style="background-color: #f5f5f5; border: 2px dashed #d32f2f; border-radius: 8px; padding: 20px; margin: 30px 0;">
-          <div style="font-size: 42px; font-weight: bold; color: #d32f2f; letter-spacing: 8px; font-family: 'Courier New', monospace;">
-            ${otp}
-          </div>
-        </div>
-        
-        <p style="font-size: 14px; color: #666; background-color: #fff3cd; padding: 10px; border-left: 3px solid #ffc107; margin: 20px 0;">
-          ⏰ <strong>Important:</strong> This code will expire in <strong>10 minutes</strong>.
-        </p>
-        
-        <p style="font-size: 13px; color: #999; margin-top: 30px;">
-          If you didn't request this code, please ignore this email.
-        </p>
-        
-        <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 30px 0;">
-        
-        <div style="font-size: 13px; color: #777;">
-          <p style="margin: 0;">Regards,</p>
-          <p style="margin: 5px 0; font-weight: bold; color: #d32f2f;">Executive Team, Law Nation</p>
-        </div>
-      </div>
-
-      <div style="background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eeeeee;">
-        Law Nation &copy; 2025 | New Delhi, India | This code is valid for 10 minutes
-      </div>
-    </div>
-  `;
-
-  return sendEmail({ to: userEmail, subject, html: htmlContent });
+  const { subject, html } = generateOtpEmailHtml({ otp });
+  return sendEmail({ to: userEmail, subject, html });
 }
 
-// --- RED & WHITE PROFESSIONAL THEME (Signup Only) ---
 export async function sendAuthNotification(userEmail: string, userName: string) {
-  const subject = "Welcome to Law Nation! ⚖️";
-  
-  const htmlContent = `
-    <div style="font-family: 'Helvetica', Arial, sans-serif; max-width: 600px; margin: auto; border: 2px solid #d32f2f; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
-      
-      <div style="background-color: #d32f2f; padding: 30px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 32px; letter-spacing: 2px; font-weight: bold; text-transform: uppercase;">LAW NATION</h1>
-        <p style="color: #ffcdd2; margin: 5px 0 0 0; font-size: 12px; letter-spacing: 1px;">THE ULTIMATE LEGAL RESEARCH PORTAL</p>
-      </div>
-      
-      <div style="padding: 40px 30px; color: #333; line-height: 1.8; text-align: center;">
-        <h2 style="color: #d32f2f; font-size: 26px; margin-bottom: 20px;">Registration Successful</h2>
-        
-        <p style="font-size: 17px; color: #444;">
-          We are honored to welcome you to <b>Law Nation Prime Times</b>. Your gateway to premium legal scholarships and expert research analysis is now active.
-        </p>
-        
-        <div style="margin: 35px 0;">
-          <a href="http://localhost:3000/law/home" style="background-color: #d32f2f; color: #ffffff; padding: 15px 35px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">ACCESS PORTAL</a>
-        </div>
-        
-        <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 30px 0;">
-        
-        <div style="font-size: 13px; color: #777;">
-          <p style="margin: 0;">Regards,</p>
-          <p style="margin: 5px 0; font-weight: bold; color: #d32f2f;">Executive Team, Law Nation</p>
-        </div>
-      </div>
-
-      <div style="background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eeeeee;">
-        Law Nation &copy; 2025 | New Delhi, India | Legal Scholarship Excellence
-      </div>
-    </div>
-  `;
-
-  return sendEmail({ to: userEmail, subject, html: htmlContent });
+  const { subject, html } = generateWelcomeEmailHtml({
+    userName,
+    frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000'
+  });
+  return sendEmail({ to: userEmail, subject, html });
 }
 
-// --- ARTICLE EMAILS (RED THEME) ---
+// --- ARTICLE EMAILS ---
 
 export async function sendArticleSubmissionConfirmation(authorEmail: string, authorName: string, articleTitle: string, articleId: string) {
-  const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #d32f2f; border-radius: 8px; overflow: hidden;">
-      <div style="background-color: #d32f2f; padding: 20px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 22px;">LAW NATION</h1>
-      </div>
-      <div style="padding: 30px;">
-        <h3 style="color: #d32f2f; border-bottom: 2px solid #f44336; padding-bottom: 10px;">Submission Received</h3>
-        <p>Your article <b>"${articleTitle}"</b> has been received for review.</p>
-        <p style="font-size: 14px; color: #666;"><b>Article ID:</b> ${articleId}</p>
-      </div>
-    </div>`;
-  return sendEmail({ to: authorEmail, subject: "Article Received", html: htmlContent });
+  const { subject, html } = generateArticleSubmissionHtml({
+    authorName,
+    articleTitle,
+    articleId
+  });
+  return sendEmail({ to: authorEmail, subject, html });
+}
+
+export async function sendCoAuthorNotification(coAuthorEmail: string, coAuthorName: string, primaryAuthorName: string, articleTitle: string, articleId: string) {
+  const { subject, html } = generateCoAuthorNotificationHtml({
+    coAuthorName,
+    primaryAuthorName,
+    articleTitle,
+    articleId
+  });
+  return sendEmail({ to: coAuthorEmail, subject, html });
 }
 
 export async function sendAuthorAssignmentNotification(authorEmail: string, authorName: string, articleTitle: string, articleId: string) {
-  const htmlContent = `
-    <div style="font-family: 'Georgia', serif; max-width: 600px; margin: auto; border: 1px solid #d4af37; border-radius: 8px; overflow: hidden;">
-      <div style="background-color: #1a1a1a; padding: 20px; text-align: center;">
-        <h1 style="color: #d4af37; margin: 0; font-size: 22px;">LAW NATION</h1>
-      </div>
-      <div style="padding: 30px; text-align: center;">
-        <h2 style="color: #1a1a1a;">Editor Assigned</h2>
-        <p style="font-size: 16px;">Your article <b>"${articleTitle}"</b> has been successfully assigned to an editor for formal review.</p>
-        <p style="color: #555;">You will be notified once the review process is complete.</p>
-      </div>
-    </div>`;
-
-  return sendEmail({ to: authorEmail, subject: "Status Update: Editor Assigned", html: htmlContent });
+  const { subject, html } = generateAuthorAssignmentHtml({
+    authorName,
+    articleTitle,
+    articleId
+  });
+  return sendEmail({ to: authorEmail, subject, html });
 }
 
 export async function sendEditorAssignmentNotification(editorEmail: string, editorName: string, articleTitle: string, authorName: string, category: string, articleId: string) {
-  return sendEmail({
-    to: editorEmail,
-    subject: "New Review Task Assigned",
-    html: `<h2>New Assignment</h2><p>Editor ${editorName}, you have a new article "${articleTitle}" from ${authorName} to review.</p>`,
+  const { subject, html } = generateEditorTaskAssignedHtml({
+    editorName,
+    articleTitle,
+    authorName,
+    category,
+    articleId
   });
+  return sendEmail({ to: editorEmail, subject, html });
 }
 
 export async function sendArticleApprovalNotification(authorEmail: string, authorName: string, articleTitle: string, articleId: string) {
-  return sendEmail({
-    to: authorEmail,
-    subject: "Article Approved and Published",
-    html: `<h2>Congratulations!</h2><p>Dear ${authorName}, your article "<strong>${articleTitle}</strong>" has been published.</p>`,
+  const { subject, html } = generateArticleApprovalHtml({
+    authorName,
+    articleTitle,
+    articleId
   });
+  return sendEmail({ to: authorEmail, subject, html });
 }
 
 export async function sendArticleCorrectionNotification(authorEmail: string, authorName: string, articleTitle: string, articleId: string, editorComments?: string) {
-  return sendEmail({
-    to: authorEmail,
-    subject: "Article Correction Required",
-    html: `<h2>Correction Needed</h2><p>Your article "${articleTitle}" needs updates.</p>${editorComments ? `<p>Comments: ${editorComments}</p>` : ""}`,
+  const { subject, html } = generateArticleCorrectionHtml({
+    authorName,
+    articleTitle,
+    articleId,
+    ...(editorComments && { editorComments })
   });
+  return sendEmail({ to: authorEmail, subject, html });
 }
 
 // --- EMAIL VERIFICATION FOR ARTICLE SUBMISSION ---
@@ -195,51 +130,25 @@ export async function sendArticleVerificationEmail(
   authorName: string,
   token: string
 ) {
-  const verificationUrl = `${process.env.BACKEND_URL || 'http://localhost:4000'}/api/articles/verify/${token}`;
-  
-  const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #d32f2f; border-radius: 8px; overflow: hidden;">
-      <div style="background-color: #d32f2f; padding: 20px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 22px;">LAW NATION</h1>
-      </div>
-      <div style="padding: 30px;">
-        <h3 style="color: #d32f2f;">Verify Your Article Submission</h3>
-        <p>Dear ${authorName},</p>
-        <p>Thank you for submitting your article to Law Nation. Please verify your email address to complete the submission.</p>
-        
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${verificationUrl}" 
-             style="background-color: #d32f2f; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
-            VERIFY EMAIL
-          </a>
-        </div>
-        
-        <p style="font-size: 14px; color: #666; background-color: #fff3cd; padding: 10px; border-left: 3px solid #ffc107; margin: 20px 0;">
-          ⏰ <strong>Important:</strong> This verification link will expire in <strong>48 hours</strong>.
-        </p>
-        
-        <p style="font-size: 12px; color: #666;">
-          If you didn't submit this article, please ignore this email. The submission will be automatically deleted after 48 hours.
-        </p>
-        
-        <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 20px 0;">
-        
-        <p style="font-size: 11px; color: #999;">
-          Or copy and paste this link into your browser:<br>
-          <span style="word-break: break-all;">${verificationUrl}</span>
-        </p>
-      </div>
-      <div style="background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eeeeee;">
-        Law Nation &copy; 2025 | This link is valid for 48 hours
-      </div>
-    </div>
-  `;
-  
-  return sendEmail({
-    to: authorEmail,
-    subject: "Verify Your Article Submission - Law Nation (Valid for 48 Hours)",
-    html: htmlContent
+  const { subject, html } = generateArticleVerificationHtml({
+    authorName,
+    token,
+    backendUrl: process.env.BACKEND_URL || 'http://localhost:4000'
   });
+  return sendEmail({ to: authorEmail, subject, html });
+}
+
+// --- EMAIL VERIFICATION WITH CODE FOR ARTICLE SUBMISSION ---
+export async function sendArticleVerificationCodeEmail(
+  authorEmail: string,
+  authorName: string,
+  code: string
+) {
+  const { subject, html } = generateArticleVerificationCodeHtml({
+    authorName,
+    code
+  });
+  return sendEmail({ to: authorEmail, subject, html });
 }
 
 // --- EDITOR INVITATION EMAIL ---
@@ -248,77 +157,159 @@ export async function sendEditorInvitationEmail(
   editorName: string,
   token: string
 ) {
-  const setupPasswordUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/law/setup-password?token=${token}`;
-  
-  const htmlContent = `
-    <div style="font-family: 'Helvetica', Arial, sans-serif; max-width: 600px; margin: auto; border: 2px solid #d32f2f; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
-      
-      <div style="background-color: #d32f2f; padding: 30px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 32px; letter-spacing: 2px; font-weight: bold; text-transform: uppercase;">LAW NATION</h1>
-        <p style="color: #ffcdd2; margin: 5px 0 0 0; font-size: 12px; letter-spacing: 1px;">EDITOR INVITATION</p>
-      </div>
-      
-      <div style="padding: 40px 30px; color: #333; line-height: 1.8;">
-        <h2 style="color: #d32f2f; font-size: 26px; margin-bottom: 20px; text-align: center;">Welcome to Law Nation!</h2>
-        
-        <p style="font-size: 17px; color: #444;">
-          Dear <strong>${editorName}</strong>,
-        </p>
-        
-        <p style="font-size: 16px; color: #555; line-height: 1.8;">
-          You have been invited to join <strong>Law Nation</strong> as an <strong style="color: #d32f2f;">Editor</strong>. 
-          We are excited to have you on our team to review and approve scholarly legal articles.
-        </p>
-        
-        <div style="background-color: #f5f5f5; border-left: 4px solid #d32f2f; padding: 20px; margin: 25px 0;">
-          <p style="margin: 0; font-size: 15px; color: #333;">
-            <strong>Next Step:</strong> Click the button below to set up your password and activate your editor account.
+  const { subject, html } = generateEditorInvitationHtml({
+    editorName,
+    token,
+    frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000'
+  });
+  return sendEmail({ to: editorEmail, subject, html });
+}
+
+/**
+ * Send notification to admin when editor approves article
+ */
+export async function sendEditorApprovalNotificationToAdmin(
+  adminEmail: string,
+  adminName: string,
+  articleTitle: string,
+  editorName: string,
+  articleId: string
+) {
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const reviewUrl = `${frontendUrl}/admin/articles/${articleId}/review`;
+  const changeHistoryUrl = `${frontendUrl}/articles/${articleId}/change-history`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #2c3e50; color: white; padding: 20px; text-align: center; }
+        .content { background-color: #f9f9f9; padding: 30px; border-radius: 5px; margin-top: 20px; }
+        .button { display: inline-block; padding: 12px 30px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 5px; margin: 10px 5px; }
+        .button-secondary { background-color: #3498db; }
+        .footer { text-align: center; margin-top: 30px; color: #7f8c8d; font-size: 12px; }
+        .highlight { background-color: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>📢 Article Ready for Publishing</h1>
+        </div>
+        <div class="content">
+          <p>Dear ${adminName},</p>
+          
+          <div class="highlight">
+            <strong>Editor ${editorName}</strong> has approved the article <strong>"${articleTitle}"</strong>.
+          </div>
+          
+          <p>The article is now ready for your final review and publishing.</p>
+          
+          <p><strong>Next Steps:</strong></p>
+          <ul>
+            <li>Review the article and changes made by the editor</li>
+            <li>View the change history to see what was modified</li>
+            <li>Publish the article when ready</li>
+          </ul>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${reviewUrl}" class="button">Review & Publish Article</a>
+            <a href="${changeHistoryUrl}" class="button button-secondary">View Change History</a>
+          </div>
+          
+          <p style="color: #7f8c8d; font-size: 14px;">
+            <strong>Note:</strong> You can now publish this article from the admin dashboard.
           </p>
         </div>
-        
-        <div style="text-align: center; margin: 35px 0;">
-          <a href="${setupPasswordUrl}" 
-             style="background-color: #d32f2f; color: #ffffff; padding: 15px 40px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-            SET UP PASSWORD
-          </a>
-        </div>
-        
-        <p style="font-size: 14px; color: #666; background-color: #fff3cd; padding: 12px; border-left: 3px solid #ffc107; margin: 25px 0;">
-          ⏰ <strong>Important:</strong> This invitation link will expire in <strong>48 hours</strong>. Please complete your registration before the deadline.
-        </p>
-        
-        <p style="font-size: 13px; color: #777;">
-          Once your password is set, you can log in and start reviewing articles assigned to you.
-        </p>
-        
-        <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 30px 0;">
-        
-        <p style="font-size: 11px; color: #999;">
-          If the button doesn't work, copy and paste this link into your browser:<br>
-          <span style="word-break: break-all; color: #d32f2f;">${setupPasswordUrl}</span>
-        </p>
-        
-        <p style="font-size: 12px; color: #999; margin-top: 20px;">
-          If you didn't expect this invitation, please ignore this email. The invitation will automatically expire after 48 hours.
-        </p>
-        
-        <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 30px 0;">
-        
-        <div style="font-size: 13px; color: #777; text-align: center;">
-          <p style="margin: 0;">Regards,</p>
-          <p style="margin: 5px 0; font-weight: bold; color: #d32f2f;">Executive Team, Law Nation</p>
+        <div class="footer">
+          <p>This is an automated notification from Law Nation</p>
+          <p>© ${new Date().getFullYear()} Law Nation. All rights reserved.</p>
         </div>
       </div>
-
-      <div style="background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eeeeee;">
-        Law Nation &copy; 2025 | New Delhi, India | This invitation is valid for 48 hours
-      </div>
-    </div>
+    </body>
+    </html>
   `;
-  
-  return sendEmail({
-    to: editorEmail,
-    subject: "You're Invited to Join Law Nation as an Editor! ⚖️",
-    html: htmlContent
+
+  await sendEmail({
+    to: adminEmail,
+    subject: `Article Ready for Publishing - ${articleTitle}`,
+    html,
+  });
+}
+
+/**
+ * Send notification to uploader when article is published (with link to change history)
+ */
+export async function sendArticlePublishedNotification(
+  uploaderEmail: string,
+  uploaderName: string,
+  articleTitle: string,
+  articleId: string
+) {
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const articleUrl = `${frontendUrl}/articles/${articleId}`;
+  const changeHistoryUrl = `${frontendUrl}/articles/${articleId}/change-history`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #27ae60; color: white; padding: 20px; text-align: center; }
+        .content { background-color: #f9f9f9; padding: 30px; border-radius: 5px; margin-top: 20px; }
+        .button { display: inline-block; padding: 12px 30px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 5px; margin: 10px 5px; }
+        .button-secondary { background-color: #3498db; }
+        .footer { text-align: center; margin-top: 30px; color: #7f8c8d; font-size: 12px; }
+        .success-box { background-color: #d4edda; border: 1px solid #c3e6cb; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center; }
+        .info-box { background-color: #d1ecf1; border-left: 4px solid #17a2b8; padding: 15px; margin: 20px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>🎉 Your Article Has Been Published!</h1>
+        </div>
+        <div class="content">
+          <p>Dear ${uploaderName},</p>
+          
+          <div class="success-box">
+            <h2 style="margin: 0; color: #155724;">Great News!</h2>
+            <p style="margin: 10px 0 0 0;">Your article <strong>"${articleTitle}"</strong> has been published.</p>
+          </div>
+          
+          <p>Thank you for your valuable contribution to Law Nation. Your article is now live and accessible to our readers.</p>
+          
+          <div class="info-box">
+            <p style="margin: 0;"><strong>📝 Want to see what changed?</strong></p>
+            <p style="margin: 5px 0 0 0;">View the change history to see any edits made during the review process.</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${articleUrl}" class="button">Read Your Published Article</a>
+            <a href="${changeHistoryUrl}" class="button button-secondary">View Change History</a>
+          </div>
+          
+          <p style="color: #7f8c8d; font-size: 14px;">
+            <strong>Share your article:</strong> You can now share your published article with colleagues and on social media.
+          </p>
+        </div>
+        <div class="footer">
+          <p>Thank you for contributing to Law Nation</p>
+          <p>© ${new Date().getFullYear()} Law Nation. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail({
+    to: uploaderEmail,
+    subject: `Your Article Has Been Published - ${articleTitle}`,
+    html,
   });
 }

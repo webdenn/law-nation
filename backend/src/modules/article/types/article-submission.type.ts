@@ -5,6 +5,10 @@ export interface ArticleSubmissionData {
   authorEmail: string;
   authorPhone?: string | undefined;
   authorOrganization?: string | undefined;
+  secondAuthorName?: string | undefined;
+  secondAuthorEmail?: string | undefined;
+  secondAuthorPhone?: string | undefined;
+  secondAuthorOrganization?: string | undefined;
   title: string;
   category: string;
   abstract: string;

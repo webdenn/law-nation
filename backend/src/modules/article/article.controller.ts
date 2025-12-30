@@ -87,6 +87,48 @@ export class ArticleController {
     }
   }
 
+  // Verify article by code (public endpoint - JSON response)
+  async verifyArticleByCode(req: AuthRequest, res: Response) {
+    try {
+      const { email, code } = req.body;
+
+      if (!email || !code) {
+        throw new BadRequestError("Email and verification code are required");
+      }
+
+      // Validate code format (6 digits)
+      if (!/^\d{6}$/.test(code)) {
+        throw new BadRequestError("Verification code must be 6 digits");
+      }
+
+      // Verify code and create article
+      const result = await articleService.verifyArticleByCode(email, code);
+
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error("Code Verification Error:", error);
+      throw error;
+    }
+  }
+
+  // Resend verification code (public endpoint)
+  async resendVerificationCode(req: AuthRequest, res: Response) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        throw new BadRequestError("Email is required");
+      }
+
+      const result = await articleService.resendVerificationCode(email);
+
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error("Resend Code Error:", error);
+      throw error;
+    }
+  }
+
   // Admin assigns editor
   async assignEditor(req: AuthRequest, res: Response) {
     try {
@@ -249,13 +291,15 @@ export class ArticleController {
       console.log(`📄 [Download] Article: "${article.title}"`);
       console.log(`📂 [Download] PDF path: ${article.currentPdfUrl}`);
 
-      // Add watermark to PDF
+      // Add watermark to PDF with clickable link
       const watermarkedPdf = await addWatermarkToPdf(
         article.currentPdfUrl,
         {
           userName,
           downloadDate: new Date(),
           articleTitle: article.title,
+          articleId: articleId,
+          frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
         }
       );
 
@@ -293,13 +337,15 @@ export class ArticleController {
       console.log(`📄 [Download] Article: "${article.title}"`);
       console.log(`📂 [Download] Word path: ${article.currentWordUrl}`);
 
-      // Add watermark to Word document
+      // Add watermark to Word document with clickable link
       const watermarkedWord = await addSimpleWatermarkToWord(
         article.currentWordUrl!,
         {
           userName,
           downloadDate: new Date(),
           articleTitle: article.title,
+          articleId: articleId,
+          frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
         }
       );
 
@@ -511,6 +557,93 @@ export class ArticleController {
       res.json({
         message: `${imageUrls.length} images uploaded successfully`,
         article,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ✅ NEW: Editor approves article
+  async editorApproveArticle(req: AuthRequest, res: Response) {
+    try {
+      const articleId = req.params.id;
+      if (!articleId) {
+        throw new BadRequestError("Article ID is required");
+      }
+
+      const editorId = req.user!.id;
+
+      const article = await articleService.editorApproveArticle(articleId, editorId);
+
+      res.json({
+        message: "Article approved successfully. Admin has been notified and can now publish it.",
+        article,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ✅ NEW: Admin publishes article (only after editor approval)
+  async adminPublishArticle(req: AuthRequest, res: Response) {
+    try {
+      const articleId = req.params.id;
+      if (!articleId) {
+        throw new BadRequestError("Article ID is required");
+      }
+
+      const adminId = req.user!.id;
+
+      const result = await articleService.adminPublishArticle(articleId, adminId);
+
+      res.json({
+        message: "Article published successfully",
+        article: result.article,
+        diffSummary: result.diffSummary,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ✅ NEW: Get article change history
+  async getArticleChangeHistory(req: AuthRequest, res: Response) {
+    try {
+      const articleId = req.params.id;
+      if (!articleId) {
+        throw new BadRequestError("Article ID is required");
+      }
+
+      const userId = req.user!.id;
+      const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
+
+      const result = await articleService.getArticleChangeHistory(articleId, userId, userRoles);
+
+      res.json({
+        message: "Change history retrieved successfully",
+        ...result,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ✅ NEW: Get specific change log diff
+  async getChangeLogDiff(req: AuthRequest, res: Response) {
+    try {
+      const changeLogId = req.params.changeLogId;
+      if (!changeLogId) {
+        throw new BadRequestError("Change log ID is required");
+      }
+
+      const userId = req.user!.id;
+      const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
+
+      const result = await articleService.getChangeLogDiff(changeLogId, userId, userRoles);
+
+      res.json({
+        message: "Change log diff retrieved successfully",
+        changeLog: result,
       });
     } catch (error) {
       throw error;

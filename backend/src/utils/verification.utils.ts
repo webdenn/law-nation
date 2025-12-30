@@ -16,16 +16,25 @@ export class VerificationService {
   }
 
   /**
-   * Create a verification record with 48-hour TTL
+   * Generate a 6-digit verification code
+   */
+  static generateVerificationCode(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  /**
+   * Create a verification record with 48-hour TTL and optional code
    */
   static async createVerificationRecord(
     email: string,
     resourceType: string,
     metadata: any,
-    ttlHours: number = DEFAULT_TTL_HOURS
+    ttlHours: number = DEFAULT_TTL_HOURS,
+    includeCode: boolean = false
   ) {
     const token = this.generateVerificationToken();
     const resourceId = crypto.randomUUID();
+    const verificationCode = includeCode ? this.generateVerificationCode() : null;
     
     // Calculate expiration: current time + 48 hours
     const ttl = new Date();
@@ -37,12 +46,18 @@ export class VerificationService {
         resourceType,
         email,
         token,
+        verificationCode,
         ttl,
         metadata,
       },
     });
 
-    return { token, verificationId: verification.id, expiresAt: ttl };
+    return { 
+      token, 
+      code: verificationCode, 
+      verificationId: verification.id, 
+      expiresAt: ttl 
+    };
   }
 
   /**
@@ -70,6 +85,30 @@ export class VerificationService {
   }
 
   /**
+   * Verify code and check if it's valid
+   */
+  static async verifyCode(email: string, code: string) {
+    const verification = await prisma.emailVerification.findFirst({
+      where: {
+        email,
+        verificationCode: code,
+        isVerified: false,
+      },
+    });
+
+    if (!verification) {
+      return { valid: false, error: 'Invalid verification code' };
+    }
+
+    // Check if code expired (after 48 hours)
+    if (new Date() > verification.ttl) {
+      return { valid: false, error: 'Verification code expired (48 hours passed)' };
+    }
+
+    return { valid: true, data: verification.metadata, verification };
+  }
+
+  /**
    * Mark verification as complete
    */
   static async markAsVerified(token: string) {
@@ -84,12 +123,55 @@ export class VerificationService {
   }
 
   /**
+   * Mark verification as complete by email and code
+   */
+  static async markAsVerifiedByCode(email: string, code: string) {
+    const verification = await prisma.emailVerification.findFirst({
+      where: {
+        email,
+        verificationCode: code,
+      },
+    });
+
+    if (!verification) {
+      throw new Error('Verification not found');
+    }
+
+    await prisma.emailVerification.update({
+      where: { id: verification.id },
+      data: {
+        isVerified: true,
+        verifiedAt: new Date(),
+      },
+    });
+    return verification.token;
+  }
+
+  /**
    * Delete verification record
    */
   static async deleteVerification(token: string) {
     await prisma.emailVerification.delete({
       where: { token },
     });
+  }
+
+  /**
+   * Delete verification record by email and code
+   */
+  static async deleteVerificationByCode(email: string, code: string) {
+    const verification = await prisma.emailVerification.findFirst({
+      where: {
+        email,
+        verificationCode: code,
+      },
+    });
+
+    if (verification) {
+      await prisma.emailVerification.delete({
+        where: { id: verification.id },
+      });
+    }
   }
 
   /**

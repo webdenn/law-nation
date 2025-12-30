@@ -22,10 +22,22 @@ router.post(
   articleController.submitArticle.bind(articleController)
 );
 
-// PUBLIC: Verify email and create article
+// PUBLIC: Verify email and create article (legacy link-based)
 router.get(
   "/verify/:token",
   articleController.verifyArticleSubmission.bind(articleController)
+);
+
+// PUBLIC: Verify article by code (new code-based)
+router.post(
+  "/verify-code",
+  articleController.verifyArticleByCode.bind(articleController)
+);
+
+// PUBLIC: Resend verification code
+router.post(
+  "/resend-code",
+  articleController.resendVerificationCode.bind(articleController)
 );
 
 // PUBLIC: Get ONLY published articles (Updated Fix)
@@ -46,12 +58,26 @@ router.get(
   articleController.getArticlePreview.bind(articleController)
 );
 
-// PROTECTED: Get article upload history (auth required)
+// PROTECTED: Get article upload history (auth required) - LEGACY
 router.get(
   "/:id/history",
   requireAuth,
   requirePermission("article", "read"),
   articleController.getArticleHistory.bind(articleController)
+);
+
+// ✅ NEW: Get article change history (with diff tracking)
+router.get(
+  "/:id/change-history",
+  requireAuth,
+  articleController.getArticleChangeHistory.bind(articleController)
+);
+
+// ✅ NEW: Get specific change log diff
+router.get(
+  "/:id/change-log/:changeLogId",
+  requireAuth,
+  articleController.getChangeLogDiff.bind(articleController)
 );
 
 // PUBLIC: Get article content for reading (optional auth - works for both logged and non-logged users)
@@ -91,6 +117,20 @@ router.patch(
   requirePermission("article", "write"),
   uploadOptionalPdf,
   articleController.approveArticle.bind(articleController)
+);
+
+// ✅ NEW: Editor approves article (submits for publishing)
+router.patch(
+  "/:id/editor-approve",
+  requirePermission("article", "write"),
+  articleController.editorApproveArticle.bind(articleController)
+);
+
+// ✅ NEW: Admin publishes article (only after editor approval)
+router.patch(
+  "/:id/admin-publish",
+  requirePermission("article", "write"),
+  articleController.adminPublishArticle.bind(articleController)
 );
 
 // Editor: Upload corrected PDF or Word (Option C)
