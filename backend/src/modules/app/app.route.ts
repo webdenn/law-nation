@@ -4,6 +4,8 @@ import AuthRouter from "@/modules/auth/auth.routes.js";
 import UserRouter from "@/modules/user/user.route.js";
 import RbacRouter from "@/modules/rbac/rbac.route.js";
 import ArticleRouter from "@/modules/article/article.route.js";
+import AdminDashboardRouter from "@/modules/admin/admin-dashboard.route.js";
+import NotificationRouter from "@/modules/notification/notification.route.js";
 
 // /src/modules/app/app.route.ts
 
@@ -14,6 +16,8 @@ AppRouter.use("/auth", AuthRouter);
 AppRouter.use("/users", requireAuth, UserRouter);
 AppRouter.use("/rbac", requireAuth, RbacRouter);
 AppRouter.use("/articles", ArticleRouter);
+AppRouter.use("/admin/dashboard", AdminDashboardRouter);
+AppRouter.use("/notifications", NotificationRouter);
 
 // Health check
 AppRouter.get("/health", (_req, res) => {

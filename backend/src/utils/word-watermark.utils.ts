@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { Document, Packer, Paragraph, TextRun, AlignmentType, Header } from 'docx';
+import { Document, Packer, Paragraph, TextRun, AlignmentType, Header, ExternalHyperlink } from 'docx';
 import { createRequire } from 'module';
 
 // Create require for CommonJS modules
@@ -18,6 +18,8 @@ export async function addWatermarkToWord(
     userName: string;
     downloadDate: Date;
     articleTitle: string;
+    articleId: string;
+    frontendUrl: string;
   }
 ): Promise<Buffer> {
   try {
@@ -85,6 +87,8 @@ export async function addSimpleWatermarkToWord(
     userName: string;
     downloadDate: Date;
     articleTitle: string;
+    articleId: string;
+    frontendUrl: string;
   }
 ): Promise<Buffer> {
   try {
@@ -102,13 +106,15 @@ export async function addSimpleWatermarkToWord(
     
     console.log(`📄 [Word Watermark] Extracted ${originalText.length} characters`);
     
-    // Create watermark text
+    // Create watermark text and link
     const downloadDate = watermarkData.downloadDate.toLocaleDateString('en-GB'); // DD/MM/YYYY format
     const mainWatermark = `DOWNLOADED FROM LAW NATION DATE ${downloadDate}`;
     const userInfo = `User: ${watermarkData.userName} | Article: ${watermarkData.articleTitle}`;
+    const articleUrl = `${watermarkData.frontendUrl}/articles/${watermarkData.articleId}`;
     
     console.log(`💧 [Word Watermark] Main watermark: ${mainWatermark}`);
     console.log(`💧 [Word Watermark] User info: ${userInfo}`);
+    console.log(`🔗 [Word Watermark] Article link: ${articleUrl}`);
     
     // Create new document with watermark
     const doc = new Document({
@@ -175,6 +181,28 @@ export async function addSimpleWatermarkToWord(
                 }),
               ],
             }),
+            // Add clickable link
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new TextRun({
+                  text: "View online: ",
+                  size: 16,
+                  color: "666666",
+                }),
+                new ExternalHyperlink({
+                  children: [
+                    new TextRun({
+                      text: articleUrl,
+                      size: 16,
+                      color: "0000FF",
+                      underline: {},
+                    }),
+                  ],
+                  link: articleUrl,
+                }),
+              ],
+            }),
             new Paragraph({
               alignment: AlignmentType.CENTER,
               children: [
@@ -223,6 +251,28 @@ export async function addSimpleWatermarkToWord(
                   size: 16,
                   color: "888888",
                   italics: true,
+                }),
+              ],
+            }),
+            // Add clickable link at bottom
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new TextRun({
+                  text: "View online: ",
+                  size: 16,
+                  color: "666666",
+                }),
+                new ExternalHyperlink({
+                  children: [
+                    new TextRun({
+                      text: articleUrl,
+                      size: 16,
+                      color: "0000FF",
+                      underline: {},
+                    }),
+                  ],
+                  link: articleUrl,
                 }),
               ],
             }),
