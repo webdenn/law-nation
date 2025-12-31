@@ -11,6 +11,8 @@ import { generateArticleCorrectionHtml } from "@/templates/email/article/correct
 import { generateEditorInvitationHtml } from "@/templates/email/editor/invitation.template.js";
 import { generateEditorTaskAssignedHtml } from "@/templates/email/editor/task-assigned.template.js";
 import { generateCoAuthorNotificationHtml } from "@/templates/email/article/coauthor-notification.template.js";
+import { generateArticlePublishedHtml } from "@/templates/email/article/published.template.js";
+import { generateEditorApprovalNotificationHtml } from "@/templates/email/admin/editor-approval.template.js";
 
 dotenv.config();
 
@@ -175,67 +177,16 @@ export async function sendEditorApprovalNotificationToAdmin(
   editorName: string,
   articleId: string
 ) {
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-  const reviewUrl = `${frontendUrl}/admin/articles/${articleId}/review`;
-  const changeHistoryUrl = `${frontendUrl}/articles/${articleId}/change-history`;
-
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #2c3e50; color: white; padding: 20px; text-align: center; }
-        .content { background-color: #f9f9f9; padding: 30px; border-radius: 5px; margin-top: 20px; }
-        .button { display: inline-block; padding: 12px 30px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 5px; margin: 10px 5px; }
-        .button-secondary { background-color: #3498db; }
-        .footer { text-align: center; margin-top: 30px; color: #7f8c8d; font-size: 12px; }
-        .highlight { background-color: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>📢 Article Ready for Publishing</h1>
-        </div>
-        <div class="content">
-          <p>Dear ${adminName},</p>
-          
-          <div class="highlight">
-            <strong>Editor ${editorName}</strong> has approved the article <strong>"${articleTitle}"</strong>.
-          </div>
-          
-          <p>The article is now ready for your final review and publishing.</p>
-          
-          <p><strong>Next Steps:</strong></p>
-          <ul>
-            <li>Review the article and changes made by the editor</li>
-            <li>View the change history to see what was modified</li>
-            <li>Publish the article when ready</li>
-          </ul>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${reviewUrl}" class="button">Review & Publish Article</a>
-            <a href="${changeHistoryUrl}" class="button button-secondary">View Change History</a>
-          </div>
-          
-          <p style="color: #7f8c8d; font-size: 14px;">
-            <strong>Note:</strong> You can now publish this article from the admin dashboard.
-          </p>
-        </div>
-        <div class="footer">
-          <p>This is an automated notification from Law Nation</p>
-          <p>© ${new Date().getFullYear()} Law Nation. All rights reserved.</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
+  const { subject, html } = generateEditorApprovalNotificationHtml({
+    adminName,
+    articleTitle,
+    editorName,
+    articleId
+  });
 
   await sendEmail({
     to: adminEmail,
-    subject: `Article Ready for Publishing - ${articleTitle}`,
+    subject,
     html,
   });
 }
@@ -247,69 +198,19 @@ export async function sendArticlePublishedNotification(
   uploaderEmail: string,
   uploaderName: string,
   articleTitle: string,
-  articleId: string
+  articleId: string,
+  diffSummary?: string
 ) {
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-  const articleUrl = `${frontendUrl}/articles/${articleId}`;
-  const changeHistoryUrl = `${frontendUrl}/articles/${articleId}/change-history`;
-
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #27ae60; color: white; padding: 20px; text-align: center; }
-        .content { background-color: #f9f9f9; padding: 30px; border-radius: 5px; margin-top: 20px; }
-        .button { display: inline-block; padding: 12px 30px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 5px; margin: 10px 5px; }
-        .button-secondary { background-color: #3498db; }
-        .footer { text-align: center; margin-top: 30px; color: #7f8c8d; font-size: 12px; }
-        .success-box { background-color: #d4edda; border: 1px solid #c3e6cb; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center; }
-        .info-box { background-color: #d1ecf1; border-left: 4px solid #17a2b8; padding: 15px; margin: 20px 0; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>🎉 Your Article Has Been Published!</h1>
-        </div>
-        <div class="content">
-          <p>Dear ${uploaderName},</p>
-          
-          <div class="success-box">
-            <h2 style="margin: 0; color: #155724;">Great News!</h2>
-            <p style="margin: 10px 0 0 0;">Your article <strong>"${articleTitle}"</strong> has been published.</p>
-          </div>
-          
-          <p>Thank you for your valuable contribution to Law Nation. Your article is now live and accessible to our readers.</p>
-          
-          <div class="info-box">
-            <p style="margin: 0;"><strong>📝 Want to see what changed?</strong></p>
-            <p style="margin: 5px 0 0 0;">View the change history to see any edits made during the review process.</p>
-          </div>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${articleUrl}" class="button">Read Your Published Article</a>
-            <a href="${changeHistoryUrl}" class="button button-secondary">View Change History</a>
-          </div>
-          
-          <p style="color: #7f8c8d; font-size: 14px;">
-            <strong>Share your article:</strong> You can now share your published article with colleagues and on social media.
-          </p>
-        </div>
-        <div class="footer">
-          <p>Thank you for contributing to Law Nation</p>
-          <p>© ${new Date().getFullYear()} Law Nation. All rights reserved.</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
+  const { subject, html } = generateArticlePublishedHtml({
+    authorName: uploaderName,
+    articleTitle,
+    articleId,
+    ...(diffSummary && { diffSummary })
+  });
 
   await sendEmail({
     to: uploaderEmail,
-    subject: `Your Article Has Been Published - ${articleTitle}`,
+    subject,
     html,
   });
 }

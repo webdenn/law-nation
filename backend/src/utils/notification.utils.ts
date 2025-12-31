@@ -116,7 +116,8 @@ export async function notifyUploaderOfPublication(
   articleId: string,
   articleTitle: string,
   uploaderEmail: string,
-  uploaderName: string
+  uploaderName: string,
+  diffSummary?: string
 ) {
   try {
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
@@ -146,15 +147,19 @@ export async function notifyUploaderOfPublication(
       console.log(`🔔 [Notification] Created in-app notification for ${uploaderName}`);
     }
 
-    // 2. Send email notification (always, even if not registered user)
+    // 2. Send email notification with diff summary (always, even if not registered user)
     try {
       await sendArticlePublishedNotification(
         uploaderEmail,
         uploaderName,
         articleTitle,
-        articleId
+        articleId,
+        diffSummary  // Pass diff summary to email
       );
       console.log(`📧 [Email] Sent publication notification to ${uploaderEmail}`);
+      if (diffSummary) {
+        console.log(`📊 [Email] Included diff summary: ${diffSummary}`);
+      }
     } catch (emailError) {
       console.error(`❌ [Email] Failed to send to ${uploaderEmail}:`, emailError);
       // Don't throw - this is not critical
