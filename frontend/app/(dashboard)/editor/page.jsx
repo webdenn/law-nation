@@ -7,34 +7,51 @@ import { toast } from "react-toastify";
 
 // ✅ NEW: Diff Viewer Component (Isse existing icons ke neeche paste kar do)
 const DiffViewer = ({ diffData }) => {
-  if (!diffData || !diffData.summary) return <p className="text-xs text-gray-400 italic">No diff data available.</p>;
+  if (!diffData || !diffData.summary)
+    return (
+      <p className="text-xs text-gray-400 italic">No diff data available.</p>
+    );
 
   return (
     <div className="mt-3 bg-gray-50 rounded border border-gray-200 text-xs font-mono overflow-hidden">
       {/* Summary Header */}
       <div className="bg-gray-100 p-2 border-b flex gap-2 font-bold uppercase tracking-wider text-[10px]">
-        <span className="text-green-600">+{diffData.summary.totalAdded} Added</span>
-        <span className="text-red-600">-{diffData.summary.totalRemoved} Removed</span>
-        <span className="text-blue-600">~{diffData.summary.totalModified} Modified</span>
+        <span className="text-green-600">
+          +{diffData.summary.totalAdded} Added
+        </span>
+        <span className="text-red-600">
+          -{diffData.summary.totalRemoved} Removed
+        </span>
+        <span className="text-blue-600">
+          ~{diffData.summary.totalModified} Modified
+        </span>
       </div>
-      
+
       {/* Scrollable Diff Body */}
       <div className="max-h-48 overflow-y-auto p-1 space-y-0.5">
         {diffData.removed?.map((line, i) => (
           <div key={`rem-${i}`} className="flex bg-red-50 text-red-700">
-            <span className="w-6 text-gray-400 border-r border-red-200 mr-2 text-right pr-1 select-none">{line.oldLineNumber}</span>
-            <span className="line-through decoration-red-300 opacity-75">- {line.content}</span>
+            <span className="w-6 text-gray-400 border-r border-red-200 mr-2 text-right pr-1 select-none">
+              {line.oldLineNumber}
+            </span>
+            <span className="line-through decoration-red-300 opacity-75">
+              - {line.content}
+            </span>
           </div>
         ))}
         {diffData.added?.map((line, i) => (
           <div key={`add-${i}`} className="flex bg-green-50 text-green-700">
-            <span className="w-6 text-gray-400 border-r border-green-200 mr-2 text-right pr-1 select-none">{line.newLineNumber}</span>
+            <span className="w-6 text-gray-400 border-r border-green-200 mr-2 text-right pr-1 select-none">
+              {line.newLineNumber}
+            </span>
             <span>+ {line.content}</span>
           </div>
         ))}
         {diffData.modified?.map((line, i) => (
           <div key={`mod-${i}`} className="flex bg-blue-50 text-blue-700">
-             <span className="w-6 text-gray-400 border-r border-blue-200 mr-2 text-right pr-1 select-none">{line.newLineNumber}</span>
+            <span className="w-6 text-gray-400 border-r border-blue-200 mr-2 text-right pr-1 select-none">
+              {line.newLineNumber}
+            </span>
             <span>~ {line.content}</span>
           </div>
         ))}
@@ -47,20 +64,50 @@ const DiffViewer = ({ diffData }) => {
 
 // --- YAHAN PASTE KARO (ICONS) ---
 const DownloadIcon = () => (
-  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+  <svg
+    className="w-4 h-4 mr-2"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+    />
   </svg>
 );
 const WordIcon = () => (
-  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  <svg
+    className="w-4 h-4 mr-2"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+    />
   </svg>
 );
 
 // ✅ Icons wale section mein ise add karo
 const CheckCircleIcon = () => (
-  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+  <svg
+    className="w-5 h-5 mr-2"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+    />
   </svg>
 );
 // --------------------------------
@@ -80,25 +127,27 @@ const EditorStatCard = ({ title, count, color }) => (
 export default function EditorDashboard() {
   const router = useRouter();
 
- const [isAuthorized, setIsAuthorized] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [activeTab, setActiveTab] = useState("tasks");
   const [pdfViewMode, setPdfViewMode] = useState("original");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [articles, setArticles] = useState([]);
-  const [isLoading, setIsLoading] = useState(true); 
+  const [isLoading, setIsLoading] = useState(true);
   const [uploadedFile, setUploadedFile] = useState(null); // SIRF EK BAAR
-  const [changeHistory, setChangeHistory] = useState([]); 
-  const [uploadComment, setUploadComment] = useState(""); 
+  const [changeHistory, setChangeHistory] = useState([]);
+  const [uploadComment, setUploadComment] = useState("");
   const [isUploading, setIsUploading] = useState(false);
-
 
   // 📊 Chart Data Calculations
   const totalTasks = articles.length || 0;
-  const completedTasks = articles.filter(a => a.status === "Published").length || 0;
-  const pendingTasks = articles.filter(a => a.status !== "Published").length || 0;
-  const efficiency = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const completedTasks =
+    articles.filter((a) => a.status === "Published").length || 0;
+  const pendingTasks =
+    articles.filter((a) => a.status !== "Published").length || 0;
+  const efficiency =
+    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const API_BASE_URL = "http://localhost:4000";
 
@@ -161,16 +210,18 @@ export default function EditorDashboard() {
     }
   };
 
-
   // ... existing fetchAssignedArticles function ...
 
   // ✅ NEW FUNCTION: Change History Fetch karne ke liye
   const fetchChangeHistory = async (articleId) => {
     try {
       const token = localStorage.getItem("editorToken");
-      const res = await fetch(`${API_BASE_URL}/api/articles/${articleId}/change-history`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_BASE_URL}/api/articles/${articleId}/change-history`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (res.ok) {
         const data = await res.json();
         setChangeHistory(data.changeLogs || []);
@@ -192,19 +243,21 @@ export default function EditorDashboard() {
   // ✅ NEW 1: Handle Upload Corrected Version (Comment ke saath)
   const handleUploadCorrection = async () => {
     if (!uploadedFile) return toast.error("Please select a file first");
-    
+
     try {
       setIsUploading(true);
       const token = localStorage.getItem("editorToken");
       const formData = new FormData();
-      
+
       // ✅ FIX: Backend 'uploadDocument' middleware expect kar raha hai "document" field
-      formData.append("document", uploadedFile); 
-      
+      formData.append("document", uploadedFile);
+
       if (uploadComment) formData.append("comments", uploadComment);
 
       const res = await fetch(
-        `${API_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id}/upload-corrected`,
+        `${API_BASE_URL}/api/articles/${
+          selectedArticle.id || selectedArticle._id
+        }/upload-corrected`,
         {
           method: "PATCH",
           headers: { Authorization: `Bearer ${token}` },
@@ -218,10 +271,10 @@ export default function EditorDashboard() {
         setUploadedFile(null);
         setUploadComment("");
         fetchChangeHistory(selectedArticle.id || selectedArticle._id);
-        
+
         if (data.article && data.article.currentPdfUrl) {
-            setSelectedArticle(prev => ({ ...prev, ...data.article }));
-            setPdfViewMode("current"); 
+          setSelectedArticle((prev) => ({ ...prev, ...data.article }));
+          setPdfViewMode("current");
         }
       } else {
         // Agar ab bhi error aaye, toh data.error check karein
@@ -239,13 +292,15 @@ export default function EditorDashboard() {
     try {
       const token = localStorage.getItem("editorToken");
       const res = await fetch(
-        `${API_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id}/editor-approve`,
+        `${API_BASE_URL}/api/articles/${
+          selectedArticle.id || selectedArticle._id
+        }/editor-approve`,
         {
           method: "PATCH",
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      
+
       const data = await res.json();
       if (res.ok) {
         toast.success("Approved! Sent to Admin.");
@@ -277,7 +332,9 @@ export default function EditorDashboard() {
     try {
       toast.info(`Downloading ${type}...`);
       const token = localStorage.getItem("editorToken");
-      const fullUrl = fileUrl.startsWith("http") ? fileUrl : `${API_BASE_URL}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
+      const fullUrl = fileUrl.startsWith("http")
+        ? fileUrl
+        : `${API_BASE_URL}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
 
       const res = await fetch(fullUrl, {
         method: "GET",
@@ -304,42 +361,105 @@ export default function EditorDashboard() {
   };
   // ----------------------------------
 
-  const getPdfUrlToView = () => {
-    if (!selectedArticle) return "";
-    const path = pdfViewMode === "original" ? selectedArticle.originalPdfUrl : selectedArticle.currentPdfUrl;
-    if (!path) return "";
-    return path.startsWith("http") ? path : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+  // ✅ NEW: Download Diff PDF from Backend
+  const handleDownloadDiffPdf = async (changeLogId) => {
+    try {
+      toast.info("Generating Diff PDF...");
+      const token = localStorage.getItem("editorToken");
+      const articleId = selectedArticle.id || selectedArticle._id;
+
+      const res = await fetch(
+        `${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff`,
+        {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to generate PDF");
+
+      // Backend se buffer (blob) aa raha hai
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `diff-v2-${articleId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Diff PDF Downloaded!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not download Diff PDF");
+    }
   };
 
-  if (!isAuthorized) return <div className="h-screen flex items-center justify-center">Verifying...</div>;
+  const getPdfUrlToView = () => {
+    if (!selectedArticle) return "";
+    const path =
+      pdfViewMode === "original"
+        ? selectedArticle.originalPdfUrl
+        : selectedArticle.currentPdfUrl;
+    if (!path) return "";
+    return path.startsWith("http")
+      ? path
+      : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+  };
+
+  if (!isAuthorized)
+    return (
+      <div className="h-screen flex items-center justify-center">
+        Verifying...
+      </div>
+    );
 
   return (
     <div className="flex min-h-screen bg-gray-50 flex-col md:flex-row relative">
-
       {/* 🌑 MOBILE OVERLAY (Backdrop) */}
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-30 md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       {/* 🔴 SIDEBAR (Responsive) */}
-      <aside 
+      <aside
         className={`fixed md:sticky top-0 z-40 h-screen w-72 bg-red-700 text-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out 
-        ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+        ${
+          isMobileMenuOpen
+            ? "translate-x-0"
+            : "-translate-x-full md:translate-x-0"
+        }`}
       >
         <div className="p-8 border-b border-red-800 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-black italic tracking-tighter">LAW NATION</h1>
+            <h1 className="text-2xl font-black italic tracking-tighter">
+              LAW NATION
+            </h1>
             <span className="text-[10px] bg-white text-red-700 px-2 py-0.5 rounded-full font-bold uppercase">
               {selectedArticle ? "Review Mode" : "Editor Panel"}
             </span>
           </div>
           {/* Close Button Mobile */}
-          <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-white">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="md:hidden text-white"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="w-6 h-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -348,16 +468,26 @@ export default function EditorDashboard() {
           {!selectedArticle ? (
             <>
               <button
-                onClick={() => { setActiveTab("tasks"); setIsMobileMenuOpen(false); }}
-                className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${activeTab === "tasks" ? "bg-red-800" : "hover:bg-red-600"}`}
+                onClick={() => {
+                  setActiveTab("tasks");
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${
+                  activeTab === "tasks" ? "bg-red-800" : "hover:bg-red-600"
+                }`}
               >
-                 Assigned Tasks
+                Assigned Tasks
               </button>
               <button
-                onClick={() => { setActiveTab("profile"); setIsMobileMenuOpen(false); }}
-                className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${activeTab === "profile" ? "bg-red-800" : "hover:bg-red-600"}`}
+                onClick={() => {
+                  setActiveTab("profile");
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${
+                  activeTab === "profile" ? "bg-red-800" : "hover:bg-red-600"
+                }`}
               >
-                 Profile Settings
+                Profile Settings
               </button>
             </>
           ) : (
@@ -365,21 +495,43 @@ export default function EditorDashboard() {
               <div className="px-3 py-2 text-xs font-bold text-red-200 uppercase tracking-widest border-b border-red-600 mb-2">
                 Document Options
               </div>
-              
+
               <button
-                onClick={() => { setPdfViewMode("original"); setIsMobileMenuOpen(false); }}
-                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === 'original' ? 'bg-white text-red-700 shadow-lg' : 'hover:bg-red-800 text-white'}`}
+                onClick={() => {
+                  setPdfViewMode("original");
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                  pdfViewMode === "original"
+                    ? "bg-white text-red-700 shadow-lg"
+                    : "hover:bg-red-800 text-white"
+                }`}
               >
-                 View Original PDF
-                {pdfViewMode === 'original' && <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>}
+                View Original PDF
+                {pdfViewMode === "original" && (
+                  <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">
+                    Active
+                  </span>
+                )}
               </button>
 
               <button
-                onClick={() => { setPdfViewMode("current"); setIsMobileMenuOpen(false); }}
-                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === 'current' ? 'bg-white text-red-700 shadow-lg' : 'hover:bg-red-800 text-white'}`}
+                onClick={() => {
+                  setPdfViewMode("current");
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                  pdfViewMode === "current"
+                    ? "bg-white text-red-700 shadow-lg"
+                    : "hover:bg-red-800 text-white"
+                }`}
               >
-                 View Edited PDF
-                {pdfViewMode === 'current' && <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>}
+                View Edited PDF
+                {pdfViewMode === "current" && (
+                  <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">
+                    Active
+                  </span>
+                )}
               </button>
 
               <div className="my-6 border-t border-red-800"></div>
@@ -400,69 +552,119 @@ export default function EditorDashboard() {
 
         {!selectedArticle && (
           <div className="p-4 border-t border-red-800">
-            <button onClick={handleLogout} className="w-full p-2 text-sm bg-red-900 rounded font-medium uppercase">Logout</button>
+            <button
+              onClick={handleLogout}
+              className="w-full p-2 text-sm bg-red-900 rounded font-medium uppercase"
+            >
+              Logout
+            </button>
           </div>
         )}
       </aside>
 
       {/* 🟢 MAIN CONTENT AREA */}
       <main className="flex-1 h-screen overflow-y-auto bg-white flex flex-col">
-        
         {/* HEADER */}
         <header className="bg-white h-20 border-b flex items-center justify-between px-4 md:px-10 sticky top-0 z-20 shadow-sm shrink-0">
           <div className="flex items-center gap-3">
             {/* Hamburger Button (Visible only on Mobile) */}
-            <button 
-              onClick={() => setIsMobileMenuOpen(true)} 
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
               className="md:hidden text-gray-600 hover:text-red-700 p-1"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className="w-7 h-7"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                />
               </svg>
             </button>
 
             <h2 className="text-lg md:text-xl font-bold text-gray-700 truncate max-w-[200px] md:max-w-none">
-              {selectedArticle ? `Reviewing: ${selectedArticle.title.substring(0, 30)}...` : (activeTab === "tasks" ? "Editor Workspace" : "Profile")}
+              {selectedArticle
+                ? `Reviewing: ${selectedArticle.title.substring(0, 30)}...`
+                : activeTab === "tasks"
+                ? "Editor Workspace"
+                : "Profile"}
             </h2>
           </div>
 
           <div className="flex items-center gap-3">
-             <div className="w-10 h-10 bg-red-100 border-2 border-red-600 rounded-full flex items-center justify-center text-red-700 font-black">
+            <div className="w-10 h-10 bg-red-100 border-2 border-red-600 rounded-full flex items-center justify-center text-red-700 font-black">
               {profile.name.charAt(0)}
             </div>
           </div>
         </header>
 
-        
-
         {/* CONTENT SWITCHER */}
         <div className="p-4 md:p-10 pb-20 flex-1">
-          
           {/* VIEW 1: TASK LIST (Default) */}
           {!selectedArticle && activeTab === "tasks" && (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-8">
-                <EditorStatCard title="Total Assigned" count={articles.length} color="border-red-600" />
-                <EditorStatCard title="Pending" count={articles.filter((a) => a.status !== "Published").length} color="border-yellow-500" />
-                <EditorStatCard title="Approved" count={articles.filter((a) => a.status === "Published").length} color="border-green-600" />
+                <EditorStatCard
+                  title="Total Assigned"
+                  count={articles.length}
+                  color="border-red-600"
+                />
+                <EditorStatCard
+                  title="Pending"
+                  count={
+                    articles.filter((a) => a.status !== "Published").length
+                  }
+                  color="border-yellow-500"
+                />
+                <EditorStatCard
+                  title="Approved"
+                  count={
+                    articles.filter((a) => a.status === "Published").length
+                  }
+                  color="border-green-600"
+                />
               </div>
 
               <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                <div className="bg-red-50 p-5 border-b border-red-100"><h3 className="font-bold text-red-800 text-lg">My Tasks</h3></div>
+                <div className="bg-red-50 p-5 border-b border-red-100">
+                  <h3 className="font-bold text-red-800 text-lg">My Tasks</h3>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left whitespace-nowrap">
                     <thead>
                       <tr className="text-xs uppercase bg-gray-50 text-gray-400">
-                        <th className="p-5">Article</th><th className="p-5">Author</th><th className="p-5">Status</th><th className="p-5 text-right">Action</th>
+                        <th className="p-5">Article</th>
+                        <th className="p-5">Author</th>
+                        <th className="p-5">Status</th>
+                        <th className="p-5 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {isLoading ? <tr><td colSpan="4" className="p-10 text-center">Loading...</td></tr> : 
+                      {isLoading ? (
+                        <tr>
+                          <td colSpan="4" className="p-10 text-center">
+                            Loading...
+                          </td>
+                        </tr>
+                      ) : (
                         articles.map((art) => (
-                          <tr key={art._id || art.id} className="hover:bg-gray-50">
+                          <tr
+                            key={art._id || art.id}
+                            className="hover:bg-gray-50"
+                          >
                             <td className="p-5 font-medium">{art.title}</td>
                             <td className="p-5 text-sm">{art.authorName}</td>
-                            <td className="p-5"><span className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded-full">{art.status}</span></td>
+                            <td className="p-5">
+                              <span className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded-full">
+                                {art.status}
+                              </span>
+                            </td>
                             <td className="p-5 text-right">
                               <button
                                 onClick={() => {
@@ -476,7 +678,7 @@ export default function EditorDashboard() {
                             </td>
                           </tr>
                         ))
-                      }
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -484,164 +686,214 @@ export default function EditorDashboard() {
             </>
           )}
 
-  
-          
-
           {/* VIEW 2: ARTICLE REVIEW INTERFACE */}
           {selectedArticle && (
             <div className="flex flex-col lg:flex-row gap-6 h-auto lg:h-full">
-              
               {/* PDF VIEWER SECTION */}
               <div className="flex-1 bg-gray-100 rounded-xl border border-gray-300 p-4 flex flex-col h-[500px] lg:h-auto min-h-[500px]">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-gray-700 uppercase text-sm md:text-base">
-                    {pdfViewMode === 'original' ? '📂 Original Submission' : '📝 Latest Edited Version'}
+                    {pdfViewMode === "original"
+                      ? "📂 Original Submission"
+                      : "📝 Latest Edited Version"}
                   </h3>
                   {getPdfUrlToView() && (
-                    <a href={getPdfUrlToView()} target="_blank" className="text-xs text-blue-600 hover:underline">Open in New Tab ↗</a>
+                    <a
+                      href={getPdfUrlToView()}
+                      target="_blank"
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Open in New Tab ↗
+                    </a>
                   )}
                 </div>
-                
+
                 <div className="flex-1 bg-white rounded-lg shadow-inner flex items-center justify-center border-2 border-dashed border-gray-300 relative overflow-hidden">
-                   {getPdfUrlToView() ? (
-                     <iframe 
-                       src={getPdfUrlToView()} 
-                       className="w-full h-full absolute inset-0"
-                       title="PDF Viewer"
-                     />
-                   ) : (
-                     <div className="text-center text-gray-400">
-                       <p className="text-4xl mb-2">📄</p>
-                       <p>PDF not available for this version</p>
-                     </div>
-                   )}
+                  {getPdfUrlToView() ? (
+                    <iframe
+                      src={getPdfUrlToView()}
+                      className="w-full h-full absolute inset-0"
+                      title="PDF Viewer"
+                    />
+                  ) : (
+                    <div className="text-center text-gray-400">
+                      <p className="text-4xl mb-2">📄</p>
+                      <p>PDF not available for this version</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* ACTION PANEL (Right Side on Desktop, Bottom on Mobile) */}
-              
-                   {/* ACTION PANEL (Right Side) */}
-<div className="w-full lg:w-[350px] space-y-6 shrink-0 h-full overflow-y-auto pb-10">
-  
-  {/* 1. UPLOAD SECTION */}
-  <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
-    <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-      <span>📤</span> Upload Correction
-    </h3>
-    
-    <div className="space-y-3">
-      {/* File Input */}
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition cursor-pointer relative bg-gray-50">
-        <input type="file" accept=".pdf,.docx" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-        <div className="pointer-events-none">
-          {uploadedFile ? (
-             <p className="text-sm font-bold text-green-600 truncate px-2">📄 {uploadedFile.name}</p>
-          ) : (
-             <div className="text-gray-400 text-xs">
-                <p className="font-bold text-gray-500">Click to choose file</p>
-                <p>PDF or Word Doc</p>
-             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Comment Input */}
-      <textarea
-        className="w-full p-2 text-sm border rounded bg-gray-50 focus:ring-2 ring-red-200 outline-none resize-none"
-        rows="2"
-        placeholder="Describe changes (e.g. Fixed typos on pg 2)..."
-        value={uploadComment}
-        onChange={(e) => setUploadComment(e.target.value)}
-      />
+              {/* ACTION PANEL (Right Side) */}
+              <div className="w-full lg:w-[350px] space-y-6 shrink-0 h-full overflow-y-auto pb-10">
+                {/* 1. UPLOAD SECTION */}
+                <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
+                  <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                    <span>📤</span> Upload Correction
+                  </h3>
 
-      {/* Upload Button */}
-      <button 
-        onClick={handleUploadCorrection}
-        disabled={!uploadedFile || isUploading}
-        className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white
-          ${!uploadedFile ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-      >
-        {isUploading ? "Processing Diff..." : "Upload & Generate Diff"}
-      </button>
-    </div>
-  </div>
+                  <div className="space-y-3">
+                    {/* File Input */}
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition cursor-pointer relative bg-gray-50">
+                      <input
+                        type="file"
+                        accept=".pdf,.docx"
+                        onChange={handleFileChange}
+                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                      />
+                      <div className="pointer-events-none">
+                        {uploadedFile ? (
+                          <p className="text-sm font-bold text-green-600 truncate px-2">
+                            📄 {uploadedFile.name}
+                          </p>
+                        ) : (
+                          <div className="text-gray-400 text-xs">
+                            <p className="font-bold text-gray-500">
+                              Click to choose file
+                            </p>
+                            <p>PDF or Word Doc</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-  {/* 2. APPROVE BUTTON */}
-  <button 
-    onClick={handleEditorApprove}
-    className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 shadow-lg transition flex items-center justify-center gap-2 transform active:scale-95"
-  >
-    <CheckCircleIcon /> Approve & Notify Admin
-  </button>
+                    {/* Comment Input */}
+                    <textarea
+                      className="w-full p-2 text-sm border rounded bg-gray-50 focus:ring-2 ring-red-200 outline-none resize-none"
+                      rows="2"
+                      placeholder="Describe changes (e.g. Fixed typos on pg 2)..."
+                      value={uploadComment}
+                      onChange={(e) => setUploadComment(e.target.value)}
+                    />
 
-  {/* 3. CHANGE HISTORY LIST (Dynamic) */}
-  <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
-    <h3 className="font-bold text-gray-800 mb-4 border-b pb-2">📜 Change History</h3>
-    
-    <div className="space-y-6">
-      {changeHistory.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-2">No edits made yet.</p>
-      ) : (
-        changeHistory.map((log, index) => (
-          <div key={log.id} className="relative pl-4 border-l-2 border-gray-200">
-            {/* Timeline Dot */}
-            <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-white"></div>
-            
-            <div className="mb-1">
-              <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                Version {log.versionNumber}
-              </span>
-              <span className="text-[10px] text-gray-400 ml-2">
-                {new Date(log.editedAt).toLocaleDateString()}
-              </span>
+                    {/* Upload Button */}
+                    <button
+                      onClick={handleUploadCorrection}
+                      disabled={!uploadedFile || isUploading}
+                      className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white
+          ${
+            !uploadedFile
+              ? "bg-gray-300 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700"
+          }`}
+                    >
+                      {isUploading
+                        ? "Processing Diff..."
+                        : "Upload & Generate Diff"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. APPROVE BUTTON */}
+                <button
+                  onClick={handleEditorApprove}
+                  className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 shadow-lg transition flex items-center justify-center gap-2 transform active:scale-95"
+                >
+                  <CheckCircleIcon /> Approve & Notify Admin
+                </button>
+
+                {/* 3. CHANGE HISTORY LIST (Dynamic) */}
+                <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
+                  <h3 className="font-bold text-gray-800 mb-4 border-b pb-2">
+                    📜 Change History
+                  </h3>
+
+                  <div className="space-y-6">
+                    {changeHistory.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-2">
+                        No edits made yet.
+                      </p>
+                    ) : (
+                      changeHistory.map((log, index) => (
+                        <div
+                          key={log.id}
+                          className="relative pl-4 border-l-2 border-gray-200"
+                        >
+                          {/* Timeline Dot */}
+                          <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-white"></div>
+
+                          <div className="mb-1">
+                            <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                              Version {log.versionNumber}
+                            </span>
+                            <span className="text-[10px] text-gray-400 ml-2">
+                              {new Date(log.editedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600 italic mb-2">
+                            "{log.comments || "No comments provided"}"
+                          </p>
+
+                          {/* ✅ Added: Download Button for PDF Report */}
+                          <button
+                            onClick={() =>
+                              handleDownloadDiffPdf(log.id || log._id)
+                            }
+                            className="mb-2 flex items-center text-[10px] font-bold text-red-600 hover:text-red-800 bg-red-50 px-2 py-1 rounded border border-red-100 transition"
+                          >
+                            <DownloadIcon /> Download PDF Report
+                          </button>
+
+                          {/* Render Diff Viewer Component here */}
+                          <DiffViewer diffData={log.diffData} />
+                        </div>
+                      ))
+                    )}
+
+                    {/* Original Submission Marker */}
+                    <div className="relative pl-4 border-l-2 border-gray-200 opacity-60">
+                      <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-gray-400 ring-4 ring-white"></div>
+                      <p className="text-xs font-bold text-gray-500">
+                        Original Submission
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. SOURCE FILES (Existing buttons moved here) */}
+                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                  <h3 className="font-bold text-gray-800 mb-4">Source Files</h3>
+                  <div className="flex flex-col gap-3">
+                    {selectedArticle.originalWordUrl ? (
+                      <button
+                        onClick={() =>
+                          handleDownloadFile(
+                            selectedArticle.originalWordUrl,
+                            selectedArticle.title,
+                            "Word"
+                          )
+                        }
+                        className="flex items-center justify-center w-full py-2 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold rounded-lg hover:bg-blue-100 transition"
+                      >
+                        <WordIcon /> Download Word
+                      </button>
+                    ) : (
+                      <div className="text-xs text-center text-gray-400">
+                        No Word file
+                      </div>
+                    )}
+
+                    {selectedArticle.originalPdfUrl && (
+                      <button
+                        onClick={() =>
+                          handleDownloadFile(
+                            selectedArticle.originalPdfUrl,
+                            selectedArticle.title,
+                            "PDF"
+                          )
+                        }
+                        className="flex items-center justify-center w-full py-2 bg-red-50 text-red-700 border border-red-200 text-xs font-bold rounded-lg hover:bg-red-100 transition"
+                      >
+                        <DownloadIcon /> Download PDF
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-
-            <p className="text-xs text-gray-600 italic mb-2">
-              "{log.comments || "No comments provided"}"
-            </p>
-
-            {/* Render Diff Viewer Component here */}
-            <DiffViewer diffData={log.diffData} />
-          </div>
-        ))
-      )}
-      
-      {/* Original Submission Marker */}
-      <div className="relative pl-4 border-l-2 border-gray-200 opacity-60">
-        <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-gray-400 ring-4 ring-white"></div>
-        <p className="text-xs font-bold text-gray-500">Original Submission</p>
-      </div>
-    </div>
-  </div>
-
-  {/* 4. SOURCE FILES (Existing buttons moved here) */}
-  <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-    <h3 className="font-bold text-gray-800 mb-4">Source Files</h3>
-    <div className="flex flex-col gap-3">
-      {selectedArticle.originalWordUrl ? (
-        <button
-          onClick={() => handleDownloadFile(selectedArticle.originalWordUrl, selectedArticle.title, "Word")}
-          className="flex items-center justify-center w-full py-2 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold rounded-lg hover:bg-blue-100 transition"
-        >
-          <WordIcon /> Download Word
-        </button>
-      ) : <div className="text-xs text-center text-gray-400">No Word file</div>}
-
-      {selectedArticle.originalPdfUrl && (
-        <button
-          onClick={() => handleDownloadFile(selectedArticle.originalPdfUrl, selectedArticle.title, "PDF")}
-          className="flex items-center justify-center w-full py-2 bg-red-50 text-red-700 border border-red-200 text-xs font-bold rounded-lg hover:bg-red-100 transition"
-        >
-          <DownloadIcon /> Download PDF
-        </button>
-      )}
-    </div>
-  </div>
-
-</div>
-            </div>
           )}
-
         </div>
       </main>
     </div>

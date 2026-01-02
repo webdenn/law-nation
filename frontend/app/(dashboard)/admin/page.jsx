@@ -51,6 +51,22 @@ const DiffViewer = ({ diffData }) => {
   );
 };
 
+const DownloadIcon = () => (
+  <svg
+    className="w-3 h-3 mr-1"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+    />
+  </svg>
+);
+
 // Stat Card Component
 const StatCard = ({ title, count }) => (
   <div className="bg-white p-6 rounded-xl border-l-4 border-red-600 shadow-md">
@@ -66,6 +82,7 @@ export default function AdminDashboard() {
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const [isLoading, setIsLoading] = useState(true);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   // ✅ 0. UI STATE (Responsive Sidebar)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -149,6 +166,42 @@ export default function AdminDashboard() {
       console.error("Failed to fetch history", err);
     }
   };
+
+  // ✅ NEW: Download Diff PDF for Admin
+  const handleDownloadDiffPdf = async (articleId, changeLogId) => {
+  try {
+    setIsDownloadingPdf(true); // 🟢 Start loading
+    toast.info("Generating Diff PDF...");
+    
+    const token = localStorage.getItem("adminToken");
+    const res = await fetch(`${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) throw new Error("Failed");
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `admin-diff-report-${articleId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    
+    // ⏳ Thoda delay daal dein taaki popup aane ke baad hi success dikhe
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Ready to save!"); 
+      setIsDownloadingPdf(false); // 🔴 End loading
+    }, 1000);
+
+  } catch (err) {
+    setIsDownloadingPdf(false);
+    toast.error("Download failed");
+  }
+};
 
   // Jab bhi admin koi article khole, uski history load ho jaye
   useEffect(() => {
@@ -263,7 +316,7 @@ export default function AdminDashboard() {
             // 🔥 Backend fields names are exactly these:
             originalPdfUrl: item.originalPdfUrl,
             currentPdfUrl: item.currentPdfUrl,
-            pdfUrl: item.currentPdfUrl || item.originalPdfUrl,  // Fallback
+            pdfUrl: item.currentPdfUrl || item.originalPdfUrl, // Fallback
           }));
           setArticles(formatted);
           setArticles(formatted);
@@ -1009,6 +1062,19 @@ export default function AdminDashboard() {
                         <div className="bg-red-50 p-3 rounded-lg text-xs italic text-gray-700 border border-red-100 mb-3">
                           "{log.comments}"
                         </div>
+
+                        {/* ✅ Added: Admin Download Button */}
+                        <button
+                          onClick={() =>
+                            handleDownloadDiffPdf(
+                              selectedArticle.id || selectedArticle._id,
+                              log.id || log._id
+                            )
+                          }
+                          className="mb-3 flex items-center text-[9px] font-black text-red-700 hover:text-white hover:bg-red-600 bg-white px-2 py-1 rounded border border-red-200 transition-all uppercase"
+                        >
+                          <DownloadIcon /> Download Diff Report (PDF)
+                        </button>
 
                         {/* DIFF VIEWER */}
                         <DiffViewer diffData={log.diffData} />
