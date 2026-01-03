@@ -20,12 +20,16 @@ export default function HomePage() {
   const { user } = useSelector((state) => state.auth);
 
   // 2. Protected Read Logic
- const handleProtectedRead = (item) => {
-   
-   
-    const articleId = item._id || item.id;
-    router.push(`/article/${articleId}`);
-  };
+const handleProtectedRead = (item) => {
+  const slug = item.slug;
+  if (slug) {
+    // ✅ Absolute path: /article/slug-name
+    router.push(`/article/${slug}`); 
+  } else {
+    // Fallback agar slug na ho (Purane articles ke liye)
+    router.push(`/article/${item._id || item.id}`);
+  }
+};
 
   // 2. Updated useEffect
   // Isse useEffect ke upar (BAHAR) rakho taaki Search button bhi ise use kar sake
@@ -369,7 +373,7 @@ export default function HomePage() {
             ) : publishedArticles.length > 0 ? (
               publishedArticles.map((item) => (
                 <article
-                  key={item._id || item.id}
+                  key={item.slug || item.id}
                   className="bg-white border border-gray-200 rounded-lg p-8 flex flex-col h-full overflow-hidden"
                 >
 

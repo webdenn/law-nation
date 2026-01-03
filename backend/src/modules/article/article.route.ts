@@ -109,6 +109,13 @@ router.get(
   articleController.getArticleBySlug.bind(articleController)
 );
 
+// PUBLIC: Get article content by slug (with 250-word limit for guests)
+router.get(
+  "/slug/:slug/content",
+  optionalAuth,  // Allows both guests and logged-in users
+  articleController.getArticleContentBySlug.bind(articleController)
+);
+
 // Protected routes - Require authentication
 router.use(requireAuth);
 

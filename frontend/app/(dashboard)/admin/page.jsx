@@ -100,7 +100,7 @@ export default function AdminDashboard() {
     const adminData = localStorage.getItem("adminUser");
 
     if (!token) {
-      router.push("/admin-login");
+      router.push("/management-login");
     } else {
       try {
         if (adminData) {
@@ -109,7 +109,7 @@ export default function AdminDashboard() {
         setIsAuthorized(true);
       } catch (error) {
         localStorage.removeItem("adminToken");
-        router.push("/admin-login");
+        router.push("/management-login");
       }
     }
   }, [router]);
@@ -120,7 +120,7 @@ export default function AdminDashboard() {
     localStorage.clear(); // Sabse safe tareeka (Saari keys delete ho jayengi)
 
     toast.info("Admin Logged Out");
-    router.push("/admin-login");
+    router.push("/management-login");
     // Page refresh kar do taaki states poori tarah reset ho jayein
     window.location.reload();
   };
@@ -161,6 +161,17 @@ export default function AdminDashboard() {
       if (res.ok) {
         const data = await res.json();
         setChangeHistory(data.changeLogs || []);
+
+        // ✅ Backend se aane wali editorDocumentUrl ko state mein inject karein
+        if (
+          data.article?.editorDocumentUrl &&
+          selectedArticle?.editorDocumentUrl !== data.article.editorDocumentUrl
+        ) {
+          setSelectedArticle((prev) => ({
+            ...prev,
+            editorDocumentUrl: data.article.editorDocumentUrl,
+          }));
+        }
       }
     } catch (err) {
       console.error("Failed to fetch history", err);
@@ -168,67 +179,79 @@ export default function AdminDashboard() {
   };
 
   // ✅ NEW: Download Diff PDF for Admin
-  const handleDownloadDiffPdf = async (articleId, changeLogId) => {
-  try {
-    setIsDownloadingPdf(true); // 🟢 Start loading
-    toast.info("Generating Diff PDF...");
-    
-    const token = localStorage.getItem("adminToken");
-    const res = await fetch(`${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+  // ✅ REPLACE: handleDownloadDiffPdf with this universal function
+  const handleDownloadAdminReport = async (
+    changeLogId,
+    type,
+    format = "pdf"
+  ) => {
+    try {
+      const token = localStorage.getItem("adminToken");
+      const articleId = selectedArticle.id || selectedArticle._id;
 
-    if (!res.ok) throw new Error("Failed");
+      // Backend dev ki di hui documentation ke hisaab se endpoints
+      const endpoint =
+        type === "diff"
+          ? `${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`
+          : `${API_BASE_URL}/api/articles/change-logs/${changeLogId}/editor-document?format=${format}`;
 
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `admin-diff-report-${articleId}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    
-    // ⏳ Thoda delay daal dein taaki popup aane ke baad hi success dikhe
-    setTimeout(() => {
+      toast.info(`Generating ${format.toUpperCase()}...`);
+
+      const res = await fetch(endpoint, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) throw new Error("Download failed");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${type}-v${articleId}.${
+        format === "word" ? "docx" : "pdf"
+      }`;
+      document.body.appendChild(a);
+      a.click();
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      toast.success("Ready to save!"); 
-      setIsDownloadingPdf(false); // 🔴 End loading
-    }, 1000);
-
-  } catch (err) {
-    setIsDownloadingPdf(false);
-    toast.error("Download failed");
-  }
-};
+      toast.success("Download Successful!");
+    } catch (err) {
+      toast.error("Format conversion not supported for this file yet.");
+    }
+  };
 
   // Jab bhi admin koi article khole, uski history load ho jaye
+  // Isse purane wale ki jagah paste karein
   useEffect(() => {
-    if (selectedArticle)
-      fetchChangeHistory(selectedArticle.id || selectedArticle._id);
-  }, [selectedArticle]);
+    const articleId = selectedArticle?.id || selectedArticle?._id;
+
+    if (articleId) {
+      // Sirf fetch tab karein jab article change ho, loop rokne ke liye
+      const currentLoadedId =
+        changeHistory.length > 0
+          ? changeHistory[0].articleId || changeHistory[0]._id
+          : null;
+
+      if (articleId !== currentLoadedId) {
+        fetchChangeHistory(articleId);
+      }
+    }
+  }, [selectedArticle?.id, selectedArticle?._id]);
 
   // PDF URL Fix Logic (Isse "PDF Not Found" khatam ho jayega)
   console.log("Admin Dashboard Data Row:", selectedArticle);
   const getPdfUrlToView = () => {
     if (!selectedArticle) return null;
+    let path = "";
 
-    const path =
-      pdfViewMode === "original"
-        ? selectedArticle.originalPdfUrl
-        : selectedArticle.currentPdfUrl;
-
-    console.log("Current Path:", path); // 👈 Agar ye null hai toh PDF nahi dikhegi
+    if (pdfViewMode === "original") path = selectedArticle.originalPdfUrl;
+    else if (pdfViewMode === "current") path = selectedArticle.currentPdfUrl;
+    else if (pdfViewMode === "track") path = selectedArticle.editorDocumentUrl; // ✅ Latest logic
 
     if (!path) return null;
-
-    const fullUrl = path.startsWith("http")
+    return path.startsWith("http")
       ? path
-      : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
-
-    console.log("Full PDF URL:", fullUrl); // 👈 Ye URL browser mein copy karke check karein
-    return fullUrl;
+      : `${API_BASE_URL}/${path.replace(/^\//, "")}`;
   };
 
   // ✅ FETCH DATA (Articles + Editors)
@@ -874,7 +897,6 @@ export default function AdminDashboard() {
                             View Abstract
                           </button>
                         </td>
-
                         {/* 2. Author & Date */}
                         <td className="p-5">
                           <p className="text-sm text-gray-800 font-bold">
@@ -884,7 +906,6 @@ export default function AdminDashboard() {
                             {art.date}
                           </p>
                         </td>
-
                         {/* 3. Status Badge */}
                         <td className="p-5">
                           <span
@@ -899,7 +920,6 @@ export default function AdminDashboard() {
                             {art.status}
                           </span>
                         </td>
-
                         {/* 4. Assign Editor Dropdown */}
                         <td className="p-5 text-center">
                           <select
@@ -917,32 +937,55 @@ export default function AdminDashboard() {
                             ))}
                           </select>
                         </td>
-
                         {/* 5. Combined Actions (Publish + Delete) */}
+
                         <td className="p-5 text-right flex justify-end gap-3 items-center">
                           <button
                             onClick={() => {
-                              console.log("Selected Article Data:", art);
                               setSelectedArticle(art);
                               setPdfViewMode("original");
                             }}
-                            className="bg-blue-600 text-white px-3 py-2 rounded text-[10px] font-black hover:bg-blue-800 transition-colors uppercase"
+                            className="w-[80px] bg-blue-600 text-white py-2 rounded text-[10px] font-black hover:bg-blue-800 transition-colors uppercase text-center"
                           >
                             Review
                           </button>
 
                           <button
                             onClick={() => overrideAndPublish(art.id)}
-                            className="bg-black text-white px-3 py-2 rounded text-[10px] font-black hover:bg-green-600 transition-colors uppercase"
+                            disabled={art.status === "Published"}
+                            className={`w-[90px] py-2 rounded text-[10px] font-black transition-colors uppercase text-center ${
+                              art.status === "Published"
+                                ? "bg-gray-400 cursor-not-allowed text-gray-200"
+                                : "bg-black text-white hover:bg-green-600"
+                            }`}
                           >
-                            Publish
+                            {art.status === "Published"
+                              ? "Published"
+                              : "Publish"}
                           </button>
 
                           <button
-                            onClick={() => deleteArticle(art.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                            onClick={() => {
+                              if (window.confirm("Permanent Delete?"))
+                                deleteArticle(art.id);
+                            }}
+                            className="bg-red-100 text-red-600 p-2 rounded hover:bg-red-600 hover:text-white transition-all shrink-0"
+                            title="Delete Article"
                           >
-                            {/* Delete Icon SVG yahan rahega */}
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862A2 2 0 011.995 18.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
                           </button>
                         </td>
                       </tr>
@@ -1001,23 +1044,33 @@ export default function AdminDashboard() {
               <div className="p-4 border-b bg-gray-50 flex gap-4">
                 <button
                   onClick={() => setPdfViewMode("original")}
-                  className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${
+                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${
                     pdfViewMode === "original"
                       ? "bg-red-600 text-white shadow-lg"
                       : "bg-white text-gray-400 border"
                   }`}
                 >
-                  ORIGINAL SUBMISSION
+                  1. ORIGINAL SUBMISSION
                 </button>
                 <button
                   onClick={() => setPdfViewMode("current")}
-                  className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${
+                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${
                     pdfViewMode === "current"
-                      ? "bg-red-600 text-white shadow-lg"
+                      ? "bg-blue-600 text-white shadow-lg"
                       : "bg-white text-gray-400 border"
                   }`}
                 >
-                  EDITOR'S EDITED VERSION
+                  2. FINAL EDITED VERSION
+                </button>
+                <button
+                  onClick={() => setPdfViewMode("track")}
+                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${
+                    pdfViewMode === "track"
+                      ? "bg-green-600 text-white shadow-lg"
+                      : "bg-white text-gray-400 border"
+                  }`}
+                >
+                  3. VIEW TRACK FILE
                 </button>
               </div>
               {/* ✅ Sirf tabhi iframe dikhao jab URL available ho */}
@@ -1064,17 +1117,43 @@ export default function AdminDashboard() {
                         </div>
 
                         {/* ✅ Added: Admin Download Button */}
-                        <button
-                          onClick={() =>
-                            handleDownloadDiffPdf(
-                              selectedArticle.id || selectedArticle._id,
-                              log.id || log._id
-                            )
-                          }
-                          className="mb-3 flex items-center text-[9px] font-black text-red-700 hover:text-white hover:bg-red-600 bg-white px-2 py-1 rounded border border-red-200 transition-all uppercase"
-                        >
-                          <DownloadIcon /> Download Diff Report (PDF)
-                        </button>
+                        <div className="grid grid-cols-2 gap-2 mt-2 border-t pt-3">
+                          {/* DIFF REPORTS */}
+                          <button
+                            onClick={() =>
+                              handleDownloadAdminReport(log.id, "diff", "pdf")
+                            }
+                            className="flex items-center justify-center text-[9px] font-black text-red-700 bg-red-50 p-2 rounded hover:bg-red-600 hover:text-white transition-all border border-red-200 uppercase"
+                          >
+                            <DownloadIcon /> Diff (PDF)
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleDownloadAdminReport(log.id, "diff", "word")
+                            }
+                            className="flex items-center justify-center text-[9px] font-black text-blue-700 bg-blue-50 p-2 rounded hover:bg-blue-600 hover:text-white transition-all border border-blue-200 uppercase"
+                          >
+                            <DownloadIcon /> Diff (Word)
+                          </button>
+
+                          {/* TRACK FILE REPORTS - Backend route sync */}
+                          <button
+                            onClick={() =>
+                              handleDownloadAdminReport(log.id, "track", "pdf")
+                            }
+                            className="flex items-center justify-center text-[9px] font-black text-green-700 bg-green-50 p-2 rounded hover:bg-green-600 hover:text-white transition-all border border-green-200 uppercase"
+                          >
+                            <DownloadIcon /> Track (PDF)
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleDownloadAdminReport(log.id, "track", "word")
+                            }
+                            className="flex items-center justify-center text-[9px] font-black text-purple-700 bg-purple-50 p-2 rounded hover:bg-purple-600 hover:text-white transition-all border border-purple-200 uppercase"
+                          >
+                            <DownloadIcon /> Track (Word)
+                          </button>
+                        </div>
 
                         {/* DIFF VIEWER */}
                         <DiffViewer diffData={log.diffData} />

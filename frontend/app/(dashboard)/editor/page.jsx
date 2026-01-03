@@ -136,6 +136,7 @@ export default function EditorDashboard() {
   const [articles, setArticles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [uploadedFile, setUploadedFile] = useState(null); // SIRF EK BAAR
+  const [trackFile, setTrackFile] = useState(null);
   const [changeHistory, setChangeHistory] = useState([]);
   const [uploadComment, setUploadComment] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -181,7 +182,7 @@ export default function EditorDashboard() {
     }
 
     if (!token) {
-      router.push("/admin-login");
+      router.push("/management-login");
     }
   }, [router]);
 
@@ -212,47 +213,62 @@ export default function EditorDashboard() {
 
   // ... existing fetchAssignedArticles function ...
 
-  // ✅ NEW FUNCTION: Change History Fetch karne ke liye
-  const fetchChangeHistory = async (articleId) => {
-    try {
-      const token = localStorage.getItem("editorToken");
-      const res = await fetch(
-        `${API_BASE_URL}/api/articles/${articleId}/change-history`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setChangeHistory(data.changeLogs || []);
+const fetchChangeHistory = async (articleId) => {
+  try {
+    const token = localStorage.getItem("editorToken");
+    const res = await fetch(`${API_BASE_URL}/api/articles/${articleId}/change-history`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setChangeHistory(data.changeLogs || []);
+
+      // ✅ Loop Fix: Pehle check karo ki kya backend se naya URL aaya hai
+      if (data.article?.editorDocumentUrl && selectedArticle?.editorDocumentUrl !== data.article.editorDocumentUrl) {
+        setSelectedArticle(prev => ({
+          ...prev,
+          editorDocumentUrl: data.article.editorDocumentUrl
+        }));
       }
-    } catch (err) {
-      console.error("Failed to fetch history", err);
     }
-  };
+  } catch (err) {
+    console.error("Failed to fetch history", err);
+  }
+};
 
   // ✅ USE EFFECT: Jab selectedArticle change ho, tab history lao
   useEffect(() => {
-    if (selectedArticle) {
-      fetchChangeHistory(selectedArticle.id || selectedArticle._id);
-    }
-  }, [selectedArticle]);
+  const articleId = selectedArticle?.id || selectedArticle?._id;
+  if (articleId) {
+    fetchChangeHistory(articleId);
+  }
+}, [selectedArticle?.id, selectedArticle?._id]); // ✅ Sirf ID track hogi, loop ruk jayega
 
   // ❌ DELETE OLD: handleArticleAction function hata do.
 
   // ✅ NEW 1: Handle Upload Corrected Version (Comment ke saath)
   const handleUploadCorrection = async () => {
-    if (!uploadedFile) return toast.error("Please select a file first");
+    // Check if main file is selected
+    if (!uploadedFile)
+      return toast.error("Please select a corrected file first");
 
     try {
       setIsUploading(true);
       const token = localStorage.getItem("editorToken");
       const formData = new FormData();
 
-      // ✅ FIX: Backend 'uploadDocument' middleware expect kar raha hai "document" field
+      // 1. Corrected Article: Iska field name backend 'document' expect kar raha hai
       formData.append("document", uploadedFile);
 
-      if (uploadComment) formData.append("comments", uploadComment);
+      // 2. Track Changes/Editor Doc: Iska field name backend 'editorDocument' expect kar raha hai
+      if (trackFile) {
+        formData.append("editorDocument", trackFile);
+      }
+
+      // 3. Comments: Backend req.body.comments se uthayega
+      if (uploadComment) {
+        formData.append("comments", uploadComment);
+      }
 
       const res = await fetch(
         `${API_BASE_URL}/api/articles/${
@@ -260,28 +276,39 @@ export default function EditorDashboard() {
         }/upload-corrected`,
         {
           method: "PATCH",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            // Note: Yahan Content-Type set nahi karna hai, FormData khud kar lega
+          },
           body: formData,
         }
       );
 
       const data = await res.json();
+
       if (res.ok) {
         toast.success("New version uploaded & Diff generated!");
+
+        // Reset form states
         setUploadedFile(null);
+        setTrackFile(null);
         setUploadComment("");
+
+        // Refresh Change History to show the new version
         fetchChangeHistory(selectedArticle.id || selectedArticle._id);
 
+        // Latest PDF view update karein
         if (data.article && data.article.currentPdfUrl) {
           setSelectedArticle((prev) => ({ ...prev, ...data.article }));
           setPdfViewMode("current");
         }
       } else {
-        // Agar ab bhi error aaye, toh data.error check karein
+        // Backend se error message dikhao
         toast.error(data.error || data.message || "Upload failed");
       }
     } catch (err) {
-      toast.error("Server Error");
+      console.error("Upload Error:", err);
+      toast.error("Server Error: Could not connect to backend");
     } finally {
       setIsUploading(false);
     }
@@ -317,7 +344,7 @@ export default function EditorDashboard() {
   const handleLogout = () => {
     localStorage.removeItem("editorToken");
     localStorage.removeItem("editorUser");
-    router.push("/admin-login");
+    router.push("/management-login");
   };
 
   const handleFileChange = (e) => {
@@ -362,50 +389,66 @@ export default function EditorDashboard() {
   // ----------------------------------
 
   // ✅ NEW: Download Diff PDF from Backend
-  const handleDownloadDiffPdf = async (changeLogId) => {
+  // Function ko update karein taaki format accept kare
+  const handleDownloadDiffReport = async (changeLogId, format = "pdf") => {
     try {
-      toast.info("Generating Diff PDF...");
+      const typeLabel = format === "word" ? "Word" : "PDF";
+      toast.info(`Generating ${typeLabel} Report...`);
+
       const token = localStorage.getItem("editorToken");
       const articleId = selectedArticle.id || selectedArticle._id;
 
+      // API URL mein ?format= parameter add kiya
       const res = await fetch(
-        `${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff`,
+        `${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`,
         {
           method: "GET",
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
-      if (!res.ok) throw new Error("Failed to generate PDF");
+      if (!res.ok) throw new Error(`Failed to generate ${typeLabel}`);
 
-      // Backend se buffer (blob) aa raha hai
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `diff-v2-${articleId}.pdf`;
+
+      // Extension set karein
+      const extension = format === "word" ? "docx" : "pdf";
+      a.download = `diff-v2-${articleId}.${extension}`;
+
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast.success("Diff PDF Downloaded!");
+      toast.success(`${typeLabel} Downloaded!`);
     } catch (err) {
       console.error(err);
-      toast.error("Could not download Diff PDF");
+      toast.error(`Could not download ${format.toUpperCase()} report`);
     }
   };
 
-  const getPdfUrlToView = () => {
-    if (!selectedArticle) return "";
-    const path =
-      pdfViewMode === "original"
-        ? selectedArticle.originalPdfUrl
-        : selectedArticle.currentPdfUrl;
-    if (!path) return "";
-    return path.startsWith("http")
-      ? path
-      : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
-  };
+  // --- Update getPdfUrlToView Function ---
+const getPdfUrlToView = () => {
+  if (!selectedArticle) return "";
+  let path = "";
+
+  if (pdfViewMode === "original") {
+    path = selectedArticle.originalPdfUrl;
+  } else if (pdfViewMode === "current") {
+    path = selectedArticle.currentPdfUrl;
+  } else if (pdfViewMode === "track") {
+    // ✅ Backend ne jo naya field diya hai use priority dein
+    path = selectedArticle.editorDocumentUrl; 
+  }
+
+  if (!path) return "";
+  
+  return path.startsWith("http")
+    ? path
+    : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+};
 
   if (!isAuthorized)
     return (
@@ -495,7 +538,6 @@ export default function EditorDashboard() {
               <div className="px-3 py-2 text-xs font-bold text-red-200 uppercase tracking-widest border-b border-red-600 mb-2">
                 Document Options
               </div>
-
               <button
                 onClick={() => {
                   setPdfViewMode("original");
@@ -514,6 +556,14 @@ export default function EditorDashboard() {
                   </span>
                 )}
               </button>
+
+              {pdfViewMode === "track" && (
+                <div className="px-3 mt-1">
+                  <p className="text-[10px] text-red-200 mb-1">
+                    Source: ArticleChangeLog.editorDocumentUrl
+                  </p>
+                </div>
+              )}
 
               <button
                 onClick={() => {
@@ -534,8 +584,40 @@ export default function EditorDashboard() {
                 )}
               </button>
 
-              <div className="my-6 border-t border-red-800"></div>
+              <button
+                onClick={() => {
+                  setPdfViewMode("track"); // ✅ Naya mode
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                  pdfViewMode === "track"
+                    ? "bg-white text-red-700 shadow-lg"
+                    : "hover:bg-red-800 text-white"
+                }`}
+              >
+                View Track File
+                {pdfViewMode === "track" && (
+                  <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">
+                    Active
+                  </span>
+                )}
+              </button>
 
+              {/* {pdfViewMode === "track" && getPdfUrlToView() && (
+                <button
+                  onClick={() =>
+                    handleDownloadFile(
+                      getPdfUrlToView(),
+                      "Track_Changes",
+                      "PDF"
+                    )
+                  }
+                  className="w-full mt-2 p-2 text-[10px] bg-green-700 hover:bg-green-800 rounded font-bold uppercase flex items-center justify-center"
+                >
+                  <DownloadIcon /> Download Track File
+                </button>
+              )} */}
+              <div className="my-6 border-t border-red-800"></div>
               <button
                 onClick={() => {
                   setSelectedArticle(null);
@@ -729,39 +811,52 @@ export default function EditorDashboard() {
               {/* ACTION PANEL (Right Side) */}
               <div className="w-full lg:w-[350px] space-y-6 shrink-0 h-full overflow-y-auto pb-10">
                 {/* 1. UPLOAD SECTION */}
+                {/* 1. UPLOAD SECTION */}
                 <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
                   <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                     <span>📤</span> Upload Correction
                   </h3>
 
                   <div className="space-y-3">
-                    {/* File Input */}
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition cursor-pointer relative bg-gray-50">
+                    {/* Corrected File Input */}
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center bg-gray-50 relative hover:bg-gray-100 transition cursor-pointer">
                       <input
                         type="file"
                         accept=".pdf,.docx"
-                        onChange={handleFileChange}
+                        onChange={(e) => setUploadedFile(e.target.files[0])}
                         className="absolute inset-0 opacity-0 cursor-pointer z-10"
                       />
-                      <div className="pointer-events-none">
-                        {uploadedFile ? (
-                          <p className="text-sm font-bold text-green-600 truncate px-2">
-                            📄 {uploadedFile.name}
-                          </p>
-                        ) : (
-                          <div className="text-gray-400 text-xs">
-                            <p className="font-bold text-gray-500">
-                              Click to choose file
-                            </p>
-                            <p>PDF or Word Doc</p>
-                          </div>
-                        )}
-                      </div>
+                      <p className="text-[10px] font-bold text-gray-500 uppercase">
+                        CORRECTED FILE
+                      </p>
+                      <p className="text-xs truncate font-medium text-gray-700">
+                        {uploadedFile
+                          ? `📄 ${uploadedFile.name}`
+                          : "Select Corrected Version"}
+                      </p>
+                    </div>
+
+                    {/* Track File Input */}
+                    <div className="border-2 border-dashed border-blue-200 rounded-lg p-3 text-center bg-blue-50/30 relative hover:bg-blue-50 transition cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".pdf,.docx"
+                        onChange={(e) => setTrackFile(e.target.files[0])}
+                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                      />
+                      <p className="text-[10px] font-bold text-blue-600 uppercase">
+                        TRACK FILE (CHANGES)
+                      </p>
+                      <p className="text-xs truncate font-medium text-blue-800">
+                        {trackFile
+                          ? `📄 ${trackFile.name}`
+                          : "Select Track Changes File"}
+                      </p>
                     </div>
 
                     {/* Comment Input */}
                     <textarea
-                      className="w-full p-2 text-sm border rounded bg-gray-50 focus:ring-2 ring-red-200 outline-none resize-none"
+                      className="w-full p-2 text-sm border rounded bg-gray-50 focus:ring-2 ring-red-200 outline-none resize-none mt-2"
                       rows="2"
                       placeholder="Describe changes (e.g. Fixed typos on pg 2)..."
                       value={uploadComment}
@@ -771,13 +866,13 @@ export default function EditorDashboard() {
                     {/* Upload Button */}
                     <button
                       onClick={handleUploadCorrection}
-                      disabled={!uploadedFile || isUploading}
-                      className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white
-          ${
-            !uploadedFile
-              ? "bg-gray-300 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
-          }`}
+                      disabled={!uploadedFile || !trackFile || isUploading}
+                      className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-2
+      ${
+        !uploadedFile || !trackFile
+          ? "bg-gray-300 cursor-not-allowed"
+          : "bg-blue-600 hover:bg-blue-700 active:scale-95"
+      }`}
                     >
                       {isUploading
                         ? "Processing Diff..."
@@ -813,7 +908,6 @@ export default function EditorDashboard() {
                         >
                           {/* Timeline Dot */}
                           <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-white"></div>
-
                           <div className="mb-1">
                             <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
                               Version {log.versionNumber}
@@ -825,17 +919,31 @@ export default function EditorDashboard() {
                           <p className="text-xs text-gray-600 italic mb-2">
                             "{log.comments || "No comments provided"}"
                           </p>
-
                           {/* ✅ Added: Download Button for PDF Report */}
+
                           <button
-                            onClick={() =>
-                              handleDownloadDiffPdf(log.id || log._id)
+                            onClick={
+                              () =>
+                                handleDownloadDiffReport(
+                                  log.id || log._id,
+                                  "pdf"
+                                ) // ✅ handleDownloadDiffReport use karein
                             }
                             className="mb-2 flex items-center text-[10px] font-bold text-red-600 hover:text-red-800 bg-red-50 px-2 py-1 rounded border border-red-100 transition"
                           >
                             <DownloadIcon /> Download PDF Report
                           </button>
-
+                          <button
+                            onClick={() =>
+                              handleDownloadDiffReport(
+                                log.id || log._id,
+                                "word"
+                              )
+                            }
+                            className="flex items-center text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100 transition"
+                          >
+                            <WordIcon /> Download Word Report
+                          </button>
                           {/* Render Diff Viewer Component here */}
                           <DiffViewer diffData={log.diffData} />
                         </div>

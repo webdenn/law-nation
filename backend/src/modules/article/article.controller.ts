@@ -154,7 +154,6 @@ export class ArticleController {
   }
 
   // Editor or Admin approves article (Option A)
-  // Editor or Admin approves article (Option A)
   async approveArticle(req: AuthRequest, res: Response) {
     try {
       const articleId = req.params.id;
@@ -165,16 +164,10 @@ export class ArticleController {
       const userId = req.user!.id;
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
 
-      // ✅ CHANGE 1: Check karo agar nayi PDF file upload hui hai
-      const newPdfUrl = req.fileMeta?.url; 
-
-      // ✅ CHANGE 2: Service function mein newPdfUrl pass karo
-      const article = await articleService.approveArticle(articleId, userId, userRoles, newPdfUrl);
+      const article = await articleService.approveArticle(articleId, userId, userRoles);
 
       res.json({
-        message: newPdfUrl 
-          ? "Article updated via upload and published successfully" 
-          : "Article approved successfully",
+        message: "Article approved successfully",
         article,
       });
     } catch (error) {
@@ -220,6 +213,8 @@ export class ArticleController {
       const data: UploadCorrectedPdfData = {
         pdfUrl: req.fileMeta.url,
         comments: validatedData.comments,
+        editorDocumentUrl: req.body.editorDocumentUrl,      // ✅ Pass editor document URL from middleware
+        editorDocumentType: req.body.editorDocumentType,    // ✅ Pass editor document type from middleware
       };
 
       const article = await articleService.uploadCorrectedPdf(articleId, editorId, data);
@@ -291,6 +286,33 @@ export class ArticleController {
       const article = await articleService.getArticleBySlug(slug);
 
       res.json({ article });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Get article content by slug (with 250-word limit for guests)
+  async getArticleContentBySlug(req: AuthRequest, res: Response) {
+    try {
+      const slug = req.params.slug;
+      if (!slug) {
+        throw new BadRequestError("Article slug is required");
+      }
+
+      // First get article by slug
+      const article = await articleService.getArticleBySlug(slug);
+
+      // Then get content with auth check
+      const isAuthenticated = !!req.user;
+      const content = await articleService.getArticleContent(article.id, isAuthenticated);
+
+      res.json({
+        message: isAuthenticated 
+          ? "Article content retrieved successfully"
+          : "Preview mode: Login to read the full article",
+        article: content,
+        requiresLogin: !isAuthenticated && content.isLimited
+      });
     } catch (error) {
       throw error;
     }

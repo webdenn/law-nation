@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, use } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useSelector } from "react-redux";
@@ -68,11 +69,13 @@ const LockIcon = () => (
   </svg>
 );
 
-export default function ArticlePage() {
-  const params = useParams();
+export default function ArticlePage({ params }) {
   const router = useRouter();
   const pathname = usePathname();
-  const id = params?.id;
+
+  // ✅ Next.js 15: params ko use() hook se unwrap karna zaroori hai
+  const unwrappedParams = use(params);
+  const slug = unwrappedParams?.slug;
 
   const API_BASE_URL = "http://localhost:4000";
   const { token } = useSelector((state) => state.auth);
@@ -80,8 +83,6 @@ export default function ArticlePage() {
   const [article, setArticle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-
-  // New State: Backend batayega ki limited view hai ya full
   const [isLimited, setIsLimited] = useState(false);
 
   const getPdfUrl = (url) => {
@@ -91,44 +92,39 @@ export default function ArticlePage() {
   };
 
   useEffect(() => {
-    if (!id) return;
-
-    // ❌ Redirect Logic Hata Diya (Ab Guest bhi dekh sakta hai)
+    if (!slug) return;
 
     const fetchArticleData = async () => {
       try {
         setLoading(true);
-
-        // ✅ Change 1: Headers conditionally banayein
-        const headers = {
-          "Content-Type": "application/json",
-        };
-        // Agar token hai to bhejo, warna mat bhejo (Guest Mode)
+        const headers = { "Content-Type": "application/json" };
+        
+        // ✅ Missing token fix: Tabhi bhejien jab token ho
         if (token) {
           headers["Authorization"] = `Bearer ${token}`;
         }
 
-        const res = await fetch(`${API_BASE_URL}/api/articles/${id}/content`, {
-          method: "GET",
-          headers: headers,
-        });
+        // ✅ API URL Fix: Backend dev ke mutabiq '/content' hata diya
+        const res = await fetch(
+          `${API_BASE_URL}/api/articles/slug/${slug}/content`,
+          {
+            method: "GET",
+            headers: headers,
+          }
+        );
 
         const data = await res.json();
 
         if (res.ok && data.article) {
           setArticle(data.article);
-          // ✅ Change 2: Check karein agar content limited hai
-          if (data.requiresLogin || data.article.isLimited) {
-            setIsLimited(true);
-          } else {
-            setIsLimited(false);
-          }
+          // Backend 'requiresLogin' bhejta hai agar user logged in nahi hai aur article limited hai
+          setIsLimited(!!(data.requiresLogin || data.article.isLimited));
         } else {
-          console.error("Error from backend:", data.message);
+          console.error("Backend error:", data.message);
           setError(true);
         }
       } catch (err) {
-        console.error("Failed to load article:", err);
+        console.error("Fetch error:", err);
         setError(true);
       } finally {
         setLoading(false);
@@ -136,7 +132,7 @@ export default function ArticlePage() {
     };
 
     fetchArticleData();
-  }, [id, token]); // Router dependency hata di
+  }, [slug, token]);
 
   const handleDownload = async (type) => {
     if (!token) {
@@ -146,37 +142,30 @@ export default function ArticlePage() {
     }
 
     try {
-      // Toast dikhao ki download shuru ho raha hai
       toast.info(`Downloading ${type.toUpperCase()}...`);
-
-      // Backend API endpoint decide karo
       const endpoint = type === "word" ? "download/word" : "download/pdf";
 
-      // Fetch request with Token
+      // ✅ Database ID use karein kyunki slug se download nahi hota
       const res = await fetch(
-        `${API_BASE_URL}/api/articles/${id}/${endpoint}`,
+        `${API_BASE_URL}/api/articles/${article.id || article._id}/${endpoint}`,
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${token}`, // 👈 Ye zaroori hai
+            Authorization: `Bearer ${token}`,
           },
         }
       );
 
       if (!res.ok) throw new Error("Download failed");
 
-      // File ko Blob (binary data) mein convert karo
       const blob = await res.blob();
-
-      // Temporary link bana kar download trigger karo
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${article.title}.${type === "word" ? "docx" : "pdf"}`; // Filename set karo
+      a.download = `${article.title}.${type === "word" ? "docx" : "pdf"}`;
       document.body.appendChild(a);
       a.click();
 
-      // Cleanup
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       toast.success("Download complete!");
@@ -270,25 +259,14 @@ export default function ArticlePage() {
               </div>
             </div>
 
-            {/* Only show PDF button if NOT limited */}
             {!isLimited && article.currentPdfUrl && (
               <button
-                onClick={() => handleDownload("pdf")} // 👈 PDF ke liye function call
+                onClick={() => handleDownload("pdf")}
                 className="hidden sm:flex items-center text-sm font-medium text-gray-600 hover:text-black border border-gray-200 rounded-full px-4 py-2 hover:border-gray-400 transition-all cursor-pointer"
               >
                 <DownloadIcon /> PDF
               </button>
             )}
-
-            {/* ✅ FIXED: Desktop Word Button (Now using onClick) */}
-            {/* {!isLimited && article.currentWordUrl && (
-              <button
-                onClick={() => handleDownload("word")}
-                className="hidden sm:flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 border border-blue-200 rounded-full px-4 py-2 hover:border-blue-400 transition-all ml-3"
-              >
-                <WordIcon /> Word
-              </button>
-            )} */}
           </div>
         </header>
 
@@ -298,13 +276,11 @@ export default function ArticlePage() {
           </div>
         )}
 
-        {/* Content Body */}
         <div
           className={`prose prose-lg prose-slate max-w-none prose-headings:font-bold prose-a:text-blue-600 hover:prose-a:text-blue-500 prose-img:rounded-xl ${
             isLimited ? "relative" : ""
           }`}
         >
-          {/* HTML or Text Content */}
           {article.contentHtml ? (
             <div dangerouslySetInnerHTML={{ __html: article.contentHtml }} />
           ) : article.content ? (
@@ -315,7 +291,6 @@ export default function ArticlePage() {
             </div>
           )}
 
-          {/* ✅ Change 3: Fade Out Effect & Login Button for Guests */}
           {isLimited && (
             <div className="absolute bottom-0 left-0 w-full h-48 bg-gradient-to-t from-white via-white/90 to-transparent flex items-end justify-center pb-0">
               <div className="w-full text-center bg-white pt-4">
@@ -331,7 +306,6 @@ export default function ArticlePage() {
           )}
         </div>
 
-        {/* Download Button at Bottom (Only for Logged In users) */}
         {!isLimited && article.currentPdfUrl && (
           <div className="mt-16 pt-8 border-t border-gray-100 sm:hidden">
             <a
@@ -345,7 +319,6 @@ export default function ArticlePage() {
           </div>
         )}
 
-        {/* Word Button for Mobile ONLY */}
         {article.currentWordUrl && (
           <button
             onClick={() => handleDownload("word")}
