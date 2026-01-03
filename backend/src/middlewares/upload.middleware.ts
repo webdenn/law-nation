@@ -354,6 +354,131 @@ export const uploadOptionalPdf = (req: Request, res: Response, next: NextFunctio
   }
 };
 
+// ✅ NEW: Editor uploads corrected PDF + optional editor document
+export const uploadEditorFiles = (req: Request, res: Response, next: NextFunction) => {
+  // Ensure editor-docs directory exists
+  if (isLocal) {
+    const editorDocsDir = 'uploads/editor-docs/';
+    if (!fs.existsSync(editorDocsDir)) {
+      fs.mkdirSync(editorDocsDir, { recursive: true });
+    }
+  }
+
+  if (isLocal) {
+    const upload = multer({
+      storage: multer.diskStorage({
+        destination: (req, file, cb) => {
+          let directory = '';
+          if (file.fieldname === 'document') {
+            // Main corrected article file
+            directory = 'uploads/pdfs/';
+          } else if (file.fieldname === 'editorDocument') {
+            // Editor's additional document
+            directory = 'uploads/editor-docs/';
+          }
+          
+          if (!fs.existsSync(directory)) {
+            fs.mkdirSync(directory, { recursive: true });
+          }
+          
+          cb(null, directory);
+        },
+        filename: (req, file, cb) => {
+          const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+          cb(null, unique + path.extname(file.originalname));
+        },
+      }),
+      fileFilter: documentFileFilter,
+      limits: { fileSize: MAX_DOCUMENT_SIZE }
+    });
+
+    upload.fields([
+      { name: 'document', maxCount: 1 },      // Required: corrected article
+      { name: 'editorDocument', maxCount: 1 } // Optional: editor's notes/diff
+    ])(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      
+      // Handle main corrected document (required)
+      if (files.document && files.document[0]) {
+        const docFile = files.document[0];
+        req.fileMeta = {
+          url: `/uploads/pdfs/${docFile.filename}`,
+          storageKey: docFile.filename
+        };
+      } else {
+        return res.status(400).json({ error: "Corrected document file required" });
+      }
+      
+      // Handle editor document (optional)
+      if (files.editorDocument && files.editorDocument[0]) {
+        const editorDocFile = files.editorDocument[0];
+        const ext = path.extname(editorDocFile.originalname).toLowerCase();
+        const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
+        
+        req.body.editorDocumentUrl = `/uploads/editor-docs/${editorDocFile.filename}`;
+        req.body.editorDocumentType = docType;
+      }
+      
+      next();
+    });
+  } else {
+    const upload = multer({
+      storage: multer.memoryStorage(),
+      fileFilter: documentFileFilter,
+      limits: { fileSize: MAX_DOCUMENT_SIZE }
+    });
+
+    upload.fields([
+      { name: 'document', maxCount: 1 },
+      { name: 'editorDocument', maxCount: 1 }
+    ])(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      
+      try {
+        // Handle main corrected document (required)
+        if (files.document && files.document[0]) {
+          const docFile = files.document[0];
+          const { url, storageKey } = await uploadBufferToSupabase(
+            docFile.buffer,
+            docFile.originalname,
+            docFile.mimetype,
+            'pdf'
+          );
+          req.fileMeta = { url, storageKey };
+        } else {
+          return res.status(400).json({ error: "Corrected document file required" });
+        }
+        
+        // Handle editor document (optional)
+        if (files.editorDocument && files.editorDocument[0]) {
+          const editorDocFile = files.editorDocument[0];
+          const ext = path.extname(editorDocFile.originalname).toLowerCase();
+          const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
+          
+          const { url } = await uploadBufferToSupabase(
+            editorDocFile.buffer,
+            editorDocFile.originalname,
+            editorDocFile.mimetype,
+            'pdf'
+          );
+          
+          req.body.editorDocumentUrl = url;
+          req.body.editorDocumentType = docType;
+        }
+        
+        next();
+      } catch (e) {
+        console.error("Supabase upload error:", e);
+        return res.status(500).json({ error: "File upload failed" });
+      }
+    });
+  }
+};
+
 
 // ---------- SINGLE IMAGE UPLOAD HANDLER ----------
 export const uploadImage = (req: Request, res: Response, next: NextFunction) => {
