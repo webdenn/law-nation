@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { Document, Packer, Paragraph, TextRun, AlignmentType, Header, ExternalHyperlink } from 'docx';
+import { Document, Packer, Paragraph, TextRun, AlignmentType, Header, ExternalHyperlink, ImageRun } from 'docx';
 import { createRequire } from 'module';
 
 // Create require for CommonJS modules
@@ -92,7 +92,7 @@ export async function addSimpleWatermarkToWord(
   }
 ): Promise<Buffer> {
   try {
-    console.log(`💧 [Word Watermark] Adding simple watermark to: ${wordPath}`);
+    console.log(`💧 [Word Watermark] Adding watermark with logo to: ${wordPath}`);
     
     const fullPath = path.join(process.cwd(), wordPath);
     
@@ -106,6 +106,22 @@ export async function addSimpleWatermarkToWord(
     
     console.log(`📄 [Word Watermark] Extracted ${originalText.length} characters`);
     
+    // Load company logo
+    let logoImageData: Buffer | null = null;
+    try {
+      const logoPath = path.join(process.cwd(), 'src', 'assests', 'img', 'Screenshot 2026-01-09 204120.png');
+      console.log(`🖼️ [Word Watermark] Loading logo from: ${logoPath}`);
+      
+      if (await fs.access(logoPath).then(() => true).catch(() => false)) {
+        logoImageData = await fs.readFile(logoPath);
+        console.log(`✅ [Word Watermark] Logo loaded successfully (${logoImageData.length} bytes)`);
+      } else {
+        console.warn(`⚠️ [Word Watermark] Logo file not found, skipping logo`);
+      }
+    } catch (error) {
+      console.warn(`⚠️ [Word Watermark] Failed to load logo:`, error);
+    }
+    
     // Create watermark text and link
     const downloadDate = watermarkData.downloadDate.toLocaleDateString('en-GB'); // DD/MM/YYYY format
     const mainWatermark = `DOWNLOADED FROM LAW NATION DATE ${downloadDate}`;
@@ -116,36 +132,64 @@ export async function addSimpleWatermarkToWord(
     console.log(`💧 [Word Watermark] User info: ${userInfo}`);
     console.log(`🔗 [Word Watermark] Article link: ${articleUrl}`);
     
+    // Create header children array
+    const headerChildren: Paragraph[] = [];
+    
+    // Add logo if available
+    if (logoImageData) {
+      headerChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: {
+            after: 100, // Space after logo
+          },
+          children: [
+            new ImageRun({
+              data: logoImageData,
+              transformation: {
+                width: 150,  // Logo width in pixels
+                height: 75,  // Logo height in pixels (adjust based on aspect ratio)
+              },
+              type: 'png',
+            }),
+          ],
+        })
+      );
+    }
+    
+    // Add text watermark
+    headerChildren.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text: mainWatermark,
+            size: 16, // 8pt
+            color: "999999",
+            italics: true,
+          }),
+        ],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text: userInfo,
+            size: 14, // 7pt
+            color: "AAAAAA",
+            italics: true,
+          }),
+        ],
+      })
+    );
+    
     // Create new document with watermark
     const doc = new Document({
       sections: [
         {
           headers: {
             default: new Header({
-              children: [
-                new Paragraph({
-                  alignment: AlignmentType.CENTER,
-                  children: [
-                    new TextRun({
-                      text: mainWatermark,
-                      size: 16, // 8pt
-                      color: "999999",
-                      italics: true,
-                    }),
-                  ],
-                }),
-                new Paragraph({
-                  alignment: AlignmentType.CENTER,
-                  children: [
-                    new TextRun({
-                      text: userInfo,
-                      size: 14, // 7pt
-                      color: "AAAAAA",
-                      italics: true,
-                    }),
-                  ],
-                }),
-              ],
+              children: headerChildren,
             }),
           },
           children: [
