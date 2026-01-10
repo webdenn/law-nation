@@ -8,7 +8,7 @@
   "main": "index.js",
   "scripts": {
     "start:dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && tsc-alias",
     "seed": "tsx src/scripts/admin.seed.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -25,6 +25,7 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
+    "diff": "^8.0.2",
     "docx": "^9.5.1",
     "docx-pdf": "^0.0.1",
     "dotenv": "^17.2.3",
@@ -33,11 +34,12 @@
     "mammoth": "^1.11.0",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
-    "nodemailer": "^7.0.11",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^5.4.530",
     "pdfkit": "^0.17.2",
     "pg": "^8.16.3",
+    "resend": "^6.6.0",
     "slug": "^11.0.1",
     "zod": "^4.2.1"
   },
@@ -50,11 +52,11 @@
     "@types/morgan": "^1.9.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^25.0.3",
-    "@types/nodemailer": "^7.0.4",
     "@types/pdfkit": "^0.17.4",
     "@types/pg": "^8.16.0",
     "@types/slug": "^5.0.9",
     "prisma": "^7.1.0",
+    "tsc-alias": "^1.8.10",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

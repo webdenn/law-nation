@@ -36,11 +36,13 @@ export interface ArticleListFilters {
 
 export interface AssignEditorData {
   editorId: string;
+  reason?: string | undefined;
+  preserveWork?: boolean; // Whether to keep previous editor's revisions (default: true)
 }
 
 export interface UploadCorrectedPdfData {
   pdfUrl: string;
   comments?: string | undefined;
   editorDocumentUrl?: string | undefined;
-  editorDocumentType?: 'PDF' | 'WORD' | undefined;
+  editorDocumentType?: "PDF" | "WORD" | undefined;
 }

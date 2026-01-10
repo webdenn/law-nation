@@ -21,6 +21,8 @@ const isLocal = process.env.NODE_ENV === "local";
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_KEY = process.env.SUPABASE_KEY || "";
 const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || "";
+const SUPABASE_IMAGES_BUCKET = process.env.SUPABASE_IMAGES_BUCKET || "Images";
+const SUPABASE_THUMBNAILS_BUCKET = process.env.SUPABASE_THUMBNAILS_BUCKET || "Thumbnail";
 
 // Only create Supabase client if not in local mode
 const supabase = !isLocal && SUPABASE_URL && SUPABASE_KEY 
@@ -175,17 +177,31 @@ async function uploadBufferToSupabase(
   buffer: Buffer,
   originalname: string,
   mimetype: string,
-  fileType: 'pdf' | 'image' = 'pdf'
+  fileType: 'pdf' | 'image' | 'thumbnail' = 'pdf'
 ): Promise<{ url: string; storageKey: string }> {
   if (!supabase) {
     throw new Error("Supabase client not initialized");
   }
   
-  const folder = fileType === 'pdf' ? 'articles' : 'images';
+  // Choose bucket based on file type
+  let bucket: string;
+  let folder: string;
+  
+  if (fileType === 'thumbnail') {
+    bucket = SUPABASE_THUMBNAILS_BUCKET;
+    folder = 'thumbnails';
+  } else if (fileType === 'image') {
+    bucket = SUPABASE_IMAGES_BUCKET;
+    folder = 'images';
+  } else {
+    bucket = SUPABASE_BUCKET;
+    folder = 'articles';
+  }
+  
   const storageKey = `${folder}/${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(originalname)}`;
   
   const { data, error } = await supabase.storage
-    .from(SUPABASE_BUCKET)
+    .from(bucket)
     .upload(storageKey, buffer, {
       contentType: mimetype,
       cacheControl: "3600",
@@ -195,7 +211,7 @@ async function uploadBufferToSupabase(
   if (error) throw error;
 
   const { data: pub } = supabase.storage
-    .from(SUPABASE_BUCKET)
+    .from(bucket)
     .getPublicUrl(storageKey);
 
   return { url: pub.publicUrl, storageKey };
@@ -501,7 +517,10 @@ export const uploadImage = (req: Request, res: Response, next: NextFunction) => 
       const file = req.file as Express.Multer.File | undefined;
       if (!file) return res.status(400).json({ error: "Image file required" });
       
-      uploadBufferToSupabase(file.buffer, file.originalname, file.mimetype, 'image')
+      // Use 'thumbnail' type for thumbnail uploads, 'image' for regular images
+      const fileType = req.path.includes('thumbnail') ? 'thumbnail' : 'image';
+      
+      uploadBufferToSupabase(file.buffer, file.originalname, file.mimetype, fileType)
         .then(({ url, storageKey }) => {
           req.fileUrl = url;
           req.fileMeta = { url, storageKey };

@@ -8,21 +8,23 @@ datasource db {
 
 /// ---------- core user model ----------
 model User {
-  id               String             @id @default(cuid())
-  name             String
-  email            String             @unique
-  phone            String?
-  passwordHash     String
-  isActive         Boolean            @default(true)
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  version          Int                @default(1)
-  assignedArticles Article[]
-  auditLogs        AuditLog[]
-  refreshTokens    RefreshToken[]
-  roles            UserRole[]
-  changeLogs       ArticleChangeLog[]
-  notifications    Notification[]
+  id                        String                  @id @default(cuid())
+  name                      String
+  email                     String                  @unique
+  phone                     String?
+  passwordHash              String
+  isActive                  Boolean                 @default(true)
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+  version                   Int                     @default(1)
+  assignedArticles          Article[]
+  auditLogs                 AuditLog[]
+  refreshTokens             RefreshToken[]
+  roles                     UserRole[]
+  changeLogs                ArticleChangeLog[]
+  notifications             Notification[]
+  editorHistory             ArticleEditorHistory[]  @relation("EditorHistory")
+  assignedEditorHistory     ArticleEditorHistory[]  @relation("AssignedByHistory")
 }
 
 /// ---------- roles ----------
@@ -95,7 +97,7 @@ model RefreshToken {
 }
 
 model Article {
-  id                 String            @id @default(cuid())
+  id                 String                  @id @default(cuid())
   authorName         String
   authorEmail        String
   authorPhone        String?
@@ -105,7 +107,11 @@ model Article {
   secondAuthorPhone        String?
   secondAuthorOrganization String?
   title              String
+<<<<<<< HEAD
   slug               String         @unique
+=======
+  slug               String                  @unique
+>>>>>>> f853872e2a9677d1ec5d4a18c9f0659e8f324659
   category           String
   abstract           String
   keywords           String?
@@ -113,25 +119,26 @@ model Article {
   remarksToEditor    String?
   originalPdfUrl     String
   currentPdfUrl      String
-  status             ArticleStatus     @default(PENDING_ADMIN_REVIEW)
+  status             ArticleStatus           @default(PENDING_ADMIN_REVIEW)
   assignedEditorId   String?
   editorApprovedAt   DateTime?
-  submittedAt        DateTime          @default(now())
+  submittedAt        DateTime                @default(now())
   reviewedAt         DateTime?
   approvedAt         DateTime?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
   content            String?
   contentHtml        String?
   imageUrls          String[]
   thumbnailUrl       String?
   currentWordUrl     String?
-  originalFileType   String            @default("pdf")
+  originalFileType   String                  @default("pdf")
   originalWordUrl    String?
-  assignedEditor     User?             @relation(fields: [assignedEditorId], references: [id])
+  assignedEditor     User?                   @relation(fields: [assignedEditorId], references: [id])
   revisions          ArticleRevision[]
   changeLogs         ArticleChangeLog[]
   notifications      Notification[]
+  editorHistory      ArticleEditorHistory[]
 
   @@index([status])
   @@index([assignedEditorId])
@@ -183,6 +190,7 @@ model ArticleChangeLog {
   newFileUrl          String
   fileType            String   // "PDF" or "WORD"
   diffData            Json     // {added: [], removed: [], modified: []}
+  visualDiffUrl       String?  // Path to visual diff PDF with markup
   editedBy            String
   editedAt            DateTime @default(now())
   status              String   @default("pending") // "pending", "approved", "published"
@@ -216,6 +224,30 @@ model Notification {
   @@index([articleId])
   @@index([isRead])
   @@index([createdAt])
+}
+
+/// ---------- Article Editor History (Audit Trail) ----------
+model ArticleEditorHistory {
+  id           String    @id @default(cuid())
+  articleId    String
+  editorId     String
+  assignedAt   DateTime  @default(now())
+  unassignedAt DateTime?
+  assignedBy   String    // Admin ID who made the assignment
+  reason       String?   // Optional reason for assignment/reassignment
+  status       String    @default("active") // "active", "reassigned", "completed"
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  article      Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  editor       User      @relation("EditorHistory", fields: [editorId], references: [id])
+  assignedByUser User    @relation("AssignedByHistory", fields: [assignedBy], references: [id])
+
+  @@index([articleId])
+  @@index([editorId])
+  @@index([assignedBy])
+  @@index([status])
+  @@index([assignedAt])
 }
 
 enum ArticleStatus {

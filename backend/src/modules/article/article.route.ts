@@ -73,6 +73,14 @@ router.get(
   articleController.getArticleChangeHistory.bind(articleController)
 );
 
+// ✅ NEW: Get editor assignment history (Admin only)
+router.get(
+  "/:id/editor-history",
+  requireAuth,
+  requirePermission("article", "read"),
+  articleController.getEditorAssignmentHistory.bind(articleController)
+);
+
 // ✅ NEW: Get specific change log diff
 router.get(
   "/:id/change-log/:changeLogId",
@@ -189,6 +197,14 @@ router.get(
   "/:id/download/word",
   requireAuth,
   articleController.downloadArticleWord.bind(articleController)
+);
+
+// ✅ NEW: View visual diff (Editor and Admin only)
+router.get(
+  "/:id/change-log/:changeLogId/visual-diff",
+  requireAuth,
+  requirePermission("article", "read"),
+  articleController.viewVisualDiff.bind(articleController)
 );
 
 // LEGACY: Keep old download route for backward compatibility (downloads PDF)

@@ -59,6 +59,8 @@ export const articleSubmissionSchema = z.object({
 
 export const assignEditorSchema = z.object({
   editorId: z.string().cuid("Invalid editor ID"),
+  reason: z.string().max(500, "Reason must not exceed 500 characters").optional(),
+  preserveWork: z.boolean().optional().default(true), // Default: keep previous editor's work
 });
 
 export const articleListQuerySchema = z.object({

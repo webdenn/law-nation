@@ -4,6 +4,7 @@ import { articleService } from "./article.service.js";
 import { BadRequestError } from "@/utils/http-errors.util.js";
 import { addWatermarkToPdf } from "@/utils/pdf-watermark.utils.js";
 import { addSimpleWatermarkToWord } from "@/utils/word-watermark.utils.js";
+import { prisma } from "@/db/db.js";
 import {
   articleSubmissionSchema,
   assignEditorSchema,
@@ -139,14 +140,18 @@ export class ArticleController {
 
       // Validate request body
       const validatedData = assignEditorSchema.parse(req.body);
-      const data: AssignEditorData = validatedData;
       const adminId = req.user!.id;
 
-      const article = await articleService.assignEditor(articleId, data, adminId);
+      const result = await articleService.assignEditor(articleId, validatedData, adminId);
 
       res.json({
-        message: "Editor assigned successfully",
-        article,
+        message: result.isReassignment 
+          ? `Editor reassigned successfully from ${result.oldEditor?.name} to ${result.newEditor.name}`
+          : `Editor ${result.newEditor.name} assigned successfully`,
+        article: result.article,
+        isReassignment: result.isReassignment,
+        oldEditor: result.oldEditor,
+        newEditor: result.newEditor,
       });
     } catch (error) {
       throw error;
@@ -175,14 +180,13 @@ export class ArticleController {
     }
   }
 
-  // SPECIAL FUNCTION: Sirf Published articles laane ke liye (Homepage ke liye)
+
   async getPublishedArticles(req: AuthRequest, res: Response) {
     try {
-      // Hum yahan zabardasti 'status' ko PUBLISHED set kar rahe hain
-      // Taaki Pending articles galti se bhi na aayein
+      
       const filters: ArticleListFilters = {
-        ...req.query,       // Baaki filters (page, limit) user se lo
-        status: "PUBLISHED" // Lekin status hum fix kar denge
+        ...req.query,       
+        status: "PUBLISHED" 
       };
 
       const result = await articleService.listArticles(filters);
@@ -709,18 +713,112 @@ export class ArticleController {
       const downloadFormat = format === 'word' ? 'word' : 'pdf';
       
       const userId = req.user!.id;
+      const userName = req.user!.name || 'User';
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
 
       const result = await articleService.downloadDiff(changeLogId, userId, userRoles, downloadFormat);
 
+      // Get article info for watermark
+      const changeLog = await prisma.articleChangeLog.findUnique({
+        where: { id: changeLogId },
+        include: {
+          article: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+        },
+      });
+
+      // Add watermark to diff
+      let watermarkedBuffer: Buffer;
+      
+      if (downloadFormat === 'pdf') {
+        // Save buffer to temp file, add watermark, then delete
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const os = await import('os');
+        
+        const tempDir = os.tmpdir();
+        const tempFilePath = path.join(tempDir, `diff-temp-${Date.now()}.pdf`);
+        
+        try {
+          // Write buffer to temp file
+          await fs.writeFile(tempFilePath, result.buffer);
+          
+          console.log(`💧 [Diff Download] Adding watermark to PDF diff`);
+          
+          // Add logo watermark
+          watermarkedBuffer = await addWatermarkToPdf(
+            tempFilePath,
+            {
+              userName,
+              downloadDate: new Date(),
+              articleTitle: changeLog?.article.title || 'Article Diff',
+              articleId: changeLog?.article.id || '',
+              frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+            }
+          );
+          
+          // Clean up temp file
+          await fs.unlink(tempFilePath);
+        } catch (error) {
+          // Clean up temp file on error
+          try {
+            await fs.unlink(tempFilePath);
+          } catch {}
+          throw error;
+        }
+      } else {
+        // Save buffer to temp file, add watermark, then delete
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const os = await import('os');
+        
+        const tempDir = os.tmpdir();
+        const tempFilePath = path.join(tempDir, `diff-temp-${Date.now()}.docx`);
+        
+        try {
+          // Write buffer to temp file
+          await fs.writeFile(tempFilePath, result.buffer);
+          
+          console.log(`💧 [Diff Download] Adding watermark to Word diff`);
+          
+          // Add text watermark
+          watermarkedBuffer = await addSimpleWatermarkToWord(
+            tempFilePath,
+            {
+              userName,
+              downloadDate: new Date(),
+              articleTitle: changeLog?.article.title || 'Article Diff',
+              articleId: changeLog?.article.id || '',
+              frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+            }
+          );
+          
+          // Clean up temp file
+          await fs.unlink(tempFilePath);
+        } catch (error) {
+          // Clean up temp file on error
+          try {
+            await fs.unlink(tempFilePath);
+          } catch {}
+          throw error;
+        }
+      }
+      
       // Set headers for file download
       res.setHeader('Content-Type', result.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
-      res.setHeader('Content-Length', result.buffer.length);
+      res.setHeader('Content-Length', watermarkedBuffer.length);
 
-      // Send file buffer
-      res.send(result.buffer);
+      console.log(`✅ [Diff Download] Sending watermarked file: ${result.filename} (${watermarkedBuffer.length} bytes)`);
+
+      // Send watermarked file buffer
+      res.send(watermarkedBuffer);
     } catch (error) {
+      console.error('❌ [Diff Download] Failed:', error);
       throw error;
     }
   }
@@ -739,28 +837,131 @@ export class ArticleController {
       const downloadFormat = format === 'word' ? 'word' : 'pdf';
       
       const userId = req.user!.id;
+      const userName = req.user!.name || 'User';
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
 
       const result = await articleService.downloadEditorDocument(changeLogId, userId, userRoles, downloadFormat);
 
-      // Read file from disk
-      const fs = await import('fs/promises');
-      const path = await import('path');
+      // Get article info for watermark
+      const changeLog = await prisma.articleChangeLog.findUnique({
+        where: { id: changeLogId },
+        include: {
+          article: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+        },
+      });
+
+      // Add watermark based on format
+      let watermarkedBuffer: Buffer;
       
-      const fullPath = path.join(process.cwd(), result.filePath);
-      const fileBuffer = await fs.readFile(fullPath);
+      if (downloadFormat === 'pdf') {
+        // Add logo watermark to PDF
+        console.log(`💧 [Editor Doc Download] Adding watermark to PDF`);
+        watermarkedBuffer = await addWatermarkToPdf(
+          result.filePath,
+          {
+            userName,
+            downloadDate: new Date(),
+            articleTitle: changeLog?.article.title || 'Editor Document',
+            articleId: changeLog?.article.id || '',
+            frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+          }
+        );
+      } else {
+        // Add text watermark to Word
+        console.log(`💧 [Editor Doc Download] Adding watermark to Word`);
+        watermarkedBuffer = await addSimpleWatermarkToWord(
+          result.filePath,
+          {
+            userName,
+            downloadDate: new Date(),
+            articleTitle: changeLog?.article.title || 'Editor Document',
+            articleId: changeLog?.article.id || '',
+            frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+          }
+        );
+      }
 
       // Set headers for file download
       res.setHeader('Content-Type', result.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
-      res.setHeader('Content-Length', fileBuffer.length);
+      res.setHeader('Content-Length', watermarkedBuffer.length);
 
-      console.log(`✅ [Editor Doc Download] Sending file: ${result.filename} (${fileBuffer.length} bytes)`);
+      console.log(`✅ [Editor Doc Download] Sending watermarked file: ${result.filename} (${watermarkedBuffer.length} bytes)`);
 
-      // Send file buffer
-      res.send(fileBuffer);
+      // Send watermarked file buffer
+      res.send(watermarkedBuffer);
     } catch (error) {
       console.error('❌ [Editor Doc Download] Failed:', error);
+      throw error;
+    }
+  }
+
+  // Get editor assignment history for an article (Admin only)
+  async getEditorAssignmentHistory(req: AuthRequest, res: Response) {
+    try {
+      const articleId = req.params.id;
+      if (!articleId) {
+        throw new BadRequestError("Article ID is required");
+      }
+
+      const userId = req.user!.id;
+      const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
+
+      const result = await articleService.getEditorAssignmentHistory(articleId, userId, userRoles);
+
+      res.json({
+        message: "Editor assignment history retrieved successfully",
+        ...result,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ✅ NEW: View visual diff (Editor and Admin only)
+  async viewVisualDiff(req: AuthRequest, res: Response) {
+    try {
+      const { changeLogId } = req.params;
+      
+      if (!changeLogId) {
+        throw new BadRequestError("Change log ID is required");
+      }
+
+      const userId = req.user!.id;
+      const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
+
+      // Get visual diff info
+      const result = await articleService.getVisualDiff(changeLogId, userId, userRoles);
+
+      // If visual diff doesn't exist, generate it
+      if (!result.visualDiffUrl) {
+        console.log(`🎨 [Visual Diff] Visual diff not found, generating...`);
+        const visualDiffPath = await articleService.generateVisualDiff(changeLogId);
+        result.visualDiffUrl = visualDiffPath;
+      }
+
+      // Read visual diff PDF
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      
+      const fullPath = path.join(process.cwd(), result.visualDiffUrl);
+      const pdfBuffer = await fs.readFile(fullPath);
+
+      // Send PDF
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="visual-diff-v${result.versionNumber}.pdf"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+
+      console.log(`✅ [Visual Diff] Sending visual diff: ${result.visualDiffUrl} (${pdfBuffer.length} bytes)`);
+
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('❌ [Visual Diff] Failed:', error);
       throw error;
     }
   }

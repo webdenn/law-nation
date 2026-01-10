@@ -53,7 +53,24 @@ export async function addWatermarkToPdf(
     
     console.log(`📄 [Watermark] PDF has ${pages.length} pages`);
     
-    // 3. Prepare watermark text and link
+    // 3. Load logo image
+    let logoImage: Awaited<ReturnType<typeof pdfDoc.embedPng>> | undefined;
+    try {
+      const logoPath = path.join(process.cwd(), 'src', 'assests', 'img', 'Screenshot 2026-01-09 204120.png');
+      console.log('🖼️ [Watermark] Loading logo from:', logoPath);
+      
+      if (fs.existsSync(logoPath)) {
+        const logoBytes = fs.readFileSync(logoPath);
+        logoImage = await pdfDoc.embedPng(logoBytes);
+        console.log('✅ [Watermark] Logo loaded successfully');
+      } else {
+        console.warn('⚠️ [Watermark] Logo file not found, skipping logo watermark');
+      }
+    } catch (error) {
+      console.warn('⚠️ [Watermark] Failed to load logo, skipping logo watermark:', error);
+    }
+    
+    // 4. Prepare watermark text and link
     const dateStr = options.downloadDate.toLocaleDateString('en-GB', {
       day: '2-digit',
       month: '2-digit',
@@ -68,11 +85,30 @@ export async function addWatermarkToPdf(
     console.log('🔖 [Watermark] Watermark text:', watermarkText);
     console.log('🔗 [Watermark] Article link:', articleUrl);
     
-    // 4. Add watermark to each page, link only on first page
+    // 5. Add watermark to each page, link only on first page
     console.log('✍️ [Watermark] Adding watermark to all pages...');
     
     pages.forEach((page, index) => {
       const { width, height } = page.getSize();
+      
+      // Add logo in center of page (if loaded)
+      if (logoImage) {
+        const logoScale = 0.3; // Scale logo to 30% of original size
+        const logoDims = logoImage.scale(logoScale);
+        
+        // Calculate center position
+        const logoX = (width - logoDims.width) / 2;
+        const logoY = (height - logoDims.height) / 2;
+        
+        // Draw logo with low opacity
+        page.drawImage(logoImage, {
+          x: logoX,
+          y: logoY,
+          width: logoDims.width,
+          height: logoDims.height,
+          opacity: 0.15, // 15% opacity - very light
+        });
+      }
       
       // Top-right watermark (LAW NATION logo) - on ALL pages
       page.drawText('LAW NATION', {
@@ -148,9 +184,12 @@ export async function addWatermarkToPdf(
     });
     
     console.log(`✅ [Watermark] Watermark added to ${pages.length} pages`);
+    if (logoImage) {
+      console.log(`✅ [Watermark] Logo watermark added to center of all pages`);
+    }
     console.log(`✅ [Watermark] Clickable link added to first page only`);
     
-    // 5. Save watermarked PDF
+    // 6. Save watermarked PDF
     console.log('💾 [Watermark] Saving watermarked PDF...');
     const watermarkedBytes = await pdfDoc.save();
     const buffer = Buffer.from(watermarkedBytes);
