@@ -1,6 +1,10 @@
 import { prisma } from "@/db/db.js";
 import { Prisma } from "@prisma/client";
-import { NotFoundError, BadRequestError, ForbiddenError } from "@/utils/http-errors.util.js";
+import {
+  NotFoundError,
+  BadRequestError,
+  ForbiddenError,
+} from "@/utils/http-errors.util.js";
 import {
   sendArticleSubmissionConfirmation,
   sendEditorAssignmentNotification,
@@ -13,11 +17,21 @@ import {
 } from "@/utils/email.utils.js";
 import { VerificationService } from "@/utils/verification.utils.js";
 import { extractPdfContent } from "@/utils/pdf-extract.utils.js";
-import { ensureBothFormats, getFileType } from "@/utils/file-conversion.utils.js";
-import { calculateFileDiff, generateDiffSummary, getFileTypeFromPath } from "@/utils/diff-calculator.utils.js";
+import {
+  ensureBothFormats,
+  getFileType,
+} from "@/utils/file-conversion.utils.js";
+import {
+  calculateFileDiff,
+  generateDiffSummary,
+  getFileTypeFromPath,
+} from "@/utils/diff-calculator.utils.js";
 import { generateDiffPdf } from "@/utils/diff-pdf-generator.utils.js";
 import { generateDiffWord } from "@/utils/diff-word-generator.utils.js";
-import { notifyAdminOfEditorApproval, notifyUploaderOfPublication } from "@/utils/notification.utils.js";
+import {
+  notifyAdminOfEditorApproval,
+  notifyUploaderOfPublication,
+} from "@/utils/notification.utils.js";
 import { generateUniqueSlug } from "@/utils/slug.utils.js";
 import { articleHistoryService } from "./article-history.service.js";
 import type {
@@ -41,28 +55,45 @@ export class ArticleService {
   }
 
   // Create article directly for logged-in users (no verification needed)
-  private async createArticleDirectly(data: ArticleSubmissionData, userId: string) {
+  private async createArticleDirectly(
+    data: ArticleSubmissionData,
+    userId: string
+  ) {
     const fileType = getFileType(data.pdfUrl);
-    
+
     // Convert to ensure both formats exist
-    console.log(`📄 [Logged-in User] Converting file to both formats: ${data.pdfUrl}`);
+    console.log(
+      `📄 [Logged-in User] Converting file to both formats: ${data.pdfUrl}`
+    );
     const { pdfPath, wordPath } = await ensureBothFormats(data.pdfUrl);
-    
+
     // Generate unique slug from title
     const articleSlug = await generateUniqueSlug(data.title);
-    console.log(`🔗 [Slug] Generated slug: "${articleSlug}" from title: "${data.title}"`);
-    
+    console.log(
+      `🔗 [Slug] Generated slug: "${articleSlug}" from title: "${data.title}"`
+    );
+
     // Create article first to get ID
     const article = await prisma.article.create({
       data: {
         authorName: data.authorName,
         authorEmail: data.authorEmail,
         ...(data.authorPhone && { authorPhone: data.authorPhone }),
-        ...(data.authorOrganization && { authorOrganization: data.authorOrganization }),
-        ...(data.secondAuthorName && { secondAuthorName: data.secondAuthorName }),
-        ...(data.secondAuthorEmail && { secondAuthorEmail: data.secondAuthorEmail }),
-        ...(data.secondAuthorPhone && { secondAuthorPhone: data.secondAuthorPhone }),
-        ...(data.secondAuthorOrganization && { secondAuthorOrganization: data.secondAuthorOrganization }),
+        ...(data.authorOrganization && {
+          authorOrganization: data.authorOrganization,
+        }),
+        ...(data.secondAuthorName && {
+          secondAuthorName: data.secondAuthorName,
+        }),
+        ...(data.secondAuthorEmail && {
+          secondAuthorEmail: data.secondAuthorEmail,
+        }),
+        ...(data.secondAuthorPhone && {
+          secondAuthorPhone: data.secondAuthorPhone,
+        }),
+        ...(data.secondAuthorOrganization && {
+          secondAuthorOrganization: data.secondAuthorOrganization,
+        }),
         title: data.title,
         slug: articleSlug,
         category: data.category,
@@ -92,7 +123,7 @@ export class ArticleService {
     // Combine uploaded images with extracted images
     const allImageUrls = [
       ...(data.imageUrls || []),
-      ...(pdfContent.images || [])
+      ...(pdfContent.images || []),
     ];
 
     // Update article with extracted content and images
@@ -125,7 +156,7 @@ export class ArticleService {
     }
 
     return {
-      message: 'Article submitted successfully',
+      message: "Article submitted successfully",
       article: updatedArticle,
       requiresVerification: false,
     };
@@ -134,16 +165,17 @@ export class ArticleService {
   // Create verification record for guest users
   private async createVerificationRecord(data: ArticleSubmissionData) {
     // Create verification record with 48-hour TTL and 6-digit code
-    const { token, code, expiresAt } = await VerificationService.createVerificationRecord(
-      data.authorEmail,
-      'ARTICLE',
-      {
-        ...data,
-        tempPdfPath: data.pdfUrl, // Store temp file path
-      } as ArticleVerificationMetadata,
-      48, // TTL hours
-      true // Include verification code
-    );
+    const { token, code, expiresAt } =
+      await VerificationService.createVerificationRecord(
+        data.authorEmail,
+        "ARTICLE",
+        {
+          ...data,
+          tempPdfPath: data.pdfUrl, // Store temp file path
+        } as ArticleVerificationMetadata,
+        48, // TTL hours
+        true // Include verification code
+      );
 
     // Send verification email with code
     await sendArticleVerificationCodeEmail(
@@ -153,7 +185,7 @@ export class ArticleService {
     );
 
     return {
-      message: 'Verification email sent. Please check your inbox.',
+      message: "Verification email sent. Please check your inbox.",
       expiresAt,
       requiresVerification: true,
     };
@@ -165,30 +197,39 @@ export class ArticleService {
     const verification = await VerificationService.verifyToken(token);
 
     if (!verification.valid) {
-      throw new BadRequestError(verification.error || 'Invalid verification token');
+      throw new BadRequestError(
+        verification.error || "Invalid verification token"
+      );
     }
 
-    const metadata = verification.data as unknown as ArticleVerificationMetadata;
+    const metadata =
+      verification.data as unknown as ArticleVerificationMetadata;
 
     // Move file from temp to permanent directory
     let permanentFileUrl = metadata.pdfUrl;
-    if (metadata.tempPdfPath && metadata.tempPdfPath.includes('/temp/')) {
+    if (metadata.tempPdfPath && metadata.tempPdfPath.includes("/temp/")) {
       try {
-        permanentFileUrl = await VerificationService.moveTempFile(metadata.tempPdfPath);
+        permanentFileUrl = await VerificationService.moveTempFile(
+          metadata.tempPdfPath
+        );
       } catch (error) {
-        console.error('Failed to move temp file:', error);
+        console.error("Failed to move temp file:", error);
         // Continue with temp path if move fails
       }
     }
 
     // Detect file type and convert to both formats
     const fileType = getFileType(permanentFileUrl);
-    console.log(`📄 [Guest Verification] Converting file to both formats: ${permanentFileUrl}`);
+    console.log(
+      `📄 [Guest Verification] Converting file to both formats: ${permanentFileUrl}`
+    );
     const { pdfPath, wordPath } = await ensureBothFormats(permanentFileUrl);
 
     // Generate unique slug from title
     const articleSlug = await generateUniqueSlug(metadata.title);
-    console.log(`🔗 [Slug] Generated slug: "${articleSlug}" from title: "${metadata.title}"`);
+    console.log(
+      `🔗 [Slug] Generated slug: "${articleSlug}" from title: "${metadata.title}"`
+    );
 
     // Create article first to get ID
     const article = await prisma.article.create({
@@ -196,18 +237,30 @@ export class ArticleService {
         authorName: metadata.authorName,
         authorEmail: metadata.authorEmail,
         ...(metadata.authorPhone && { authorPhone: metadata.authorPhone }),
-        ...(metadata.authorOrganization && { authorOrganization: metadata.authorOrganization }),
-        ...(metadata.secondAuthorName && { secondAuthorName: metadata.secondAuthorName }),
-        ...(metadata.secondAuthorEmail && { secondAuthorEmail: metadata.secondAuthorEmail }),
-        ...(metadata.secondAuthorPhone && { secondAuthorPhone: metadata.secondAuthorPhone }),
-        ...(metadata.secondAuthorOrganization && { secondAuthorOrganization: metadata.secondAuthorOrganization }),
+        ...(metadata.authorOrganization && {
+          authorOrganization: metadata.authorOrganization,
+        }),
+        ...(metadata.secondAuthorName && {
+          secondAuthorName: metadata.secondAuthorName,
+        }),
+        ...(metadata.secondAuthorEmail && {
+          secondAuthorEmail: metadata.secondAuthorEmail,
+        }),
+        ...(metadata.secondAuthorPhone && {
+          secondAuthorPhone: metadata.secondAuthorPhone,
+        }),
+        ...(metadata.secondAuthorOrganization && {
+          secondAuthorOrganization: metadata.secondAuthorOrganization,
+        }),
         title: metadata.title,
         slug: articleSlug,
         category: metadata.category,
         abstract: metadata.abstract,
         ...(metadata.keywords && { keywords: metadata.keywords }),
         ...(metadata.coAuthors && { coAuthors: metadata.coAuthors }),
-        ...(metadata.remarksToEditor && { remarksToEditor: metadata.remarksToEditor }),
+        ...(metadata.remarksToEditor && {
+          remarksToEditor: metadata.remarksToEditor,
+        }),
         originalPdfUrl: pdfPath,
         currentPdfUrl: pdfPath,
         originalWordUrl: wordPath,
@@ -230,7 +283,7 @@ export class ArticleService {
     // Combine uploaded images with extracted images
     const allImageUrls = [
       ...(metadata.imageUrls || []),
-      ...(pdfContent.images || [])
+      ...(pdfContent.images || []),
     ];
 
     // Update article with extracted content and images
@@ -275,30 +328,39 @@ export class ArticleService {
     const verification = await VerificationService.verifyCode(email, code);
 
     if (!verification.valid) {
-      throw new BadRequestError(verification.error || 'Invalid verification code');
+      throw new BadRequestError(
+        verification.error || "Invalid verification code"
+      );
     }
 
-    const metadata = verification.data as unknown as ArticleVerificationMetadata;
+    const metadata =
+      verification.data as unknown as ArticleVerificationMetadata;
 
     // Move file from temp to permanent directory
     let permanentFileUrl = metadata.pdfUrl;
-    if (metadata.tempPdfPath && metadata.tempPdfPath.includes('/temp/')) {
+    if (metadata.tempPdfPath && metadata.tempPdfPath.includes("/temp/")) {
       try {
-        permanentFileUrl = await VerificationService.moveTempFile(metadata.tempPdfPath);
+        permanentFileUrl = await VerificationService.moveTempFile(
+          metadata.tempPdfPath
+        );
       } catch (error) {
-        console.error('Failed to move temp file:', error);
+        console.error("Failed to move temp file:", error);
         // Continue with temp path if move fails
       }
     }
 
     // Detect file type and convert to both formats
     const fileType = getFileType(permanentFileUrl);
-    console.log(`📄 [Code Verification] Converting file to both formats: ${permanentFileUrl}`);
+    console.log(
+      `📄 [Code Verification] Converting file to both formats: ${permanentFileUrl}`
+    );
     const { pdfPath, wordPath } = await ensureBothFormats(permanentFileUrl);
 
     // Generate unique slug from title
     const articleSlug = await generateUniqueSlug(metadata.title);
-    console.log(`🔗 [Slug] Generated slug: "${articleSlug}" from title: "${metadata.title}"`);
+    console.log(
+      `🔗 [Slug] Generated slug: "${articleSlug}" from title: "${metadata.title}"`
+    );
 
     // Create article
     const article = await prisma.article.create({
@@ -306,18 +368,30 @@ export class ArticleService {
         authorName: metadata.authorName,
         authorEmail: metadata.authorEmail,
         ...(metadata.authorPhone && { authorPhone: metadata.authorPhone }),
-        ...(metadata.authorOrganization && { authorOrganization: metadata.authorOrganization }),
-        ...(metadata.secondAuthorName && { secondAuthorName: metadata.secondAuthorName }),
-        ...(metadata.secondAuthorEmail && { secondAuthorEmail: metadata.secondAuthorEmail }),
-        ...(metadata.secondAuthorPhone && { secondAuthorPhone: metadata.secondAuthorPhone }),
-        ...(metadata.secondAuthorOrganization && { secondAuthorOrganization: metadata.secondAuthorOrganization }),
+        ...(metadata.authorOrganization && {
+          authorOrganization: metadata.authorOrganization,
+        }),
+        ...(metadata.secondAuthorName && {
+          secondAuthorName: metadata.secondAuthorName,
+        }),
+        ...(metadata.secondAuthorEmail && {
+          secondAuthorEmail: metadata.secondAuthorEmail,
+        }),
+        ...(metadata.secondAuthorPhone && {
+          secondAuthorPhone: metadata.secondAuthorPhone,
+        }),
+        ...(metadata.secondAuthorOrganization && {
+          secondAuthorOrganization: metadata.secondAuthorOrganization,
+        }),
         title: metadata.title,
         slug: articleSlug,
         category: metadata.category,
         abstract: metadata.abstract,
         ...(metadata.keywords && { keywords: metadata.keywords }),
         ...(metadata.coAuthors && { coAuthors: metadata.coAuthors }),
-        ...(metadata.remarksToEditor && { remarksToEditor: metadata.remarksToEditor }),
+        ...(metadata.remarksToEditor && {
+          remarksToEditor: metadata.remarksToEditor,
+        }),
         originalPdfUrl: pdfPath,
         currentPdfUrl: pdfPath,
         originalWordUrl: wordPath,
@@ -339,7 +413,7 @@ export class ArticleService {
     // Combine uploaded images with extracted images
     const allImageUrls = [
       ...(metadata.imageUrls || []),
-      ...(pdfContent.images || [])
+      ...(pdfContent.images || []),
     ];
 
     // Update article with extracted content and images
@@ -377,8 +451,8 @@ export class ArticleService {
 
     return {
       success: true,
-      message: 'Article verified and submitted successfully',
-      articleId: updatedArticle.id
+      message: "Article verified and submitted successfully",
+      articleId: updatedArticle.id,
     };
   }
 
@@ -389,17 +463,19 @@ export class ArticleService {
       where: {
         email,
         isVerified: false,
-        ttl: { gte: new Date() }
+        ttl: { gte: new Date() },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: "desc" },
     });
 
     if (!verification) {
-      throw new BadRequestError('No pending verification found for this email');
+      throw new BadRequestError("No pending verification found for this email");
     }
 
     if (!verification.verificationCode) {
-      throw new BadRequestError('This verification does not support code resend');
+      throw new BadRequestError(
+        "This verification does not support code resend"
+      );
     }
 
     const metadata = verification.metadata as any;
@@ -413,12 +489,16 @@ export class ArticleService {
 
     return {
       success: true,
-      message: 'Verification code resent successfully'
+      message: "Verification code resent successfully",
     };
   }
 
   // Step 2: Admin assigns editor (handles both first-time assignment and reassignment)
-  async assignEditor(articleId: string, data: AssignEditorData, adminId: string) {
+  async assignEditor(
+    articleId: string,
+    data: AssignEditorData,
+    adminId: string
+  ) {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
       include: {
@@ -434,7 +514,7 @@ export class ArticleService {
     const allowedStatuses = [
       "PENDING_ADMIN_REVIEW",
       "ASSIGNED_TO_EDITOR",
-      "EDITOR_EDITING"
+      "EDITOR_EDITING",
     ];
 
     if (!allowedStatuses.includes(article.status)) {
@@ -473,8 +553,10 @@ export class ArticleService {
 
       if (!preserveWork) {
         // Delete previous editor's revisions and change logs
-        console.log(`🗑️ [Reassignment] Deleting previous editor's work (preserveWork=false)`);
-        
+        console.log(
+          `🗑️ [Reassignment] Deleting previous editor's work (preserveWork=false)`
+        );
+
         await prisma.articleRevision.deleteMany({
           where: {
             articleId,
@@ -491,7 +573,9 @@ export class ArticleService {
 
         console.log(`✅ [Reassignment] Previous editor's work deleted`);
       } else {
-        console.log(`📦 [Reassignment] Preserving previous editor's work (preserveWork=true)`);
+        console.log(
+          `📦 [Reassignment] Preserving previous editor's work (preserveWork=true)`
+        );
       }
     }
 
@@ -531,7 +615,7 @@ export class ArticleService {
     if (isReassignment && oldEditor) {
       // REASSIGNMENT SCENARIO
       console.log(`📧 [Reassignment] Notifying old editor: ${oldEditor.email}`);
-      
+
       // Notify old editor about reassignment
       sendEditorReassignmentNotification(
         oldEditor.email,
@@ -555,7 +639,7 @@ export class ArticleService {
     } else {
       // FIRST-TIME ASSIGNMENT SCENARIO
       console.log(`📧 [First Assignment] Notifying new editor and author`);
-      
+
       // Notify new editor
       sendEditorAssignmentNotification(
         newEditor.email,
@@ -588,11 +672,13 @@ export class ArticleService {
     return {
       article: updatedArticle,
       isReassignment,
-      oldEditor: isReassignment ? {
-        id: oldEditor?.id,
-        name: oldEditor?.name,
-        email: oldEditor?.email,
-      } : null,
+      oldEditor: isReassignment
+        ? {
+            id: oldEditor?.id,
+            name: oldEditor?.name,
+            email: oldEditor?.email,
+          }
+        : null,
       newEditor: {
         id: newEditor.id,
         name: newEditor.name,
@@ -602,10 +688,14 @@ export class ArticleService {
   }
 
   // Step 3 - Option A: Editor or Admin approves directly
- // Step 3 - Option A: Editor or Admin approves directly
+  // Step 3 - Option A: Editor or Admin approves directly
   // ✅ CHANGE: Added 'newPdfUrl' parameter
-  async approveArticle(articleId: string, userId: string, userRoles: string[], newPdfUrl?: string) {
-    
+  async approveArticle(
+    articleId: string,
+    userId: string,
+    userRoles: string[],
+    newPdfUrl?: string
+  ) {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
     });
@@ -619,7 +709,9 @@ export class ArticleService {
     const isAssignedEditor = article.assignedEditorId === userId;
 
     if (!isAdmin && !isAssignedEditor) {
-      throw new ForbiddenError("You do not have permission to approve this article");
+      throw new ForbiddenError(
+        "You do not have permission to approve this article"
+      );
     }
 
     // Admin can approve from any status, Editor only from specific statuses
@@ -628,7 +720,9 @@ export class ArticleService {
         article.status !== "ASSIGNED_TO_EDITOR" &&
         article.status !== "PENDING_APPROVAL"
       ) {
-        throw new BadRequestError("Article cannot be approved in current status");
+        throw new BadRequestError(
+          "Article cannot be approved in current status"
+        );
       }
     } else {
       // Admin can approve from PENDING_ADMIN_REVIEW, ASSIGNED_TO_EDITOR, or PENDING_APPROVAL
@@ -637,7 +731,9 @@ export class ArticleService {
         article.status !== "ASSIGNED_TO_EDITOR" &&
         article.status !== "PENDING_APPROVAL"
       ) {
-        throw new BadRequestError("Article cannot be approved in current status");
+        throw new BadRequestError(
+          "Article cannot be approved in current status"
+        );
       }
     }
 
@@ -652,7 +748,7 @@ export class ArticleService {
     if (newPdfUrl) {
       console.log(`♻️ Replacing PDF for article ${articleId} on approval`);
       updateData.currentPdfUrl = newPdfUrl;
-      
+
       // Optional: Extract text from new PDF for search indexing
       try {
         const pdfContent = await extractPdfContent(newPdfUrl);
@@ -709,23 +805,30 @@ export class ArticleService {
       throw new ForbiddenError("You are not assigned to this article");
     }
 
-    if (article.status !== "ASSIGNED_TO_EDITOR" && article.status !== "EDITOR_EDITING") {
-      throw new BadRequestError("Article is not in correct status for corrections");
+    if (
+      article.status !== "ASSIGNED_TO_EDITOR" &&
+      article.status !== "EDITOR_EDITING"
+    ) {
+      throw new BadRequestError(
+        "Article is not in correct status for corrections"
+      );
     }
 
     // Convert to ensure both formats exist
     const fileType = getFileType(data.pdfUrl);
-    console.log(`📄 [Editor Upload] Converting file to both formats: ${data.pdfUrl}`);
+    console.log(
+      `📄 [Editor Upload] Converting file to both formats: ${data.pdfUrl}`
+    );
     const { pdfPath, wordPath } = await ensureBothFormats(data.pdfUrl);
 
     // ✅ NEW: Calculate diff between old and new file
     const oldFilePath = article.currentPdfUrl;
     const newFilePath = pdfPath;
-    
+
     console.log(`📊 [Diff] Calculating changes...`);
     const diff = await calculateFileDiff(oldFilePath, newFilePath);
     const diffSummary = generateDiffSummary(diff);
-    
+
     console.log(`✅ [Diff] ${diffSummary}`);
 
     // Get current version number
@@ -747,12 +850,18 @@ export class ArticleService {
         editedBy: editorId,
         status: "pending",
         ...(data.comments && { comments: data.comments }),
-        ...(data.editorDocumentUrl && { editorDocumentUrl: data.editorDocumentUrl }),
-        ...(data.editorDocumentType && { editorDocumentType: data.editorDocumentType }),
+        ...(data.editorDocumentUrl && {
+          editorDocumentUrl: data.editorDocumentUrl,
+        }),
+        ...(data.editorDocumentType && {
+          editorDocumentType: data.editorDocumentType,
+        }),
       },
     });
 
-    console.log(`📝 [Change Log] Created version ${versionNumber} for article ${articleId}`);
+    console.log(
+      `📝 [Change Log] Created version ${versionNumber} for article ${articleId}`
+    );
 
     // Extract text and images from corrected PDF
     let pdfContent = { text: "", html: "", images: [] as string[] };
@@ -791,8 +900,10 @@ export class ArticleService {
     // ✅ REMOVED: Don't send correction emails during editing
     // Author will receive ONE final email when article is published
     // with link to view complete change history (final diff only)
-    
-    console.log(`📝 [Editor Upload] Version ${versionNumber} uploaded. No email sent to author.`);
+
+    console.log(
+      `📝 [Editor Upload] Version ${versionNumber} uploaded. No email sent to author.`
+    );
     console.log(`📊 [Diff Summary] ${diffSummary}`);
 
     return {
@@ -804,7 +915,14 @@ export class ArticleService {
 
   // List articles with filters (Admin/Editor)
   async listArticles(filters: ArticleListFilters) {
-    const { status, category, authorEmail, assignedEditorId, page = 1, limit = 20 } = filters;
+    const {
+      status,
+      category,
+      authorEmail,
+      assignedEditorId,
+      page = 1,
+      limit = 20,
+    } = filters;
 
     const where: any = {};
     if (status) where.status = status;
@@ -843,9 +961,9 @@ export class ArticleService {
   // Get single article details (full access - for logged-in users)
   async getArticleById(articleId: string) {
     const article = await prisma.article.findUnique({
-      where: { 
+      where: {
         id: articleId,
-        status: "PUBLISHED"  // Only show published articles
+        status: "PUBLISHED", // Only show published articles
       },
       include: {
         assignedEditor: {
@@ -867,9 +985,9 @@ export class ArticleService {
   // Get article by slug (SEO-friendly URL)
   async getArticleBySlug(slug: string) {
     const article = await prisma.article.findUnique({
-      where: { 
+      where: {
         slug: slug,
-        status: "PUBLISHED"  // Only show published articles
+        status: "PUBLISHED", // Only show published articles
       },
       include: {
         assignedEditor: {
@@ -891,9 +1009,9 @@ export class ArticleService {
   // Get article preview (limited access - for non-logged-in users)
   async getArticlePreview(articleId: string) {
     const article = await prisma.article.findUnique({
-      where: { 
-        id: articleId, 
-        status: "PUBLISHED" // Only show published articles
+      where: {
+        id: articleId,
+        status: "PUBLISHED", // Only show published articles
       },
       select: {
         id: true,
@@ -920,13 +1038,13 @@ export class ArticleService {
   // Get PDF URL for download (for logged-in users)
   async getArticlePdfUrl(articleId: string) {
     const article = await prisma.article.findUnique({
-      where: { 
-        id: articleId, 
-        status: "PUBLISHED" 
+      where: {
+        id: articleId,
+        status: "PUBLISHED",
       },
-      select: { 
+      select: {
         currentPdfUrl: true,
-        title: true 
+        title: true,
       },
     });
 
@@ -940,13 +1058,13 @@ export class ArticleService {
   // Get Word URL for download (for all logged-in users)
   async getArticleWordUrl(articleId: string) {
     const article = await prisma.article.findUnique({
-      where: { 
-        id: articleId, 
-        status: "PUBLISHED" 
+      where: {
+        id: articleId,
+        status: "PUBLISHED",
       },
-      select: { 
+      select: {
         currentWordUrl: true,
-        title: true 
+        title: true,
       },
     });
 
@@ -979,97 +1097,111 @@ export class ArticleService {
   }
 
   // Get article content for reading (public endpoint with optional auth)
-async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
-  const article = await prisma.article.findUnique({
-    where: {
-      id: articleId,
-      status: "PUBLISHED",
-    },
-    select: {
-      id: true,
-      title: true,
-      abstract: true,
-      category: true,
-      keywords: true,
-      authorName: true,
-      authorOrganization: true,
-      content: true,
-      contentHtml: true,
-      currentPdfUrl: true,
-      currentWordUrl: true,
-      thumbnailUrl: true,
-      imageUrls: true,
-      submittedAt: true,
-      approvedAt: true,
-    },
-  });
+  async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
+    const article = await prisma.article.findUnique({
+      where: {
+        id: articleId,
+        status: "PUBLISHED",
+      },
+      select: {
+        id: true,
+        title: true,
+        abstract: true,
+        category: true,
+        keywords: true,
+        authorName: true,
+        authorOrganization: true,
+        content: true,
+        contentHtml: true,
+        currentPdfUrl: true,
+        currentWordUrl: true,
+        thumbnailUrl: true,
+        imageUrls: true,
+        submittedAt: true,
+        approvedAt: true,
+      },
+    });
 
-  if (!article) {
-    throw new NotFoundError("Article not found or not published");
-  }
+    if (!article) {
+      throw new NotFoundError("Article not found or not published");
+    }
 
-  // ✅ Lazy extraction - extract content on-demand if missing
-  if (!article.content || article.content.trim().length === 0) {
-    console.log(`⚡ [Lazy Extract] Content missing for article ${articleId}, extracting now...`);
-    
-    try {
-      const pdfContent = await extractPdfContent(article.currentPdfUrl, articleId);
-      
-      if (pdfContent.text && pdfContent.text.length > 0) {
-        console.log(`✅ [Lazy Extract] Extracted ${pdfContent.text.length} characters and ${pdfContent.images.length} images`);
-        
-        // Update database with extracted content and images
-        await prisma.article.update({
-          where: { id: articleId },
-          data: {
-            content: pdfContent.text,
-            contentHtml: pdfContent.html,
-            imageUrls: pdfContent.images || [],
-          },
-        });
-        
-        // Update the article object to return
-        article.content = pdfContent.text;
-        article.contentHtml = pdfContent.html;
-        article.imageUrls = pdfContent.images || [];
-      } else {
-        console.warn(`⚠️ [Lazy Extract] No text extracted (might be scanned PDF)`);
+    // ✅ Lazy extraction - extract content on-demand if missing
+    if (!article.content || article.content.trim().length === 0) {
+      console.log(
+        `⚡ [Lazy Extract] Content missing for article ${articleId}, extracting now...`
+      );
+
+      try {
+        const pdfContent = await extractPdfContent(
+          article.currentPdfUrl,
+          articleId
+        );
+
+        if (pdfContent.text && pdfContent.text.length > 0) {
+          console.log(
+            `✅ [Lazy Extract] Extracted ${pdfContent.text.length} characters and ${pdfContent.images.length} images`
+          );
+
+          // Update database with extracted content and images
+          await prisma.article.update({
+            where: { id: articleId },
+            data: {
+              content: pdfContent.text,
+              contentHtml: pdfContent.html,
+              imageUrls: pdfContent.images || [],
+            },
+          });
+
+          // Update the article object to return
+          article.content = pdfContent.text;
+          article.contentHtml = pdfContent.html;
+          article.imageUrls = pdfContent.images || [];
+        } else {
+          console.warn(
+            `⚠️ [Lazy Extract] No text extracted (might be scanned PDF)`
+          );
+        }
+      } catch (error) {
+        console.error(`❌ [Lazy Extract] Failed:`, error);
+        // Continue without content - frontend will show "Preview unavailable"
       }
-    } catch (error) {
-      console.error(`❌ [Lazy Extract] Failed:`, error);
-      // Continue without content - frontend will show "Preview unavailable"
     }
-  }
 
-  // ✅ Limit content for non-authenticated users
-  if (!isAuthenticated && article.content) {
-    const words = article.content.split(/\s+/);
-    const wordLimit = 250; // 250 words (between 200-300)
-    
-    if (words.length > wordLimit) {
-      const limitedContent = words.slice(0, wordLimit).join(' ') + '...';
-      
-      console.log(`🔒 [Content Limit] Non-authenticated user - showing ${wordLimit}/${words.length} words`);
-      
-      return {
-        ...article,
-        content: limitedContent,
-        contentHtml: null, // Don't send HTML for limited preview
-        isLimited: true,
-        totalWords: words.length,
-        previewWords: wordLimit,
-      };
+    // ✅ Limit content for non-authenticated users
+    if (!isAuthenticated && article.content) {
+      const words = article.content.split(/\s+/);
+      const wordLimit = 250; // 250 words (between 200-300)
+
+      if (words.length > wordLimit) {
+        const limitedContent = words.slice(0, wordLimit).join(" ") + "...";
+
+        console.log(
+          `🔒 [Content Limit] Non-authenticated user - showing ${wordLimit}/${words.length} words`
+        );
+
+        return {
+          ...article,
+          content: limitedContent,
+          contentHtml: null, // Don't send HTML for limited preview
+          isLimited: true,
+          totalWords: words.length,
+          previewWords: wordLimit,
+        };
+      }
     }
+
+    console.log(
+      `✅ [Full Access] ${
+        isAuthenticated ? "Authenticated" : "Guest"
+      } user - full content available`
+    );
+
+    return {
+      ...article,
+      isLimited: false,
+    };
   }
-
-  console.log(`✅ [Full Access] ${isAuthenticated ? 'Authenticated' : 'Guest'} user - full content available`);
-  
-  return {
-    ...article,
-    isLimited: false,
-  };
-}
-
 
   // Get article upload history (revisions)
   async getArticleHistory(articleId: string) {
@@ -1179,7 +1311,7 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
   }
 
   // Search articles using PostgreSQL Full-Text Search with enhanced filters
- // Search articles using PostgreSQL Full-Text Search with enhanced filters
+  // Search articles using PostgreSQL Full-Text Search with enhanced filters
   async searchArticles(
     searchQuery: string,
     filters: {
@@ -1189,8 +1321,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       keyword?: string;
       dateFrom?: string;
       dateTo?: string;
-      sortBy?: 'relevance' | 'date' | 'title' | 'author';
-      sortOrder?: 'asc' | 'desc';
+      sortBy?: "relevance" | "date" | "title" | "author";
+      sortOrder?: "asc" | "desc";
       minScore?: number;
       exclude?: string;
       page?: number;
@@ -1200,8 +1332,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
     const page = filters.page || 1;
     const limit = filters.limit || 20;
     const skip = (page - 1) * limit;
-    const sortBy = filters.sortBy || 'relevance';
-    const sortOrder = filters.sortOrder || 'desc';
+    const sortBy = filters.sortBy || "relevance";
+    const sortOrder = filters.sortOrder || "desc";
     const minScore = filters.minScore || 0;
 
     // Build category filter
@@ -1211,17 +1343,19 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
 
     // Build author filter (case-insensitive partial match)
     const authorFilter = filters.author
-      ? Prisma.sql`AND "authorName" ILIKE ${'%' + filters.author + '%'}`
+      ? Prisma.sql`AND "authorName" ILIKE ${"%" + filters.author + "%"}`
       : Prisma.empty;
 
     // Build organization filter (case-insensitive partial match)
     const organizationFilter = filters.organization
-      ? Prisma.sql`AND "authorOrganization" ILIKE ${'%' + filters.organization + '%'}`
+      ? Prisma.sql`AND "authorOrganization" ILIKE ${
+          "%" + filters.organization + "%"
+        }`
       : Prisma.empty;
 
     // Build keyword filter (case-insensitive partial match)
     const keywordFilter = filters.keyword
-      ? Prisma.sql`AND keywords ILIKE ${'%' + filters.keyword + '%'}`
+      ? Prisma.sql`AND keywords ILIKE ${"%" + filters.keyword + "%"}`
       : Prisma.empty;
 
     // Build date range filter
@@ -1237,32 +1371,39 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
     // Build exclude filter (exclude articles containing certain words)
     const excludeFilter = filters.exclude
       ? Prisma.sql`AND NOT (
-          title ILIKE ${'%' + filters.exclude + '%'} OR
-          abstract ILIKE ${'%' + filters.exclude + '%'} OR
-          keywords ILIKE ${'%' + filters.exclude + '%'}
+          title ILIKE ${"%" + filters.exclude + "%"} OR
+          abstract ILIKE ${"%" + filters.exclude + "%"} OR
+          keywords ILIKE ${"%" + filters.exclude + "%"}
         )`
       : Prisma.empty;
 
     // Build minimum score filter
-    const minScoreFilter = minScore > 0
-      ? Prisma.sql`AND relevance >= ${minScore}`
-      : Prisma.empty;
+    const minScoreFilter =
+      minScore > 0 ? Prisma.sql`AND relevance >= ${minScore}` : Prisma.empty;
 
     // Build ORDER BY clause based on sortBy parameter
     let orderByClause;
     switch (sortBy) {
-      case 'date':
-        orderByClause = Prisma.sql`ORDER BY "approvedAt" ${Prisma.raw(sortOrder.toUpperCase())}`;
+      case "date":
+        orderByClause = Prisma.sql`ORDER BY "approvedAt" ${Prisma.raw(
+          sortOrder.toUpperCase()
+        )}`;
         break;
-      case 'title':
-        orderByClause = Prisma.sql`ORDER BY title ${Prisma.raw(sortOrder.toUpperCase())}`;
+      case "title":
+        orderByClause = Prisma.sql`ORDER BY title ${Prisma.raw(
+          sortOrder.toUpperCase()
+        )}`;
         break;
-      case 'author':
-        orderByClause = Prisma.sql`ORDER BY "authorName" ${Prisma.raw(sortOrder.toUpperCase())}`;
+      case "author":
+        orderByClause = Prisma.sql`ORDER BY "authorName" ${Prisma.raw(
+          sortOrder.toUpperCase()
+        )}`;
         break;
-      case 'relevance':
+      case "relevance":
       default:
-        orderByClause = Prisma.sql`ORDER BY relevance ${Prisma.raw(sortOrder.toUpperCase())}, "approvedAt" DESC`;
+        orderByClause = Prisma.sql`ORDER BY relevance ${Prisma.raw(
+          sortOrder.toUpperCase()
+        )}, "approvedAt" DESC`;
         break;
     }
 
@@ -1380,19 +1521,19 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
     });
-    
+
     if (!article) {
       throw new NotFoundError("Article not found");
     }
-    
+
     // Append new images to existing ones
     const updatedImageUrls = [...(article.imageUrls || []), ...imageUrls];
-    
+
     const updatedArticle = await prisma.article.update({
       where: { id: articleId },
       data: { imageUrls: updatedImageUrls },
     });
-    
+
     return updatedArticle;
   }
 
@@ -1413,7 +1554,10 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       throw new ForbiddenError("You are not assigned to this article");
     }
 
-    if (article.status !== "EDITOR_EDITING" && article.status !== "ASSIGNED_TO_EDITOR") {
+    if (
+      article.status !== "EDITOR_EDITING" &&
+      article.status !== "ASSIGNED_TO_EDITOR"
+    ) {
       throw new BadRequestError("Article cannot be approved in current status");
     }
 
@@ -1445,7 +1589,9 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       article.assignedEditor?.name || "Editor"
     );
 
-    console.log(`✅ [Editor Approval] Article ${articleId} approved by editor ${editorId}`);
+    console.log(
+      `✅ [Editor Approval] Article ${articleId} approved by editor ${editorId}`
+    );
 
     return updatedArticle;
   }
@@ -1466,28 +1612,31 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
     // ✅ Check if editor has approved
     if (article.status !== "EDITOR_APPROVED") {
       throw new BadRequestError(
-        "Article must be approved by editor before publishing. Current status: " + article.status
+        "Article must be approved by editor before publishing. Current status: " +
+          article.status
       );
     }
 
     // ✅ Calculate FINAL diff (original vs current) for author notification
     let finalDiffSummary = "No changes made";
     let finalDiffData = null;
-    
+
     if (article.originalPdfUrl !== article.currentPdfUrl) {
       try {
-        console.log(`📊 [Final Diff] Calculating original vs final for author...`);
+        console.log(
+          `📊 [Final Diff] Calculating original vs final for author...`
+        );
         console.log(`   Original: ${article.originalPdfUrl}`);
         console.log(`   Final: ${article.currentPdfUrl}`);
-        
+
         const finalDiff = await calculateFileDiff(
-          article.originalPdfUrl,  // Original submission
-          article.currentPdfUrl    // Final published version
+          article.originalPdfUrl, // Original submission
+          article.currentPdfUrl // Final published version
         );
-        
+
         finalDiffData = finalDiff;
         finalDiffSummary = generateDiffSummary(finalDiff);
-        
+
         console.log(`✅ [Final Diff] ${finalDiffSummary}`);
       } catch (error) {
         console.error("❌ [Final Diff] Failed to calculate:", error);
@@ -1495,7 +1644,9 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
         finalDiffSummary = "Changes were made during review";
       }
     } else {
-      console.log(`ℹ️ [Final Diff] No changes - original and current are the same`);
+      console.log(
+        `ℹ️ [Final Diff] No changes - original and current are the same`
+      );
     }
 
     // Update article status to PUBLISHED
@@ -1520,7 +1671,10 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
 
     // Mark editor assignment as completed in history
     if (article.assignedEditorId) {
-      await articleHistoryService.markAsCompleted(articleId, article.assignedEditorId);
+      await articleHistoryService.markAsCompleted(
+        articleId,
+        article.assignedEditorId
+      );
     }
 
     // ✅ Notify original uploader with FINAL diff summary
@@ -1529,7 +1683,7 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       article.title,
       article.authorEmail,
       article.authorName,
-      finalDiffSummary  // Pass final diff summary
+      finalDiffSummary // Pass final diff summary
     );
 
     // ✅ Notify second author if exists
@@ -1539,11 +1693,13 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
         article.title,
         article.secondAuthorEmail,
         article.secondAuthorName,
-        finalDiffSummary  // Pass final diff summary
+        finalDiffSummary // Pass final diff summary
       );
     }
 
-    console.log(`✅ [Admin Publish] Article ${articleId} published by admin ${adminId}`);
+    console.log(
+      `✅ [Admin Publish] Article ${articleId} published by admin ${adminId}`
+    );
 
     return {
       article: updatedArticle,
@@ -1552,7 +1708,11 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
   }
 
   // ✅ NEW: Get editor assignment history for an article
-  async getEditorAssignmentHistory(articleId: string, userId: string, userRoles: string[]) {
+  async getEditorAssignmentHistory(
+    articleId: string,
+    userId: string,
+    userRoles: string[]
+  ) {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
       select: {
@@ -1570,10 +1730,14 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
     // Only admins can view editor history
     const isAdmin = userRoles.includes("admin");
     if (!isAdmin) {
-      throw new ForbiddenError("Only admins can view editor assignment history");
+      throw new ForbiddenError(
+        "Only admins can view editor assignment history"
+      );
     }
 
-    const history = await articleHistoryService.getArticleEditorHistory(articleId);
+    const history = await articleHistoryService.getArticleEditorHistory(
+      articleId
+    );
 
     return {
       article: {
@@ -1588,7 +1752,11 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
   }
 
   // ✅ NEW: Get change history for an article
-  async getArticleChangeHistory(articleId: string, userId: string, userRoles: string[]) {
+  async getArticleChangeHistory(
+    articleId: string,
+    userId: string,
+    userRoles: string[]
+  ) {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
       select: {
@@ -1615,16 +1783,28 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       where: { id: userId },
       select: { email: true },
     });
-    const isUploader = user && (user.email === article.authorEmail || user.email === article.secondAuthorEmail);
+    const isUploader =
+      user &&
+      (user.email === article.authorEmail ||
+        user.email === article.secondAuthorEmail);
 
     // Access control
     if (!isAdmin && !isAssignedEditor && !isUploader) {
-      throw new ForbiddenError("You do not have permission to view this article's change history");
+      throw new ForbiddenError(
+        "You do not have permission to view this article's change history"
+      );
     }
 
     // If uploader and article not published, deny access
-    if (isUploader && !isAdmin && !isAssignedEditor && article.status !== "PUBLISHED") {
-      throw new ForbiddenError("Change history is only available after article is published");
+    if (
+      isUploader &&
+      !isAdmin &&
+      !isAssignedEditor &&
+      article.status !== "PUBLISHED"
+    ) {
+      throw new ForbiddenError(
+        "Change history is only available after article is published"
+      );
     }
 
     // Get all change logs
@@ -1645,14 +1825,16 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
     // If uploader (non-admin, non-editor), calculate and show FINAL diff only
     if (isUploader && !isAdmin && !isAssignedEditor) {
       try {
-        console.log(`📊 [Author View] Calculating final diff (original vs current)...`);
-        
+        console.log(
+          `📊 [Author View] Calculating final diff (original vs current)...`
+        );
+
         // Calculate actual diff between original and current
         const finalDiff = await calculateFileDiff(
           article.originalPdfUrl,
           article.currentPdfUrl
         );
-        
+
         const finalDiffSummary = generateDiffSummary(finalDiff);
         console.log(`✅ [Author View] ${finalDiffSummary}`);
 
@@ -1669,13 +1851,16 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
             totalRemoved: finalDiff.summary.totalRemoved,
             totalModified: finalDiff.summary.totalModified,
             summary: finalDiffSummary,
-            diffData: finalDiff,  // Include full diff data for detailed view
+            diffData: finalDiff, // Include full diff data for detailed view
           },
           accessLevel: "uploader",
         };
       } catch (error) {
-        console.error("❌ [Author View] Failed to calculate final diff:", error);
-        
+        console.error(
+          "❌ [Author View] Failed to calculate final diff:",
+          error
+        );
+
         // Fallback: return summary without detailed diff
         return {
           article: {
@@ -1709,7 +1894,7 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
         status: article.status,
         originalPdfUrl: article.originalPdfUrl,
         currentPdfUrl: article.currentPdfUrl,
-        editorDocumentUrl: latestEditorDocUrl,  // ✅ NEW: Latest editor document
+        editorDocumentUrl: latestEditorDocUrl, // ✅ NEW: Latest editor document
         editorDocumentType: latestEditorDocType, // ✅ NEW: Latest editor document type
       },
       changeLogs: changeLogs.map((log) => ({
@@ -1731,7 +1916,11 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
   }
 
   // ✅ NEW: Get specific diff details
-  async getChangeLogDiff(changeLogId: string, userId: string, userRoles: string[]) {
+  async getChangeLogDiff(
+    changeLogId: string,
+    userId: string,
+    userRoles: string[]
+  ) {
     const changeLog = await prisma.articleChangeLog.findUnique({
       where: { id: changeLogId },
       include: {
@@ -1766,14 +1955,16 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       where: { id: userId },
       select: { email: true },
     });
-    const isUploader = user && (
-      user.email === changeLog.article.authorEmail || 
-      user.email === changeLog.article.secondAuthorEmail
-    );
+    const isUploader =
+      user &&
+      (user.email === changeLog.article.authorEmail ||
+        user.email === changeLog.article.secondAuthorEmail);
 
     // Access control
     if (!isAdmin && !isAssignedEditor && !isUploader) {
-      throw new ForbiddenError("You do not have permission to view this change log");
+      throw new ForbiddenError(
+        "You do not have permission to view this change log"
+      );
     }
 
     return {
@@ -1795,7 +1986,12 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
   }
 
   // ✅ NEW: Download diff as PDF or Word
-  async downloadDiff(changeLogId: string, userId: string, userRoles: string[], format: 'pdf' | 'word' = 'pdf') {
+  async downloadDiff(
+    changeLogId: string,
+    userId: string,
+    userRoles: string[],
+    format: "pdf" | "word" = "pdf"
+  ) {
     const changeLog = await prisma.articleChangeLog.findUnique({
       where: { id: changeLogId },
       include: {
@@ -1827,7 +2023,9 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
 
     // Access control - Only admin and assigned editor can download
     if (!isAdmin && !isAssignedEditor) {
-      throw new ForbiddenError("You do not have permission to download this diff");
+      throw new ForbiddenError(
+        "You do not have permission to download this diff"
+      );
     }
 
     // Get user info for "generated by" field
@@ -1836,9 +2034,9 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       select: { name: true, email: true },
     });
 
-    const generatedBy = currentUser 
+    const generatedBy = currentUser
       ? `${currentUser.name} (${currentUser.email})`
-      : 'Unknown User';
+      : "Unknown User";
 
     const options = {
       articleTitle: changeLog.article.title,
@@ -1853,17 +2051,20 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
     let filename: string;
     let mimeType: string;
 
-    if (format === 'word') {
-      console.log(`📝 [Diff Word] Generating Word document for change log ${changeLogId}`);
+    if (format === "word") {
+      console.log(
+        `📝 [Diff Word] Generating Word document for change log ${changeLogId}`
+      );
       buffer = await generateDiffWord(changeLog.diffData as any, options);
       filename = `diff-v${changeLog.versionNumber}-${changeLog.article.id}.docx`;
-      mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      mimeType =
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
       console.log(`✅ [Diff Word] Generated ${buffer.length} bytes`);
     } else {
       console.log(`📄 [Diff PDF] Generating PDF for change log ${changeLogId}`);
       buffer = await generateDiffPdf(changeLog.diffData as any, options);
       filename = `diff-v${changeLog.versionNumber}-${changeLog.article.id}.pdf`;
-      mimeType = 'application/pdf';
+      mimeType = "application/pdf";
       console.log(`✅ [Diff PDF] Generated ${buffer.length} bytes`);
     }
 
@@ -1875,7 +2076,12 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
   }
 
   // ✅ NEW: Download editor's uploaded document with format conversion
-  async downloadEditorDocument(changeLogId: string, userId: string, userRoles: string[], format: 'pdf' | 'word' = 'pdf') {
+  async downloadEditorDocument(
+    changeLogId: string,
+    userId: string,
+    userRoles: string[],
+    format: "pdf" | "word" = "pdf"
+  ) {
     const changeLog = await prisma.articleChangeLog.findUnique({
       where: { id: changeLogId },
       include: {
@@ -1912,20 +2118,27 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       throw new ForbiddenError("Only admins can download editor documents");
     }
 
-    const originalType = changeLog.editorDocumentType?.toLowerCase() || 'pdf';
+    const originalType = changeLog.editorDocumentType?.toLowerCase() || "pdf";
     const requestedFormat = format.toLowerCase();
 
-    console.log(`📥 [Editor Doc] Downloading editor document for change log ${changeLogId}`);
-    console.log(`   Original type: ${originalType}, Requested: ${requestedFormat}`);
+    console.log(
+      `📥 [Editor Doc] Downloading editor document for change log ${changeLogId}`
+    );
+    console.log(
+      `   Original type: ${originalType}, Requested: ${requestedFormat}`
+    );
 
     // If requested format matches original, return directly
     if (originalType === requestedFormat) {
       console.log(`✅ [Editor Doc] Format matches, returning original file`);
-      
-      const filename = `editor-doc-v${changeLog.versionNumber}-${changeLog.article.id}.${requestedFormat === 'word' ? 'docx' : 'pdf'}`;
-      const mimeType = requestedFormat === 'word' 
-        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        : 'application/pdf';
+
+      const filename = `editor-doc-v${changeLog.versionNumber}-${
+        changeLog.article.id
+      }.${requestedFormat === "word" ? "docx" : "pdf"}`;
+      const mimeType =
+        requestedFormat === "word"
+          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          : "application/pdf";
 
       return {
         filePath: changeLog.editorDocumentUrl,
@@ -1936,16 +2149,23 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
     }
 
     // Need to convert format
-    console.log(`🔄 [Editor Doc] Converting from ${originalType} to ${requestedFormat}`);
-    
+    console.log(
+      `🔄 [Editor Doc] Converting from ${originalType} to ${requestedFormat}`
+    );
+
     try {
-      const { pdfPath, wordPath } = await ensureBothFormats(changeLog.editorDocumentUrl);
-      
-      const convertedPath = requestedFormat === 'pdf' ? pdfPath : wordPath;
-      const filename = `editor-doc-v${changeLog.versionNumber}-${changeLog.article.id}.${requestedFormat === 'word' ? 'docx' : 'pdf'}`;
-      const mimeType = requestedFormat === 'word' 
-        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        : 'application/pdf';
+      const { pdfPath, wordPath } = await ensureBothFormats(
+        changeLog.editorDocumentUrl
+      );
+
+      const convertedPath = requestedFormat === "pdf" ? pdfPath : wordPath;
+      const filename = `editor-doc-v${changeLog.versionNumber}-${
+        changeLog.article.id
+      }.${requestedFormat === "word" ? "docx" : "pdf"}`;
+      const mimeType =
+        requestedFormat === "word"
+          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          : "application/pdf";
 
       console.log(`✅ [Editor Doc] Converted successfully`);
 
@@ -1957,14 +2177,18 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       };
     } catch (error) {
       console.error(`❌ [Editor Doc] Conversion failed:`, error);
-      throw new BadRequestError(`Failed to convert document to ${requestedFormat} format`);
+      throw new BadRequestError(
+        `Failed to convert document to ${requestedFormat} format`
+      );
     }
   }
 
   // ✅ NEW: Generate visual diff PDF
   async generateVisualDiff(changeLogId: string): Promise<string> {
-    console.log(`🎨 [Visual Diff] Generating visual diff for change log ${changeLogId}`);
-    
+    console.log(
+      `🎨 [Visual Diff] Generating visual diff for change log ${changeLogId}`
+    );
+
     const changeLog = await prisma.articleChangeLog.findUnique({
       where: { id: changeLogId },
       include: {
@@ -1982,13 +2206,15 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
     }
 
     // Only generate for PDF files
-    if (changeLog.fileType !== 'PDF') {
+    if (changeLog.fileType !== "PDF") {
       throw new BadRequestError("Visual diff is only supported for PDF files");
     }
 
     try {
-      const { generateVisualDiffFromChangeLog } = await import('@/utils/pdf-visual-diff.utils.js');
-      
+      const { generateVisualDiffFromChangeLog } = await import(
+        "@/utils/pdf-visual-diff.utils.js"
+      );
+
       // Generate visual diff
       const visualDiffPath = await generateVisualDiffFromChangeLog(
         changeLogId,
@@ -1999,7 +2225,9 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       );
 
       // Convert to relative path
-      const relativePath = visualDiffPath.replace(process.cwd(), '').replace(/\\/g, '/');
+      const relativePath = visualDiffPath
+        .replace(process.cwd(), "")
+        .replace(/\\/g, "/");
 
       // Update change log with visual diff path
       await prisma.articleChangeLog.update({
@@ -2009,7 +2237,6 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
 
       console.log(`✅ [Visual Diff] Generated and saved: ${relativePath}`);
       return relativePath;
-      
     } catch (error) {
       console.error(`❌ [Visual Diff] Generation failed:`, error);
       throw new BadRequestError(`Failed to generate visual diff: ${error}`);
