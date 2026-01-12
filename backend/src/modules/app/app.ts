@@ -18,8 +18,15 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(morgan("dev"));
 
-// Serve static files from uploads folder
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+// Serve static files from uploads folder with no-cache headers
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads"), {
+  setHeaders: (res) => {
+    // Disable caching for all uploaded files to prevent PDF cross-contamination
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
 
 // API routes mount point
 app.use("/api", AppRouter);
