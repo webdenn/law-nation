@@ -332,6 +332,7 @@ export default function EditorDashboard() {
         setUploadedFile(null);
         setTrackFile(null);
         setUploadComment("");
+        setVisualDiffBlobUrl(null);
 
         // Refresh Change History to show the new version
         fetchChangeHistory(selectedArticle.id || selectedArticle._id);
@@ -625,7 +626,7 @@ export default function EditorDashboard() {
                   </span>
                 )}
               </button>
-              <button
+              {/* <button
                 onClick={() => {
                   setPdfViewMode("track"); // ✅ Naya mode
                   setIsMobileMenuOpen(false);
@@ -642,17 +643,22 @@ export default function EditorDashboard() {
                     Active
                   </span>
                 )}
-              </button>
+              </button> */}
 
               <button
                 onClick={() => {
-                  if (!visualDiffBlobUrl) {
-                    toast.info(
-                      "Please open Change History and click 'View Visual Diff' on a version first."
-                    );
-                  } else {
-                    setPdfViewMode("visual-diff");
+                  if (changeHistory && changeHistory.length > 0) {
+                    // Agar blob pehle se hai to direct dikhao, nahi to fetch karo latest wala
+                    if (visualDiffBlobUrl) {
+                      setPdfViewMode("visual-diff");
+                    } else {
+                      // Automatically fetch diff for the LATEST version (first item in array)
+                      const latestLog = changeHistory[0];
+                      handleViewVisualDiff(latestLog.id || latestLog._id);
+                    }
                     setIsMobileMenuOpen(false);
+                  } else {
+                    toast.info("No change history available to generate diff.");
                   }
                 }}
                 className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
@@ -661,7 +667,7 @@ export default function EditorDashboard() {
                     : "hover:bg-red-800 text-white"
                 }`}
               >
-                <span>👁️</span> View Visual Diff
+                View Visual Diff
                 {pdfViewMode === "visual-diff" && (
                   <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">
                     Active
@@ -841,8 +847,8 @@ export default function EditorDashboard() {
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-gray-700 uppercase text-sm md:text-base">
                     {pdfViewMode === "original"
-                      ? "📂 Original Submission"
-                      : "📝 Latest Edited Version"}
+                      ? " Original Submission"
+                      : " Latest Edited Version"}
                   </h3>
                   {getPdfUrlToView() && (
                     <a
@@ -879,7 +885,7 @@ export default function EditorDashboard() {
                 {/* 1. UPLOAD SECTION */}
                 <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
                   <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                    <span>📤</span> Upload Correction
+                    Upload Correction
                   </h3>
 
                   <div className="space-y-3">
@@ -958,7 +964,7 @@ export default function EditorDashboard() {
                 {/* 3. CHANGE HISTORY LIST (Dynamic) */}
                 <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
                   <h3 className="font-bold text-gray-800 mb-4 border-b pb-2">
-                    📜 Change History
+                    Change History
                   </h3>
 
                   <div className="space-y-6">
@@ -986,14 +992,14 @@ export default function EditorDashboard() {
                             "{log.comments || "No comments provided"}"
                           </p>
 
-                          <button
+                          {/* <button
                             onClick={() =>
                               handleViewVisualDiff(log.id || log._id)
                             }
                             className="w-full mb-2 flex items-center justify-center gap-2 text-[10px] font-bold text-white bg-purple-600 hover:bg-purple-700 px-2 py-1.5 rounded shadow transition"
                           >
                             <span>🔍</span> View Visual Diff (Red/Green)
-                          </button>
+                          </button> */}
                           {/* ✅ Added: Download Button for PDF Report */}
 
                           <button
