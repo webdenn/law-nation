@@ -1,23 +1,6 @@
-import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import fs from 'fs';
 import path from 'path';
-
-try {
-  // Try to find the worker file in node_modules
-  const workerPath = path.join(process.cwd(), 'node_modules', 'pdfjs-dist', 'build', 'pdf.worker.mjs');
-  if (fs.existsSync(workerPath)) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
-    console.log(`✅ [PDF.js] Worker configured: ${workerPath}`);
-  } else {
-    // Fallback: use empty string to disable worker for Node.js
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-    console.log(`⚠️ [PDF.js] Worker disabled (fallback mode)`);
-  }
-} catch (error) {
-  // Final fallback: use empty string to disable worker
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-  console.log(`⚠️ [PDF.js] Worker setup failed, using fallback mode:`, error);
-}
 
 /**
  * Word position information
@@ -85,21 +68,36 @@ export async function extractTextWithPositions(pdfPath: string): Promise<PageTex
       // Process each text item
       for (const item of textContent.items) {
         if ('str' in item && item.str.trim()) {
-          const transform = item.transform;
+          // ✅ FIX #1: Convert PDF coordinates to viewport coordinates
+          const [x, y] = viewport.convertToViewportPoint(
+            item.transform[4],
+            item.transform[5]
+          );
           
-          // Calculate position
-          const x = transform[4];
-          const y = transform[5];
-          const width = item.width || 0;
-          const height = item.height || 0;
+          // ✅ FIX #2: Scale width and height properly
+          const width = item.width * viewport.scale;
+          const height = item.height * viewport.scale;
           
-          words.push({
-            text: item.str.trim(),
-            x,
-            y,
-            width,
-            height,
-          });
+          // ✅ IMPROVEMENT: Split text runs into individual words for better diff accuracy
+          const text = item.str.trim();
+          const parts = text.split(/\s+/);
+          let cursorX = x;
+          
+          for (const part of parts) {
+            if (part) { // Skip empty parts
+              const approxWidth = (width / text.length) * part.length;
+              
+              words.push({
+                text: part,
+                x: cursorX,
+                y,
+                width: approxWidth,
+                height,
+              });
+              
+              cursorX += approxWidth;
+            }
+          }
         }
       }
       
