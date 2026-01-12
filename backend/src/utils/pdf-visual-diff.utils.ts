@@ -27,10 +27,18 @@ export async function generateVisualDiffPdf(
     
     console.log(`📊 [Visual Diff] Processing ${diffResult.changes.length} changes`);
     
-    // Load original PDF
-    let fullPath = originalPdfPath;
-    if (originalPdfPath.startsWith('/uploads')) {
-      fullPath = path.join(process.cwd(), originalPdfPath);
+    // ✅ IMPROVED: Use modified PDF as base for better layout accuracy
+    let basePdfPath = modifiedPdfPath;
+    if (diffResult.addedCount > diffResult.deletedCount) {
+      basePdfPath = modifiedPdfPath; // Use modified if more additions
+    } else if (diffResult.deletedCount > 0) {
+      basePdfPath = originalPdfPath; // Use original if there are deletions
+    }
+    
+    // Load base PDF
+    let fullPath = basePdfPath;
+    if (basePdfPath.startsWith('/uploads')) {
+      fullPath = path.join(process.cwd(), basePdfPath);
     }
     
     const pdfBytes = fs.readFileSync(fullPath);
@@ -56,6 +64,8 @@ export async function generateVisualDiffPdf(
         const page = pages[pageNum - 1];
         if (page) {
           console.log(`🎨 [Visual Diff] Adding markup to page ${pageNum}: ${changes.length} changes`);
+          console.log(`   ➕ Additions: ${changes.filter(c => c.type === 'added').length}`);
+          console.log(`   ➖ Deletions: ${changes.filter(c => c.type === 'deleted').length}`);
           addMarkupToPage(page, changes);
         }
       }
@@ -85,53 +95,158 @@ export async function generateVisualDiffPdf(
 }
 
 /**
- * Add visual markup to a page
+ * ✅ IMPROVED: Add visual markup to a page with better positioning and styling
  */
 function addMarkupToPage(page: PDFPage, changes: TextChange[]): void {
-  const { height } = page.getSize();
+  const { width, height } = page.getSize();
   
-  for (const change of changes) {
-    // Convert Y coordinate (PDF uses bottom-left origin, we use top-left)
-    const y = height - change.y - change.height;
+  // ✅ IMPROVED: Sort changes by type to draw deletions first, then additions
+  const deletions = changes.filter(c => c.type === 'deleted');
+  const additions = changes.filter(c => c.type === 'added');
+  
+  console.log(`   🔴 Drawing ${deletions.length} deletions`);
+  console.log(`   🟢 Drawing ${additions.length} additions`);
+  
+  // Draw deletions first (red highlights)
+  for (const change of deletions) {
+    // ✅ IMPROVED: Better coordinate conversion - PDF uses bottom-left origin
+    const x = Math.max(0, Math.min(change.x, width - 10));
+    const y = Math.max(0, Math.min(height - change.y - change.height, height - 10));
+    const rectWidth = Math.max(change.width || 50, 10);
+    const rectHeight = Math.max(change.height || 12, 8);
     
-    if (change.type === 'deleted') {
-      // Draw light red background
+    // Draw light red background for deleted text
+    page.drawRectangle({
+      x: x,
+      y: y,
+      width: rectWidth,
+      height: rectHeight,
+      color: rgb(1, 0.85, 0.85), // Light red background
+      opacity: 0.7,
+    });
+    
+    // Draw red border
+    page.drawRectangle({
+      x: x,
+      y: y,
+      width: rectWidth,
+      height: rectHeight,
+      borderColor: rgb(0.8, 0, 0), // Dark red border
+      borderWidth: 1,
+      opacity: 0.9,
+    });
+    
+    // Draw strikethrough line for deleted text
+    page.drawLine({
+      start: { x: x, y: y + rectHeight / 2 },
+      end: { x: x + rectWidth, y: y + rectHeight / 2 },
+      color: rgb(0.8, 0, 0), // Dark red line
+      thickness: 2,
+      opacity: 0.9,
+    });
+    
+    console.log(`     🔴 Deleted "${change.text}" at (${x.toFixed(1)}, ${y.toFixed(1)}) size ${rectWidth.toFixed(1)}x${rectHeight.toFixed(1)}`);
+  }
+  
+  // Draw additions second (green highlights)
+  for (const change of additions) {
+    // ✅ IMPROVED: Better coordinate conversion
+    const x = Math.max(0, Math.min(change.x, width - 10));
+    const y = Math.max(0, Math.min(height - change.y - change.height, height - 10));
+    const rectWidth = Math.max(change.width || 50, 10);
+    const rectHeight = Math.max(change.height || 12, 8);
+    
+    // Draw light green background for added text
+    page.drawRectangle({
+      x: x,
+      y: y,
+      width: rectWidth,
+      height: rectHeight,
+      color: rgb(0.85, 1, 0.85), // Light green background
+      opacity: 0.7,
+    });
+    
+    // Draw green border
+    page.drawRectangle({
+      x: x,
+      y: y,
+      width: rectWidth,
+      height: rectHeight,
+      borderColor: rgb(0, 0.6, 0), // Dark green border
+      borderWidth: 1,
+      opacity: 0.9,
+    });
+    
+    // Draw green underline for added text
+    page.drawLine({
+      start: { x: x, y: y },
+      end: { x: x + rectWidth, y: y },
+      color: rgb(0, 0.6, 0), // Dark green line
+      thickness: 2,
+      opacity: 0.9,
+    });
+    
+    console.log(`     🟢 Added "${change.text}" at (${x.toFixed(1)}, ${y.toFixed(1)}) size ${rectWidth.toFixed(1)}x${rectHeight.toFixed(1)}`);
+  }
+  
+  // ✅ NEW: Add legend in top-right corner
+  if (changes.length > 0) {
+    const legendX = width - 150;
+    const legendY = height - 30;
+    
+    // Legend background
+    page.drawRectangle({
+      x: legendX - 10,
+      y: legendY - 25,
+      width: 140,
+      height: 50,
+      color: rgb(1, 1, 1), // White background
+      borderColor: rgb(0.7, 0.7, 0.7), // Gray border
+      borderWidth: 1,
+      opacity: 0.9,
+    });
+    
+    // Legend text
+    page.drawText('Visual Diff Legend:', {
+      x: legendX,
+      y: legendY + 15,
+      size: 8,
+      color: rgb(0, 0, 0),
+    });
+    
+    if (deletions.length > 0) {
       page.drawRectangle({
-        x: change.x,
-        y: y,
-        width: change.width || 50, // Default width if not available
-        height: change.height || 12, // Default height if not available
-        color: rgb(1, 0.9, 0.9), // Light red
-        opacity: 0.6,
+        x: legendX,
+        y: legendY,
+        width: 15,
+        height: 8,
+        color: rgb(1, 0.85, 0.85),
+        borderColor: rgb(0.8, 0, 0),
+        borderWidth: 1,
       });
-      
-      // Draw red strikethrough line
-      page.drawLine({
-        start: { x: change.x, y: y + (change.height || 12) / 2 },
-        end: { x: change.x + (change.width || 50), y: y + (change.height || 12) / 2 },
-        color: rgb(1, 0, 0), // Red
-        thickness: 2,
-        opacity: 0.8,
+      page.drawText(`Deleted (${deletions.length})`, {
+        x: legendX + 20,
+        y: legendY + 1,
+        size: 7,
+        color: rgb(0, 0, 0),
       });
-      
-    } else if (change.type === 'added') {
-      // Draw light green background
+    }
+    
+    if (additions.length > 0) {
       page.drawRectangle({
-        x: change.x,
-        y: y,
-        width: change.width || 50,
-        height: change.height || 12,
-        color: rgb(0.9, 1, 0.9), // Light green
-        opacity: 0.6,
+        x: legendX,
+        y: legendY - 12,
+        width: 15,
+        height: 8,
+        color: rgb(0.85, 1, 0.85),
+        borderColor: rgb(0, 0.6, 0),
+        borderWidth: 1,
       });
-      
-      // Draw green underline
-      page.drawLine({
-        start: { x: change.x, y: y },
-        end: { x: change.x + (change.width || 50), y: y },
-        color: rgb(0, 0.7, 0), // Green
-        thickness: 2,
-        opacity: 0.8,
+      page.drawText(`Added (${additions.length})`, {
+        x: legendX + 20,
+        y: legendY - 11,
+        size: 7,
+        color: rgb(0, 0, 0),
       });
     }
   }
