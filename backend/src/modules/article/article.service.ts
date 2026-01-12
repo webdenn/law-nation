@@ -2113,9 +2113,11 @@ export class ArticleService {
     const isAdmin = userRoles.includes("admin");
     const isAssignedEditor = changeLog.article.assignedEditorId === userId;
 
-    // Access control - Only admin can download
-    if (!isAdmin) {
-      throw new ForbiddenError("Only admins can download editor documents");
+    // Access control - Only admin and assigned editor can download
+    if (!isAdmin && !isAssignedEditor) {
+      throw new ForbiddenError(
+        "Only admins and assigned editors can download editor documents"
+      );
     }
 
     const originalType = changeLog.editorDocumentType?.toLowerCase() || "pdf";
