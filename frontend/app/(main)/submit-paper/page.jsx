@@ -38,6 +38,7 @@ export default function SubmitPaperPage() {
   const [formData, setFormData] = useState(initialFormState);
   const [keywordInput, setKeywordInput] = useState("");
   const [captchaToken, setCaptchaToken] = useState(null); // ✅ Captcha State
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const handleCaptchaChange = (token) => {
     setCaptchaToken(token); // ✅ Token set karo
@@ -249,7 +250,7 @@ export default function SubmitPaperPage() {
         setShowVerification(true);
         setPendingArticleId(result.articleId);
       } else {
-        toast.success("Article submitted successfully!");
+        setShowSuccessModal(true);
 
         // Reset Form
         setFormData(initialFormState);
@@ -316,6 +317,36 @@ export default function SubmitPaperPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-4 sm:py-6 lg:py-8">
       <ToastContainer position="top-center" autoClose={4000} />
+
+      {/* 👇 SUCCESS POPUP MODAL START 👇 */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-10 max-w-md w-full text-center transform transition-all scale-100 border border-gray-100">
+            
+            {/* Success Icon */}
+            <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-green-100 mb-6">
+              <svg className="h-10 w-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            </div>
+
+            {/* Title & Message */}
+            <h2 className="text-3xl font-bold text-gray-900 mb-3">Great Job! 🎉</h2>
+            <p className="text-gray-600 text-lg mb-8 leading-relaxed">
+              Your article has been submitted successfully. Our team will review it shortly.
+            </p>
+
+            {/* OK Button */}
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="w-full py-3.5 px-6 bg-green-600 hover:bg-green-700 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
+            >
+              Okay, Got it!
+            </button>
+          </div>
+        </div>
+      )}
+      {/* 👆 SUCCESS POPUP MODAL END 👆 */}
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
         <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
