@@ -1,9 +1,26 @@
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import * as pdfjsLib from 'pdfjs-dist';
 import fs from 'fs';
 import path from 'path';
 
+// ✅ CORRECT: Configure real worker for PDF.js v5.4.530
+const workerPath = path.join(
+  process.cwd(),
+  "node_modules",
+  "pdfjs-dist",
+  "build",
+  "pdf.worker.mjs"
+);
+
+if (!fs.existsSync(workerPath)) {
+  throw new Error("❌ pdf.worker.mjs not found at: " + workerPath);
+}
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
+console.log("✅ PDF.js worker configured:", workerPath);
+console.log("✅ PDF.js version:", pdfjsLib.version);
+
 /**
- * Word position information
+ * Text item position information (PDF.js v5.4.530 compatible)
  */
 export interface WordPosition {
   text: string;
@@ -14,11 +31,11 @@ export interface WordPosition {
 }
 
 /**
- * Page text with positions
+ * Page text with positions (atomic text items)
  */
 export interface PageText {
   pageNumber: number;
-  words: WordPosition[];
+  words: WordPosition[]; // Note: These are text items, not individual words
   width: number;
   height: number;
 }
@@ -44,7 +61,7 @@ export async function extractTextWithPositions(pdfPath: string): Promise<PageTex
     
     const pdfBuffer = fs.readFileSync(fullPath);
     
-    // Load PDF document
+    // ✅ CORRECT: v5.4.530 compatible PDF loading
     const loadingTask = pdfjsLib.getDocument({
       data: new Uint8Array(pdfBuffer),
       useSystemFonts: true,
@@ -60,7 +77,7 @@ export async function extractTextWithPositions(pdfPath: string): Promise<PageTex
     // Extract text from each page
     for (let pageNum = 1; pageNum <= numPages; pageNum++) {
       const page = await pdfDoc.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 1.5 }); // Increased scale for better precision
+      const viewport = page.getViewport({ scale: 1 }); // ✅ CORRECT: Use scale 1 for accuracy
       const textContent = await page.getTextContent();
       
       const words: WordPosition[] = [];
@@ -68,39 +85,28 @@ export async function extractTextWithPositions(pdfPath: string): Promise<PageTex
       // Process each text item
       for (const item of textContent.items) {
         if ('str' in item && item.str.trim()) {
-          // ✅ IMPROVED: Better coordinate conversion with proper scaling
+          // ✅ CORRECT: v5.4.530 coordinate conversion
           const [x, y] = viewport.convertToViewportPoint(
             item.transform[4],
             item.transform[5]
           );
           
-          // ✅ IMPROVED: More accurate width and height calculation
+          // ✅ CORRECT: v5.4.530 height calculation from transform matrix
+          const [a, b, c, d] = item.transform;
+          const fontHeight = Math.sqrt(b * b + d * d);
+          const itemHeight = fontHeight * viewport.scale;
           const itemWidth = item.width * viewport.scale;
-          const itemHeight = item.height * viewport.scale;
           
-          // ✅ IMPROVED: Better word splitting with accurate positioning
+          // ✅ CORRECT: Treat each text item as atomic (no word splitting)
           const text = item.str.trim();
-          const words_in_item = text.split(/(\s+)/); // Keep spaces for accurate positioning
-          let cursorX = x;
-          
-          for (const word_part of words_in_item) {
-            if (word_part.trim()) { // Only process non-space parts
-              // Calculate more accurate width based on character count
-              const charRatio = word_part.length / text.length;
-              const wordWidth = itemWidth * charRatio;
-              
-              words.push({
-                text: word_part.trim(),
-                x: Math.round(cursorX),
-                y: Math.round(y),
-                width: Math.round(wordWidth),
-                height: Math.round(itemHeight),
-              });
-            }
-            
-            // Move cursor by the proportional width of this part (including spaces)
-            const partRatio = word_part.length / text.length;
-            cursorX += itemWidth * partRatio;
+          if (text) {
+            words.push({
+              text,
+              x: Math.round(x),
+              y: Math.round(y - itemHeight), // ✅ FIX: Convert baseline to top-left
+              width: Math.round(itemWidth),
+              height: Math.round(itemHeight),
+            });
           }
         }
       }
@@ -121,7 +127,7 @@ export async function extractTextWithPositions(pdfPath: string): Promise<PageTex
         height: viewport.height,
       });
       
-      console.log(`✅ [Text Extract] Page ${pageNum}: ${words.length} words extracted`);
+      console.log(`✅ [Text Extract] Page ${pageNum}: ${words.length} text items extracted`);
     }
     
     console.log(`✅ [Text Extract] Extraction complete: ${pagesText.length} pages`);
@@ -143,7 +149,8 @@ export async function extractPlainText(pdfPath: string): Promise<string> {
   
   let plainText = '';
   for (const page of pagesText) {
-    const pageText = page.words.map(w => w.text).join(' ');
+    // Join text items with spaces (they're already atomic text units)
+    const pageText = page.words.map(item => item.text).join(' ');
     plainText += pageText + '\n\n';
   }
   

@@ -3,13 +3,24 @@ import { ArticleStatus } from "@prisma/client";
 
 export const articleSubmissionSchema = z.object({
   // Primary author (required)
-  authorName: z.string().min(2, "Primary author name is required"),
+  authorName: z.string()
+    .min(2, "Primary author name is required")
+    .regex(
+      /^[a-zA-Z\s]+$/,
+      "Author name can only contain letters and spaces (no numbers, special characters, or punctuation allowed)"
+    ),
   authorEmail: z.string().email("Valid email is required"),
   authorPhone: z.string().optional(),
   authorOrganization: z.string().optional(),
   
   // Second author (optional)
-  secondAuthorName: z.string().min(2, "Second author name must be at least 2 characters").optional(),
+  secondAuthorName: z.string()
+    .min(2, "Second author name must be at least 2 characters")
+    .regex(
+      /^[a-zA-Z\s]+$/,
+      "Second author name can only contain letters and spaces (no numbers, special characters, or punctuation allowed)"
+    )
+    .optional(),
   secondAuthorEmail: z.string().email("Valid email is required for second author").optional(),
   secondAuthorPhone: z.string().optional(),
   secondAuthorOrganization: z.string().optional(),
@@ -19,8 +30,8 @@ export const articleSubmissionSchema = z.object({
     .min(50, "Title must be at least 50 characters")
     .max(100, "Title must not exceed 100 characters")
     .regex(
-      /^[a-zA-Z0-9\s\-:,.'&()]+$/,
-      "Title can only contain letters, numbers, spaces, and basic punctuation (- : , . ' & ( ))"
+      /^[a-zA-Z\s\-:,.'&()]+$/,
+      "Title can only contain letters, spaces, and basic punctuation (- : , . ' & ( ))"
     ),
   category: z.string().min(2, "Category is required"),
   abstract: z.string()
