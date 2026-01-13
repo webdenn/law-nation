@@ -9,9 +9,7 @@ interface DiffPdfOptions {
   generatedBy: string;
 }
 
-/**
- * Generate a PDF document showing the diff between two versions
- */
+
 export async function generateDiffPdf(
   diffData: DiffResult,
   options: DiffPdfOptions

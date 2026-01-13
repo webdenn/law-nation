@@ -7,7 +7,11 @@ import {
   revokeRefreshToken,
 } from "@/utils/jwt.utils.js";
 import type { Response } from "express";
-import { NotFoundError, UnauthorizedError, BadRequestError } from "@/utils/http-errors.util.js";
+import {
+  NotFoundError,
+  UnauthorizedError,
+  BadRequestError,
+} from "@/utils/http-errors.util.js";
 import { sendOtpEmail } from "@/utils/email.utils.js";
 
 const SALT = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
@@ -92,7 +96,12 @@ async function signup(data: {
   };
 }
 
-async function login(email: string, password: string, res: Response, requireAdminAccess: boolean = false) {
+async function login(
+  email: string,
+  password: string,
+  res: Response,
+  requireAdminAccess: boolean = false
+) {
   const user = await prisma.user.findUnique({
     where: { email },
     include: {
@@ -117,12 +126,14 @@ async function login(email: string, password: string, res: Response, requireAdmi
 
   // Check if admin access is required (for admin/editor login)
   if (requireAdminAccess) {
-    const hasAdminAccess = user.roles.some(r => 
-      r.role.name === 'admin' || r.role.name === 'editor'
+    const hasAdminAccess = user.roles.some(
+      (r) => r.role.name === "admin" || r.role.name === "editor"
     );
 
     if (!hasAdminAccess) {
-      throw new UnauthorizedError("Access denied. Admin or Editor privileges required.");
+      throw new UnauthorizedError(
+        "Access denied. Admin or Editor privileges required."
+      );
     }
   }
 
@@ -307,7 +318,9 @@ async function verifyOtp(email: string, otp: string) {
 
   // Check if expired
   if (new Date() > verification.ttl) {
-    throw new BadRequestError("Verification code expired. Please request a new one");
+    throw new BadRequestError(
+      "Verification code expired. Please request a new one"
+    );
   }
 
   // Mark as verified
@@ -346,7 +359,9 @@ async function setupPassword(token: string, password: string) {
 
   // Check if expired
   if (new Date() > verification.ttl) {
-    throw new BadRequestError("Invitation link expired. Please contact admin for a new invitation.");
+    throw new BadRequestError(
+      "Invitation link expired. Please contact admin for a new invitation."
+    );
   }
 
   // Check if this is an editor invitation
@@ -406,7 +421,8 @@ async function setupPassword(token: string, password: string) {
 
   return {
     success: true,
-    message: "Password set successfully. You can now log in with your credentials.",
+    message:
+      "Password set successfully. You can now log in with your credentials.",
     user: {
       id: user.id,
       name: user.name,

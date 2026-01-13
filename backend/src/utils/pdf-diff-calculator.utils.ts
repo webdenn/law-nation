@@ -1,6 +1,6 @@
-import { diffWords, diffLines } from 'diff';
-import type { Change } from 'diff';
+import { diffWords } from 'diff';
 import { extractTextWithPositions } from './pdf-text-extract.utils.js';
+import { extractPdfText } from './pdf-extract.utils.js';
 import type { PageText, WordPosition } from './pdf-text-extract.utils.js';
 
 /**
@@ -22,7 +22,17 @@ export interface TextChange {
 }
 
 /**
- * Diff result
+ * Simple diff result for change history (counts only)
+ */
+export interface SimpleDiffResult {
+  addedCount: number;
+  deletedCount: number;
+  modifiedCount: number;
+  totalChanges: number;
+}
+
+/**
+ * Complex diff result for visual markup (with positions)
  */
 export interface DiffResult {
   changes: TextChange[];
@@ -32,21 +42,91 @@ export interface DiffResult {
 }
 
 /**
- * Calculate differences between two PDFs
+ * SYSTEM 1: Simple text diff for change history (fast & reliable)
+ * Uses pdf-parse for simple text extraction and counting
  * @param originalPdfPath - Path to original PDF
  * @param modifiedPdfPath - Path to modified PDF
- * @returns Diff result with changes and positions
+ * @returns Simple change counts for display
+ */
+export async function calculateSimpleTextDiff(
+  originalPdfPath: string,
+  modifiedPdfPath: string
+): Promise<SimpleDiffResult> {
+  console.log('\n📊 [Simple Diff] Starting change history calculation...');
+  console.log(`📄 [Simple Diff] Original: ${originalPdfPath}`);
+  console.log(`📄 [Simple Diff] Modified: ${modifiedPdfPath}`);
+  
+  try {
+    // Extract plain text using pdf-parse (simple & reliable)
+    console.log('📖 [Simple Diff] Extracting text using pdf-parse...');
+    const originalText = await extractPdfText(originalPdfPath);
+    const modifiedText = await extractPdfText(modifiedPdfPath);
+    
+    console.log(`📊 [Simple Diff] Original text: ${originalText.length} chars`);
+    console.log(`📊 [Simple Diff] Modified text: ${modifiedText.length} chars`);
+    
+    // Perform word-level diff
+    const diffResult = diffWords(originalText, modifiedText);
+    
+    let addedCount = 0;
+    let deletedCount = 0;
+    let modifiedCount = 0;
+    
+    // Count changes
+    for (const part of diffResult) {
+      const wordCount = part.value.trim().split(/\s+/).filter(w => w.length > 0).length;
+      
+      if (part.added) {
+        addedCount += wordCount;
+      } else if (part.removed) {
+        deletedCount += wordCount;
+      }
+    }
+    
+    // Calculate modified count (pairs of add/remove operations)
+    modifiedCount = Math.min(addedCount, deletedCount);
+    const actualAdded = addedCount - modifiedCount;
+    const actualDeleted = deletedCount - modifiedCount;
+    
+    const result: SimpleDiffResult = {
+      addedCount: actualAdded,
+      deletedCount: actualDeleted,
+      modifiedCount,
+      totalChanges: actualAdded + actualDeleted + modifiedCount,
+    };
+    
+    console.log(`✅ [Simple Diff] Change history calculated:`);
+    console.log(`   ➕ Added: ${result.addedCount} words`);
+    console.log(`   ➖ Deleted: ${result.deletedCount} words`);
+    console.log(`   🔄 Modified: ${result.modifiedCount} words`);
+    console.log(`   📝 Total changes: ${result.totalChanges} words`);
+    
+    return result;
+    
+  } catch (error) {
+    console.error('❌ [Simple Diff] Failed:', error);
+    throw new Error(`Failed to calculate simple text diff: ${error}`);
+  }
+}
+
+/**
+ * SYSTEM 2: Complex positional diff for visual markup (PDF.js based)
+ * Uses PDF.js for coordinate-aware text extraction and positioning
+ * @param originalPdfPath - Path to original PDF
+ * @param modifiedPdfPath - Path to modified PDF
+ * @returns Diff result with changes and positions for visual markup
  */
 export async function calculatePdfDifferences(
   originalPdfPath: string,
   modifiedPdfPath: string
 ): Promise<DiffResult> {
-  console.log('\n🔍 [Diff Calculator] Starting PDF comparison...');
-  console.log(`📄 [Diff Calculator] Original: ${originalPdfPath}`);
-  console.log(`📄 [Diff Calculator] Modified: ${modifiedPdfPath}`);
+  console.log('\n🎨 [Visual Diff] Starting PDF comparison for visual markup...');
+  console.log(`📄 [Visual Diff] Original: ${originalPdfPath}`);
+  console.log(`📄 [Visual Diff] Modified: ${modifiedPdfPath}`);
   
   try {
-    // Extract text with positions from both PDFs
+    // Extract text with positions from both PDFs using PDF.js
+    console.log('🎯 [Visual Diff] Extracting positioned text using PDF.js...');
     const originalPages = await extractTextWithPositions(originalPdfPath);
     const modifiedPages = await extractTextWithPositions(modifiedPdfPath);
     
@@ -54,13 +134,13 @@ export async function calculatePdfDifferences(
     const originalText = pagesToText(originalPages);
     const modifiedText = pagesToText(modifiedPages);
     
-    console.log(`📊 [Diff Calculator] Original text length: ${originalText.length} chars`);
-    console.log(`📊 [Diff Calculator] Modified text length: ${modifiedText.length} chars`);
+    console.log(`📊 [Visual Diff] Original text length: ${originalText.length} chars`);
+    console.log(`📊 [Visual Diff] Modified text length: ${modifiedText.length} chars`);
     
     // ✅ IMPROVED: Use word-level diff for better accuracy
     const diffResult = diffWords(originalText, modifiedText);
     
-    console.log(`📊 [Diff Calculator] Diff parts: ${diffResult.length}`);
+    console.log(`📊 [Visual Diff] Diff parts: ${diffResult.length}`);
     
     // ✅ IMPROVED: Better change mapping with accurate positioning
     const changes: TextChange[] = [];
@@ -122,7 +202,7 @@ export async function calculatePdfDifferences(
       }
     }
     
-    console.log(`✅ [Diff Calculator] Comparison complete:`);
+    console.log(`✅ [Visual Diff] Comparison complete:`);
     console.log(`   ➕ Added: ${addedCount} words`);
     console.log(`   ➖ Deleted: ${deletedCount} words`);
     console.log(`   ⚪ Unchanged: ${unchangedCount} words`);
@@ -136,7 +216,7 @@ export async function calculatePdfDifferences(
     };
     
   } catch (error) {
-    console.error('❌ [Diff Calculator] Failed:', error);
+    console.error('❌ [Visual Diff] Failed:', error);
     throw new Error(`Failed to calculate PDF differences: ${error}`);
   }
 }
@@ -272,3 +352,4 @@ function findWordPosition(
   
   return null;
 }
+

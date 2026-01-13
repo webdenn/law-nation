@@ -1,10 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import mammoth from "mammoth";
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-const { PDFParse } = require("pdf-parse");
+import { extractPdfText } from "./pdf-extract.utils.js";
 
 export interface DiffLine {
   lineNumber: number;
@@ -28,50 +25,15 @@ export interface DiffResult {
 }
 
 /**
- * Extract text from PDF file
+ * Extract text from PDF file using the reliable pdf-parse extractor
  */
 async function extractTextFromPdf(filePath: string): Promise<string> {
   try {
     console.log(`📄 [Diff-PDF] Extracting text from: ${filePath}`);
     
-    let dataBuffer: Buffer;
+    // Use the reliable pdf-extract utility
+    const text = await extractPdfText(filePath);
     
-    // Check if it's a URL (Supabase or remote storage)
-    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-      console.log(`🌐 [Diff-PDF] Downloading from URL...`);
-      const response = await fetch(filePath);
-      if (!response.ok) {
-        throw new Error(`Failed to download PDF: ${response.statusText}`);
-      }
-      const arrayBuffer = await response.arrayBuffer();
-      dataBuffer = Buffer.from(arrayBuffer);
-      console.log(`✅ [Diff-PDF] Downloaded ${dataBuffer.length} bytes`);
-    } else {
-      // Handle local file path
-      let absolutePath = filePath;
-      
-      // Convert relative path to absolute
-      if (filePath.startsWith('/uploads')) {
-        absolutePath = path.join(process.cwd(), filePath);
-        console.log(`🔄 [Diff-PDF] Converted to absolute path: ${absolutePath}`);
-      }
-      
-      console.log(`💾 [Diff-PDF] Reading local file...`);
-      dataBuffer = await fs.readFile(absolutePath);
-      console.log(`✅ [Diff-PDF] Read ${dataBuffer.length} bytes`);
-    }
-    
-    // ✅ FIX: Use correct PDFParse API (class-based, same as pdf-extract.utils.ts)
-    console.log(`⚙️ [Diff-PDF] Creating PDFParse instance...`);
-    const parser = new PDFParse({ data: dataBuffer });
-    
-    console.log(`📖 [Diff-PDF] Extracting text...`);
-    const result = await parser.getText();
-    
-    console.log(`🧹 [Diff-PDF] Cleaning up parser...`);
-    await parser.destroy();
-    
-    const text = result.text || "";
     console.log(`✅ [Diff-PDF] Extracted ${text.length} characters`);
     
     if (text.trim().length === 0) {
