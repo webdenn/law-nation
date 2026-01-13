@@ -16,6 +16,7 @@ const strongPasswordValidation = z
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
+  recaptchaToken: z.string().min(1, "reCAPTCHA verification is required"),
 });
 
 export const signupSchema = z.object({
@@ -23,6 +24,7 @@ export const signupSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: strongPasswordValidation,
   phone: z.string().optional(),
+  recaptchaToken: z.string().min(1, "reCAPTCHA verification is required"),
 });
 
 export const refreshSchema = z.object({

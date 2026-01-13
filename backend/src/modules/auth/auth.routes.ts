@@ -11,13 +11,14 @@ import {
   setupPasswordHandler,
 } from "./auth.controller.js";
 import { requireAuth } from "@/middlewares/auth.middleware.js";
+import { validateRecaptcha } from "@/middlewares/recaptcha.middleware.js";
 
 // /src/modules/auth/auth.routes.ts
 export const AuthRouter: Router = Router();
 
-AuthRouter.post("/signup", signupHandler);
-AuthRouter.post("/login", loginHandler);
-AuthRouter.post("/admin-login", adminLoginHandler);
+AuthRouter.post("/signup", validateRecaptcha, signupHandler);
+AuthRouter.post("/login", validateRecaptcha, loginHandler);
+AuthRouter.post("/admin-login", validateRecaptcha, adminLoginHandler);
 AuthRouter.post("/refresh", refreshHandler);
 AuthRouter.get("/me", requireAuth, meHandler);
 AuthRouter.post("/logout", logoutHandler);
