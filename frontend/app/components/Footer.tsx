@@ -1,118 +1,136 @@
-"use client"
-import React from "react"
+"use client";
+
+import React from "react";
 import Link from "next/link";
+import { 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Linkedin, 
+  Twitter, 
+  Instagram, 
+  Facebook, 
+  Scale, // Briefcase ki jagah Scale use kiya (Law icon)
+  BookOpen 
+} from "lucide-react";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-neutral-950 text-neutral-400 border-t border-neutral-800 font-sans">
-      <div className="max-w-7xl mx-auto px-6 lg:px-8 py-16">
+    <footer className="bg-white text-slate-600 font-sans pt-16 pb-8 border-t border-slate-200">
+      <div className="max-w-7xl mx-auto px-6">
         
-        {/* Top Section: Grid Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 lg:gap-8 mb-16">
+        {/* --- Top Section: Main Content --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-16">
           
-          {/* 1. Brand & Intro */}
-          <div className="lg:col-span-4 space-y-6">
-            <Link href="/" className="inline-block">
-              <h2 className="text-2xl font-bold text-white tracking-tighter">
-                LAW<span className="text-red-600">NATION</span>
-              </h2>
+          {/* Brand and Mission - 5 columns wide */}
+          <div className="lg:col-span-5 space-y-6">
+            <Link href="/" className="flex items-center gap-2 text-red-700 font-bold text-2xl">
+              <Scale size={28} />
+              <span>LAW<span className="text-slate-900">NATION</span></span>
             </Link>
-            <p className="text-sm leading-7 text-neutral-500 max-w-sm">
+            
+            <p className="text-[15px] leading-relaxed">
               Bridging the gap between legal scholarship and global practice. 
-              We provide open-access research, peer-reviewed journals, and a platform for legal innovation.
+              We provide <strong>open-access research, peer-reviewed journals</strong>, and a platform for legal innovation.
+              Connecting scholars, practitioners, and students to the future of law.
             </p>
             
-            {/* Social Icons */}
-            <div className="flex gap-4 pt-2">
-              <SocialLink href="#" label="Li" />
-              <SocialLink href="#" label="Tw" />
-              <SocialLink href="#" label="Fb" />
-            </div>
-          </div>
-
-          {/* 2. Quick Links */}
-          <div className="lg:col-span-2 lg:ml-auto">
-            <h3 className="text-white text-xs font-bold uppercase tracking-[0.2em] mb-6">Explore</h3>
-            <ul className="space-y-3 text-sm">
-              <FooterLink href="/home" text="Home" />
-              <FooterLink href="/about" text="About Us" />
-              <FooterLink href="/research-paper" text="Journals" />
-              <FooterLink href="/submit-paper" text="Submit Paper" />
-            </ul>
-          </div>
-
-          {/* 3. Resources */}
-          <div className="lg:col-span-2">
-            <h3 className="text-white text-xs font-bold uppercase tracking-[0.2em] mb-6">Legal</h3>
-            <ul className="space-y-3 text-sm">
-              <FooterLink href="#" text="Privacy Policy" />
-              <FooterLink href="#" text="Terms of Service" />
-              <FooterLink href="#" text="Cookie Policy" />
-              <FooterLink href="#" text="Editorial Board" />
-            </ul>
-          </div>
-
-          {/* 4. Newsletter */}
-          <div className="lg:col-span-4">
-            <h3 className="text-white text-xs font-bold uppercase tracking-[0.2em] mb-4">Stay Informed</h3>
-            <p className="text-xs text-neutral-500 mb-4">
-              Subscribe to our newsletter for the latest legal citations and updates.
+            <p className="text-[14px]">
+              <span className="font-bold text-slate-900">For Researchers:</span> From citations to publication, 
+              we offer industry-standard reviewing processes, DOI assignments, and global indexing 
+              to ensure your work reaches the right audience.
             </p>
-            <form className="flex flex-col sm:flex-row gap-2" onSubmit={(e) => e.preventDefault()}>
-              <input 
-                type="email" 
-                placeholder="email@example.com" 
-                className="w-full bg-neutral-900 border border-neutral-800 rounded px-4 py-2.5 text-sm text-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all placeholder:text-neutral-600"
-                required
-              />
-              <button className="bg-white hover:bg-neutral-200 text-black text-sm font-bold px-6 py-2.5 rounded transition duration-200">
-                Join
-              </button>
-            </form>
+            
+            <p className="italic text-red-700 font-medium">"Justice through Knowledge, Our Ultimate Mission."</p>
+          </div>
+
+          {/* Explore - 2 columns */}
+          <div className="lg:col-span-2">
+            <h3 className="text-slate-900 font-bold text-lg mb-6">Explore</h3>
+            <ul className="space-y-3 text-[15px]">
+              <li><Link href="/articles" className="hover:text-red-700 transition-colors">Browse Journals</Link></li>
+              <li><Link href="/latest" className="hover:text-red-700 transition-colors">Latest Articles</Link></li>
+              <li><Link href="/authors" className="hover:text-red-700 transition-colors">Top Authors</Link></li>
+              <li><Link href="/conferences" className="hover:text-red-700 transition-colors">Legal Conferences</Link></li>
+              <li><Link href="/case-studies" className="hover:text-red-700 transition-colors">Case Studies</Link></li>
+            </ul>
+          </div>
+
+          {/* Submission - 3 columns */}
+          <div className="lg:col-span-3">
+            <h3 className="text-slate-900 font-bold text-lg mb-6">For Authors</h3>
+            <ul className="space-y-3 text-[15px]">
+              <li><Link href="/submit-paper" className="hover:text-red-700 transition-colors">Submit Your Paper</Link></li>
+              <li><Link href="/guidelines" className="hover:text-red-700 transition-colors">Submission Guidelines</Link></li>
+              <li><Link href="/peer-review" className="hover:text-red-700 transition-colors">Peer Review Process</Link></li>
+              <li><Link href="/indexing" className="hover:text-red-700 transition-colors">Indexing & Impact</Link></li>
+              <li><Link href="/ethics" className="hover:text-red-700 transition-colors">Publication Ethics</Link></li>
+              <li><Link href="/track" className="hover:text-red-700 transition-colors">Track Manuscript</Link></li>
+            </ul>
+          </div>
+
+          {/* Quick Support - 2 columns */}
+          <div className="lg:col-span-2">
+             <h3 className="text-slate-900 font-bold text-lg mb-6">Support</h3>
+             <ul className="space-y-3 text-[15px]">
+              <li><Link href="/help" className="hover:text-red-700">Help Center</Link></li>
+              <li><Link href="/editorial-board" className="hover:text-red-700">Editorial Board</Link></li>
+              <li><Link href="/privacy" className="hover:text-red-700">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="hover:text-red-700">Terms of Service</Link></li>
+            </ul>
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="pt-8 border-t border-neutral-900 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-center text-xs text-neutral-600">
-            <p>© {currentYear} Law Nation. All rights reserved.</p>
-            <span className="hidden md:inline text-neutral-800">|</span>
-            <p>ISSN: 2025-4890</p>
+        {/* --- Contact & Socials --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 py-12 border-t border-slate-100">
+          <div>
+            <h3 className="text-slate-900 font-bold text-lg mb-6">Contact Us</h3>
+            <div className="space-y-4 text-[15px]">
+              <div className="flex items-center gap-3">
+                <Mail size={18} className="text-red-700" />
+                <a href="mailto:support@lawnation.com" className="hover:underline">support@lawnation.com</a>
+              </div>
+              <div className="flex items-center gap-3">
+                <Phone size={18} className="text-red-700" />
+                <span>+91 9876 543 210</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <MapPin size={18} className="text-red-700 mt-1 shrink-0" />
+                <span>Supreme Court Lane, New Delhi - 110001</span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-900 border border-neutral-800">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-400">System Operational</span>
+          <div className="md:text-right">
+            <h3 className="text-slate-900 font-bold text-lg mb-6 md:pr-2">Connect With Us</h3>
+            <div className="flex md:justify-end gap-3 mb-6">
+              {[Linkedin, Twitter, Instagram, Facebook].map((Icon, idx) => (
+                <a key={idx} href="#" className="p-3 border border-slate-200 rounded-lg text-slate-600 hover:text-red-700 hover:border-red-700 transition-all">
+                  <Icon size={20} />
+                </a>
+              ))}
+            </div>
+            <p className="text-sm">
+              Indexing partner with <span className="text-red-700 font-semibold">Google Scholar & Scopus</span>
+            </p>
           </div>
+        </div>
+
+        {/* --- Legal Keywords SEO Tag Cloud --- */}
+        <div className="bg-slate-50 p-8 rounded-xl mt-8 border border-slate-100">
+          <p className="text-[12px] leading-relaxed text-slate-400 text-center uppercase tracking-tight">
+            <span className="font-bold text-slate-600">Popular Research Topics:</span> Constitutional Law | Criminal Justice | Human Rights | International Law | Corporate Governance | Intellectual Property Rights | Cyber Law | Family Law | Environmental Law | Torts | Contract Law | Jurisprudence | Legal History | Administrative Law | Labor Laws | Arbitration & Conciliation | Evidence Act | IPC Section Analysis | Supreme Court Judgments | High Court Rulings | Legal Aid | Women & Law | Child Rights | Maritime Law | Space Law | Artificial Intelligence in Law | Data Privacy | GDPR Compliance | White Collar Crimes | Taxation Law | GST Implications | Insolvency and Bankruptcy | Medical Negligence | Consumer Protection | Competition Law | Mergers & Acquisitions | Public Interest Litigation (PIL) | Legal Education | Bar Council Updates | Moot Court Memorials | Legal Internships
+          </p>
+        </div>
+
+        {/* --- Final Copyright --- */}
+        <div className="mt-8 pt-8 border-t border-slate-100 text-center text-sm text-slate-400 flex flex-col sm:flex-row justify-between items-center">
+          <p>© {currentYear} Law Nation. All rights reserved.</p>
+          <p>ISSN: 2025-4890 • Impact Factor: 4.5</p>
         </div>
       </div>
     </footer>
   );
-}
-
-// ✅ FIX: Added types for TypeScript (Red lines will go away)
-function FooterLink({ href, text }: { href: string; text: string }) {
-  return (
-    <li>
-      <Link href={href} className="hover:text-white transition-colors duration-200">
-        {text}
-      </Link>
-    </li>
-  );
-}
-
-function SocialLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link 
-      href={href} 
-      className="w-8 h-8 rounded bg-neutral-900 border border-neutral-800 flex items-center justify-center text-xs font-bold text-neutral-400 hover:bg-white hover:text-black hover:border-white transition-all duration-300"
-    >
-      {label}
-    </Link>
-  );
-}
+};

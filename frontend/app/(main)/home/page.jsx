@@ -20,28 +20,29 @@ export default function HomePage() {
   const { user } = useSelector((state) => state.auth);
 
   // 2. Protected Read Logic
-const handleProtectedRead = (item) => {
-  const slug = item.slug;
-  if (slug) {
-    // ✅ Absolute path: /article/slug-name
-    router.push(`/article/${slug}`); 
-  } else {
-    // Fallback agar slug na ho (Purane articles ke liye)
-    router.push(`/article/${item._id || item.id}`);
-  }
-};
+  const handleProtectedRead = (item) => {
+    const slug = item.slug;
+    if (slug) {
+      // ✅ Absolute path: /article/slug-name
+      router.push(`/article/${slug}`);
+    } else {
+      // Fallback agar slug na ho (Purane articles ke liye)
+      router.push(`/article/${item._id || item.id}`);
+    }
+  };
 
   // 2. Updated useEffect
   // Isse useEffect ke upar (BAHAR) rakho taaki Search button bhi ise use kar sake
   // Purane fetchArticles ki jagah ye naya wala paste karein
- // 2. Updated fetchArticles Function
+  // 2. Updated fetchArticles Function
   // Is code ko purane fetchArticles ki jagah replace karein
-// 2. Updated fetchArticles Function (Replace Old One)
+  // 2. Updated fetchArticles Function (Replace Old One)
   const fetchArticles = async (searchQuery = "", currentFilters = {}) => {
     setIsLoading(true);
 
     // Check agar koi bhi search active hai
-    const hasSearch = searchQuery.trim() || currentFilters.keywords || currentFilters.authors;
+    const hasSearch =
+      searchQuery.trim() || currentFilters.keywords || currentFilters.authors;
     if (hasSearch) setIsSearching(true);
 
     try {
@@ -53,16 +54,19 @@ const handleProtectedRead = (item) => {
         // LOGIC: Backend ko 'q' chahiye hota hai search ke liye.
         // Agar Main Search (searchQuery) khali hai, toh hum Author ya Keyword ko hi 'q' bana kar bhejenge
         // taaki backend ka "Text Match" fail na ho.
-        const fallbackQuery = currentFilters.authors || currentFilters.keywords || "all";
+        const fallbackQuery =
+          currentFilters.authors || currentFilters.keywords || "all";
         params.append("q", searchQuery.trim() || fallbackQuery);
 
         // Advance Filters pass karein
-        if (currentFilters.keywords) params.append("keyword", currentFilters.keywords);
-        if (currentFilters.authors) params.append("author", currentFilters.authors);
-        
+        if (currentFilters.keywords)
+          params.append("keyword", currentFilters.keywords);
+        if (currentFilters.authors)
+          params.append("author", currentFilters.authors);
+
         // Agar Category filter hai
         if (currentFilters.category && currentFilters.category !== "all") {
-             params.append("category", currentFilters.category);
+          params.append("category", currentFilters.category);
         }
 
         url = `${API_BASE_URL}/api/articles/search?${params.toString()}`;
@@ -75,14 +79,14 @@ const handleProtectedRead = (item) => {
 
       const res = await fetch(url);
       const data = await res.json();
-      
+
       const list = data.results || data.articles || [];
-      setPublishedArticles(list);
+      // ✅ Sirf top 9 articles lo
+      setPublishedArticles(list.slice(0, 9));
 
       if (hasSearch && list.length === 0) {
         toast.info("No articles found.");
       }
-
     } catch (error) {
       console.error("Fetch error:", error);
       toast.error("Failed to load articles");
@@ -361,7 +365,7 @@ const handleProtectedRead = (item) => {
           <div className="mb-12">
             {/* text-center se headline beech mein aa jayegi, agar left mein chahiye toh text-center hata dena */}
             <h2 className="text-4xl font-bold text-black leading-tight text-center">
-              All <span className="text-gray-900">Articles</span>
+              Top <span className="text-gray-900">Articles</span>
             </h2>
           </div>
 
@@ -376,20 +380,25 @@ const handleProtectedRead = (item) => {
                   key={item.slug || item.id}
                   className="bg-white border border-gray-200 rounded-lg p-8 flex flex-col h-full overflow-hidden"
                 >
-
-                 {item.thumbnailUrl && item.thumbnailUrl !== "null" && item.thumbnailUrl !== "undefined" && (
-                    <div className="w-full h-48 mb-6 rounded-md overflow-hidden bg-gray-100">
-                      <img 
-                        src={item.thumbnailUrl.startsWith("http") ? item.thumbnailUrl : `${API_BASE_URL}${item.thumbnailUrl}`} 
-                        alt={item.title}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          // Agar image load fail ho jaye, toh parent div ko hi gayab kar do
-                          e.target.parentElement.style.display = 'none';
-                        }} 
-                      />
-                    </div>
-                  )}
+                  {item.thumbnailUrl &&
+                    item.thumbnailUrl !== "null" &&
+                    item.thumbnailUrl !== "undefined" && (
+                      <div className="w-full h-48 mb-6 rounded-md overflow-hidden bg-gray-100">
+                        <img
+                          src={
+                            item.thumbnailUrl.startsWith("http")
+                              ? item.thumbnailUrl
+                              : `${API_BASE_URL}${item.thumbnailUrl}`
+                          }
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Agar image load fail ho jaye, toh parent div ko hi gayab kar do
+                            e.target.parentElement.style.display = "none";
+                          }}
+                        />
+                      </div>
+                    )}
 
                   <div className="space-y-4">
                     {/* Title - Black, breaks long words, moves to next line */}
@@ -424,6 +433,13 @@ const handleProtectedRead = (item) => {
                 No articles published yet.
               </p>
             )}
+          </div>
+          <div className="mt-16 text-center">
+            <Link href="/articles">
+              <button className="bg-red-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-gray-800 transition">
+                View All Articles Library
+              </button>
+            </Link>
           </div>
         </div>
       </section>

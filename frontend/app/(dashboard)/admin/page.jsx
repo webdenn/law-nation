@@ -1340,32 +1340,33 @@ export default function AdminDashboard() {
   const [changeHistory, setChangeHistory] = useState([]);
   // History fetch karne ka function
   const fetchChangeHistory = async (articleId) => {
-    try {
-      const token = localStorage.getItem("adminToken");
-      const res = await fetch(
-        `${API_BASE_URL}/api/articles/${articleId}/change-history`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setChangeHistory(data.changeLogs || []);
-        // ✅ Backend se aane wali editorDocumentUrl ko state mein inject karein
-        if (
-          data.article?.editorDocumentUrl &&
-          selectedArticle?.editorDocumentUrl !== data.article.editorDocumentUrl
-        ) {
-          setSelectedArticle((prev) => ({
-            ...prev,
-            editorDocumentUrl: data.article.editorDocumentUrl,
-          }));
-        }
+  try {
+    const token = localStorage.getItem("adminToken");
+    const cb = Date.now(); // Unique timestamp
+    const res = await fetch(
+      `${API_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`, 
+      {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache"
+        },
       }
-    } catch (err) {
-      console.error("Failed to fetch history", err);
+    );
+    if (res.ok) {
+      const data = await res.json();
+      setChangeHistory(data.changeLogs || []);
+      if (data.article?.editorDocumentUrl && selectedArticle?.editorDocumentUrl !== data.article.editorDocumentUrl) {
+        setSelectedArticle((prev) => ({
+          ...prev,
+          editorDocumentUrl: data.article.editorDocumentUrl,
+        }));
+      }
     }
-  };
+  } catch (err) {
+    console.error("Failed to fetch history", err);
+  }
+};
   const handleDownloadAdminReport = async (changeLogId, type, format = "pdf") => {
     try {
       const token = localStorage.getItem("adminToken");
@@ -1456,41 +1457,43 @@ export default function AdminDashboard() {
   // PDF URL Fix Logic (Isse "PDF Not Found" khatam ho jayega)
   console.log("Admin Dashboard Data Row:", selectedArticle);
   const getPdfUrlToView = () => {
-    if (!selectedArticle) return null;
-    let path = "";
-    if (pdfViewMode === "original") path = selectedArticle.originalPdfUrl;
-    else if (pdfViewMode === "current") path = selectedArticle.currentPdfUrl;
-    else if (pdfViewMode === "track") path = selectedArticle.editorDocumentUrl; // ✅ Latest logic
-    if (!path) return null;
-    return path.startsWith("http")
-      ? path
-      : `${API_BASE_URL}/${path.replace(/^\//, "")}`;
-  };
+  if (!selectedArticle) return null;
+  let path = "";
+  if (pdfViewMode === "original") path = selectedArticle.originalPdfUrl;
+  else if (pdfViewMode === "current") path = selectedArticle.currentPdfUrl;
+  else if (pdfViewMode === "track") path = selectedArticle.editorDocumentUrl;
+  
+  if (!path) return null;
+  
+  const cleanPath = path.startsWith("http")
+    ? path
+    : `${API_BASE_URL}/${path.replace(/^\//, "")}`;
+
+  // Add timestamp to prevent PDF caching
+  return `${cleanPath}?cb=${Date.now()}`;
+};
   // ✅ FETCH DATA (Articles + Editors)
   // --- REPLACE YOUR OLD useEffect WITH THIS ---
   useEffect(() => {
-    if (!isAuthorized) return;
-    const fetchDashboardData = async () => {
-      try {
-        const token = localStorage.getItem("adminToken");
-        console.log("Admin Token:", token);
-        const headers = { Authorization: `Bearer ${token}` };
-        // 🔥 Promise.all se 5 API ek saath call hongi (Super Fast)
-        const [summaryRes, metricsRes, statusRes, timelineRes, editorsRes] =
-          await Promise.all([
-            fetch(`${API_BASE_URL}/api/admin/dashboard/summary`, { headers }),
-            fetch(`${API_BASE_URL}/api/admin/dashboard/time-metrics`, {
-              headers,
-            }),
-            fetch(`${API_BASE_URL}/api/admin/dashboard/status-distribution`, {
-              headers,
-            }),
-            fetch(
-              `${API_BASE_URL}/api/admin/dashboard/articles-timeline?limit=50`,
-              { headers }
-            ), // Last 50 articles
-            fetch(`${API_BASE_URL}/api/users/editors`, { headers }),
-          ]);
+   if (!isAuthorized) return;
+  const fetchDashboardData = async () => {
+    try {
+      const token = localStorage.getItem("adminToken");
+      const cb = Date.now(); // Cache breaker
+      const headers = { 
+        Authorization: `Bearer ${token}`,
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache"
+      };
+
+      const [summaryRes, metricsRes, statusRes, timelineRes, editorsRes] =
+        await Promise.all([
+          fetch(`${API_BASE_URL}/api/admin/dashboard/summary?cb=${cb}`, { headers }),
+          fetch(`${API_BASE_URL}/api/admin/dashboard/time-metrics?cb=${cb}`, { headers }),
+          fetch(`${API_BASE_URL}/api/admin/dashboard/status-distribution?cb=${cb}`, { headers }),
+          fetch(`${API_BASE_URL}/api/admin/dashboard/articles-timeline?limit=50&cb=${cb}`, { headers }),
+          fetch(`${API_BASE_URL}/api/users/editors?cb=${cb}`, { headers }),
+        ]);
         // 1. Summary Data Set Karna
         if (summaryRes.ok) {
           const data = await summaryRes.json();

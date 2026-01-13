@@ -317,7 +317,9 @@ export default function SubmitPaperPage() {
         throw new Error(result.message || "Verification failed");
       }
 
-      toast.success("Email verified successfully 🎉");
+      // ✅ Change: Toast hata diya aur Modal True kar diya
+      setShowSuccessModal(true); 
+      
       setShowVerification(false);
       setOtp("");
       setPendingArticleId(null);

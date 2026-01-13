@@ -144,36 +144,47 @@ export default function EditorDashboard() {
 
   const [visualDiffBlobUrl, setVisualDiffBlobUrl] = useState(null);
 
-  const handleViewVisualDiff = async (changeLogId) => {
-    try {
-      toast.info("Generating Visual Diff...");
-      const token = localStorage.getItem("editorToken");
-      const articleId = selectedArticle.id || selectedArticle._id;
+ const handleViewVisualDiff = async (changeLogId) => {
+  try {
+    toast.info("Generating Visual Diff...");
+    const token = localStorage.getItem("editorToken");
+    const articleId = selectedArticle.id || selectedArticle._id;
+    
+    const res = await fetch(`${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/visual-diff`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      const res = await fetch(
-        `${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/visual-diff`,
-        {
-          method: "GET",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+    // ✅ FIX: Check content type before processing response
+    const contentType = res.headers.get('content-type');
+    
+    if (!res.ok) {
+      // Handle error responses (JSON)
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to generate visual diff");
+      } else {
+        throw new Error("Failed to load visual diff");
+      }
+    }
 
-      if (!res.ok) throw new Error("Failed to load visual diff");
-
-      // Backend se PDF blob aayega
+    // ✅ FIX: Ensure we got a PDF response
+    if (contentType && contentType.includes('application/pdf')) {
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
-
-      setVisualDiffBlobUrl(url); // URL save karo
-      setPdfViewMode("visual-diff"); // View mode badlo
-
-      // Mobile menu band karo agar khula hai
+      setVisualDiffBlobUrl(url);
+      setPdfViewMode("visual-diff");
+      
       if (isMobileMenuOpen) setIsMobileMenuOpen(false);
-    } catch (err) {
-      console.error(err);
-      toast.error("Could not load visual diff.");
+    } else {
+      throw new Error("Expected PDF but received different content type");
     }
-  };
+    
+  } catch (err) {
+    console.error("Visual Diff Error:", err);
+    toast.error(err.message || "Could not load visual diff.");
+  }
+};
 
   // 📊 Chart Data Calculations
   const totalTasks = articles.length || 0;
@@ -223,10 +234,15 @@ export default function EditorDashboard() {
   const fetchAssignedArticles = async (editorId, token) => {
     try {
       setIsLoading(true);
+      const cb = Date.now(); // Cache breaker
       const res = await fetch(
-        `${API_BASE_URL}/api/articles?assignedEditorId=${editorId}`,
+        `${API_BASE_URL}/api/articles?assignedEditorId=${editorId}&cb=${cb}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+          },
         }
       );
 
@@ -250,17 +266,21 @@ export default function EditorDashboard() {
   const fetchChangeHistory = async (articleId) => {
     try {
       const token = localStorage.getItem("editorToken");
+      const cb = Date.now(); // Cache breaker
       const res = await fetch(
-        `${API_BASE_URL}/api/articles/${articleId}/change-history`,
+        `${API_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+          },
         }
       );
       if (res.ok) {
         const data = await res.json();
         setChangeHistory(data.changeLogs || []);
 
-        // ✅ Loop Fix: Pehle check karo ki kya backend se naya URL aaya hai
         if (
           data.article?.editorDocumentUrl &&
           selectedArticle?.editorDocumentUrl !== data.article.editorDocumentUrl
@@ -472,10 +492,9 @@ export default function EditorDashboard() {
 
   // --- Update getPdfUrlToView Function ---
   // ✅ STEP 2: REPLACE THIS FUNCTION (Pura function replace karo)
-  const getPdfUrlToView = () => {
+ const getPdfUrlToView = () => {
     if (!selectedArticle) return "";
 
-    // Naya mode handle karo
     if (pdfViewMode === "visual-diff") {
       return visualDiffBlobUrl;
     }
@@ -491,9 +510,12 @@ export default function EditorDashboard() {
 
     if (!path) return "";
 
-    return path.startsWith("http")
+    const cleanUrl = path.startsWith("http")
       ? path
       : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+    
+    // Append timestamp to ensure fresh PDF download/view
+    return `${cleanUrl}?cb=${Date.now()}`;
   };
 
   if (!isAuthorized)
