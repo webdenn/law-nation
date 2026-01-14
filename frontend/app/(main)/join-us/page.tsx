@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import ReCAPTCHA from "react-google-recaptcha";
 
 export default function JoinUsPage() {
   const router = useRouter()
@@ -21,6 +22,7 @@ export default function JoinUsPage() {
   // OTP States
   const [otp, setOtp] = useState("") 
   const [isOtpSent, setIsOtpSent] = useState(false) 
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   // UI States
   const [showPassword, setShowPassword] = useState(false)
@@ -74,8 +76,16 @@ export default function JoinUsPage() {
   }
 
   // ✅ STEP 2: Verify OTP & Signup Logic
+ // ✅ STEP 2: Verify OTP & Signup Logic (UPDATED CODE)
   const handleVerifyAndSignup = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // 1. Check if Captcha is completed
+    if (!captchaToken) { 
+        toast.error("Please complete the reCAPTCHA challenge", { position: "top-right", theme: "colored" }); 
+        return; 
+    }
+
     if (!otp) { toast.error("Please enter the OTP"); return; }
 
     setIsLoading(true)
@@ -96,11 +106,13 @@ export default function JoinUsPage() {
       }
 
       // 2. Agar OTP sahi hai -> Call Signup
+      // 🔥 CHANGE HERE: Added recaptchaToken to payload
       const payload = {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        phone: formData.phone
+        phone: formData.phone,
+        recaptchaToken: captchaToken // Backend ko ye token chahiye
       }
       
       const signupResponse = await fetch("http://localhost:4000/api/auth/signup", {
@@ -334,6 +346,14 @@ export default function JoinUsPage() {
                     )}
                   </button>
                 </div>
+              </div>
+
+                  <div className="mb-4">
+                <ReCAPTCHA
+                  // || "" add karna hai taki undefined na jaye
+                  sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ""}
+                  onChange={(token) => setCaptchaToken(token)}
+                />
               </div>
 
               {/* OTP Input Field */}

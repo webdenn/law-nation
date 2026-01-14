@@ -1474,43 +1474,57 @@ export default function AdminDashboard() {
 };
   // ✅ FETCH DATA (Articles + Editors)
   // --- REPLACE YOUR OLD useEffect WITH THIS ---
-  useEffect(() => {
-   if (!isAuthorized) return;
-  const fetchDashboardData = async () => {
-    try {
-      const token = localStorage.getItem("adminToken");
-      const cb = Date.now(); // Cache breaker
-      const headers = { 
-        Authorization: `Bearer ${token}`,
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Pragma": "no-cache"
-      };
+// ✅ 1. Pehle Function Define karo (Order Fix)
+  const mapBackendStatus = (status) => {
+    if (status === "PENDING_ADMIN_REVIEW") return "Pending";
+    if (status === "APPROVED") return "Published";
+    if (status === "PUBLISHED") return "Published";
+    if (status === "ASSIGNED_TO_EDITOR") return "In Review";
+    return status;
+  };
 
-      const [summaryRes, metricsRes, statusRes, timelineRes, editorsRes] =
-        await Promise.all([
-          fetch(`${API_BASE_URL}/api/admin/dashboard/summary?cb=${cb}`, { headers }),
-          fetch(`${API_BASE_URL}/api/admin/dashboard/time-metrics?cb=${cb}`, { headers }),
-          fetch(`${API_BASE_URL}/api/admin/dashboard/status-distribution?cb=${cb}`, { headers }),
-          fetch(`${API_BASE_URL}/api/admin/dashboard/articles-timeline?limit=50&cb=${cb}`, { headers }),
-          fetch(`${API_BASE_URL}/api/users/editors?cb=${cb}`, { headers }),
-        ]);
-        // 1. Summary Data Set Karna
+  // ✅ 2. Phir useEffect lagao (Data Fetching)
+  useEffect(() => {
+    if (!isAuthorized) return;
+
+    const fetchDashboardData = async () => {
+      try {
+        const token = localStorage.getItem("adminToken");
+        // 🔥 Caching Fix: Timestamp add kiya
+        const cb = Date.now(); 
+        const headers = { 
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache"
+        };
+
+        const [summaryRes, metricsRes, statusRes, timelineRes, editorsRes] =
+          await Promise.all([
+            fetch(`${API_BASE_URL}/api/admin/dashboard/summary?cb=${cb}`, { headers }),
+            fetch(`${API_BASE_URL}/api/admin/dashboard/time-metrics?cb=${cb}`, { headers }),
+            fetch(`${API_BASE_URL}/api/admin/dashboard/status-distribution?cb=${cb}`, { headers }),
+            fetch(`${API_BASE_URL}/api/admin/dashboard/articles-timeline?limit=50&cb=${cb}`, { headers }),
+            fetch(`${API_BASE_URL}/api/users/editors?cb=${cb}`, { headers }),
+          ]);
+
+        // 1. Summary Data
         if (summaryRes.ok) {
           const data = await summaryRes.json();
           setStats(data.summary);
         }
-        // 2. Time Metrics Set Karna
+
+        // 2. Time Metrics
         if (metricsRes.ok) {
           const data = await metricsRes.json();
           setTimeMetrics(data.metrics);
         }
-        // 3. Charts Data Set Karna
-        // ✅ Naya Logic: Sirf API se aane wale 2 fields dikhayega
+
+        // 3. Charts Data
         if (statusRes.ok) {
           const data = await statusRes.json();
           const counts = data.distribution?.statusCounts || {};
           const percs = data.distribution?.percentages || {};
-          // Pie chart ke liye sirf real data mapping
+          
           const chartData = [
             {
               label: "Pending",
@@ -1527,34 +1541,34 @@ export default function AdminDashboard() {
           ];
           setStatusDist(chartData);
         }
-        // 4. Table Data Set Karna (Helper function mapBackendStatus use karega)
+
+        // 4. Table Data
         if (timelineRes.ok) {
           const data = await timelineRes.json();
           const rawArticles = data.articles || [];
-          // ✅ Correct mapping for Admin
-          // ✅ Correct Mapping according to Backend Service
+          
           const formatted = rawArticles.map((item) => ({
             id: item._id || item.id,
             title: item.title,
             author: item.authorName || "Unknown",
-            status: mapBackendStatus(item.status),
-            // ✅ Backend se 'assignedEditor' object aata hai, humein uski ID chahiye dropdown ke liye
-assignedTo: item.assignedEditor?.id || item.assignedEditorId || "",
-            date: new Date(item.createdAt).toLocaleDateString("en-GB"),
+            status: mapBackendStatus(item.status), // ✅ Ab ye sahi chalega
+            assignedTo: item.assignedEditor?.id || item.assignedEditorId || "",
+           // ✅ Is line ko dhundo aur replace karo:
+date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "Just Now",
             abstract: item.abstract,
-            // 🔥 Backend fields names are exactly these:
             originalPdfUrl: item.originalPdfUrl,
             currentPdfUrl: item.currentPdfUrl,
-            pdfUrl: item.currentPdfUrl || item.originalPdfUrl, // Fallback
+            pdfUrl: item.currentPdfUrl || item.originalPdfUrl,
           }));
           setArticles(formatted);
-          setArticles(formatted);
         }
-        // 5. Editors List Set Karna
+
+        // 5. Editors List
         if (editorsRes.ok) {
           const data = await editorsRes.json();
           setEditors(Array.isArray(data) ? data : data.editors || []);
         }
+
       } catch (error) {
         console.error("Dashboard Load Error:", error);
         toast.error("Failed to load dashboard statistics.");
@@ -1562,28 +1576,24 @@ assignedTo: item.assignedEditor?.id || item.assignedEditorId || "",
         setIsLoading(false);
       }
     };
+
     fetchDashboardData();
   }, [isAuthorized]);
-  const mapBackendStatus = (status) => {
-    if (status === "PENDING_ADMIN_REVIEW") return "Pending";
-    if (status === "APPROVED") return "Published";
-    if (status === "PUBLISHED") return "Published";
-    if (status === "ASSIGNED_TO_EDITOR") return "In Review";
-    return status;
-  };
+ 
   const handlePdfClick = (relativeUrl) => {
     if (!relativeUrl) {
       toast.warning("PDF not found");
       return;
     }
-    // ✅ Fix: Check karo ki URL '/' se shuru ho raha hai ya nahi
-    // Agar relativeUrl "uploads/pdfs/..." hai, toh ye use "/uploads/pdfs/..." bana dega
+    
     const cleanPath = relativeUrl.startsWith("/")
       ? relativeUrl
       : `/${relativeUrl}`;
-    // ✅ Ab URL hamesha sahi banega: http://localhost:4000/uploads/pdfs/...
-    const fullUrl = `${API_BASE_URL}${cleanPath}`;
-    console.log("Opening Corrected URL:", fullUrl); // Browser console me check karne ke liye
+
+    // 🔥 CHANGE: ?t=${Date.now()} add kiya taaki browser naya version maange
+    const fullUrl = `${API_BASE_URL}${cleanPath}?t=${Date.now()}`;
+
+    console.log("Opening Fresh URL:", fullUrl); 
     window.open(fullUrl, "_blank");
   };
   // Search & Filter
@@ -2277,6 +2287,7 @@ assignedTo: item.assignedEditor?.id || item.assignedEditorId || "",
               {/* ✅ Sirf tabhi iframe dikhao jab URL available ho */}
               {getPdfUrlToView() ? (
                 <iframe
+                key={getPdfUrlToView()}
                   src={getPdfUrlToView()}
                   className="flex-1 w-full"
                   title="Admin Viewer"

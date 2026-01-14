@@ -3,6 +3,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { toast, ToastContainer } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
+import ReCAPTCHA from "react-google-recaptcha";
 
 export default function Adminlogin() {
   const router = useRouter()
@@ -25,6 +26,10 @@ export default function Adminlogin() {
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
+  // ... baaki states ke saath ye line add kar do:
+const [captchaToken, setCaptchaToken] = useState(null);
+  
+  
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -58,15 +63,27 @@ export default function Adminlogin() {
       return
     }
 
+    // ✅ FIX 1: Captcha check add kiya
+    if (!captchaToken) {
+        toast.error("Please complete the reCAPTCHA challenge");
+        return;
+    }
+
     setIsLoading(true)
 
     try {
       const API_URL = "http://localhost:4000/api"
       
+      // ✅ FIX 2: Naya payload banaya jisme token bhi hai
+      const payload = {
+          ...formData,               // email & password
+          recaptchaToken: captchaToken // 🔥 Backend ye dhoond raha hai
+      }
+
       const response = await fetch(`${API_URL}/auth/admin-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload), // formData ki jagah payload bheja
       })
 
       const data = await response.json()
@@ -75,12 +92,10 @@ export default function Adminlogin() {
         throw new Error(data.message || "Login failed")
       }
 
-      // ✅ FIX 2: Login se pehle purana kachra saaf karein
       localStorage.clear(); 
       toast.success("Login Successful!")
       
       const userRoles = data.user.roles || []
-      // Roles check karne ka sahi tareeka
       const isEditor = userRoles.some(role => 
         (role.name?.toLowerCase() === "editor") || 
         (role.role?.name?.toLowerCase() === "editor")
@@ -157,6 +172,17 @@ export default function Adminlogin() {
                   </button>
                 </div>
               </div>
+
+
+
+                <div className="mb-4">
+                              <ReCAPTCHA
+                                // || "" add karna hai taki undefined na jaye
+                                sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ""}
+                                onChange={(token) => setCaptchaToken(token)}
+                              />
+                            </div>
+
 
               <button
                 type="submit"

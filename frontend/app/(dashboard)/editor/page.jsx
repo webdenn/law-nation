@@ -204,33 +204,7 @@ export default function EditorDashboard() {
     role: "Editor",
   });
 
-  useEffect(() => {
-    const token = localStorage.getItem("editorToken");
-    const adminToken = localStorage.getItem("adminToken");
-    const userData = localStorage.getItem("editorUser");
-
-    if (token && userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setProfile((prev) => ({ ...prev, ...parsedUser }));
-        fetchAssignedArticles(parsedUser.id || parsedUser._id, token);
-        setIsAuthorized(true);
-        return;
-      } catch (e) {
-        console.error("Error", e);
-      }
-    }
-
-    if (adminToken) {
-      router.push("/admin");
-      return;
-    }
-
-    if (!token) {
-      router.push("/management-login");
-    }
-  }, [router]);
-
+  
   const fetchAssignedArticles = async (editorId, token) => {
     try {
       setIsLoading(true);
@@ -260,6 +234,36 @@ export default function EditorDashboard() {
       setIsLoading(false);
     }
   };
+
+
+
+  useEffect(() => {
+    const token = localStorage.getItem("editorToken");
+    const adminToken = localStorage.getItem("adminToken");
+    const userData = localStorage.getItem("editorUser");
+
+    if (token && userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        setProfile((prev) => ({ ...prev, ...parsedUser }));
+        fetchAssignedArticles(parsedUser.id || parsedUser._id, token);
+        setIsAuthorized(true);
+        return;
+      } catch (e) {
+        console.error("Error", e);
+      }
+    }
+
+    if (adminToken) {
+      router.push("/admin");
+      return;
+    }
+
+    if (!token) {
+      router.push("/management-login");
+    }
+  }, [router]);
+
 
   // ... existing fetchAssignedArticles function ...
 
