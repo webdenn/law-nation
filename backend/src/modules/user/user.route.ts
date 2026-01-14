@@ -5,6 +5,8 @@ import { requirePermission } from "@/middlewares/require-premission.middleware.j
 // src/modules/user/user.routes.ts
 export const UserRouter: Router = Router();
 
+
+
 /**
  * User Routes
  *
@@ -25,6 +27,14 @@ UserRouter.post(
   "/invite-editor",
   requirePermission("user", "write"),
   UserController.inviteEditorHandler
+);
+
+// ✅ 1. Editors List (YE NAYA ROUTE YAHAN ADD KARO)
+// Isko hamesha '/:id' se pehle rakhna
+UserRouter.get(
+  "/editors",
+  requirePermission("user", "read"), // Permission same rakhi hai
+  UserController.listEditorsHandler
 );
 
 // List all users

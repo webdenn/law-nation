@@ -14,7 +14,7 @@ import {
 } from "./validators/auth.validator.js";
 import { UnauthorizedError } from "@/utils/http-errors.util.js";
 
-// /src/controllers/auth.controller.ts
+// --- SIGNUP HANDLER (Naya Registration) ---
 export async function signupHandler(
   req: Request,
   res: Response,
@@ -33,6 +33,7 @@ export async function signupHandler(
   }
 }
 
+// --- LOGIN HANDLER (Signin) ---
 export async function loginHandler(
   req: Request,
   res: Response,
@@ -64,10 +65,13 @@ export async function adminLoginHandler(
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: z.treeifyError(err) });
     }
+
+    
     next(err);
   }
 }
 
+// --- REFRESH HANDLER ---
 export async function refreshHandler(
   req: Request,
   res: Response,
@@ -86,6 +90,7 @@ export async function refreshHandler(
   }
 }
 
+// --- LOGOUT HANDLER ---
 export async function logoutHandler(
   req: Request,
   res: Response,
@@ -104,6 +109,7 @@ export async function logoutHandler(
   }
 }
 
+// --- ME HANDLER (Current User) ---
 export async function meHandler(
   req: AuthRequest,
   res: Response,
