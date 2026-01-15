@@ -17,6 +17,16 @@ import type {
   UploadCorrectedPdfData,
 } from "./types/article-submission.type.js";
 
+
+function getStringParam(param: string | string[] | undefined, paramName: string): string {
+  if (!param) {
+    throw new BadRequestError(`${paramName} is required`);
+  }
+  if (Array.isArray(param)) {
+    throw new BadRequestError(`Invalid ${paramName} format`);
+  }
+  return param;
+}
 export class ArticleController {
   // Article submission (works for both guest and logged-in users)
   async submitArticle(req: AuthRequest, res: Response, next: NextFunction) {
@@ -65,11 +75,7 @@ export class ArticleController {
   // Verify email and create article (public endpoint)
   async verifyArticleSubmission(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { token } = req.params;
-
-      if (!token) {
-        throw new BadRequestError("Verification token is required");
-      }
+      const token = getStringParam(req.params.token, "Verification token");
 
       // Verify token and create article in database
       await articleService.confirmArticleSubmission(token);
@@ -133,10 +139,7 @@ export class ArticleController {
   // Admin assigns editor
   async assignEditor(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       // Validate request body
       const validatedData = assignEditorSchema.parse(req.body);
@@ -161,10 +164,7 @@ export class ArticleController {
   // Editor or Admin approves article (Option A)
   async approveArticle(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       const userId = req.user!.id;
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
@@ -200,10 +200,7 @@ export class ArticleController {
   // Editor uploads corrected PDF (Option C - Step 1)
   async uploadCorrectedPdf(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       const editorId = req.user!.id;
 
@@ -247,10 +244,7 @@ export class ArticleController {
   // Get article preview (public - no auth required)
   async getArticlePreview(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       const article = await articleService.getArticlePreview(articleId);
 
@@ -266,10 +260,7 @@ export class ArticleController {
   // Get full article details (protected - auth required)
   async getArticleById(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       const article = await articleService.getArticleById(articleId);
 
@@ -282,10 +273,7 @@ export class ArticleController {
   // Get article by slug (SEO-friendly URL)
   async getArticleBySlug(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const slug = req.params.slug;
-      if (!slug) {
-        throw new BadRequestError("Article slug is required");
-      }
+      const slug = getStringParam(req.params.slug, "Article slug");
 
       const article = await articleService.getArticleBySlug(slug);
 
@@ -298,10 +286,7 @@ export class ArticleController {
   // Get article content by slug (with 250-word limit for guests)
   async getArticleContentBySlug(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const slug = req.params.slug;
-      if (!slug) {
-        throw new BadRequestError("Article slug is required");
-      }
+      const slug = getStringParam(req.params.slug, "Article slug");
 
       // First get article by slug
       const article = await articleService.getArticleBySlug(slug);
@@ -325,10 +310,7 @@ export class ArticleController {
   // Download article PDF (protected - auth required)
   async downloadArticlePdf(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       const userName = req.user?.name || 'Guest User';
       
@@ -371,10 +353,7 @@ export class ArticleController {
   // Download article Word (protected - auth required, all logged-in users)
   async downloadArticleWord(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       const userName = req.user?.name || 'User';
       
@@ -417,10 +396,7 @@ export class ArticleController {
   // Delete article
   async deleteArticle(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       const result = await articleService.deleteArticle(articleId);
 
@@ -433,10 +409,7 @@ export class ArticleController {
   // Get article content for reading (public endpoint with optional auth)
   async getArticleContent(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       // Check if user is authenticated
       const isAuthenticated = !!req.user;
@@ -465,10 +438,7 @@ export class ArticleController {
   // Get article upload history (protected endpoint)
   async getArticleHistory(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       const result = await articleService.getArticleHistory(articleId);
 
@@ -568,10 +538,7 @@ export class ArticleController {
   // Upload thumbnail for article
   async uploadThumbnail(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
       
       if (!req.fileMeta?.url) {
         throw new BadRequestError("Image file is required");
@@ -591,10 +558,7 @@ export class ArticleController {
   // Upload multiple images for article
   async uploadImages(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
       
       if (!req.fileUrls || req.fileUrls.length === 0) {
         throw new BadRequestError("Image files are required");
@@ -615,10 +579,7 @@ export class ArticleController {
   // ✅ NEW: Editor approves article
   async editorApproveArticle(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       const editorId = req.user!.id;
 
@@ -636,10 +597,7 @@ export class ArticleController {
   // ✅ NEW: Admin publishes article (only after editor approval)
   async adminPublishArticle(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       const adminId = req.user!.id;
 
@@ -658,10 +616,7 @@ export class ArticleController {
   // ✅ NEW: Get article change history
   async getArticleChangeHistory(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       const userId = req.user!.id;
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
@@ -680,10 +635,7 @@ export class ArticleController {
   // ✅ NEW: Get specific change log diff
   async getChangeLogDiff(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const changeLogId = req.params.changeLogId;
-      if (!changeLogId) {
-        throw new BadRequestError("Change log ID is required");
-      }
+      const changeLogId = getStringParam(req.params.changeLogId, "Change log ID");
 
       const userId = req.user!.id;
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
@@ -702,12 +654,8 @@ export class ArticleController {
   // Download diff as PDF or Word
   async downloadDiff(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { changeLogId } = req.params;
+      const changeLogId = getStringParam(req.params.changeLogId, "Change log ID");
       const { format } = req.query;
-      
-      if (!changeLogId) {
-        throw new BadRequestError("Change log ID is required");
-      }
 
       // Validate format
       const downloadFormat = format === 'word' ? 'word' : 'pdf';
@@ -828,12 +776,8 @@ export class ArticleController {
   // ✅ NEW: Download editor's uploaded document
   async downloadEditorDocument(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { changeLogId } = req.params;
+      const changeLogId = getStringParam(req.params.changeLogId, "Change log ID");
       const { format } = req.query;
-      
-      if (!changeLogId) {
-        throw new BadRequestError("Change log ID is required");
-      }
 
       // Validate format
       const downloadFormat = format === 'word' ? 'word' : 'pdf';
@@ -906,10 +850,7 @@ export class ArticleController {
   // Get editor assignment history for an article (Admin only)
   async getEditorAssignmentHistory(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const articleId = req.params.id;
-      if (!articleId) {
-        throw new BadRequestError("Article ID is required");
-      }
+      const articleId = getStringParam(req.params.id, "Article ID");
 
       const userId = req.user!.id;
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
@@ -928,11 +869,7 @@ export class ArticleController {
   // ✅ PRODUCTION-GRADE: View visual diff with proper error handling
   async viewVisualDiff(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { changeLogId } = req.params;
-      
-      if (!changeLogId) {
-        throw new BadRequestError("Change log ID is required");
-      }
+      const changeLogId = getStringParam(req.params.changeLogId, "Change log ID");
 
       const userId = req.user!.id;
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
@@ -970,35 +907,57 @@ export class ArticleController {
       }
 
       // Step 2: Resolve file path using production-safe method
-      const { resolveUploadPath, fileExists, validateFile } = await import('@/utils/file-path.utils.js');
+      const { resolveUploadPath, fileExists } = await import('@/utils/file-path.utils.js');
+      const path = await import('path');
       const fullPath = resolveUploadPath(visualDiffUrl);
 
-      // Step 3: Validate file exists and is readable
+      // Step 3: Check if file exists (flexible approach)
+      const fs = await import('fs/promises');
+      let pdfPath = fullPath;
+      
       try {
-        await validateFile(fullPath);
+        // Try to access the visual-diff file
+        await fs.access(fullPath);
+        console.log(`✅ [Visual Diff] Found visual-diff file: ${visualDiffUrl}`);
       } catch (error: any) {
-        console.error(`❌ [Visual Diff] File validation failed: ${error.message}`);
+        console.log(`⚠️ [Visual Diff] Visual-diff file not found, checking for edited PDF...`);
         
-        // File is corrupted/missing, reset status for regeneration
-        await prisma.articleChangeLog.update({
+        // Visual-diff file doesn't exist, try to serve the edited PDF directly (overlay approach)
+        const changeLog = await prisma.articleChangeLog.findUnique({
           where: { id: changeLogId },
-          data: { 
-            visualDiffStatus: 'PENDING',
-            visualDiffUrl: null 
-          },
+          select: { 
+            newFileUrl: true,
+            article: {
+              select: { currentPdfUrl: true }
+            }
+          }
         });
         
-        return res.status(404).json({
-          message: 'Visual diff file is corrupted or missing. Please try generating again.',
-          status: 'corrupted'
-        });
+        if (!changeLog?.newFileUrl && !changeLog?.article?.currentPdfUrl) {
+          return res.status(404).json({
+            message: 'No PDF available for visual diff.',
+            status: 'no_pdf'
+          });
+        }
+        
+        // Use the edited PDF from change log or current article PDF
+        const editedPdfUrl = changeLog.newFileUrl || changeLog.article.currentPdfUrl;
+        
+        // If path already starts with /uploads/, remove the leading slash and resolve directly
+        if (editedPdfUrl.startsWith('/uploads/')) {
+          pdfPath = path.join(process.cwd(), editedPdfUrl.substring(1));
+        } else if (editedPdfUrl.startsWith('uploads/')) {
+          pdfPath = path.join(process.cwd(), editedPdfUrl);
+        } else {
+          pdfPath = resolveUploadPath(editedPdfUrl);
+        }
+        
+        console.log(`📄 [Visual Diff] Using edited PDF: ${editedPdfUrl}`);
       }
 
       // Step 4: Read and serve PDF file
-      const fs = await import('fs/promises');
-      
       try {
-        const pdfBuffer = await fs.readFile(fullPath);
+        const pdfBuffer = await fs.readFile(pdfPath);
 
         // Set proper headers
         res.setHeader('Content-Type', 'application/pdf');
@@ -1006,7 +965,7 @@ export class ArticleController {
         res.setHeader('Content-Length', pdfBuffer.length);
         res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
 
-        console.log(`✅ [Visual Diff] Serving file: ${visualDiffUrl} (${pdfBuffer.length} bytes)`);
+        console.log(`✅ [Visual Diff] Serving file: ${pdfBuffer.length} bytes`);
 
         res.send(pdfBuffer);
       } catch (error: any) {

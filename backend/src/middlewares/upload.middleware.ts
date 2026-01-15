@@ -81,12 +81,14 @@ if (isLocal) {
   const wordDir = "uploads/words/";
   const imageDir = "uploads/images/";
   const tempImageDir = "uploads/temp/images/";
+  const visualDiffDir = "uploads/visual-diffs/";
   
   if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
   if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
   if (!fs.existsSync(wordDir)) fs.mkdirSync(wordDir, { recursive: true });
   if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
   if (!fs.existsSync(tempImageDir)) fs.mkdirSync(tempImageDir, { recursive: true });
+  if (!fs.existsSync(visualDiffDir)) fs.mkdirSync(visualDiffDir, { recursive: true });
 }
 
 // ---------- DOCUMENT UPLOAD CONFIG (PDF or Word for users) ----------
