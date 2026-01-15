@@ -2,9 +2,11 @@
 import { useState, useRef, useEffect } from "react";
 // 1. Toastify imports
 import { ToastContainer, toast } from "react-toastify";
+import { useRouter } from "next/navigation";
 import "react-toastify/dist/ReactToastify.css";
 import ReCAPTCHA from "react-google-recaptcha"; // ✅ New Import
 export default function SubmitPaperPage() {
+  const router = useRouter();
   const getWordCount = (text) => {
     return text.trim().length === 0 ? 0 : text.trim().split(/\s+/).length;
   };
@@ -106,9 +108,9 @@ export default function SubmitPaperPage() {
   const handleNext = () => {
     // ✅ Zod Schema: /^[a-zA-Z\s]+$/ (Only letters & space)
     const nameRegex = /^[a-zA-Z\s]+$/;
-    
+
     // ✅ Zod Schema: /^[a-zA-Z\s\-:,.'&()]+$/ (Letters, space, basic punctuation. NO NUMBERS)
-    const titleRegex = /^[a-zA-Z\s\-:,.'&()]+$/; 
+    const titleRegex = /^[a-zA-Z\s\-:,.'&()]+$/;
 
     if (currentStep === 1) {
       // 1. Primary Author Check
@@ -119,7 +121,9 @@ export default function SubmitPaperPage() {
 
       // Check Primary Author Name Regex
       if (!nameRegex.test(formData.fullName)) {
-        toast.error("Author name must contain only letters and spaces (No numbers or special characters).");
+        toast.error(
+          "Author name must contain only letters and spaces (No numbers or special characters)."
+        );
         return;
       }
 
@@ -133,9 +137,12 @@ export default function SubmitPaperPage() {
         );
         return;
       }
-      
+
       // Check Second Author Name Regex (if exists)
-      if (formData.secondAuthorName && !nameRegex.test(formData.secondAuthorName)) {
+      if (
+        formData.secondAuthorName &&
+        !nameRegex.test(formData.secondAuthorName)
+      ) {
         toast.error("Second Author name must contain only letters and spaces.");
         return;
       }
@@ -156,7 +163,9 @@ export default function SubmitPaperPage() {
 
       // 2. Title Regex Validation (Strict Zod Match)
       if (!titleRegex.test(formData.articleTitle)) {
-        toast.error("Title can only contain letters and basic punctuation (- : , . ' & ( )). Numbers are not allowed.");
+        toast.error(
+          "Title can only contain letters and basic punctuation (- : , . ' & ( )). Numbers are not allowed."
+        );
         return;
       }
 
@@ -172,8 +181,8 @@ export default function SubmitPaperPage() {
       }
       // Max 500 is handled by HTML maxLength, but good to check logic
       if (formData.detailedDescription.length > 500) {
-         toast.error("Abstract must not exceed 500 characters.");
-         return;
+        toast.error("Abstract must not exceed 500 characters.");
+        return;
       }
     }
 
@@ -217,20 +226,20 @@ export default function SubmitPaperPage() {
         formData.submissionOnBehalfName
           ? formData.submissionOnBehalfName
           : formData.fullName;
-          
+
       data.append("authorName", finalAuthorName);
       data.append("authorEmail", formData.email);
       data.append("authorPhone", formData.phone || ""); // Optional handle
-      
+
       if (formData.secondAuthorName)
         data.append("secondAuthorName", formData.secondAuthorName);
       if (formData.secondAuthorEmail)
         data.append("secondAuthorEmail", formData.secondAuthorEmail);
-        
+
       data.append("title", formData.articleTitle);
       data.append("category", formData.contentFormat);
       data.append("abstract", formData.detailedDescription);
-      
+
       // Keywords handle
       if (formData.keywords && formData.keywords.length > 0) {
         data.append("keywords", formData.keywords.join(", "));
@@ -260,9 +269,11 @@ export default function SubmitPaperPage() {
       if (!response.ok) {
         // Backend ka asli error console me dekho developer ke liye
         console.error("Backend Validation Error:", result);
-        
+
         // User ko sirf ye dikhao:
-        throw new Error("Submission failed. Please ensure all details comply with the guidelines."); 
+        throw new Error(
+          "Submission failed. Please ensure all details comply with the guidelines."
+        );
       }
       // ----------------------------------------------------------------
 
@@ -318,8 +329,8 @@ export default function SubmitPaperPage() {
       }
 
       // ✅ Change: Toast hata diya aur Modal True kar diya
-      setShowSuccessModal(true); 
-      
+      setShowSuccessModal(true);
+
       setShowVerification(false);
       setOtp("");
       setPendingArticleId(null);
@@ -341,23 +352,38 @@ export default function SubmitPaperPage() {
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-10 max-w-md w-full text-center transform transition-all scale-100 border border-gray-100">
-            
             {/* Success Icon */}
             <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-green-100 mb-6">
-              <svg className="h-10 w-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+              <svg
+                className="h-10 w-10 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M5 13l4 4L19 7"
+                ></path>
               </svg>
             </div>
 
             {/* Title & Message */}
-            <h2 className="text-3xl font-bold text-gray-900 mb-3">Great Job! 🎉</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-3">
+              Great Job! 🎉
+            </h2>
             <p className="text-gray-600 text-lg mb-8 leading-relaxed">
-              Your article has been submitted successfully. Our team will review it shortly.
+              Your article has been submitted successfully. Our team will review
+              it shortly.
             </p>
 
             {/* OK Button */}
             <button
-              onClick={() => setShowSuccessModal(false)}
+              onClick={() => {
+                setShowSuccessModal(false);
+                router.push("/home"); // 👈 Ye home ('/') par redirect kar dega
+              }}
               className="w-full py-3.5 px-6 bg-green-600 hover:bg-green-700 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
             >
               Okay, Got it!
@@ -1030,10 +1056,6 @@ export default function SubmitPaperPage() {
                 </div>
               )}
 
-
-
-              
-
               {currentStep === totalSteps ? (
                 <div className="mt-5 sm:mt-6 lg:mt-8 pt-4 sm:pt-5 lg:pt-6 border-t border-gray-200 space-y-3 sm:space-y-4">
                   <button
@@ -1044,14 +1066,13 @@ export default function SubmitPaperPage() {
                   >
                     Previous
                   </button>
-
                   <div className="mt-4 flex justify-center sm:justify-start">
-                  <ReCAPTCHA
-                    sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
-                    onChange={handleCaptchaChange}
-                  />
-                </div>
-                ``
+                    <ReCAPTCHA
+                      sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+                      onChange={handleCaptchaChange}
+                    />
+                  </div>
+                  ``
                   <button
                     type="submit"
                     disabled={isLoading}
