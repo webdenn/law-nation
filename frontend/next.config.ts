@@ -1,5 +1,6 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
   reactStrictMode: false,
   // output: 'export',          // Enables static export
   basePath: '/law',          // <-- Subfolder path
@@ -9,6 +10,9 @@ const nextConfig = {
   images: {
     unoptimized: true,       // Needed for static export if using next/image
   },
+  
+  // ✅ Empty turbopack config to silence the warning
+  turbopack: {},
 };
 
-module.exports = nextConfig;
+export default nextConfig;

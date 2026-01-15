@@ -19,8 +19,9 @@ const CheckCircleIcon = () => (
   </svg>
 );
 
-// ✅ 2. DIFF VIEWER COMPONENT
+// ✅ 2. ENHANCED DIFF VIEWER COMPONENT (Always shows BACKEND data only)
 const DiffViewer = ({ diffData }) => {
+  // ✅ ALWAYS use backend diff data, ignore frontend data
   if (!diffData || !diffData.summary)
     return <p className="text-xs text-gray-400 italic">No diff data available.</p>;
 
@@ -77,9 +78,11 @@ const ReviewInterface = ({
   handleUploadCorrection,
   handleEditorApprove,
   changeHistory,
-  handleViewVisualDiff, // ye shayad ab use na ho raha ho kyunki sidebar se click ho raha hai, but rakh lo
+  handleViewVisualDiff,
   handleDownloadDiffReport,
   handleDownloadFile,
+  currentDiffData, // ✅ NEW: Frontend-generated diff data
+  isGeneratingDiff, // ✅ NEW: Loading state
 }) => {
   if (!selectedArticle) return null;
 
@@ -104,7 +107,13 @@ const ReviewInterface = ({
         </div>
 
         <div className="flex-1 bg-white rounded-lg shadow-inner flex items-center justify-center border-2 border-dashed border-gray-300 relative overflow-hidden">
-          {getPdfUrlToView() ? (
+          {isGeneratingDiff && pdfViewMode === "visual-diff" ? (
+            <div className="text-center text-gray-600">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+              <p className="text-sm font-medium">Generating Visual Diff...</p>
+              <p className="text-xs text-gray-400 mt-2">Extracting and comparing PDFs</p>
+            </div>
+          ) : getPdfUrlToView() ? (
             <iframe
               src={getPdfUrlToView()}
               className="w-full h-full absolute inset-0"

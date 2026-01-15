@@ -3,8 +3,8 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import ReviewInterface from "./ReviewInterface";
-
-// ... existing imports ...
+// ✅ Removed static imports - will use dynamic imports instead
+import { compareTexts, getChangeStats, formatDifferences } from "../../utilis/diffutilis";
 
 // ✅ NEW: Diff Viewer Component (Isse existing icons ke neeche paste kar do)
 const DiffViewer = ({ diffData }) => {
@@ -143,48 +143,117 @@ export default function EditorDashboard() {
   const [isUploading, setIsUploading] = useState(false);
 
   const [visualDiffBlobUrl, setVisualDiffBlobUrl] = useState(null);
+  const [isGeneratingDiff, setIsGeneratingDiff] = useState(false);
+  const [currentDiffData, setCurrentDiffData] = useState(null);
 
- const handleViewVisualDiff = async (changeLogId) => {
-  try {
-    toast.info("Generating Visual Diff...");
-    const token = localStorage.getItem("editorToken");
-    const articleId = selectedArticle.id || selectedArticle._id;
-    
-    const res = await fetch(`${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/visual-diff`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    // ✅ FIX: Check content type before processing response
-    const contentType = res.headers.get('content-type');
-    
-    if (!res.ok) {
-      // Handle error responses (JSON)
-      if (contentType && contentType.includes('application/json')) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to generate visual diff");
-      } else {
-        throw new Error("Failed to load visual diff");
+  // ✅ NEW: Generate Visual Diff from Frontend (with dynamic import)
+  const handleViewVisualDiff = async (changeLogId) => {
+    try {
+      setIsGeneratingDiff(true);
+      toast.info("Generating Visual Diff from Frontend...");
+      
+      // ✅ Dynamic import - only loads on client-side when needed
+      const { extractTextFromPDF, generateComparisonPDF } = await import("../../utilis/pdfutils");
+      
+      const token = localStorage.getItem("editorToken");
+      const articleId = selectedArticle.id || selectedArticle._id;
+      
+      // Find the specific change log
+      const changeLog = changeHistory.find(log => (log.id || log._id) === changeLogId);
+      if (!changeLog) {
+        throw new Error("Change log not found");
       }
-    }
 
-    // ✅ FIX: Ensure we got a PDF response
-    if (contentType && contentType.includes('application/pdf')) {
-      const blob = await res.blob();
+      // ✅ Debug: Log the change log structure
+      console.log("Change Log:", changeLog);
+      console.log("Selected Article:", selectedArticle);
+
+      // ✅ Check if URLs exist
+      if (!selectedArticle.originalPdfUrl) {
+        throw new Error("Original PDF URL not found");
+      }
+      
+      // ✅ Try different possible field names for edited PDF
+      const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
+      
+      if (!editedPdfUrl) {
+        throw new Error("Edited PDF URL not found. Available fields: " + Object.keys(changeLog).join(", "));
+      }
+
+      // Fetch the original PDF
+      const originalPdfUrl = selectedArticle.originalPdfUrl.startsWith("http")
+        ? selectedArticle.originalPdfUrl
+        : `${API_BASE_URL}${selectedArticle.originalPdfUrl}`;
+      
+      const originalRes = await fetch(originalPdfUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!originalRes.ok) {
+        throw new Error("Failed to fetch original PDF");
+      }
+      
+      const originalBlob = await originalRes.blob();
+      const originalFile = new File([originalBlob], "original.pdf", { type: "application/pdf" });
+
+      // Fetch the edited PDF (from the change log)
+      const editedPdfFullUrl = editedPdfUrl.startsWith("http")
+        ? editedPdfUrl
+        : `${API_BASE_URL}${editedPdfUrl}`;
+      
+      const editedRes = await fetch(editedPdfFullUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!editedRes.ok) {
+        throw new Error("Failed to fetch edited PDF");
+      }
+      
+      const editedBlob = await editedRes.blob();
+      const editedFile = new File([editedBlob], "edited.pdf", { type: "application/pdf" });
+
+      // Extract text from both PDFs
+      toast.info("Extracting text from PDFs...");
+      const originalText = await extractTextFromPDF(originalFile);
+      const editedText = await extractTextFromPDF(editedFile);
+
+      // ✅ Debug: Log extracted text to see spacing
+      console.log("Original text sample:", originalText.fullText.substring(0, 200));
+      console.log("Edited text sample:", editedText.fullText.substring(0, 200));
+
+      // Compare texts using diff utility
+      toast.info("Comparing documents...");
+      const differences = compareTexts(originalText.fullText, editedText.fullText);
+      const stats = getChangeStats(differences);
+      const formattedDiff = formatDifferences(differences);
+
+      // Store diff data for display
+      setCurrentDiffData({
+        differences: formattedDiff,
+        stats,
+        changeLog
+      });
+
+      // Generate comparison PDF
+      toast.info("Generating comparison PDF...");
+      const pdfBytes = await generateComparisonPDF(formattedDiff);
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
+      
       setVisualDiffBlobUrl(url);
       setPdfViewMode("visual-diff");
       
       if (isMobileMenuOpen) setIsMobileMenuOpen(false);
-    } else {
-      throw new Error("Expected PDF but received different content type");
+      
+      toast.success("Diff generated!");
+      
+    } catch (err) {
+      console.error("Visual Diff Error:", err);
+      toast.error(err.message || "Could not generate visual diff.");
+    } finally {
+      setIsGeneratingDiff(false);
     }
-    
-  } catch (err) {
-    console.error("Visual Diff Error:", err);
-    toast.error(err.message || "Could not load visual diff.");
-  }
-};
+  };
 
   // 📊 Chart Data Calculations
   const totalTasks = articles.length || 0;
@@ -449,17 +518,16 @@ export default function EditorDashboard() {
   };
   // ----------------------------------
 
-  // ✅ NEW: Download Diff PDF from Backend
-  // Function ko update karein taaki format accept kare
+  // ✅ Download Diff Reports from Backend (Fast & Reliable)
   const handleDownloadDiffReport = async (changeLogId, format = "pdf") => {
     try {
       const typeLabel = format === "word" ? "Word" : "PDF";
-      toast.info(`Generating ${typeLabel} Report...`);
+      toast.info(`Downloading ${typeLabel} Report...`);
 
       const token = localStorage.getItem("editorToken");
       const articleId = selectedArticle.id || selectedArticle._id;
 
-      // API URL mein ?format= parameter add kiya
+      // ✅ Always use backend API for downloads
       const res = await fetch(
         `${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`,
         {
@@ -468,25 +536,28 @@ export default function EditorDashboard() {
         }
       );
 
-      if (!res.ok) throw new Error(`Failed to generate ${typeLabel}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to generate ${typeLabel}`);
+      }
 
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-
-      // Extension set karein
+      
       const extension = format === "word" ? "docx" : "pdf";
-      a.download = `diff-v2-${articleId}.${extension}`;
-
+      a.download = `diff-report-v${changeLogId}.${extension}`;
+      
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      
       toast.success(`${typeLabel} Downloaded!`);
     } catch (err) {
       console.error(err);
-      toast.error(`Could not download ${format.toUpperCase()} report`);
+      toast.error(err.message || `Could not download ${format.toUpperCase()} report`);
     }
   };
 
@@ -671,30 +742,35 @@ export default function EditorDashboard() {
               <button
                 onClick={() => {
                   if (changeHistory && changeHistory.length > 0) {
-                    // Agar blob pehle se hai to direct dikhao, nahi to fetch karo latest wala
-                    if (visualDiffBlobUrl) {
-                      setPdfViewMode("visual-diff");
-                    } else {
-                      // Automatically fetch diff for the LATEST version (first item in array)
-                      const latestLog = changeHistory[0];
-                      handleViewVisualDiff(latestLog.id || latestLog._id);
-                    }
+                    // ✅ Always regenerate diff when clicked (don't reuse old blob)
+                    const latestLog = changeHistory[0];
+                    handleViewVisualDiff(latestLog.id || latestLog._id);
                     setIsMobileMenuOpen(false);
                   } else {
                     toast.info("No change history available to generate diff.");
                   }
                 }}
+                disabled={isGeneratingDiff}
                 className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
                   pdfViewMode === "visual-diff"
                     ? "bg-white text-red-700 shadow-lg"
                     : "hover:bg-red-800 text-white"
-                }`}
+                } ${isGeneratingDiff ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                View Visual Diff
-                {pdfViewMode === "visual-diff" && (
-                  <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">
-                    Active
-                  </span>
+                {isGeneratingDiff ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    View Visual Diff
+                    {pdfViewMode === "visual-diff" && (
+                      <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">
+                        Active
+                      </span>
+                    )}
+                  </>
                 )}
               </button>
               {/* {pdfViewMode === "track" && getPdfUrlToView() && (
@@ -878,6 +954,8 @@ export default function EditorDashboard() {
     handleViewVisualDiff={handleViewVisualDiff}
     handleDownloadDiffReport={handleDownloadDiffReport}
     handleDownloadFile={handleDownloadFile}
+    currentDiffData={currentDiffData}
+    isGeneratingDiff={isGeneratingDiff}
   />
 )}
         </div>

@@ -91,6 +91,13 @@ router.get(
   articleController.getChangeLogDiff.bind(articleController)
 );
 
+// ✅ NEW: View visual diff (inline PDF viewer)
+router.get(
+  "/:id/change-log/:changeLogId/visual-diff",
+  requireAuth,
+  articleController.viewVisualDiff.bind(articleController)
+);
+
 // ✅ NEW: Download diff as PDF
 router.get(
   "/:id/change-log/:changeLogId/download-diff",

@@ -10,11 +10,14 @@ import {
   assignEditorSchema,
   uploadCorrectedPdfSchema,
 } from "./validators/article.validator.js";
+import type {
+  ArticleSubmissionData,
+  ArticleListFilters,
+  AssignEditorData,
+  UploadCorrectedPdfData,
+} from "./types/article-submission.type.js";
 
-/**
- * Safely extract string parameter from request params
- * Ensures production and localhost compatibility
- */
+
 function getStringParam(param: string | string[] | undefined, paramName: string): string {
   if (!param) {
     throw new BadRequestError(`${paramName} is required`);
@@ -24,14 +27,6 @@ function getStringParam(param: string | string[] | undefined, paramName: string)
   }
   return param;
 }
-
-import type {
-  ArticleSubmissionData,
-  ArticleListFilters,
-  AssignEditorData,
-  UploadCorrectedPdfData,
-} from "./types/article-submission.type.js";
-
 export class ArticleController {
   // Article submission (works for both guest and logged-in users)
   async submitArticle(req: AuthRequest, res: Response, next: NextFunction) {
@@ -912,35 +907,57 @@ export class ArticleController {
       }
 
       // Step 2: Resolve file path using production-safe method
-      const { resolveUploadPath, fileExists, validateFile } = await import('@/utils/file-path.utils.js');
+      const { resolveUploadPath, fileExists } = await import('@/utils/file-path.utils.js');
+      const path = await import('path');
       const fullPath = resolveUploadPath(visualDiffUrl);
 
-      // Step 3: Validate file exists and is readable
+      // Step 3: Check if file exists (flexible approach)
+      const fs = await import('fs/promises');
+      let pdfPath = fullPath;
+      
       try {
-        await validateFile(fullPath);
+        // Try to access the visual-diff file
+        await fs.access(fullPath);
+        console.log(`✅ [Visual Diff] Found visual-diff file: ${visualDiffUrl}`);
       } catch (error: any) {
-        console.error(`❌ [Visual Diff] File validation failed: ${error.message}`);
+        console.log(`⚠️ [Visual Diff] Visual-diff file not found, checking for edited PDF...`);
         
-        // File is corrupted/missing, reset status for regeneration
-        await prisma.articleChangeLog.update({
+        // Visual-diff file doesn't exist, try to serve the edited PDF directly (overlay approach)
+        const changeLog = await prisma.articleChangeLog.findUnique({
           where: { id: changeLogId },
-          data: { 
-            visualDiffStatus: 'PENDING',
-            visualDiffUrl: null 
-          },
+          select: { 
+            newFileUrl: true,
+            article: {
+              select: { currentPdfUrl: true }
+            }
+          }
         });
         
-        return res.status(404).json({
-          message: 'Visual diff file is corrupted or missing. Please try generating again.',
-          status: 'corrupted'
-        });
+        if (!changeLog?.newFileUrl && !changeLog?.article?.currentPdfUrl) {
+          return res.status(404).json({
+            message: 'No PDF available for visual diff.',
+            status: 'no_pdf'
+          });
+        }
+        
+        // Use the edited PDF from change log or current article PDF
+        const editedPdfUrl = changeLog.newFileUrl || changeLog.article.currentPdfUrl;
+        
+        // If path already starts with /uploads/, remove the leading slash and resolve directly
+        if (editedPdfUrl.startsWith('/uploads/')) {
+          pdfPath = path.join(process.cwd(), editedPdfUrl.substring(1));
+        } else if (editedPdfUrl.startsWith('uploads/')) {
+          pdfPath = path.join(process.cwd(), editedPdfUrl);
+        } else {
+          pdfPath = resolveUploadPath(editedPdfUrl);
+        }
+        
+        console.log(`📄 [Visual Diff] Using edited PDF: ${editedPdfUrl}`);
       }
 
       // Step 4: Read and serve PDF file
-      const fs = await import('fs/promises');
-      
       try {
-        const pdfBuffer = await fs.readFile(fullPath);
+        const pdfBuffer = await fs.readFile(pdfPath);
 
         // Set proper headers
         res.setHeader('Content-Type', 'application/pdf');
@@ -948,7 +965,7 @@ export class ArticleController {
         res.setHeader('Content-Length', pdfBuffer.length);
         res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
 
-        console.log(`✅ [Visual Diff] Serving file: ${visualDiffUrl} (${pdfBuffer.length} bytes)`);
+        console.log(`✅ [Visual Diff] Serving file: ${pdfBuffer.length} bytes`);
 
         res.send(pdfBuffer);
       } catch (error: any) {

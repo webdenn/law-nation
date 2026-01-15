@@ -2292,9 +2292,15 @@ export class ArticleService {
         fullPath // Pass absolute path to generator
       );
 
-      // Step 5: Validate generated file
-      const { validateFile } = await import('@/utils/file-path.utils.js');
-      await validateFile(fullPath);
+      // Step 5: Validate generated file exists
+      const fs = await import('fs/promises');
+      
+      try {
+        await fs.access(fullPath);
+        console.log(`✅ [Visual Diff] Physical file generated: ${relativePath}`);
+      } catch {
+        throw new Error(`Failed to generate visual diff file at ${fullPath}`);
+      }
 
       // Step 6: Update status to READY
       await prisma.articleChangeLog.update({
