@@ -1,12 +1,14 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react"; // ✅ Combined Import
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import ReviewInterface from "./ReviewInterface";
-// ✅ Removed static imports - will use dynamic imports instead
 import { compareTexts, getChangeStats, formatDifferences } from "../../utilis/diffutilis";
 
-// ✅ NEW: Diff Viewer Component (Isse existing icons ke neeche paste kar do)
+// ✅ LOOP FIX: API_BASE_URL ko component ke bahar nikala taki ye baar-baar recreate na ho
+const API_BASE_URL = "http://localhost:4000";
+
+// ✅ NEW: Diff Viewer Component
 const DiffViewer = ({ diffData }) => {
   if (!diffData || !diffData.summary)
     return (
@@ -61,58 +63,6 @@ const DiffViewer = ({ diffData }) => {
   );
 };
 
-// ... existing helper components ...
-
-// --- YAHAN PASTE KARO (ICONS) ---
-const DownloadIcon = () => (
-  <svg
-    className="w-4 h-4 mr-2"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-    />
-  </svg>
-);
-const WordIcon = () => (
-  <svg
-    className="w-4 h-4 mr-2"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-    />
-  </svg>
-);
-
-// ✅ Icons wale section mein ise add karo
-const CheckCircleIcon = () => (
-  <svg
-    className="w-5 h-5 mr-2"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-    />
-  </svg>
-);
-// --------------------------------
-
 // Helper Component for Stats
 const EditorStatCard = ({ title, count, color }) => (
   <div className={`bg-white p-6 rounded-xl border-l-4 ${color} shadow-md`}>
@@ -136,7 +86,7 @@ export default function EditorDashboard() {
 
   const [articles, setArticles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [uploadedFile, setUploadedFile] = useState(null); // SIRF EK BAAR
+  const [uploadedFile, setUploadedFile] = useState(null);
   const [trackFile, setTrackFile] = useState(null);
   const [changeHistory, setChangeHistory] = useState([]);
   const [uploadComment, setUploadComment] = useState("");
@@ -146,41 +96,36 @@ export default function EditorDashboard() {
   const [isGeneratingDiff, setIsGeneratingDiff] = useState(false);
   const [currentDiffData, setCurrentDiffData] = useState(null);
 
-  // ✅ NEW: Generate Visual Diff from Frontend (with dynamic import)
-  const handleViewVisualDiff = async (changeLogId) => {
+  const [profile, setProfile] = useState({
+    id: "",
+    name: "Editor Name",
+    email: "",
+    role: "Editor",
+  });
+
+  // ✅ FIX: handleViewVisualDiff with useCallback and clean dependencies
+  const handleViewVisualDiff = useCallback(async (changeLogId) => {
+    // Agar already generate ho raha hai to rok do
+    if (isGeneratingDiff) return;
+
     try {
       setIsGeneratingDiff(true);
       toast.info("Generating Visual Diff from Frontend...");
       
-      // ✅ Dynamic import - only loads on client-side when needed
       const { extractTextFromPDF, generateComparisonPDF } = await import("../../utilis/pdfutils");
       
       const token = localStorage.getItem("editorToken");
-      const articleId = selectedArticle.id || selectedArticle._id;
+      const articleId = selectedArticle?.id || selectedArticle?._id;
       
-      // Find the specific change log
       const changeLog = changeHistory.find(log => (log.id || log._id) === changeLogId);
-      if (!changeLog) {
-        throw new Error("Change log not found");
-      }
+      if (!changeLog) throw new Error("Change log not found");
 
-      // ✅ Debug: Log the change log structure
-      console.log("Change Log:", changeLog);
-      console.log("Selected Article:", selectedArticle);
-
-      // ✅ Check if URLs exist
-      if (!selectedArticle.originalPdfUrl) {
-        throw new Error("Original PDF URL not found");
-      }
+      if (!selectedArticle?.originalPdfUrl) throw new Error("Original PDF URL not found");
       
-      // ✅ Try different possible field names for edited PDF
       const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
-      
-      if (!editedPdfUrl) {
-        throw new Error("Edited PDF URL not found. Available fields: " + Object.keys(changeLog).join(", "));
-      }
+      if (!editedPdfUrl) throw new Error("Edited PDF URL not found.");
 
-      // Fetch the original PDF
+      // Fetch Original PDF
       const originalPdfUrl = selectedArticle.originalPdfUrl.startsWith("http")
         ? selectedArticle.originalPdfUrl
         : `${API_BASE_URL}${selectedArticle.originalPdfUrl}`;
@@ -188,15 +133,11 @@ export default function EditorDashboard() {
       const originalRes = await fetch(originalPdfUrl, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      if (!originalRes.ok) {
-        throw new Error("Failed to fetch original PDF");
-      }
-      
+      if (!originalRes.ok) throw new Error("Failed to fetch original PDF");
       const originalBlob = await originalRes.blob();
       const originalFile = new File([originalBlob], "original.pdf", { type: "application/pdf" });
 
-      // Fetch the edited PDF (from the change log)
+      // Fetch Edited PDF
       const editedPdfFullUrl = editedPdfUrl.startsWith("http")
         ? editedPdfUrl
         : `${API_BASE_URL}${editedPdfUrl}`;
@@ -204,38 +145,25 @@ export default function EditorDashboard() {
       const editedRes = await fetch(editedPdfFullUrl, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      if (!editedRes.ok) {
-        throw new Error("Failed to fetch edited PDF");
-      }
-      
+      if (!editedRes.ok) throw new Error("Failed to fetch edited PDF");
       const editedBlob = await editedRes.blob();
       const editedFile = new File([editedBlob], "edited.pdf", { type: "application/pdf" });
 
-      // Extract text from both PDFs
-      toast.info("Extracting text from PDFs...");
+      // Extract & Compare
       const originalText = await extractTextFromPDF(originalFile);
       const editedText = await extractTextFromPDF(editedFile);
 
-      // ✅ Debug: Log extracted text to see spacing
-      console.log("Original text sample:", originalText.fullText.substring(0, 200));
-      console.log("Edited text sample:", editedText.fullText.substring(0, 200));
-
-      // Compare texts using diff utility
-      toast.info("Comparing documents...");
       const differences = compareTexts(originalText.fullText, editedText.fullText);
       const stats = getChangeStats(differences);
       const formattedDiff = formatDifferences(differences);
 
-      // Store diff data for display
       setCurrentDiffData({
         differences: formattedDiff,
         stats,
         changeLog
       });
 
-      // Generate comparison PDF
-      toast.info("Generating comparison PDF...");
+      // Generate PDF
       const pdfBytes = await generateComparisonPDF(formattedDiff);
       const blob = new Blob([pdfBytes], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
@@ -253,31 +181,13 @@ export default function EditorDashboard() {
     } finally {
       setIsGeneratingDiff(false);
     }
-  };
+  }, [changeHistory, selectedArticle, isGeneratingDiff, isMobileMenuOpen]); 
+  // 👆 NOTE: API_BASE_URL yahan se hata diya kyunki wo ab constant hai
 
-  // 📊 Chart Data Calculations
-  const totalTasks = articles.length || 0;
-  const completedTasks =
-    articles.filter((a) => a.status === "Published").length || 0;
-  const pendingTasks =
-    articles.filter((a) => a.status !== "Published").length || 0;
-  const efficiency =
-    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-  const API_BASE_URL = "http://localhost:4000";
-
-  const [profile, setProfile] = useState({
-    id: "",
-    name: "Editor Name",
-    email: "",
-    role: "Editor",
-  });
-
-  
   const fetchAssignedArticles = async (editorId, token) => {
     try {
       setIsLoading(true);
-      const cb = Date.now(); // Cache breaker
+      const cb = Date.now();
       const res = await fetch(
         `${API_BASE_URL}/api/articles?assignedEditorId=${editorId}&cb=${cb}`,
         {
@@ -304,42 +214,45 @@ export default function EditorDashboard() {
     }
   };
 
-
-
+  // ✅ FIX: Dependency array khali rakha taki ye sirf page load pr chale
+  // baar baar router change hone pr nahi.
   useEffect(() => {
     const token = localStorage.getItem("editorToken");
     const adminToken = localStorage.getItem("adminToken");
     const userData = localStorage.getItem("editorUser");
 
-    if (token && userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setProfile((prev) => ({ ...prev, ...parsedUser }));
-        fetchAssignedArticles(parsedUser.id || parsedUser._id, token);
-        setIsAuthorized(true);
-        return;
-      } catch (e) {
-        console.error("Error", e);
-      }
-    }
-
+    // 1. Agar Admin hai to Admin panel bhej do
     if (adminToken) {
       router.push("/admin");
       return;
     }
 
+    // 2. Agar Editor token nahi hai to Login bhej do
     if (!token) {
       router.push("/management-login");
+      return;
     }
-  }, [router]);
 
-
-  // ... existing fetchAssignedArticles function ...
+    // 3. Agar Token + User data hai to Data Load kro
+    if (token && userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        setProfile((prev) => ({ ...prev, ...parsedUser }));
+        // API Call
+        fetchAssignedArticles(parsedUser.id || parsedUser._id, token);
+        setIsAuthorized(true);
+      } catch (e) {
+        console.error("Error parsing user data", e);
+        localStorage.removeItem("editorUser"); // Corrupt data hatao
+        router.push("/management-login");
+      }
+    }
+  }, []); // 👈 Yahan [router] hata kar [] kar do (Sirf ek baar chalega)
 
   const fetchChangeHistory = async (articleId) => {
     try {
       const token = localStorage.getItem("editorToken");
-      const cb = Date.now(); // Cache breaker
+      const cb = Date.now();
       const res = await fetch(
         `${API_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`,
         {
@@ -369,19 +282,14 @@ export default function EditorDashboard() {
     }
   };
 
-  // ✅ USE EFFECT: Jab selectedArticle change ho, tab history lao
   useEffect(() => {
     const articleId = selectedArticle?.id || selectedArticle?._id;
     if (articleId) {
       fetchChangeHistory(articleId);
     }
-  }, [selectedArticle?.id, selectedArticle?._id]); // ✅ Sirf ID track hogi, loop ruk jayega
+  }, [selectedArticle?.id, selectedArticle?._id]);
 
-  // ❌ DELETE OLD: handleArticleAction function hata do.
-
-  // ✅ NEW 1: Handle Upload Corrected Version (Comment ke saath)
   const handleUploadCorrection = async () => {
-    // Check if main file is selected
     if (!uploadedFile)
       return toast.error("Please select a corrected file first");
 
@@ -390,15 +298,10 @@ export default function EditorDashboard() {
       const token = localStorage.getItem("editorToken");
       const formData = new FormData();
 
-      // 1. Corrected Article: Iska field name backend 'document' expect kar raha hai
       formData.append("document", uploadedFile);
-
-      // 2. Track Changes/Editor Doc: Iska field name backend 'editorDocument' expect kar raha hai
       if (trackFile) {
         formData.append("editorDocument", trackFile);
       }
-
-      // 3. Comments: Backend req.body.comments se uthayega
       if (uploadComment) {
         formData.append("comments", uploadComment);
       }
@@ -411,7 +314,6 @@ export default function EditorDashboard() {
           method: "PATCH",
           headers: {
             Authorization: `Bearer ${token}`,
-            // Note: Yahan Content-Type set nahi karna hai, FormData khud kar lega
           },
           body: formData,
         }
@@ -421,23 +323,18 @@ export default function EditorDashboard() {
 
       if (res.ok) {
         toast.success("New version uploaded & Diff generated!");
-
-        // Reset form states
         setUploadedFile(null);
         setTrackFile(null);
         setUploadComment("");
         setVisualDiffBlobUrl(null);
 
-        // Refresh Change History to show the new version
         fetchChangeHistory(selectedArticle.id || selectedArticle._id);
 
-        // Latest PDF view update karein
         if (data.article && data.article.currentPdfUrl) {
           setSelectedArticle((prev) => ({ ...prev, ...data.article }));
           setPdfViewMode("current");
         }
       } else {
-        // Backend se error message dikhao
         toast.error(data.error || data.message || "Upload failed");
       }
     } catch (err) {
@@ -448,7 +345,6 @@ export default function EditorDashboard() {
     }
   };
 
-  // ✅ NEW 2: Handle Editor Approval
   const handleEditorApprove = async () => {
     try {
       const token = localStorage.getItem("editorToken");
@@ -465,8 +361,8 @@ export default function EditorDashboard() {
       const data = await res.json();
       if (res.ok) {
         toast.success("Approved! Sent to Admin.");
-        setSelectedArticle(null); // Close view
-        fetchAssignedArticles(profile.id, token); // Refresh list
+        setSelectedArticle(null);
+        fetchAssignedArticles(profile.id, token);
       } else {
         toast.error(data.message || "Approval failed");
       }
@@ -474,8 +370,11 @@ export default function EditorDashboard() {
       toast.error("Something went wrong");
     }
   };
-
+ 
   const handleLogout = () => {
+    // ✅ Fix: Logout karte hi purane toasts hata do
+    toast.dismiss(); 
+    
     localStorage.removeItem("editorToken");
     localStorage.removeItem("editorUser");
     router.push("/management-login");
@@ -487,7 +386,6 @@ export default function EditorDashboard() {
     }
   };
 
-  // --- YAHAN PASTE KARO (FUNCTION) ---
   const handleDownloadFile = async (fileUrl, fileName, type) => {
     if (!fileUrl) return toast.error("File not available");
     try {
@@ -520,9 +418,7 @@ export default function EditorDashboard() {
       toast.error("Failed to download file");
     }
   };
-  // ----------------------------------
 
-  // ✅ Download Diff Reports from Backend (Fast & Reliable)
   const handleDownloadDiffReport = async (changeLogId, format = "pdf") => {
     try {
       const typeLabel = format === "word" ? "Word" : "PDF";
@@ -531,7 +427,6 @@ export default function EditorDashboard() {
       const token = localStorage.getItem("editorToken");
       const articleId = selectedArticle.id || selectedArticle._id;
 
-      // ✅ Always use backend API for downloads
       const res = await fetch(
         `${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`,
         {
@@ -565,9 +460,7 @@ export default function EditorDashboard() {
     }
   };
 
-  // --- Update getPdfUrlToView Function ---
-  // ✅ STEP 2: REPLACE THIS FUNCTION (Pura function replace karo)
- const getPdfUrlToView = () => {
+  const getPdfUrlToView = () => {
     if (!selectedArticle) return "";
 
     if (pdfViewMode === "visual-diff") {
@@ -589,7 +482,6 @@ export default function EditorDashboard() {
       ? path
       : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
     
-    // Append timestamp to ensure fresh PDF download/view
     return `${cleanUrl}?cb=${Date.now()}`;
   };
 
@@ -602,7 +494,7 @@ export default function EditorDashboard() {
 
   return (
     <div className="flex min-h-screen bg-gray-50 flex-col md:flex-row relative">
-      {/* 🌑 MOBILE OVERLAY (Backdrop) */}
+      {/* MOBILE OVERLAY */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-30 md:hidden"
@@ -610,7 +502,7 @@ export default function EditorDashboard() {
         />
       )}
 
-      {/* 🔴 SIDEBAR (Responsive) */}
+      {/* SIDEBAR */}
       <aside
         className={`fixed md:sticky top-0 z-40 h-screen w-72 bg-red-700 text-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out 
         ${
@@ -628,24 +520,12 @@ export default function EditorDashboard() {
               {selectedArticle ? "Review Mode" : "Editor Panel"}
             </span>
           </div>
-          {/* Close Button Mobile */}
           <button
             onClick={() => setIsMobileMenuOpen(false)}
             className="md:hidden text-white"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="w-6 h-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
@@ -694,18 +574,10 @@ export default function EditorDashboard() {
               >
                 View Original PDF
                 {pdfViewMode === "original" && (
-                  <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">
-                    Active
-                  </span>
+                  <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
                 )}
               </button>
-              {pdfViewMode === "track" && (
-                <div className="px-3 mt-1">
-                  <p className="text-[10px] text-red-200 mb-1">
-                    Source: ArticleChangeLog.editorDocumentUrl
-                  </p>
-                </div>
-              )}
+              
               <button
                 onClick={() => {
                   setPdfViewMode("current");
@@ -719,34 +591,13 @@ export default function EditorDashboard() {
               >
                 View Edited PDF
                 {pdfViewMode === "current" && (
-                  <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">
-                    Active
-                  </span>
+                  <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
                 )}
               </button>
-              {/* <button
-                onClick={() => {
-                  setPdfViewMode("track"); // ✅ Naya mode
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                  pdfViewMode === "track"
-                    ? "bg-white text-red-700 shadow-lg"
-                    : "hover:bg-red-800 text-white"
-                }`}
-              >
-                View Track File
-                {pdfViewMode === "track" && (
-                  <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">
-                    Active
-                  </span>
-                )}
-              </button> */}
 
               <button
                 onClick={() => {
                   if (changeHistory && changeHistory.length > 0) {
-                    // ✅ Always regenerate diff when clicked (don't reuse old blob)
                     const latestLog = changeHistory[0];
                     handleViewVisualDiff(latestLog.id || latestLog._id);
                     setIsMobileMenuOpen(false);
@@ -770,27 +621,12 @@ export default function EditorDashboard() {
                   <>
                     View Visual Diff
                     {pdfViewMode === "visual-diff" && (
-                      <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">
-                        Active
-                      </span>
+                      <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
                     )}
                   </>
                 )}
               </button>
-              {/* {pdfViewMode === "track" && getPdfUrlToView() && (
-                <button
-                  onClick={() =>
-                    handleDownloadFile(
-                      getPdfUrlToView(),
-                      "Track_Changes",
-                      "PDF"
-                    )
-                  }
-                  className="w-full mt-2 p-2 text-[10px] bg-green-700 hover:bg-green-800 rounded font-bold uppercase flex items-center justify-center"
-                >
-                  <DownloadIcon /> Download Track File
-                </button>
-              )} */}
+
               <div className="my-6 border-t border-red-800"></div>
               <button
                 onClick={() => {
@@ -818,29 +654,17 @@ export default function EditorDashboard() {
         )}
       </aside>
 
-      {/* 🟢 MAIN CONTENT AREA */}
+      {/* MAIN CONTENT AREA */}
       <main className="flex-1 h-screen overflow-y-auto bg-white flex flex-col">
         {/* HEADER */}
         <header className="bg-white h-20 border-b flex items-center justify-between px-4 md:px-10 sticky top-0 z-20 shadow-sm shrink-0">
           <div className="flex items-center gap-3">
-            {/* Hamburger Button (Visible only on Mobile) */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="md:hidden text-gray-600 hover:text-red-700 p-1"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-                className="w-7 h-7"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-                />
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
               </svg>
             </button>
 
@@ -862,7 +686,6 @@ export default function EditorDashboard() {
 
         {/* CONTENT SWITCHER */}
         <div className="p-4 md:p-10 pb-20 flex-1">
-          {/* VIEW 1: TASK LIST (Default) */}
           {!selectedArticle && activeTab === "tasks" && (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-8">
@@ -873,16 +696,12 @@ export default function EditorDashboard() {
                 />
                 <EditorStatCard
                   title="Pending"
-                  count={
-                    articles.filter((a) => a.status !== "Published").length
-                  }
+                  count={articles.filter((a) => a.status !== "Published").length}
                   color="border-yellow-500"
                 />
                 <EditorStatCard
                   title="Approved"
-                  count={
-                    articles.filter((a) => a.status === "Published").length
-                  }
+                  count={articles.filter((a) => a.status === "Published").length}
                   color="border-green-600"
                 />
               </div>
@@ -904,16 +723,11 @@ export default function EditorDashboard() {
                     <tbody className="divide-y divide-gray-100">
                       {isLoading ? (
                         <tr>
-                          <td colSpan="4" className="p-10 text-center">
-                            Loading...
-                          </td>
+                          <td colSpan="4" className="p-10 text-center">Loading...</td>
                         </tr>
                       ) : (
                         articles.map((art) => (
-                          <tr
-                            key={art._id || art.id}
-                            className="hover:bg-gray-50"
-                          >
+                          <tr key={art._id || art.id} className="hover:bg-gray-50">
                             <td className="p-5 font-medium">{art.title}</td>
                             <td className="p-5 text-sm">{art.authorName}</td>
                             <td className="p-5">
@@ -925,7 +739,7 @@ export default function EditorDashboard() {
                               <button
                                 onClick={() => {
                                   setSelectedArticle(art);
-                                  setPdfViewMode("original"); // Reset view
+                                  setPdfViewMode("original");
                                 }}
                                 className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-800 transition"
                               >
@@ -943,25 +757,25 @@ export default function EditorDashboard() {
           )}
 
           {selectedArticle && (
-  <ReviewInterface
-    selectedArticle={selectedArticle}
-    pdfViewMode={pdfViewMode}
-    getPdfUrlToView={getPdfUrlToView}
-    uploadedFile={uploadedFile}
-    setUploadedFile={setUploadedFile}
-    uploadComment={uploadComment}
-    setUploadComment={setUploadComment}
-    isUploading={isUploading}
-    handleUploadCorrection={handleUploadCorrection}
-    handleEditorApprove={handleEditorApprove}
-    changeHistory={changeHistory}
-    handleViewVisualDiff={handleViewVisualDiff}
-    handleDownloadDiffReport={handleDownloadDiffReport}
-    handleDownloadFile={handleDownloadFile}
-    currentDiffData={currentDiffData}
-    isGeneratingDiff={isGeneratingDiff}
-  />
-)}
+            <ReviewInterface
+              selectedArticle={selectedArticle}
+              pdfViewMode={pdfViewMode}
+              getPdfUrlToView={getPdfUrlToView}
+              uploadedFile={uploadedFile}
+              setUploadedFile={setUploadedFile}
+              uploadComment={uploadComment}
+              setUploadComment={setUploadComment}
+              isUploading={isUploading}
+              handleUploadCorrection={handleUploadCorrection}
+              handleEditorApprove={handleEditorApprove}
+              changeHistory={changeHistory}
+              handleViewVisualDiff={handleViewVisualDiff}
+              handleDownloadDiffReport={handleDownloadDiffReport}
+              handleDownloadFile={handleDownloadFile}
+              currentDiffData={currentDiffData}
+              isGeneratingDiff={isGeneratingDiff}
+            />
+          )}
         </div>
       </main>
     </div>
