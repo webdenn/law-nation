@@ -4,6 +4,8 @@ import path from "path";
 import fs from "fs";
 import { createClient } from "@supabase/supabase-js";
 import type { Request, Response, NextFunction } from "express";
+import { addWatermarkToPdf } from "@/utils/pdf-watermark.utils.js";
+import { addSimpleWatermarkToWord } from "@/utils/word-watermark.utils.js";
 
 // Extend Request typing so req.fileUrl(s) are recognized
 declare global {
@@ -174,6 +176,50 @@ const supabaseMemoryImage = multer({
   limits: { fileSize: MAX_IMAGE_SIZE },
 });
 
+// ---------- WATERMARK HELPER ----------
+/**
+ * Add watermark to uploaded document (PDF or Word)
+ * @param filePath - Local file path
+ * @param mimetype - File MIME type
+ * @returns Watermarked file buffer
+ */
+async function addUploadWatermark(
+  filePath: string,
+  mimetype: string
+): Promise<Buffer> {
+  console.log(`💧 [Upload Watermark] Adding watermark to: ${filePath}`);
+  
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const watermarkData = {
+    userName: 'LAW NATION',
+    downloadDate: new Date(),
+    articleTitle: 'Uploaded Document',
+    articleId: 'upload',
+    frontendUrl,
+  };
+
+  try {
+    if (mimetype === 'application/pdf') {
+      console.log(`📄 [Upload Watermark] Processing PDF...`);
+      return await addWatermarkToPdf(filePath, watermarkData);
+    } else if (
+      mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      mimetype === 'application/msword'
+    ) {
+      console.log(`📝 [Upload Watermark] Processing Word document...`);
+      return await addSimpleWatermarkToWord(filePath, watermarkData);
+    } else {
+      console.warn(`⚠️ [Upload Watermark] Unsupported file type: ${mimetype}`);
+      // Return original file if not PDF/Word
+      return fs.readFileSync(filePath);
+    }
+  } catch (error) {
+    console.error(`❌ [Upload Watermark] Failed to add watermark:`, error);
+    // Return original file on error
+    return fs.readFileSync(filePath);
+  }
+}
+
 // ---------- SUPABASE UPLOAD HELPER ----------
 async function uploadBufferToSupabase(
   buffer: Buffer,
@@ -222,35 +268,94 @@ async function uploadBufferToSupabase(
 // ---------- DOCUMENT UPLOAD HANDLER (PDF or Word for users) ----------
 export const uploadDocument = (req: Request, res: Response, next: NextFunction) => {
   if (isLocal) {
-    localUploadDocument.single("document")(req, res, (err) => {
+    localUploadDocument.single("document")(req, res, async (err) => {
       if (err) return res.status(400).json({ error: err.message });
       if (!req.file)
         return res.status(400).json({ error: "Document file (PDF or Word) required" });
       
-      // Determine the path based on user authentication status
-      const isLoggedIn = !!(req as any).user?.id;
-      const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
-      const url = `/${directory}${req.file.filename}`;
-      
-      req.fileUrl = url;
-      req.fileMeta = { url, storageKey: req.file.filename };
-      next();
+      try {
+        // Determine the path based on user authentication status
+        const isLoggedIn = !!(req as any).user?.id;
+        const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+        const tempFilePath = path.join(process.cwd(), directory, req.file.filename);
+        
+        console.log(`🔖 [Upload] Adding watermark to uploaded document...`);
+        
+        // Add watermark to the uploaded file
+        const watermarkedBuffer = await addUploadWatermark(tempFilePath, req.file.mimetype);
+        
+        // Save watermarked file (overwrite original)
+        fs.writeFileSync(tempFilePath, watermarkedBuffer);
+        
+        console.log(`✅ [Upload] Watermarked file saved: ${tempFilePath}`);
+        
+        const url = `/${directory}${req.file.filename}`;
+        
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+        next();
+      } catch (error) {
+        console.error('❌ [Upload] Watermark failed:', error);
+        // Continue with original file if watermark fails
+        const isLoggedIn = !!(req as any).user?.id;
+        const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+        const url = `/${directory}${req.file.filename}`;
+        
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+        next();
+      }
     });
   } else {
-    supabaseMemoryDocument.single("document")(req, res, (err) => {
+    supabaseMemoryDocument.single("document")(req, res, async (err) => {
       if (err) return res.status(400).json({ error: err.message });
       const file = req.file as Express.Multer.File | undefined;
       if (!file) return res.status(400).json({ error: "Document file (PDF or Word) required" });
-      uploadBufferToSupabase(file.buffer, file.originalname, file.mimetype)
-        .then(({ url, storageKey }) => {
-          req.fileUrl = url;
-          req.fileMeta = { url, storageKey };
-          next();
-        })
-        .catch((e) => {
-          console.error("Supabase document upload error:", e);
-          res.status(500).json({ error: "Document upload failed" });
-        });
+      
+      try {
+        console.log(`🔖 [Upload] Adding watermark to uploaded document...`);
+        
+        // Save to temp file for watermarking
+        const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        
+        const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(file.originalname)}`);
+        fs.writeFileSync(tempFilePath, file.buffer);
+        
+        // Add watermark
+        const watermarkedBuffer = await addUploadWatermark(tempFilePath, file.mimetype);
+        
+        // Delete temp file
+        fs.unlinkSync(tempFilePath);
+        
+        console.log(`✅ [Upload] Watermark added, uploading to Supabase...`);
+        
+        // Upload watermarked buffer to Supabase
+        const { url, storageKey } = await uploadBufferToSupabase(
+          watermarkedBuffer,
+          file.originalname,
+          file.mimetype
+        );
+        
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey };
+        next();
+      } catch (error) {
+        console.error('❌ [Upload] Watermark/Upload failed:', error);
+        // Fallback: upload original file
+        uploadBufferToSupabase(file.buffer, file.originalname, file.mimetype)
+          .then(({ url, storageKey }) => {
+            req.fileUrl = url;
+            req.fileMeta = { url, storageKey };
+            next();
+          })
+          .catch((e) => {
+            console.error("Supabase document upload error:", e);
+            res.status(500).json({ error: "Document upload failed" });
+          });
+      }
     });
   }
 };
@@ -258,32 +363,89 @@ export const uploadDocument = (req: Request, res: Response, next: NextFunction) 
 // ---------- PDF ONLY UPLOAD HANDLER (for editors) ----------
 export const uploadPdfOnly = (req: Request, res: Response, next: NextFunction) => {
   if (isLocal) {
-    localUploadPdfOnly.single("pdf")(req, res, (err) => {
+    localUploadPdfOnly.single("pdf")(req, res, async (err) => {
       if (err) return res.status(400).json({ error: err.message });
       if (!req.file)
         return res.status(400).json({ error: "PDF file required" });
       
-      const url = `/uploads/pdfs/${req.file.filename}`;
-      
-      req.fileUrl = url;
-      req.fileMeta = { url, storageKey: req.file.filename };
-      next();
+      try {
+        const tempFilePath = path.join(process.cwd(), 'uploads/pdfs/', req.file.filename);
+        
+        console.log(`🔖 [Upload] Adding watermark to editor PDF...`);
+        
+        // Add watermark to the uploaded PDF
+        const watermarkedBuffer = await addUploadWatermark(tempFilePath, req.file.mimetype);
+        
+        // Save watermarked file (overwrite original)
+        fs.writeFileSync(tempFilePath, watermarkedBuffer);
+        
+        console.log(`✅ [Upload] Watermarked PDF saved: ${tempFilePath}`);
+        
+        const url = `/uploads/pdfs/${req.file.filename}`;
+        
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+        next();
+      } catch (error) {
+        console.error('❌ [Upload] Watermark failed:', error);
+        // Continue with original file if watermark fails
+        const url = `/uploads/pdfs/${req.file.filename}`;
+        
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+        next();
+      }
     });
   } else {
-    supabaseMemoryPdfOnly.single("pdf")(req, res, (err) => {
+    supabaseMemoryPdfOnly.single("pdf")(req, res, async (err) => {
       if (err) return res.status(400).json({ error: err.message });
       const file = req.file as Express.Multer.File | undefined;
       if (!file) return res.status(400).json({ error: "PDF file required" });
-      uploadBufferToSupabase(file.buffer, file.originalname, file.mimetype)
-        .then(({ url, storageKey }) => {
-          req.fileUrl = url;
-          req.fileMeta = { url, storageKey };
-          next();
-        })
-        .catch((e) => {
-          console.error("Supabase PDF upload error:", e);
-          res.status(500).json({ error: "PDF upload failed" });
-        });
+      
+      try {
+        console.log(`🔖 [Upload] Adding watermark to editor PDF...`);
+        
+        // Save to temp file for watermarking
+        const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        
+        const tempFilePath = path.join(tempDir, `temp-${Date.now()}.pdf`);
+        fs.writeFileSync(tempFilePath, file.buffer);
+        
+        // Add watermark
+        const watermarkedBuffer = await addUploadWatermark(tempFilePath, file.mimetype);
+        
+        // Delete temp file
+        fs.unlinkSync(tempFilePath);
+        
+        console.log(`✅ [Upload] Watermark added, uploading to Supabase...`);
+        
+        // Upload watermarked buffer to Supabase
+        const { url, storageKey } = await uploadBufferToSupabase(
+          watermarkedBuffer,
+          file.originalname,
+          file.mimetype
+        );
+        
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey };
+        next();
+      } catch (error) {
+        console.error('❌ [Upload] Watermark/Upload failed:', error);
+        // Fallback: upload original file
+        uploadBufferToSupabase(file.buffer, file.originalname, file.mimetype)
+          .then(({ url, storageKey }) => {
+            req.fileUrl = url;
+            req.fileMeta = { url, storageKey };
+            next();
+          })
+          .catch((e) => {
+            console.error("Supabase PDF upload error:", e);
+            res.status(500).json({ error: "PDF upload failed" });
+          });
+      }
     });
   }
 };
@@ -337,37 +499,95 @@ export const uploadMultiplePdfs = (fieldName = "pdfs", maxCount = 5) => {
 // ✅ NEW: Optional PDF Upload Handler 
 export const uploadOptionalPdf = (req: Request, res: Response, next: NextFunction) => {
   if (isLocal) {
-    localUploadDocument.single("pdf")(req, res, (err: any) => {
+    localUploadDocument.single("pdf")(req, res, async (err: any) => {
       if (err) return res.status(400).json({ error: err.message });
       if (req.file) {
-        const isLoggedIn = !!(req as any).user?.id;
-        const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
-        const url = `/${directory}${req.file.filename}`;
-        
-        req.fileUrl = url;
-        req.fileMeta = { url, storageKey: req.file.filename };
+        try {
+          const isLoggedIn = !!(req as any).user?.id;
+          const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+          const tempFilePath = path.join(process.cwd(), directory, req.file.filename);
+          
+          console.log(`🔖 [Upload] Adding watermark to optional PDF...`);
+          
+          // Add watermark to the uploaded file
+          const watermarkedBuffer = await addUploadWatermark(tempFilePath, req.file.mimetype);
+          
+          // Save watermarked file (overwrite original)
+          fs.writeFileSync(tempFilePath, watermarkedBuffer);
+          
+          console.log(`✅ [Upload] Watermarked optional PDF saved: ${tempFilePath}`);
+          
+          const url = `/${directory}${req.file.filename}`;
+          
+          req.fileUrl = url;
+          req.fileMeta = { url, storageKey: req.file.filename };
+        } catch (error) {
+          console.error('❌ [Upload] Watermark failed:', error);
+          // Continue with original file if watermark fails
+          const isLoggedIn = !!(req as any).user?.id;
+          const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+          const url = `/${directory}${req.file.filename}`;
+          
+          req.fileUrl = url;
+          req.fileMeta = { url, storageKey: req.file.filename };
+        }
       }
       
       next();
     });
   } else {
-    supabaseMemoryDocument.single("pdf")(req, res, (err: any) => {
+    supabaseMemoryDocument.single("pdf")(req, res, async (err: any) => {
       if (err) return res.status(400).json({ error: err.message });
       
       const file = req.file as Express.Multer.File | undefined;
       if (!file) {
         return next();
       }
-      uploadBufferToSupabase(file.buffer, file.originalname, file.mimetype)
-        .then(({ url, storageKey }) => {
-          req.fileUrl = url;
-          req.fileMeta = { url, storageKey };
-          next();
-        })
-        .catch((e) => {
-          console.error("Supabase PDF upload error:", e);
-          res.status(500).json({ error: "PDF upload failed" });
-        });
+      
+      try {
+        console.log(`🔖 [Upload] Adding watermark to optional PDF...`);
+        
+        // Save to temp file for watermarking
+        const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        
+        const tempFilePath = path.join(tempDir, `temp-${Date.now()}.pdf`);
+        fs.writeFileSync(tempFilePath, file.buffer);
+        
+        // Add watermark
+        const watermarkedBuffer = await addUploadWatermark(tempFilePath, file.mimetype);
+        
+        // Delete temp file
+        fs.unlinkSync(tempFilePath);
+        
+        console.log(`✅ [Upload] Watermark added, uploading to Supabase...`);
+        
+        // Upload watermarked buffer to Supabase
+        const { url, storageKey } = await uploadBufferToSupabase(
+          watermarkedBuffer,
+          file.originalname,
+          file.mimetype
+        );
+        
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey };
+        next();
+      } catch (error) {
+        console.error('❌ [Upload] Watermark/Upload failed:', error);
+        // Fallback: upload original file
+        uploadBufferToSupabase(file.buffer, file.originalname, file.mimetype)
+          .then(({ url, storageKey }) => {
+            req.fileUrl = url;
+            req.fileMeta = { url, storageKey };
+            next();
+          })
+          .catch((e) => {
+            console.error("Supabase PDF upload error:", e);
+            res.status(500).json({ error: "PDF upload failed" });
+          });
+      }
     });
   }
 };
@@ -413,33 +633,79 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
     upload.fields([
       { name: 'document', maxCount: 1 },      // Required: corrected article
       { name: 'editorDocument', maxCount: 1 } // Optional: editor's notes/diff
-    ])(req, res, (err) => {
+    ])(req, res, async (err) => {
       if (err) return res.status(400).json({ error: err.message });
       
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
       
-      // Handle main corrected document (required)
-      if (files.document && files.document[0]) {
-        const docFile = files.document[0];
-        req.fileMeta = {
-          url: `/uploads/pdfs/${docFile.filename}`,
-          storageKey: docFile.filename
-        };
-      } else {
-        return res.status(400).json({ error: "Corrected document file required" });
-      }
-      
-      // Handle editor document (optional)
-      if (files.editorDocument && files.editorDocument[0]) {
-        const editorDocFile = files.editorDocument[0];
-        const ext = path.extname(editorDocFile.originalname).toLowerCase();
-        const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
+      try {
+        // Handle main corrected document (required)
+        if (files.document && files.document[0]) {
+          const docFile = files.document[0];
+          const docFilePath = path.join(process.cwd(), 'uploads/pdfs/', docFile.filename);
+          
+          console.log(`🔖 [Upload] Adding watermark to editor's corrected document...`);
+          
+          // Add watermark
+          const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
+          
+          // Save watermarked file (overwrite original)
+          fs.writeFileSync(docFilePath, watermarkedBuffer);
+          
+          console.log(`✅ [Upload] Watermarked corrected document saved`);
+          
+          req.fileMeta = {
+            url: `/uploads/pdfs/${docFile.filename}`,
+            storageKey: docFile.filename
+          };
+        } else {
+          return res.status(400).json({ error: "Corrected document file required" });
+        }
         
-        req.body.editorDocumentUrl = `/uploads/editor-docs/${editorDocFile.filename}`;
-        req.body.editorDocumentType = docType;
+        // Handle editor document (optional)
+        if (files.editorDocument && files.editorDocument[0]) {
+          const editorDocFile = files.editorDocument[0];
+          const editorDocFilePath = path.join(process.cwd(), 'uploads/editor-docs/', editorDocFile.filename);
+          const ext = path.extname(editorDocFile.originalname).toLowerCase();
+          const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
+          
+          console.log(`🔖 [Upload] Adding watermark to editor's additional document...`);
+          
+          // Add watermark
+          const watermarkedBuffer = await addUploadWatermark(editorDocFilePath, editorDocFile.mimetype);
+          
+          // Save watermarked file (overwrite original)
+          fs.writeFileSync(editorDocFilePath, watermarkedBuffer);
+          
+          console.log(`✅ [Upload] Watermarked editor document saved`);
+          
+          req.body.editorDocumentUrl = `/uploads/editor-docs/${editorDocFile.filename}`;
+          req.body.editorDocumentType = docType;
+        }
+        
+        next();
+      } catch (error) {
+        console.error('❌ [Upload] Watermark failed:', error);
+        // Continue with original files if watermark fails
+        if (files.document && files.document[0]) {
+          const docFile = files.document[0];
+          req.fileMeta = {
+            url: `/uploads/pdfs/${docFile.filename}`,
+            storageKey: docFile.filename
+          };
+        }
+        
+        if (files.editorDocument && files.editorDocument[0]) {
+          const editorDocFile = files.editorDocument[0];
+          const ext = path.extname(editorDocFile.originalname).toLowerCase();
+          const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
+          
+          req.body.editorDocumentUrl = `/uploads/editor-docs/${editorDocFile.filename}`;
+          req.body.editorDocumentType = docType;
+        }
+        
+        next();
       }
-      
-      next();
     });
   } else {
     const upload = multer({
@@ -460,8 +726,29 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
         // Handle main corrected document (required)
         if (files.document && files.document[0]) {
           const docFile = files.document[0];
+          
+          console.log(`🔖 [Upload] Adding watermark to editor's corrected document...`);
+          
+          // Save to temp file for watermarking
+          const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+          if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+          }
+          
+          const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(docFile.originalname)}`);
+          fs.writeFileSync(tempFilePath, docFile.buffer);
+          
+          // Add watermark
+          const watermarkedBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
+          
+          // Delete temp file
+          fs.unlinkSync(tempFilePath);
+          
+          console.log(`✅ [Upload] Watermark added, uploading to Supabase...`);
+          
+          // Upload watermarked buffer to Supabase
           const { url, storageKey } = await uploadBufferToSupabase(
-            docFile.buffer,
+            watermarkedBuffer,
             docFile.originalname,
             docFile.mimetype,
             'pdf'
@@ -477,8 +764,24 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
           const ext = path.extname(editorDocFile.originalname).toLowerCase();
           const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
           
+          console.log(`🔖 [Upload] Adding watermark to editor's additional document...`);
+          
+          // Save to temp file for watermarking
+          const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+          const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(editorDocFile.originalname)}`);
+          fs.writeFileSync(tempFilePath, editorDocFile.buffer);
+          
+          // Add watermark
+          const watermarkedBuffer = await addUploadWatermark(tempFilePath, editorDocFile.mimetype);
+          
+          // Delete temp file
+          fs.unlinkSync(tempFilePath);
+          
+          console.log(`✅ [Upload] Watermark added, uploading to Supabase...`);
+          
+          // Upload watermarked buffer to Supabase
           const { url } = await uploadBufferToSupabase(
-            editorDocFile.buffer,
+            watermarkedBuffer,
             editorDocFile.originalname,
             editorDocFile.mimetype,
             'pdf'
@@ -650,36 +953,74 @@ export const uploadArticleFiles = (req: Request, res: Response, next: NextFuncti
       { name: 'pdf', maxCount: 1 },
       { name: 'thumbnail', maxCount: 1 },
       { name: 'images', maxCount: 10 }
-    ])(req, res, (err) => {
+    ])(req, res, async (err) => {
       if (err) return res.status(400).json({ error: err.message });
       
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
       const isLoggedIn = !!(req as any).user?.id;
       
-      // Handle PDF
-      if (files.pdf && files.pdf[0]) {
-        const pdfFile = files.pdf[0];
-        const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
-        req.fileMeta = {
-          url: `/${directory}${pdfFile.filename}`,
-          storageKey: pdfFile.filename
-        };
+      try {
+        // Handle PDF with watermark
+        if (files.pdf && files.pdf[0]) {
+          const pdfFile = files.pdf[0];
+          const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+          const pdfFilePath = path.join(process.cwd(), directory, pdfFile.filename);
+          
+          console.log(`🔖 [Upload] Adding watermark to article PDF...`);
+          
+          // Add watermark
+          const watermarkedBuffer = await addUploadWatermark(pdfFilePath, pdfFile.mimetype);
+          
+          // Save watermarked file (overwrite original)
+          fs.writeFileSync(pdfFilePath, watermarkedBuffer);
+          
+          console.log(`✅ [Upload] Watermarked article PDF saved`);
+          
+          req.fileMeta = {
+            url: `/${directory}${pdfFile.filename}`,
+            storageKey: pdfFile.filename
+          };
+        }
+        
+        // Handle thumbnail
+        if (files.thumbnail && files.thumbnail[0]) {
+          const thumbFile = files.thumbnail[0];
+          const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
+          req.body.thumbnailUrl = `/${directory}${thumbFile.filename}`;
+        }
+        
+        // Handle multiple images
+        if (files.images && files.images.length > 0) {
+          const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
+          req.body.imageUrls = files.images.map(img => `/${directory}${img.filename}`);
+        }
+        
+        next();
+      } catch (error) {
+        console.error('❌ [Upload] Watermark failed:', error);
+        // Continue with original files if watermark fails
+        if (files.pdf && files.pdf[0]) {
+          const pdfFile = files.pdf[0];
+          const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+          req.fileMeta = {
+            url: `/${directory}${pdfFile.filename}`,
+            storageKey: pdfFile.filename
+          };
+        }
+        
+        if (files.thumbnail && files.thumbnail[0]) {
+          const thumbFile = files.thumbnail[0];
+          const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
+          req.body.thumbnailUrl = `/${directory}${thumbFile.filename}`;
+        }
+        
+        if (files.images && files.images.length > 0) {
+          const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
+          req.body.imageUrls = files.images.map(img => `/${directory}${img.filename}`);
+        }
+        
+        next();
       }
-      
-      // Handle thumbnail
-      if (files.thumbnail && files.thumbnail[0]) {
-        const thumbFile = files.thumbnail[0];
-        const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
-        req.body.thumbnailUrl = `/${directory}${thumbFile.filename}`;
-      }
-      
-      // Handle multiple images
-      if (files.images && files.images.length > 0) {
-        const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
-        req.body.imageUrls = files.images.map(img => `/${directory}${img.filename}`);
-      }
-      
-      next();
     });
   } else {
     const upload = multer({
@@ -697,11 +1038,32 @@ export const uploadArticleFiles = (req: Request, res: Response, next: NextFuncti
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
       
       try {
-        // Handle PDF
+        // Handle PDF with watermark
         if (files.pdf && files.pdf[0]) {
           const pdfFile = files.pdf[0];
+          
+          console.log(`🔖 [Upload] Adding watermark to article PDF...`);
+          
+          // Save to temp file for watermarking
+          const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+          if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+          }
+          
+          const tempFilePath = path.join(tempDir, `temp-${Date.now()}.pdf`);
+          fs.writeFileSync(tempFilePath, pdfFile.buffer);
+          
+          // Add watermark
+          const watermarkedBuffer = await addUploadWatermark(tempFilePath, pdfFile.mimetype);
+          
+          // Delete temp file
+          fs.unlinkSync(tempFilePath);
+          
+          console.log(`✅ [Upload] Watermark added, uploading to Supabase...`);
+          
+          // Upload watermarked buffer to Supabase
           const { url, storageKey } = await uploadBufferToSupabase(
-            pdfFile.buffer,
+            watermarkedBuffer,
             pdfFile.originalname,
             pdfFile.mimetype,
             'pdf'

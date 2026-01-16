@@ -3,6 +3,7 @@ import path from 'path';
 import { promisify } from 'util';
 import { createRequire } from 'module';
 import { createClient } from '@supabase/supabase-js';
+import { addSimpleWatermarkToWord } from './word-watermark.utils.js';
 
 // Create require for CommonJS modules in ES module context
 const require = createRequire(import.meta.url);
@@ -274,6 +275,29 @@ export async function convertPdfToWord(
     await fs.writeFile(localWordPath, buffer);
     
     console.log(`✅ [Conversion] PDF to Word successful`);
+    
+    // ✅ Add watermark to converted Word file
+    console.log(`🔖 [Conversion] Adding watermark to converted Word file...`);
+    try {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const watermarkData = {
+        userName: 'LAW NATION',
+        downloadDate: new Date(),
+        articleTitle: 'Converted Document',
+        articleId: 'conversion',
+        frontendUrl,
+      };
+      
+      const watermarkedBuffer = await addSimpleWatermarkToWord(localWordPath, watermarkData);
+      
+      // Overwrite with watermarked version
+      await fs.writeFile(localWordPath, watermarkedBuffer);
+      
+      console.log(`✅ [Conversion] Watermark added to Word file`);
+    } catch (watermarkError) {
+      console.warn(`⚠️ [Conversion] Failed to add watermark to Word file:`, watermarkError);
+      // Continue without watermark if it fails
+    }
     
     // Save converted file (local in development, Supabase in production)
     if (isRemote) {

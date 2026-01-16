@@ -167,7 +167,7 @@ export async function addSimpleWatermarkToWord(
       const logoPath = path.join(
         process.cwd(),
         "src",
-        "assets",
+        "assests",
         "img",
         "Screenshot 2026-01-09 204120.png"
       );
