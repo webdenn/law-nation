@@ -2,14 +2,10 @@
 
 import { prisma } from "@/db/db.js";
 
-/**
- * Article Editor History Service
- * Tracks all editor assignments and reassignments for audit purposes
- */
+
+//Article Editor History Service Tracks all editor assignments and reassignments for audit purposes
 export class ArticleHistoryService {
-  /**
-   * Log a new editor assignment
-   */
+   //Log a new editor assignment
   async logAssignment(data: {
     articleId: string;
     editorId: string;
