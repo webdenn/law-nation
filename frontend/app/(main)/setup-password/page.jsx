@@ -15,7 +15,7 @@ function SetupForm() {
   const [loading, setLoading] = useState(false);
   
   // Backend URL
-  const API_BASE_URL = "http://localhost:4000";
+  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
   // Agar URL mein token nahi hai
   if (!token) {
@@ -45,7 +45,7 @@ function SetupForm() {
 
     try {
       // 2. Backend API Call
-      const response = await fetch(`${API_BASE_URL}/api/auth/setup-password`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/auth/setup-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, password })

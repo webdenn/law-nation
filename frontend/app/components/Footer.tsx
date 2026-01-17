@@ -50,11 +50,9 @@ export default function Footer() {
           <div className="lg:col-span-2">
             <h3 className="text-slate-900 font-bold text-lg mb-6">Explore</h3>
             <ul className="space-y-3 text-[15px]">
-              <li><Link href="/articles" className="hover:text-red-700 transition-colors">Browse Journals</Link></li>
-              <li><Link href="/latest" className="hover:text-red-700 transition-colors">Latest Articles</Link></li>
-              <li><Link href="/authors" className="hover:text-red-700 transition-colors">Top Authors</Link></li>
-              <li><Link href="/conferences" className="hover:text-red-700 transition-colors">Legal Conferences</Link></li>
-              <li><Link href="/case-studies" className="hover:text-red-700 transition-colors">Case Studies</Link></li>
+              <li><Link href="/articles" className="hover:text-red-700 transition-colors">Browse Recent Issues</Link></li>
+              <li><Link href="/latest" className="hover:text-red-700 transition-colors">Latest Reads</Link></li>
+              <li><Link href="/latest" className="hover:text-red-700 transition-colors">Join Us As Reviewer </Link></li>
             </ul>
           </div>
 
@@ -64,10 +62,8 @@ export default function Footer() {
             <ul className="space-y-3 text-[15px]">
               <li><Link href="/submit-paper" className="hover:text-red-700 transition-colors">Submit Your Paper</Link></li>
               <li><Link href="/guidelines" className="hover:text-red-700 transition-colors">Submission Guidelines</Link></li>
-              <li><Link href="/peer-review" className="hover:text-red-700 transition-colors">Peer Review Process</Link></li>
-              <li><Link href="/indexing" className="hover:text-red-700 transition-colors">Indexing & Impact</Link></li>
-              <li><Link href="/ethics" className="hover:text-red-700 transition-colors">Publication Ethics</Link></li>
-              <li><Link href="/track" className="hover:text-red-700 transition-colors">Track Manuscript</Link></li>
+              <li><Link href="/guidelines" className="hover:text-red-700 transition-colors"> Terms & Conditions</Link></li>
+              
             </ul>
           </div>
 
@@ -78,7 +74,7 @@ export default function Footer() {
               <li><Link href="/help" className="hover:text-red-700">Help Center</Link></li>
               <li><Link href="/editorial-board" className="hover:text-red-700">Editorial Board</Link></li>
               <li><Link href="/privacy" className="hover:text-red-700">Privacy Policy</Link></li>
-              <li><Link href="/terms" className="hover:text-red-700">Terms of Service</Link></li>
+              <li><Link href="/terms" className="hover:text-red-700">Terms of use </Link></li>
             </ul>
           </div>
         </div>
@@ -90,15 +86,16 @@ export default function Footer() {
             <div className="space-y-4 text-[15px]">
               <div className="flex items-center gap-3">
                 <Mail size={18} className="text-red-700" />
-                <a href="mailto:support@lawnation.com" className="hover:underline">support@lawnation.com</a>
+                <a href="mailto:mail@lawnation.co.in" className="hover:underline">mail@lawnation.co.in</a>
               </div>
               <div className="flex items-center gap-3">
                 <Phone size={18} className="text-red-700" />
-                <span>+91 9876 543 210</span>
+                <span>011-6120 0092</span>
               </div>
               <div className="flex items-start gap-3">
                 <MapPin size={18} className="text-red-700 mt-1 shrink-0" />
-                <span>Supreme Court Lane, New Delhi - 110001</span>
+                <span>101-102, First Floor , Tolstoy House , Tolstoy Marg, New Delhi - 110001
+</span>
               </div>
             </div>
           </div>
@@ -112,9 +109,7 @@ export default function Footer() {
                 </a>
               ))}
             </div>
-            <p className="text-sm">
-              Indexing partner with <span className="text-red-700 font-semibold">Google Scholar & Scopus</span>
-            </p>
+            
           </div>
         </div>
 
@@ -127,8 +122,7 @@ export default function Footer() {
 
         {/* --- Final Copyright --- */}
         <div className="mt-8 pt-8 border-t border-slate-100 text-center text-sm text-slate-400 flex flex-col sm:flex-row justify-between items-center">
-          <p>© {currentYear} Law Nation. All rights reserved.</p>
-          <p>ISSN: 2025-4890 • Impact Factor: 4.5</p>
+          <p>© {currentYear} Law Nation Prime Times Journal , All rights reserved</p>
         </div>
       </div>
     </footer>

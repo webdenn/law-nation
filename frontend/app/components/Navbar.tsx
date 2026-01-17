@@ -314,9 +314,12 @@ export default function Navbar() {
 
   const navItems = [
     { name: "Home", link: "/home" },
+    { name: "Submit a Paper", link: "/submit-paper" },
+    { name: "Recent Issues ", link: "/research-paper" },
+    { name: " Law Nation Prime Talks ", link: "/ Law-Nation-Prime-Talks" },
     { name: "About Us", link: "/about" },
-    { name: "Research Paper", link: "/research-paper" },
-    { name: "Submit Paper", link: "/submit-paper" }
+    
+    
   ]
 
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen)

@@ -5,8 +5,8 @@ import { toast } from "react-toastify";
 import ReviewInterface from "./ReviewInterface";
 import { compareTexts, getChangeStats, formatDifferences } from "../../utilis/diffutilis";
 
-// ✅ LOOP FIX: API_BASE_URL ko component ke bahar nikala taki ye baar-baar recreate na ho
-const API_BASE_URL = "http://localhost:4000";
+// ✅ LOOP FIX: NEXT_PUBLIC_BASE_URL ko component ke bahar nikala taki ye baar-baar recreate na ho
+const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
 // ✅ NEW: Diff Viewer Component
 const DiffViewer = ({ diffData }) => {
@@ -128,7 +128,7 @@ export default function EditorDashboard() {
       // Fetch Original PDF
       const originalPdfUrl = selectedArticle.originalPdfUrl.startsWith("http")
         ? selectedArticle.originalPdfUrl
-        : `${API_BASE_URL}${selectedArticle.originalPdfUrl}`;
+        : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`;
       
       const originalRes = await fetch(originalPdfUrl, {
         headers: { Authorization: `Bearer ${token}` }
@@ -140,7 +140,7 @@ export default function EditorDashboard() {
       // Fetch Edited PDF
       const editedPdfFullUrl = editedPdfUrl.startsWith("http")
         ? editedPdfUrl
-        : `${API_BASE_URL}${editedPdfUrl}`;
+        : `${NEXT_PUBLIC_BASE_URL}${editedPdfUrl}`;
       
       const editedRes = await fetch(editedPdfFullUrl, {
         headers: { Authorization: `Bearer ${token}` }
@@ -182,14 +182,14 @@ export default function EditorDashboard() {
       setIsGeneratingDiff(false);
     }
   }, [changeHistory, selectedArticle, isGeneratingDiff, isMobileMenuOpen]); 
-  // 👆 NOTE: API_BASE_URL yahan se hata diya kyunki wo ab constant hai
+  // 👆 NOTE: NEXT_PUBLIC_BASE_URL yahan se hata diya kyunki wo ab constant hai
 
   const fetchAssignedArticles = async (editorId, token) => {
     try {
       setIsLoading(true);
       const cb = Date.now();
       const res = await fetch(
-        `${API_BASE_URL}/api/articles?assignedEditorId=${editorId}&cb=${cb}`,
+        `${NEXT_PUBLIC_BASE_URL}/api/articles?assignedEditorId=${editorId}&cb=${cb}`,
         {
           headers: { 
             Authorization: `Bearer ${token}`,
@@ -254,7 +254,7 @@ export default function EditorDashboard() {
       const token = localStorage.getItem("editorToken");
       const cb = Date.now();
       const res = await fetch(
-        `${API_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`,
+        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`,
         {
           headers: { 
             Authorization: `Bearer ${token}`,
@@ -307,7 +307,7 @@ export default function EditorDashboard() {
       }
 
       const res = await fetch(
-        `${API_BASE_URL}/api/articles/${
+        `${NEXT_PUBLIC_BASE_URL}/api/articles/${
           selectedArticle.id || selectedArticle._id
         }/upload-corrected`,
         {
@@ -349,7 +349,7 @@ export default function EditorDashboard() {
     try {
       const token = localStorage.getItem("editorToken");
       const res = await fetch(
-        `${API_BASE_URL}/api/articles/${
+        `${NEXT_PUBLIC_BASE_URL}/api/articles/${
           selectedArticle.id || selectedArticle._id
         }/editor-approve`,
         {
@@ -393,7 +393,7 @@ export default function EditorDashboard() {
       const token = localStorage.getItem("editorToken");
       const fullUrl = fileUrl.startsWith("http")
         ? fileUrl
-        : `${API_BASE_URL}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
+        : `${NEXT_PUBLIC_BASE_URL}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
 
       const res = await fetch(fullUrl, {
         method: "GET",
@@ -428,7 +428,7 @@ export default function EditorDashboard() {
       const articleId = selectedArticle.id || selectedArticle._id;
 
       const res = await fetch(
-        `${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`,
+        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`,
         {
           method: "GET",
           headers: { Authorization: `Bearer ${token}` },
@@ -480,7 +480,7 @@ export default function EditorDashboard() {
 
     const cleanUrl = path.startsWith("http")
       ? path
-      : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+      : `${NEXT_PUBLIC_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
     
     return `${cleanUrl}?cb=${Date.now()}`;
   };

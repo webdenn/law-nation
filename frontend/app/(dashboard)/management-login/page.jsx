@@ -72,7 +72,7 @@ const [captchaToken, setCaptchaToken] = useState(null);
     setIsLoading(true)
 
     try {
-      const API_URL = "http://localhost:4000/api"
+      const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
       
       // ✅ FIX 2: Naya payload banaya jisme token bhi hai
       const payload = {
@@ -80,7 +80,7 @@ const [captchaToken, setCaptchaToken] = useState(null);
           recaptchaToken: captchaToken // 🔥 Backend ye dhoond raha hai
       }
 
-      const response = await fetch(`${API_URL}/auth/admin-login`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/auth/admin-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload), // formData ki jagah payload bheja

@@ -97,8 +97,7 @@ const formatDifferences = (diffParts) => {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const API_BASE_URL =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
   const [isLoading, setIsLoading] = useState(true);
 
   const [visualDiffBlobUrl, setVisualDiffBlobUrl] = useState(null);
@@ -164,7 +163,7 @@ export default function AdminDashboard() {
     const token = localStorage.getItem("adminToken");
     const cb = Date.now(); // Unique timestamp
     const res = await fetch(
-      `${API_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`, 
+      `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`, 
       {
         headers: { 
           Authorization: `Bearer ${token}`,
@@ -212,10 +211,10 @@ export default function AdminDashboard() {
       let endpoint;
   
       if (type === "diff") {
-        endpoint = `${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`;
+        endpoint = `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`;
       } else {
         // track / editor-document
-        endpoint = `${API_BASE_URL}/api/articles/change-logs/${changeLogId}/editor-document?format=${format}`;
+        endpoint = `${NEXT_PUBLIC_BASE_URL}/api/articles/change-logs/${changeLogId}/editor-document?format=${format}`;
       }
   
       toast.info(`Generating ${format.toUpperCase()}...`);
@@ -295,7 +294,7 @@ const getPdfUrlToView = () => {
   
   const cleanPath = path.startsWith("http")
     ? path
-    : `${API_BASE_URL}/${path.replace(/^\//, "")}`;
+    : `${NEXT_PUBLIC_BASE_URL}/${path.replace(/^\//, "")}`;
 
   // Add timestamp to prevent PDF caching
   return `${cleanPath}?cb=${Date.now()}`;
@@ -337,7 +336,7 @@ const getPdfUrlToView = () => {
 
       // 1. Fetch Original PDF
       const originalRes = await fetch(
-        selectedArticle.originalPdfUrl.startsWith("http") ? selectedArticle.originalPdfUrl : `${API_BASE_URL}${selectedArticle.originalPdfUrl}`, 
+        selectedArticle.originalPdfUrl.startsWith("http") ? selectedArticle.originalPdfUrl : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`, 
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const originalBlob = await originalRes.blob();
@@ -345,7 +344,7 @@ const getPdfUrlToView = () => {
 
       // 2. Fetch Current (Edited) PDF
       const editedRes = await fetch(
-        selectedArticle.currentPdfUrl.startsWith("http") ? selectedArticle.currentPdfUrl : `${API_BASE_URL}${selectedArticle.currentPdfUrl}`, 
+        selectedArticle.currentPdfUrl.startsWith("http") ? selectedArticle.currentPdfUrl : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.currentPdfUrl}`, 
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const editedBlob = await editedRes.blob();
@@ -379,7 +378,7 @@ const getPdfUrlToView = () => {
     } finally {
       setIsGeneratingDiff(false);
     }
-  }, [selectedArticle, API_BASE_URL, isGeneratingDiff, visualDiffBlobUrl, pdfViewMode]);
+  }, [selectedArticle, NEXT_PUBLIC_BASE_URL, isGeneratingDiff, visualDiffBlobUrl, pdfViewMode]);
 
   // ✅ 2. Phir useEffect lagao (Data Fetching)
   useEffect(() => {
@@ -398,11 +397,11 @@ const getPdfUrlToView = () => {
 
         const [summaryRes, metricsRes, statusRes, timelineRes, editorsRes] =
           await Promise.all([
-            fetch(`${API_BASE_URL}/api/admin/dashboard/summary?cb=${cb}`, { headers }),
-            fetch(`${API_BASE_URL}/api/admin/dashboard/time-metrics?cb=${cb}`, { headers }),
-            fetch(`${API_BASE_URL}/api/admin/dashboard/status-distribution?cb=${cb}`, { headers }),
-            fetch(`${API_BASE_URL}/api/admin/dashboard/articles-timeline?limit=50&cb=${cb}`, { headers }),
-            fetch(`${API_BASE_URL}/api/users/editors?cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/summary?cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/time-metrics?cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/status-distribution?cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/articles-timeline?limit=50&cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/api/users/editors?cb=${cb}`, { headers }),
           ]);
 
         // 1. Summary Data
@@ -489,7 +488,7 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
       : `/${relativeUrl}`;
 
     // 🔥 CHANGE: ?t=${Date.now()} add kiya taaki browser naya version maange
-    const fullUrl = `${API_BASE_URL}${cleanPath}?t=${Date.now()}`;
+    const fullUrl = `${NEXT_PUBLIC_BASE_URL}${cleanPath}?t=${Date.now()}`;
 
     console.log("Opening Fresh URL:", fullUrl); 
     window.open(fullUrl, "_blank");
@@ -521,7 +520,7 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
     try {
       const token = localStorage.getItem("adminToken");
       const response = await fetch(
-        `${API_BASE_URL}/api/articles/${articleId}/assign-editor`,
+        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/assign-editor`,
         {
           method: "PATCH",
           headers: {
@@ -567,7 +566,7 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
         return;
       }
       const response = await fetch(
-        `${API_BASE_URL}/api/articles/${id}/admin-publish`,
+        `${NEXT_PUBLIC_BASE_URL}/api/articles/${id}/admin-publish`,
         {
           method: "PATCH",
           headers: {
@@ -604,7 +603,7 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
     try {
       const token = localStorage.getItem("adminToken");
       // Backend API calling
-      const response = await fetch(`${API_BASE_URL}/api/articles/${id}`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/articles/${id}`, {
         method: "DELETE", // Backend route.ts mein delete method hai
         headers: {
           Authorization: `Bearer ${token}`,

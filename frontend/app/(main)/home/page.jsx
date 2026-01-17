@@ -14,7 +14,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
 
-  const API_BASE_URL = "http://localhost:4000";
+  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
   // 1. Redux se login status check karna
   const { user } = useSelector((state) => state.auth);
@@ -69,10 +69,10 @@ export default function HomePage() {
           params.append("category", currentFilters.category);
         }
 
-        url = `${API_BASE_URL}/api/articles/search?${params.toString()}`;
+        url = `${NEXT_PUBLIC_BASE_URL}/api/articles/search?${params.toString()}`;
       } else {
         // Normal Load (No Search)
-        url = `${API_BASE_URL}/api/articles/published`;
+        url = `${NEXT_PUBLIC_BASE_URL}/api/articles/published`;
       }
 
       console.log("Fetching URL:", url);
@@ -254,7 +254,7 @@ export default function HomePage() {
                 href="/about"
                 className="text-sm font-semibold text-red-700 hover:text-red-800"
               >
-                Learn more about Law Nation
+                Learn More About Law Nation Prime Times Journal 
               </Link>
             </div>
 
@@ -301,7 +301,7 @@ export default function HomePage() {
                   {showAdvanced ? "Hide advanced filters" : "Advanced filters"}
                 </button>
                 <span className="h-1 w-1 rounded-full bg-gray-300" />
-                <span>Filter by year, category, and sort order</span>
+                
               </div>
 
               {showAdvanced && (
@@ -344,13 +344,13 @@ export default function HomePage() {
                   href="/submit-paper"
                   className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-red-700 text-white font-semibold hover:bg-red-800 transition"
                 >
-                  Submit your paper
+                  Submit Manuscript
                 </Link>
                 <Link
                   href="/research-paper"
                   className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-neutral-300 text-black font-semibold hover:border-red-300 transition"
                 >
-                  Browse collections
+                   Browse Issues
                 </Link>
               </div>
             </form>
@@ -365,7 +365,7 @@ export default function HomePage() {
           <div className="mb-12">
             {/* text-center se headline beech mein aa jayegi, agar left mein chahiye toh text-center hata dena */}
             <h2 className="text-4xl font-bold text-black leading-tight text-center">
-              Top <span className="text-gray-900">Articles</span>
+               Latest  <span className="text-black"> Updates</span>
             </h2>
           </div>
 
@@ -388,7 +388,7 @@ export default function HomePage() {
                           src={
                             item.thumbnailUrl.startsWith("http")
                               ? item.thumbnailUrl
-                              : `${API_BASE_URL}${item.thumbnailUrl}`
+                              : `${NEXT_PUBLIC_BASE_URL}${item.thumbnailUrl}`
                           }
                           alt={item.title}
                           className="w-full h-full object-cover"
@@ -437,7 +437,7 @@ export default function HomePage() {
           <div className="mt-16 text-center">
             <Link href="/articles">
               <button className="bg-red-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-gray-800 transition">
-                View All Articles Library
+                View All 
               </button>
             </Link>
           </div>

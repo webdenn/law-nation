@@ -12,7 +12,7 @@ export default function AddEditorPage() {
   const [loading, setLoading] = useState(false);
   
   // Backend URL
-  const API_BASE_URL = "http://localhost:4000"; 
+  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
   const handleInvite = async (e) => {
     e.preventDefault();
@@ -30,7 +30,7 @@ export default function AddEditorPage() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/users/invite-editor`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/users/invite-editor`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

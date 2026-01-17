@@ -23,7 +23,7 @@ export default function AllArticlesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const API_BASE_URL = "http://localhost:4000";
+  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
   // --- States ---
   const [articles, setArticles] = useState([]);
@@ -55,10 +55,10 @@ export default function AllArticlesPage() {
         const params = new URLSearchParams();
         // Backend ko 'q' bhejo, wo title/author/keyword sab search karega
         params.append("q", query.trim()); 
-        url = `${API_BASE_URL}/api/articles/search?${params.toString()}`;
+        url = `${NEXT_PUBLIC_BASE_URL}/api/articles/search?${params.toString()}`;
       } else {
         // Warna saare published articles load karo
-        url = `${API_BASE_URL}/api/articles/published`;
+        url = `${NEXT_PUBLIC_BASE_URL}/api/articles/published`;
       }
 
       const res = await fetch(url);
@@ -176,7 +176,7 @@ export default function AllArticlesPage() {
                 <div className="relative h-52 overflow-hidden bg-gray-100">
                   {item.thumbnailUrl ? (
                     <img
-                      src={item.thumbnailUrl.startsWith("http") ? item.thumbnailUrl : `${API_BASE_URL}${item.thumbnailUrl}`}
+                      src={item.thumbnailUrl.startsWith("http") ? item.thumbnailUrl : `${NEXT_PUBLIC_BASE_URL}${item.thumbnailUrl}`}
                       alt={item.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       onError={(e) => e.target.style.display = 'none'}

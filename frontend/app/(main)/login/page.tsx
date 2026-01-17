@@ -12,6 +12,7 @@ import ReCAPTCHA from "react-google-recaptcha";
 export default function Login() {
   const router = useRouter();
   const dispatch = useDispatch();
+  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
   // ✅ Change 2: Ye lines Component ke ANDAR honi chahiye
   const searchParams = useSearchParams();
@@ -49,7 +50,7 @@ export default function Login() {
         recaptchaToken: captchaToken // 🔥 YAHAN ADD KARNA HAI
       };
 
-      const response = await fetch("http://localhost:4000/api/auth/login", {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload), // Ab payload bhejo, sirf formData nahi

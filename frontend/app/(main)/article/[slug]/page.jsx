@@ -77,7 +77,7 @@ export default function ArticlePage({ params }) {
   const unwrappedParams = use(params);
   const slug = unwrappedParams?.slug;
 
-  const API_BASE_URL = "http://localhost:4000";
+  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
   const { token } = useSelector((state) => state.auth);
 
   const [article, setArticle] = useState(null);
@@ -88,7 +88,7 @@ export default function ArticlePage({ params }) {
   const getPdfUrl = (url) => {
     if (!url) return "#";
     if (url.startsWith("http")) return url;
-    return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+    return `${NEXT_PUBLIC_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export default function ArticlePage({ params }) {
 
         // ✅ API URL Fix: Backend dev ke mutabiq '/content' hata diya
         const res = await fetch(
-          `${API_BASE_URL}/api/articles/slug/${slug}/content`,
+          `${NEXT_PUBLIC_BASE_URL}/api/articles/slug/${slug}/content`,
           {
             method: "GET",
             headers: headers,
@@ -147,7 +147,7 @@ export default function ArticlePage({ params }) {
 
       // ✅ Database ID use karein kyunki slug se download nahi hota
       const res = await fetch(
-        `${API_BASE_URL}/api/articles/${article.id || article._id}/${endpoint}`,
+        `${NEXT_PUBLIC_BASE_URL}/api/articles/${article.id || article._id}/${endpoint}`,
         {
           method: "GET",
           headers: {
@@ -234,7 +234,7 @@ export default function ArticlePage({ params }) {
                 src={
                   article.thumbnailUrl.startsWith("http")
                     ? article.thumbnailUrl
-                    : `${API_BASE_URL}${article.thumbnailUrl}`
+                    : `${NEXT_PUBLIC_BASE_URL}${article.thumbnailUrl}`
                 }
                 alt={article.title}
                 className="w-full h-full object-cover"

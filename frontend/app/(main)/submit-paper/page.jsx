@@ -252,10 +252,9 @@ export default function SubmitPaperPage() {
       data.append("recaptchaToken", captchaToken);
 
       const token = localStorage.getItem("authToken");
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/articles";
+      const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
-      const response = await fetch(`${API_URL}/submit-with-images`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/submit-with-images`, {
         method: "POST",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
