@@ -188,6 +188,27 @@ export default function ArticlePage({ params }) {
       </div>
     );
 
+
+  // Calculate guest content
+  const guestContent = (() => {
+    if (token || !article) return "";
+
+    // Helper to strip HTML tags via regex (SSR safe)
+    const stripHtml = (html) => html.replace(/<[^>]*>?/gm, '');
+
+    let textContent = article.content;
+    if (!textContent || textContent.includes("Text extraction failed")) {
+      textContent = article.contentHtml ? stripHtml(article.contentHtml) : (article.abstract || "");
+    }
+
+    if (!textContent) return "";
+
+    const words = textContent.trim().split(/\s+/);
+    return words.length > 250
+      ? words.slice(0, 250).join(" ") + "..."
+      : textContent;
+  })();
+
   if (error || !article)
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
@@ -292,27 +313,21 @@ export default function ArticlePage({ params }) {
               </div>
             )
           ) : (
-            // 🔒 Guest: Show Truncated Plain Text Preview (Preserve Structure)
-            <div className="whitespace-pre-wrap">
-              {(article.content && !article.content.includes("Text extraction failed"))
-                ? (
-                  // Use character slice (~250 words * 6 chars) to preserve newlines/paragraphs
-                  article.content.length > 1500
-                    ? article.content.substring(0, 1500) + "..."
-                    : article.content
-                )
-                : article.abstract || "Preview unavailable."}
+            // 🔒 Guest: Show Truncated Plain Text Preview
+            <div className="whitespace-pre-wrap text-lg text-gray-700 leading-relaxed">
+              {guestContent}
             </div>
           )}
 
           {!token && (
-            <div className="absolute bottom-0 left-0 w-full h-48 bg-gradient-to-t from-white via-white/90 to-transparent flex items-end justify-center pb-0">
-              <div className="w-full text-center bg-white pt-4">
+            <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white via-white/80 to-transparent flex items-end justify-center pb-0">
+              <div className="w-full text-center bg-white/50 backdrop-blur-sm pt-4 pb-2">
                 <Link
                   href={`/login?redirect=${pathname}`}
-                  className="inline-flex items-center justify-center bg-red-700 text-white font-semibold px-8 py-3 rounded-full hover:bg-red-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  className="inline-flex items-center justify-center bg-gradient-to-r from-red-700 to-red-600 text-white font-semibold px-8 py-3 rounded-full hover:from-red-800 hover:to-red-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                 >
-                  <LockIcon /> Login to Read Full Article
+                  <LockIcon />
+                  <span className="ml-2">Login to Read Full Article</span>
                 </Link>
               </div>
             </div>
