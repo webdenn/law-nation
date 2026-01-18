@@ -895,7 +895,7 @@ export default function SubmitPaperPage() {
                         Drag & drop your file here
                       </p>
                       <p className="text-xs sm:text-sm text-gray-600 mb-4 sm:mb-6">
-                        Supports: DOCX, PDF, MD. Max size: 10MB.
+                        Supports Only: PDF
                       </p>
                       <label htmlFor="file-upload">
                         <span className="inline-block px-4 sm:px-6 py-2 text-sm sm:text-base bg-gray-200 text-gray-700 rounded-md cursor-pointer hover:bg-gray-300 transition-colors font-medium">
