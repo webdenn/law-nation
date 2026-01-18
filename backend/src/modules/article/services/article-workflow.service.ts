@@ -1,4 +1,5 @@
 import { prisma } from "@/db/db.js";
+import path from "path";
 import {
   NotFoundError,
   BadRequestError,
@@ -11,7 +12,7 @@ import {
 } from "@/utils/file-conversion.utils.js";
 import {
   calculateFileDiff,
-  generateDiffSummary,
+  // generateDiffSummary, // COMMENTED: Frontend handles diff calculation
   getFileTypeFromPath,
 } from "@/utils/diff-calculator.utils.js";
 import {
@@ -25,6 +26,7 @@ import {
   sendEditorReassignmentNotification,
 } from "@/utils/email.utils.js";
 import { articleHistoryService } from "../article-history.service.js";
+import { adobeService } from "@/services/adobe.service.js";
 import type {
   AssignEditorData,
   UploadCorrectedPdfData,
@@ -197,16 +199,131 @@ export class ArticleWorkflowService {
       throw new ForbiddenError("You are not assigned to this article");
     }
 
-    if (
-      article.status !== "ASSIGNED_TO_EDITOR" &&
-      article.status !== "EDITOR_EDITING"
-    ) {
+    // Allow corrections in multiple statuses
+    const validStatuses = [
+      "ASSIGNED_TO_EDITOR",
+      "EDITOR_EDITING", 
+      "EDITOR_APPROVED", // Allow re-editing
+      "PENDING_ADMIN_REVIEW" // Allow editing before assignment
+    ];
+
+    if (!validStatuses.includes(article.status)) {
       throw new BadRequestError(
-        "Article is not in correct status for corrections"
+        `Article status '${article.status}' does not allow corrections. Valid statuses: ${validStatuses.join(', ')}`
       );
     }
 
-    const fileType = getFileType(data.pdfUrl);
+  // NEW: Handle document vs article processing differently
+  if (article.contentType === 'DOCUMENT') {
+    return await this.handleDocumentEdit(article, editorId, data);
+  } else {
+    return await this.handleArticleEdit(article, editorId, data);
+  }
+  }
+
+  // NEW: Handle document editing (DOCX files)
+  private async handleDocumentEdit(article: any, editorId: string, data: UploadCorrectedPdfData) {
+    console.log(`📄 [Document Edit] Processing DOCX upload for document ${article.id}`);
+
+    // For documents, the uploaded file should be DOCX
+    let docxPath = data.pdfUrl; // This is actually a DOCX file for documents
+    
+    // Fix path resolution - convert relative path to absolute if needed
+    if (docxPath.startsWith('/uploads/')) {
+      docxPath = docxPath.replace('/uploads/', 'uploads/');
+      docxPath = path.join(process.cwd(), docxPath);
+      console.log(`📂 [Document Edit] Resolved absolute path: ${docxPath}`);
+    }
+    
+    // Validate it's actually a DOCX file
+    if (!docxPath.toLowerCase().endsWith('.docx')) {
+      throw new Error('Document workflow requires DOCX files');
+    }
+    
+    // Verify file exists
+    const fs = await import('fs');
+    if (!fs.existsSync(docxPath)) {
+      throw new Error(`DOCX file not found: ${docxPath}`);
+    }
+    
+    // Add watermark to edited DOCX
+    const watermarkData = {
+      userName: 'LAW NATION EDITOR',
+      downloadDate: new Date(),
+      articleTitle: article.title,
+      articleId: article.id,
+      frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+    };
+
+    const watermarkedDocxPath = docxPath.replace(/\.docx$/i, '_edited_watermarked.docx');
+    await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
+
+    // Convert edited DOCX to PDF for preview using Adobe Services
+    const pdfPath = docxPath.replace(/\.docx$/i, '_edited.pdf');
+    console.log(`🔄 [Adobe] Converting DOCX to PDF for preview: ${watermarkedDocxPath} → ${pdfPath}`);
+    await adobeService.convertDocxToPdf(watermarkedDocxPath, pdfPath);
+
+    // Convert absolute paths back to relative for database storage
+    const relativePdfPath = pdfPath.replace(process.cwd(), '').replace(/\\/g, '/').replace(/^\//, '');
+    const relativeDocxPath = watermarkedDocxPath.replace(process.cwd(), '').replace(/\\/g, '/').replace(/^\//, '');
+
+    // Update article with edited versions
+    await prisma.article.update({
+      where: { id: article.id },
+      data: {
+        currentPdfUrl: `/${relativePdfPath}`,
+        currentWordUrl: `/${relativeDocxPath}`,
+        status: "EDITOR_APPROVED",
+      },
+    });
+
+    // Create change log for document
+    await prisma.articleChangeLog.create({
+      data: {
+        articleId: article.id,
+        versionNumber: 2, // Simple versioning for documents
+        oldFileUrl: article.currentPdfUrl,
+        newFileUrl: `/${relativePdfPath}`,
+        fileType: "DOCX",
+        diffData: { type: "document_edit", message: "Document edited by editor using Adobe Services" } as any,
+        editedBy: editorId,
+        status: "approved",
+        comments: data.comments || "Document edited with Adobe conversion",
+      },
+    });
+
+    console.log(`✅ [Document Edit] Document ${article.id} processed successfully with Adobe Services`);
+
+    return {
+      message: "Document edited successfully using Adobe Services",
+      article: { id: article.id, status: "EDITOR_APPROVED" },
+    };
+  }
+
+  // Existing article editing logic - Enhanced to detect DOCX uploads
+  private async handleArticleEdit(article: any, editorId: string, data: UploadCorrectedPdfData) {
+    // Check if this is a DOCX upload - if so, treat as document workflow
+    const isDocxUpload = data.pdfUrl.toLowerCase().endsWith('.docx');
+    
+    if (isDocxUpload) {
+      console.log(`📄 [Article Edit] DOCX detected - switching to document workflow for ${article.id}`);
+      
+      // Update article to document type if not already
+      if (article.contentType !== 'DOCUMENT') {
+        await prisma.article.update({
+          where: { id: article.id },
+          data: {
+            contentType: 'DOCUMENT',
+            documentType: 'DOCX'
+          }
+        });
+        article.contentType = 'DOCUMENT'; // Update local object
+      }
+      
+      // Use document workflow with Adobe services
+      return await this.handleDocumentEdit(article, editorId, data);
+    }
+
     console.log(
       `📄 [Editor Upload] Converting file to both formats: ${data.pdfUrl}`
     );
@@ -217,11 +334,12 @@ export class ArticleWorkflowService {
 
     console.log(`📊 [Diff] Calculating changes...`);
     const diff = await calculateFileDiff(oldFilePath, newFilePath);
-    const diffSummary = generateDiffSummary(diff);
+    // const diffSummary = generateDiffSummary(diff); // COMMENTED: Frontend handles diff calculation
+    const diffSummary = "Changes made - view in frontend diff viewer";
     console.log(`✅ [Diff] ${diffSummary}`);
 
     const lastChangeLog = await prisma.articleChangeLog.findFirst({
-      where: { articleId },
+      where: { articleId: article.id },
       orderBy: { versionNumber: "desc" },
     });
     const versionNumber = (lastChangeLog?.versionNumber || 1) + 1;
@@ -247,12 +365,12 @@ export class ArticleWorkflowService {
     });
 
     console.log(
-      `📝 [Change Log] Created version ${versionNumber} for article ${articleId}`
+      `📝 [Change Log] Created version ${versionNumber} for article ${article.id}`
     );
 
     let pdfContent = { text: "", html: "", images: [] as string[] };
     try {
-      pdfContent = await extractPdfContent(pdfPath, articleId);
+      pdfContent = await extractPdfContent(pdfPath, article.id);
     } catch (error) {
       console.error("Failed to extract PDF content:", error);
     }
@@ -268,7 +386,7 @@ export class ArticleWorkflowService {
     });
 
     const updatedArticle = await prisma.article.update({
-      where: { id: articleId },
+      where: { id: article.id },
       data: {
         currentPdfUrl: pdfPath,
         currentWordUrl: wordPath,
@@ -398,7 +516,7 @@ export class ArticleWorkflowService {
       updateData.currentPdfUrl = newPdfUrl;
 
       try {
-        const pdfContent = await extractPdfContent(newPdfUrl, articleId);
+        const pdfContent = await extractPdfContent(newPdfUrl, article.id);
         if (pdfContent.text) {
           updateData.content = pdfContent.text;
           updateData.contentHtml = pdfContent.html;
@@ -451,8 +569,80 @@ export class ArticleWorkflowService {
       );
     }
 
+    // NEW: Handle document vs article publishing differently
+    if (article.contentType === 'DOCUMENT') {
+      return await this.publishDocument(article, adminId);
+    } else {
+      return await this.publishArticle(article, adminId);
+    }
+  }
+
+  // NEW: Publish document with Adobe text extraction from edited version
+  private async publishDocument(article: any, adminId: string) {
+    console.log(`📄 [Document Publish] Publishing document ${article.id} with Adobe text extraction from edited version`);
+
+    let extractedText = '';
+    
+    // Extract text from edited DOCX using Adobe services (corrected version for users)
+    if (article.currentWordUrl) {
+      try {
+        console.log(`🔍 [Adobe Extract] Extracting text from edited version: ${article.currentWordUrl}`);
+        extractedText = await adobeService.extractTextFromDocx(article.currentWordUrl);
+        console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from edited version`);
+      } catch (error) {
+        console.error('❌ [Adobe Extract] Text extraction failed:', error);
+        extractedText = 'Text extraction failed. Please contact administrator.';
+      }
+    } else {
+      console.warn('⚠️ [Document Publish] No edited DOCX version available for text extraction');
+      extractedText = 'Document not yet edited. Please contact administrator.';
+    }
+
+    // Update article with extracted text and published status
+    const updatedArticle = await prisma.article.update({
+      where: { id: article.id },
+      data: {
+        status: "PUBLISHED",
+        approvedAt: new Date(),
+        content: extractedText, // Store text from edited version for user display
+      },
+    });
+
+    // Mark change logs as published
+    await prisma.articleChangeLog.updateMany({
+      where: { articleId: article.id, status: "approved" },
+      data: { status: "published" },
+    });
+
+    // Complete editor assignment
+    if (article.assignedEditorId) {
+      await articleHistoryService.markAsCompleted(
+        article.id,
+        article.assignedEditorId
+      );
+    }
+
+    // Notify uploader
+    await notifyUploaderOfPublication(
+      article.id,
+      article.title,
+      article.authorEmail,
+      article.authorName,
+      "Document has been professionally edited and published - users will see the corrected version"
+    );
+
+    console.log(`✅ [Document Publish] Document ${article.id} published successfully with edited version text extraction`);
+
+    return {
+      message: "Document published successfully with edited version text extraction",
+      article: updatedArticle,
+      extractedText: extractedText,
+    };
+  }
+
+  // Existing article publishing logic - Enhanced with text extraction
+  private async publishArticle(article: any, adminId: string) {
     let finalDiffSummary = "No changes made";
-    let finalDiffData = null;
 
     if (article.originalPdfUrl !== article.currentPdfUrl) {
       try {
@@ -463,8 +653,8 @@ export class ArticleWorkflowService {
           article.originalPdfUrl,
           article.currentPdfUrl
         );
-        finalDiffData = finalDiff;
-        finalDiffSummary = generateDiffSummary(finalDiff);
+        // finalDiffSummary = generateDiffSummary(finalDiff); // COMMENTED: Frontend handles diff calculation
+        finalDiffSummary = "Changes made - view in frontend diff viewer";
         console.log(`✅ [Final Diff] ${finalDiffSummary}`);
       } catch (error) {
         console.error("❌ [Final Diff] Failed to calculate:", error);
@@ -476,28 +666,48 @@ export class ArticleWorkflowService {
       );
     }
 
+    // NEW: Extract text from current/edited version for user display
+    let extractedText = '';
+    
+    if (article.currentWordUrl) {
+      try {
+        console.log(`🔍 [Article Publish] Extracting text from edited version: ${article.currentWordUrl}`);
+        extractedText = await adobeService.extractTextFromDocx(article.currentWordUrl);
+        console.log(`✅ [Article Publish] Extracted ${extractedText.length} characters from edited version`);
+      } catch (error) {
+        console.error('❌ [Article Publish] Text extraction failed:', error);
+        // Fallback to existing content if available
+        extractedText = article.content || 'Text extraction failed. Please contact administrator.';
+      }
+    } else if (article.content) {
+      // Use existing extracted content if no Word version available
+      extractedText = article.content;
+      console.log(`ℹ️ [Article Publish] Using existing extracted content (${extractedText.length} characters)`);
+    }
+
     const updatedArticle = await prisma.article.update({
-      where: { id: articleId },
+      where: { id: article.id },
       data: {
         status: "PUBLISHED",
         approvedAt: new Date(),
+        content: extractedText, // Store extracted text from edited version
       },
     });
 
     await prisma.articleChangeLog.updateMany({
-      where: { articleId, status: "approved" },
+      where: { articleId: article.id, status: "approved" },
       data: { status: "published" },
     });
 
     if (article.assignedEditorId) {
       await articleHistoryService.markAsCompleted(
-        articleId,
+        article.id,
         article.assignedEditorId
       );
     }
 
     await notifyUploaderOfPublication(
-      articleId,
+      article.id,
       article.title,
       article.authorEmail,
       article.authorName,
@@ -506,7 +716,7 @@ export class ArticleWorkflowService {
 
     if (article.secondAuthorEmail && article.secondAuthorName) {
       await notifyUploaderOfPublication(
-        articleId,
+        article.id,
         article.title,
         article.secondAuthorEmail,
         article.secondAuthorName,
@@ -515,12 +725,13 @@ export class ArticleWorkflowService {
     }
 
     console.log(
-      `✅ [Admin Publish] Article ${articleId} published by admin ${adminId}`
+      `✅ [Admin Publish] Article ${article.id} published by admin ${adminId} with text extraction`
     );
 
     return {
       article: updatedArticle,
       diffSummary: finalDiffSummary,
+      extractedText: extractedText,
     };
   }
 

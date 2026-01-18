@@ -12,6 +12,7 @@ import {
   sendArticleVerificationCodeEmail,
   sendCoAuthorNotification,
 } from "@/utils/email.utils.js";
+import { adobeService } from "@/services/adobe.service.js";
 import type {
   ArticleSubmissionData,
   ArticleVerificationMetadata,
@@ -22,7 +23,7 @@ export class ArticleSubmissionService {
 
   async submitArticle(data: ArticleSubmissionData, userId?: string) {
     if (userId) {
-      return await this.createArticleDirectly(data, userId);
+      return await this.createArticleDirectly(data);
     }
     return await this.createVerificationRecord(data);
   }
@@ -31,7 +32,6 @@ export class ArticleSubmissionService {
 
   private async createArticleDirectly(
     data: ArticleSubmissionData,
-    userId: string
   ) {
     const fileType = getFileType(data.pdfUrl);
 
@@ -80,30 +80,40 @@ export class ArticleSubmissionService {
         thumbnailUrl: data.thumbnailUrl || null,
         imageUrls: data.imageUrls || [],
         status: "PENDING_ADMIN_REVIEW",
+        // NEW: Set content type and document type
+        contentType: (data as any).contentType || "ARTICLE",
+        documentType: (data as any).documentType || null,
       },
     });
 
-    console.log(`🔍 [PDF Extract] Starting extraction...`);
-    let pdfContent = { text: "", html: "", images: [] as string[] };
-    try {
-      pdfContent = await extractPdfContent(pdfPath, article.id);
-    } catch (error) {
-      console.error("Failed to extract PDF content:", error);
+    // NEW: Handle document processing if this is a document upload
+    if ((data as any).contentType === 'DOCUMENT') {
+      console.log(`📄 [Document] Starting Adobe processing for document ${article.id}`);
+      this.processDocumentInBackground(article.id, pdfPath).catch(console.error);
+    } else {
+      // Existing article processing
+      console.log(`🔍 [PDF Extract] Starting extraction...`);
+      let pdfContent = { text: "", html: "", images: [] as string[] };
+      try {
+        pdfContent = await extractPdfContent(pdfPath, article.id);
+      } catch (error) {
+        console.error("Failed to extract PDF content:", error);
+      }
+
+      const allImageUrls = [
+        ...(data.imageUrls || []),
+        ...(pdfContent.images || []),
+      ];
+
+      await prisma.article.update({
+        where: { id: article.id },
+        data: {
+          content: pdfContent.text || null,
+          contentHtml: pdfContent.html || null,
+          imageUrls: allImageUrls,
+        },
+      });
     }
-
-    const allImageUrls = [
-      ...(data.imageUrls || []),
-      ...(pdfContent.images || []),
-    ];
-
-    await prisma.article.update({
-      where: { id: article.id },
-      data: {
-        content: pdfContent.text || null,
-        contentHtml: pdfContent.html || null,
-        imageUrls: allImageUrls,
-      },
-    });
 
     await sendArticleSubmissionConfirmation(
       data.authorEmail,
@@ -131,7 +141,7 @@ export class ArticleSubmissionService {
   //Create verification record for guest users
 
   private async createVerificationRecord(data: ArticleSubmissionData) {
-    const { token, code, expiresAt } =
+    const { code, expiresAt } =
       await VerificationService.createVerificationRecord(
         data.authorEmail,
         "ARTICLE",
@@ -421,6 +431,51 @@ export class ArticleSubmissionService {
       message: "Verification code resent successfully!",
       expiresAt: verification.ttl,
     };
+  }
+
+  /**
+   * NEW: Process document in background using Adobe services
+   */
+  private async processDocumentInBackground(articleId: string, pdfPath: string): Promise<void> {
+    try {
+      console.log(`⚙️ [Document] Processing document ${articleId} with Adobe services`);
+
+      // 1. Convert PDF to DOCX using Adobe
+      const docxPath = pdfPath.replace('.pdf', '.docx');
+      await adobeService.convertPdfToDocx(pdfPath, docxPath);
+
+      // 2. Add watermark to DOCX
+      const watermarkData = {
+        userName: 'LAW NATION USER',
+        downloadDate: new Date(),
+        articleTitle: 'Document',
+        articleId: articleId,
+        frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+      };
+
+      const watermarkedDocxPath = docxPath.replace('.docx', '_watermarked.docx');
+      await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
+
+      // Update article record with DOCX URL
+      await prisma.article.update({
+        where: { id: articleId },
+        data: {
+          currentWordUrl: watermarkedDocxPath,
+        },
+      });
+
+      // Clean up temporary files
+      const fs = await import('fs');
+      if (fs.existsSync(docxPath)) {
+        fs.unlinkSync(docxPath);
+      }
+
+      console.log(`✅ [Document] Adobe processing completed for ${articleId}`);
+
+    } catch (error) {
+      console.error(`❌ [Document] Adobe processing failed for ${articleId}:`, error);
+      // Document remains in PENDING_ADMIN_REVIEW status for manual handling
+    }
   }
 }
 

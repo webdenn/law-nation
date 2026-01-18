@@ -7,7 +7,7 @@ import {
 import { extractPdfContent } from "@/utils/pdf-extract.utils.js";
 import {
   calculateFileDiff,
-  generateDiffSummary,
+  // generateDiffSummary, // COMMENTED: Frontend handles diff calculation
 } from "@/utils/diff-calculator.utils.js";
 import type { ArticleListFilters } from "../types/article-submission.type.js";
 //Article Query Service Handles listing, getting, and reading articles
@@ -132,6 +132,7 @@ export class ArticleQueryService {
     return article;
   }
   //Get article content for reading (public endpoint with optional auth)
+  // NOTE: Content field now contains text extracted from edited/corrected version during publishing
   async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
     const article = await prisma.article.findUnique({
       where: {
@@ -414,7 +415,8 @@ export class ArticleQueryService {
           article.currentPdfUrl
         );
 
-        const finalDiffSummary = generateDiffSummary(finalDiff);
+        // const finalDiffSummary = generateDiffSummary(finalDiff); // COMMENTED: Frontend handles diff calculation
+        const finalDiffSummary = "Changes made - view in frontend diff viewer";
         console.log(`✅ [Author View] ${finalDiffSummary}`);
 
         return {
@@ -481,7 +483,8 @@ export class ArticleQueryService {
         editedAt: log.editedAt,
         status: log.status,
         comments: log.comments,
-        diffSummary: generateDiffSummary(log.diffData as any),
+        // diffSummary: generateDiffSummary(log.diffData as any), // COMMENTED: Frontend handles diff calculation
+        diffSummary: "Changes made - view in frontend diff viewer",
         diffData: log.diffData,
         editorDocumentUrl: log.editorDocumentUrl,
         editorDocumentType: log.editorDocumentType,

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth, optionalAuth } from "@/middlewares/auth.middleware.js";
 import { requirePermission } from "@/middlewares/require-premission.middleware.js";
 import { validateRecaptcha } from "@/middlewares/recaptcha.middleware.js";
-import { uploadDocument, uploadPdfOnly, uploadOptionalPdf, uploadImage, uploadMultipleImages, uploadArticleFiles, uploadEditorFiles } from "@/middlewares/upload.middleware.js";
+import { uploadDocument, uploadPdfOnly, uploadOptionalPdf, uploadImage, uploadMultipleImages, uploadArticleFiles, uploadEditorFiles, uploadDocxOnly } from "@/middlewares/upload.middleware.js";
 import { articleController } from "./article.controller.js";
 
 const router = Router();
@@ -188,6 +188,36 @@ router.patch(
   articleController.uploadCorrectedPdf.bind(articleController)
 );
 
+// NEW: Editor upload edited DOCX for documents
+router.patch(
+  "/:id/upload-edited-docx",
+  requirePermission("article", "write"),
+  uploadDocxOnly, // Accept only DOCX files
+  articleController.uploadEditedDocx.bind(articleController)
+);
+
+// NEW: Upload document (explicit document workflow) - PDF ONLY for users
+router.post(
+  "/submit-document",
+  optionalAuth,
+  uploadDocument, // Accept PDF ONLY (users can't upload DOCX)
+  validateRecaptcha,
+  (req: any, res: any, next: any) => {
+    // Force document classification - users can only upload PDF
+    req.body.contentType = 'DOCUMENT';
+    req.body.documentType = 'PDF'; // Always PDF for user uploads
+    next();
+  },
+  articleController.submitArticle.bind(articleController)
+);
+
+// NEW: Admin extract text from document (for publishing)
+router.patch(
+  "/:id/extract-text",
+  requirePermission("article", "write"),
+  articleController.extractDocumentText.bind(articleController)
+);
+
 // List articles with filters
 router.get(
   "/",
@@ -207,6 +237,22 @@ router.get(
   "/:id/download/word",
   requireAuth,
   articleController.downloadArticleWord.bind(articleController)
+);
+
+// NEW: Download original user PDF converted to DOCX (for editors/admins)
+router.get(
+  "/:id/download/original-docx",
+  requireAuth,
+  requirePermission("article", "read"),
+  articleController.downloadOriginalDocx.bind(articleController)
+);
+
+// NEW: Download editor's uploaded DOCX (explicit route for admins)
+router.get(
+  "/:id/download/editor-docx",
+  requireAuth,
+  requirePermission("article", "read"),
+  articleController.downloadEditorDocx.bind(articleController)
 );
 
 

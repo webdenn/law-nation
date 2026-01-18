@@ -10,24 +10,33 @@ import { generateDiffWord } from "@/utils/diff-word-generator.utils.js";
 import path from "path";
 //Article Download Service Handles PDF/Word downloads and diff generation
 export class ArticleDownloadService {
-  //Get PDF URL for download (for logged-in users)
+  //Get PDF URL for download (for logged-in users) - Serves edited/corrected version
   async getArticlePdfUrl(articleId: string) {
     const article = await prisma.article.findUnique({
       where: { id: articleId, status: "PUBLISHED" },
-      select: { currentPdfUrl: true, title: true },
+      select: { 
+        currentPdfUrl: true, // This is the edited/corrected version
+        title: true,
+        contentType: true 
+      },
     });
 
     if (!article) {
       throw new NotFoundError("Article not found or not published");
     }
 
+    console.log(`📥 [Download PDF] Serving edited/corrected version: ${article.currentPdfUrl}`);
     return article;
   }
-  // Get Word URL for download (for all logged-in users)
+  // Get Word URL for download (for all logged-in users) - Serves edited/corrected version
   async getArticleWordUrl(articleId: string) {
     const article = await prisma.article.findUnique({
       where: { id: articleId, status: "PUBLISHED" },
-      select: { currentWordUrl: true, title: true },
+      select: { 
+        currentWordUrl: true, // This is the edited/corrected version
+        title: true,
+        contentType: true 
+      },
     });
 
     if (!article) {
@@ -38,7 +47,112 @@ export class ArticleDownloadService {
       throw new NotFoundError("Word version not available for this article");
     }
 
+    console.log(`📥 [Download Word] Serving edited/corrected version: ${article.currentWordUrl}`);
     return article;
+  }
+  
+  // NEW: Get original DOCX URL (converted from user's original PDF)
+  async getOriginalDocxUrl(articleId: string) {
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+      select: { 
+        originalWordUrl: true, 
+        title: true,
+        contentType: true,
+        status: true 
+      },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
+
+    // For documents, we need to check if original DOCX was created from PDF
+    if (article.contentType === 'DOCUMENT' && !article.originalWordUrl) {
+      throw new NotFoundError("Original DOCX not available - document may not have been processed yet");
+    }
+
+    if (!article.originalWordUrl) {
+      throw new NotFoundError("Original DOCX version not available for this article");
+    }
+
+    return article;
+  }
+  
+  // NEW: Download original DOCX with watermark
+  async downloadOriginalDocxWithWatermark(articleId: string, watermarkData: any) {
+    const article = await this.getOriginalDocxUrl(articleId);
+    
+    if (!article.originalWordUrl) {
+      throw new NotFoundError("Original DOCX not available");
+    }
+
+    console.log(`💧 [Original DOCX] Adding watermark to: ${article.originalWordUrl}`);
+
+    // Import watermark utility
+    const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
+    
+    // Add watermark to original DOCX
+    const watermarkedBuffer = await addSimpleWatermarkToWord(
+      article.originalWordUrl,
+      watermarkData
+    );
+
+    console.log(`✅ [Original DOCX] Watermark added successfully`);
+    
+    return watermarkedBuffer;
+  }
+  
+  // NEW: Get editor's DOCX URL (corrected version)
+  async getEditorDocxUrl(articleId: string) {
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+      select: { 
+        currentWordUrl: true, // This is the editor's corrected DOCX
+        title: true,
+        contentType: true,
+        status: true,
+        assignedEditorId: true
+      },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
+
+    if (!article.assignedEditorId) {
+      throw new NotFoundError("No editor assigned to this article");
+    }
+
+    if (!article.currentWordUrl) {
+      throw new NotFoundError("Editor's DOCX not available - editor may not have uploaded corrected version yet");
+    }
+
+    return article;
+  }
+  
+  // NEW: Download editor's DOCX with watermark
+  async downloadEditorDocxWithWatermark(articleId: string, watermarkData: any) {
+    const article = await this.getEditorDocxUrl(articleId);
+    
+    if (!article.currentWordUrl) {
+      throw new NotFoundError("Editor's DOCX not available");
+    }
+
+    console.log(`💧 [Editor DOCX] Adding watermark to: ${article.currentWordUrl}`);
+
+    // Import watermark utility
+    const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
+    
+    // Add watermark to editor's DOCX
+    const watermarkedBuffer = await addSimpleWatermarkToWord(
+      article.currentWordUrl,
+      watermarkData
+    );
+
+    console.log(`✅ [Editor DOCX] Watermark added successfully`);
+    
+    return watermarkedBuffer;
   }
   //Download diff as PDF or Word
   async downloadDiff(

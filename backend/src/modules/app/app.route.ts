@@ -15,7 +15,7 @@ export const AppRouter: Router = Router();
 AppRouter.use("/auth", AuthRouter);
 AppRouter.use("/users", requireAuth, UserRouter);
 AppRouter.use("/rbac", requireAuth, RbacRouter);
-AppRouter.use("/articles", ArticleRouter);
+AppRouter.use("/articles", ArticleRouter); 
 AppRouter.use("/admin/dashboard", AdminDashboardRouter);
 AppRouter.use("/notifications", NotificationRouter);
 
