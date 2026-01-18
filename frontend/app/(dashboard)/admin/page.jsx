@@ -87,7 +87,7 @@ const formatDifferences = (diffParts) => {
     // Agar added hai to Green, Removed hai to Red, nahi to normal
     if (part.added) {
       return `<span class="bg-green-200 text-green-800 px-1 rounded">${part.value}</span>`;
-    } 
+    }
     if (part.removed) {
       return `<span class="bg-red-200 text-red-800 px-1 rounded line-through">${part.value}</span>`;
     }
@@ -159,33 +159,33 @@ export default function AdminDashboard() {
   const [changeHistory, setChangeHistory] = useState([]);
   // History fetch karne ka function
   const fetchChangeHistory = async (articleId) => {
-  try {
-    const token = localStorage.getItem("adminToken");
-    const cb = Date.now(); // Unique timestamp
-    const res = await fetch(
-      `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`, 
-      {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          "Pragma": "no-cache"
-        },
+    try {
+      const token = localStorage.getItem("adminToken");
+      const cb = Date.now(); // Unique timestamp
+      const res = await fetch(
+        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+          },
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setChangeHistory(data.changeLogs || []);
+        if (data.article?.editorDocumentUrl && selectedArticle?.editorDocumentUrl !== data.article.editorDocumentUrl) {
+          setSelectedArticle((prev) => ({
+            ...prev,
+            editorDocumentUrl: data.article.editorDocumentUrl,
+          }));
+        }
       }
-    );
-    if (res.ok) {
-      const data = await res.json();
-      setChangeHistory(data.changeLogs || []);
-      if (data.article?.editorDocumentUrl && selectedArticle?.editorDocumentUrl !== data.article.editorDocumentUrl) {
-        setSelectedArticle((prev) => ({
-          ...prev,
-          editorDocumentUrl: data.article.editorDocumentUrl,
-        }));
-      }
+    } catch (err) {
+      console.error("Failed to fetch history", err);
     }
-  } catch (err) {
-    console.error("Failed to fetch history", err);
-  }
-};
+  };
   const handleDownloadAdminReport = async (changeLogId, type, format = "pdf") => {
     try {
       const token = localStorage.getItem("adminToken");
@@ -193,71 +193,104 @@ export default function AdminDashboard() {
         toast.error("Authentication token missing");
         return;
       }
-  
+
       const articleId = selectedArticle?.id || selectedArticle?._id;
       if (!articleId) {
         toast.error("No article selected");
         return;
       }
-  
+
       if (!changeLogId) {
         toast.error("No change log selected");
         return;
       }
-  
+
       // ────────────────────────────────────────────────────────────────
       //                 Choose correct endpoint pattern
       // ────────────────────────────────────────────────────────────────
       let endpoint;
-  
+
       if (type === "diff") {
         endpoint = `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`;
       } else {
         // track / editor-document
         endpoint = `${NEXT_PUBLIC_BASE_URL}/api/articles/change-logs/${changeLogId}/editor-document?format=${format}`;
       }
-  
+
       toast.info(`Generating ${format.toUpperCase()}...`);
-  
+
       const res = await fetch(endpoint, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-  
+
       if (!res.ok) {
         let errorMsg = "Download failed";
         try {
           const errData = await res.json();
           errorMsg = errData.message || errorMsg;
-        } catch {}
+        } catch { }
         throw new Error(errorMsg);
       }
-  
+
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
-  
+
       const a = document.createElement("a");
       a.href = url;
       a.download =
-        `${type.toUpperCase()}-${changeLogId}-${new Date().toISOString().slice(0,10)}.${format === "word" ? "docx" : "pdf"}`;
-  
+        `${type.toUpperCase()}-${changeLogId}-${new Date().toISOString().slice(0, 10)}.${format === "word" ? "docx" : "pdf"}`;
+
       document.body.appendChild(a);
       a.click();
-  
+
       // Clean up
       setTimeout(() => {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
       }, 100);
-  
+
       toast.success(`${format.toUpperCase()} downloaded!`);
     } catch (err) {
       console.error("Download error:", err);
       toast.error(err.message || "Download failed or format not supported.");
     }
   };
+  const handleDownloadFile = async (fileUrl, fileName, type) => {
+    if (!fileUrl) return toast.error("File not available");
+    try {
+      toast.info(`Downloading ${type}...`);
+      const token = localStorage.getItem("adminToken");
+      const fullUrl = fileUrl.startsWith("http")
+        ? fileUrl
+        : `${NEXT_PUBLIC_BASE_URL}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
+
+      const res = await fetch(fullUrl, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) throw new Error("Download failed");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const ext = type === "Word" ? "docx" : "pdf";
+      a.download = `${fileName}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Download complete!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to download file");
+    }
+  };
+
   // Jab bhi admin koi article khole, uski history load ho jaye
   // Isse purane wale ki jagah paste karein
   useEffect(() => {
@@ -276,32 +309,32 @@ export default function AdminDashboard() {
   // PDF URL Fix Logic (Isse "PDF Not Found" khatam ho jayega)
   console.log("Admin Dashboard Data Row:", selectedArticle);
   // ✅ Corrected Function
-const getPdfUrlToView = () => {
-  if (!selectedArticle) return null;
+  const getPdfUrlToView = () => {
+    if (!selectedArticle) return null;
 
-  // 1. Agar Visual Diff mode hai, to Blob URL return karo
-  if (pdfViewMode === "visual-diff") {
-     return visualDiffBlobUrl;
-  }
+    // 1. Agar Visual Diff mode hai, to Blob URL return karo
+    if (pdfViewMode === "visual-diff") {
+      return visualDiffBlobUrl;
+    }
 
-  // 2. Baki modes ke liye path set karo
-  let path = "";
-  if (pdfViewMode === "original") path = selectedArticle.originalPdfUrl;
-  else if (pdfViewMode === "current") path = selectedArticle.currentPdfUrl;
-  else if (pdfViewMode === "track") path = selectedArticle.editorDocumentUrl;
-  
-  if (!path) return null;
-  
-  const cleanPath = path.startsWith("http")
-    ? path
-    : `${NEXT_PUBLIC_BASE_URL}/${path.replace(/^\//, "")}`;
+    // 2. Baki modes ke liye path set karo
+    let path = "";
+    if (pdfViewMode === "original") path = selectedArticle.originalPdfUrl;
+    else if (pdfViewMode === "current") path = selectedArticle.currentPdfUrl;
+    else if (pdfViewMode === "track") path = selectedArticle.editorDocumentUrl;
 
-  // Add timestamp to prevent PDF caching
-  return `${cleanPath}?cb=${Date.now()}`;
-};
+    if (!path) return null;
+
+    const cleanPath = path.startsWith("http")
+      ? path
+      : `${NEXT_PUBLIC_BASE_URL}/${path.replace(/^\//, "")}`;
+
+    // Add timestamp to prevent PDF caching
+    return `${cleanPath}?cb=${Date.now()}`;
+  };
   // ✅ FETCH DATA (Articles + Editors)
   // --- REPLACE YOUR OLD useEffect WITH THIS ---
-// ✅ 1. Pehle Function Define karo (Order Fix)
+  // ✅ 1. Pehle Function Define karo (Order Fix)
   const mapBackendStatus = (status) => {
     if (status === "PENDING_ADMIN_REVIEW") return "Pending";
     if (status === "APPROVED") return "Published";
@@ -314,29 +347,29 @@ const getPdfUrlToView = () => {
 
   // ✅ VISUAL DIFF FUNCTION
 
- const handleViewVisualDiff = useCallback(async () => {
+  const handleViewVisualDiff = useCallback(async () => {
     if (isGeneratingDiff) return;
 
     // Agar already generated hai to wahi dikhao
     if (visualDiffBlobUrl && pdfViewMode === "visual-diff") {
-        setPdfViewMode("visual-diff");
-        return;
+      setPdfViewMode("visual-diff");
+      return;
     }
 
     try {
       setIsGeneratingDiff(true);
       toast.info("Generating Visual Diff...");
-      
+
       const { extractTextFromPDF, generateComparisonPDF } = await import("../../utilis/pdfutils");
-      
+
       const token = localStorage.getItem("adminToken");
-      
+
       if (!selectedArticle?.originalPdfUrl) throw new Error("Original PDF missing");
       if (!selectedArticle?.currentPdfUrl) throw new Error("Current PDF missing");
 
       // 1. Fetch Original PDF
       const originalRes = await fetch(
-        selectedArticle.originalPdfUrl.startsWith("http") ? selectedArticle.originalPdfUrl : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`, 
+        selectedArticle.originalPdfUrl.startsWith("http") ? selectedArticle.originalPdfUrl : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const originalBlob = await originalRes.blob();
@@ -344,7 +377,7 @@ const getPdfUrlToView = () => {
 
       // 2. Fetch Current (Edited) PDF
       const editedRes = await fetch(
-        selectedArticle.currentPdfUrl.startsWith("http") ? selectedArticle.currentPdfUrl : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.currentPdfUrl}`, 
+        selectedArticle.currentPdfUrl.startsWith("http") ? selectedArticle.currentPdfUrl : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.currentPdfUrl}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const editedBlob = await editedRes.blob();
@@ -353,7 +386,7 @@ const getPdfUrlToView = () => {
       // 3. Extract & Compare
       const originalText = await extractTextFromPDF(originalFile);
       const editedText = await extractTextFromPDF(editedFile);
-      
+
       // Ye Array return karta hai
       const differences = compareTexts(originalText.fullText, editedText.fullText);
 
@@ -366,12 +399,12 @@ const getPdfUrlToView = () => {
 
       const blob = new Blob([pdfBytes], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
-      
+
       setVisualDiffBlobUrl(url);
-      setPdfViewMode("visual-diff"); 
-      
+      setPdfViewMode("visual-diff");
+
       toast.success("Visual Diff Generated!");
-      
+
     } catch (err) {
       console.error("Visual Diff Error:", err);
       toast.error(err.message || "Could not generate visual diff.");
@@ -388,8 +421,8 @@ const getPdfUrlToView = () => {
       try {
         const token = localStorage.getItem("adminToken");
         // 🔥 Caching Fix: Timestamp add kiya
-        const cb = Date.now(); 
-        const headers = { 
+        const cb = Date.now();
+        const headers = {
           Authorization: `Bearer ${token}`,
           "Cache-Control": "no-cache, no-store, must-revalidate",
           "Pragma": "no-cache"
@@ -421,7 +454,7 @@ const getPdfUrlToView = () => {
           const data = await statusRes.json();
           const counts = data.distribution?.statusCounts || {};
           const percs = data.distribution?.percentages || {};
-          
+
           const chartData = [
             {
               label: "Pending",
@@ -443,18 +476,20 @@ const getPdfUrlToView = () => {
         if (timelineRes.ok) {
           const data = await timelineRes.json();
           const rawArticles = data.articles || [];
-          
+
           const formatted = rawArticles.map((item) => ({
             id: item._id || item.id,
             title: item.title,
             author: item.authorName || "Unknown",
             status: mapBackendStatus(item.status), // ✅ Ab ye sahi chalega
             assignedTo: item.assignedEditor?.id || item.assignedEditorId || "",
-           // ✅ Is line ko dhundo aur replace karo:
-date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "Just Now",
+            // ✅ Is line ko dhundo aur replace karo:
+            date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "Just Now",
             abstract: item.abstract,
             originalPdfUrl: item.originalPdfUrl,
             currentPdfUrl: item.currentPdfUrl,
+            originalWordUrl: item.originalWordUrl, // ✅ Added for Download Original
+            currentWordUrl: item.currentWordUrl,   // ✅ Added for Download Final
             pdfUrl: item.currentPdfUrl || item.originalPdfUrl,
           }));
           setArticles(formatted);
@@ -476,13 +511,13 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
 
     fetchDashboardData();
   }, [isAuthorized]);
- 
+
   const handlePdfClick = (relativeUrl) => {
     if (!relativeUrl) {
       toast.warning("PDF not found");
       return;
     }
-    
+
     const cleanPath = relativeUrl.startsWith("/")
       ? relativeUrl
       : `/${relativeUrl}`;
@@ -490,7 +525,7 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
     // 🔥 CHANGE: ?t=${Date.now()} add kiya taaki browser naya version maange
     const fullUrl = `${NEXT_PUBLIC_BASE_URL}${cleanPath}?t=${Date.now()}`;
 
-    console.log("Opening Fresh URL:", fullUrl); 
+    console.log("Opening Fresh URL:", fullUrl);
     window.open(fullUrl, "_blank");
   };
   // Search & Filter
@@ -498,19 +533,19 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
   const [statusFilter, setStatusFilter] = useState("All");
   const [showAbstract, setShowAbstract] = useState(null);
   // ✅ ASSIGN LOGIC
- // ✅ ASSIGN LOGIC (Fixed: Handles "Already Assigned" error correctly)
- // ✅ ASSIGN LOGIC (Updated)
+  // ✅ ASSIGN LOGIC (Fixed: Handles "Already Assigned" error correctly)
+  // ✅ ASSIGN LOGIC (Updated)
   const assignArticle = async (articleId, editorId) => {
     if (!editorId) return;
     // 🛑 1. FRONTEND CHECK: Kya Editor pehle se assigned hai?
     const currentArticle = articles.find((a) => a.id === articleId);
-   
+
     // Agar assignedTo exist karta hai aur empty nahi hai
     // if (currentArticle?.assignedTo && currentArticle.assignedTo !== "") {
     //   const isConfirmed = window.confirm(
     //     "⚠️ This article is ALREADY ASSIGNED to an editor.\n\nDo you want to re-assign it?"
     //   );
-     
+
     //   if (!isConfirmed) {
     //     // Agar user cancel kar de, to UI ko refresh kar do taaki purana editor wapis select ho jaye
     //     setArticles([...articles]);
@@ -536,10 +571,10 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
           prev.map((a) =>
             a.id === articleId
               ? {
-                  ...a,
-                  assignedTo: editorId,
-                  status: "In Review",
-                }
+                ...a,
+                assignedTo: editorId,
+                status: "In Review",
+              }
               : a
           )
         );
@@ -547,9 +582,9 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
       } else {
         // 🛑 2. BACKEND CHECK: Agar backend bole "Already Assigned"
         if (response.status === 409 || data.message?.toLowerCase().includes("already")) {
-            toast.warning("msg: Article Already Assigned!");
+          toast.warning("msg: Article Already Assigned!");
         } else {
-            toast.error(data.message || "Failed to assign editor");
+          toast.error(data.message || "Failed to assign editor");
         }
       }
     } catch (error) {
@@ -643,11 +678,10 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
       {/* 🔴 SIDEBAR (Responsive) */}
       <aside
         className={`fixed md:sticky top-0 h-screen w-72 bg-red-700 text-white flex flex-col shadow-2xl z-50 transition-transform duration-300 ease-in-out
-        ${
-          isMobileMenuOpen
+        ${isMobileMenuOpen
             ? "translate-x-0"
             : "-translate-x-full md:translate-x-0"
-        }`}
+          }`}
       >
         <div className="p-8 border-b border-red-800 flex justify-between items-center">
           <div>
@@ -692,12 +726,12 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
           >
             Add New Editor
           </Link>
-          <Link
+          {/* <Link
             href="/admin/live-database"
             className="block w-full text-left p-3 hover:bg-red-600 rounded-lg text-red-100 transition-all"
           >
             Live Database
-          </Link>
+          </Link> */}
         </nav>
         <div className="p-4 border-t border-red-800">
           <button
@@ -822,9 +856,8 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
                       fill="transparent"
                       stroke="#dc2626"
                       strokeWidth="3.8"
-                      strokeDasharray={`${statusDist[0]?.percentage || 0} ${
-                        100 - (statusDist[0]?.percentage || 0)
-                      }`}
+                      strokeDasharray={`${statusDist[0]?.percentage || 0} ${100 - (statusDist[0]?.percentage || 0)
+                        }`}
                       strokeDashoffset="0"
                       className="transition-all duration-1000 ease-out"
                     ></circle>
@@ -836,9 +869,8 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
                       fill="transparent"
                       stroke="#16a34a"
                       strokeWidth="3.8"
-                      strokeDasharray={`${statusDist[1]?.percentage || 0} ${
-                        100 - (statusDist[1]?.percentage || 0)
-                      }`}
+                      strokeDasharray={`${statusDist[1]?.percentage || 0} ${100 - (statusDist[1]?.percentage || 0)
+                        }`}
                       strokeDashoffset={`-${statusDist[0]?.percentage || 0}`}
                       className="transition-all duration-1000 ease-out"
                     ></circle>
@@ -1009,19 +1041,18 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
                         {/* 3. Status Badge */}
                         <td className="p-5">
                           <span
-                            className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${
-                              art.status === "Published"
-                                ? "bg-green-100 text-green-700"
-                                : art.status === "In Review"
+                            className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${art.status === "Published"
+                              ? "bg-green-100 text-green-700"
+                              : art.status === "In Review"
                                 ? "bg-blue-100 text-blue-700"
                                 : "bg-yellow-100 text-yellow-700"
-                            }`}
+                              }`}
                           >
                             {art.status}
                           </span>
                         </td>
                         {/* 4. Assign Editor Dropdown */}
-                       {/* 4. Assign Editor Dropdown (Updated UI) */}
+                        {/* 4. Assign Editor Dropdown (Updated UI) */}
                         <td className="p-5 text-center">
                           <div className="flex flex-col items-center">
                             {/* Agar Assigned hai to upar status dikhao */}
@@ -1030,13 +1061,12 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
                                 ✅ Already Assigned
                               </span>
                             )}
-                           
+
                             <select
-                              className={`p-2 border rounded text-xs font-bold outline-none cursor-pointer w-32 transition-all ${
-                                art.assignedTo
-                                  ? "bg-green-50 border-green-300 text-green-800" // Assigned style
-                                  : "bg-white border-gray-200"
-                              }`}
+                              className={`p-2 border rounded text-xs font-bold outline-none cursor-pointer w-32 transition-all ${art.assignedTo
+                                ? "bg-green-50 border-green-300 text-green-800" // Assigned style
+                                : "bg-white border-gray-200"
+                                }`}
                               value={art.assignedTo || ""}
                               onChange={(e) =>
                                 assignArticle(art.id, e.target.value)
@@ -1065,11 +1095,10 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
                           <button
                             onClick={() => overrideAndPublish(art.id)}
                             disabled={art.status === "Published"}
-                            className={`w-[90px] py-2 rounded text-[10px] font-black transition-colors uppercase text-center ${
-                              art.status === "Published"
-                                ? "bg-gray-400 cursor-not-allowed text-gray-200"
-                                : "bg-black text-white hover:bg-green-600"
-                            }`}
+                            className={`w-[90px] py-2 rounded text-[10px] font-black transition-colors uppercase text-center ${art.status === "Published"
+                              ? "bg-gray-400 cursor-not-allowed text-gray-200"
+                              : "bg-black text-white hover:bg-green-600"
+                              }`}
                           >
                             {art.status === "Published"
                               ? "Published"
@@ -1077,8 +1106,8 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
                           </button>
                           <button
                             onClick={() => {
-                             
-                                deleteArticle(art.id);
+
+                              deleteArticle(art.id);
                             }}
                             className="bg-red-100 text-red-600 p-2 rounded hover:bg-red-600 hover:text-white transition-all shrink-0"
                             title="Delete Article"
@@ -1128,7 +1157,7 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
           </div>
         </div>
       )}
-     {selectedArticle && (
+      {selectedArticle && (
         <div className="fixed inset-0 bg-white z-[60] flex flex-col overflow-hidden animate-in fade-in duration-300">
           {/* HEADER */}
           <header className="bg-red-700 text-white p-4 flex justify-between items-center shadow-xl">
@@ -1154,34 +1183,31 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
               <div className="p-4 border-b bg-gray-50 flex gap-4">
                 <button
                   onClick={() => setPdfViewMode("original")}
-                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${
-                    pdfViewMode === "original"
-                      ? "bg-red-600 text-white shadow-lg"
-                      : "bg-white text-gray-400 border"
-                  }`}
+                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${pdfViewMode === "original"
+                    ? "bg-red-600 text-white shadow-lg"
+                    : "bg-white text-gray-400 border"
+                    }`}
                 >
                   1. ORIGINAL SUBMISSION
                 </button>
                 <button
                   onClick={() => setPdfViewMode("current")}
-                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${
-                    pdfViewMode === "current"
-                      ? "bg-blue-600 text-white shadow-lg"
-                      : "bg-white text-gray-400 border"
-                  }`}
+                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${pdfViewMode === "current"
+                    ? "bg-blue-600 text-white shadow-lg"
+                    : "bg-white text-gray-400 border"
+                    }`}
                 >
                   2. FINAL EDITED VERSION
                 </button>
-                
+
                 {/* ✅ VISUAL DIFF BUTTON (Track File Removed) */}
                 <button
                   onClick={handleViewVisualDiff}
                   disabled={isGeneratingDiff}
-                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${
-                    pdfViewMode === "visual-diff"
-                      ? "bg-green-600 text-white shadow-lg"
-                      : "bg-white text-gray-400 border"
-                  }`}
+                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${pdfViewMode === "visual-diff"
+                    ? "bg-green-600 text-white shadow-lg"
+                    : "bg-white text-gray-400 border"
+                    }`}
                 >
                   {isGeneratingDiff ? "GENERATING..." : "3. VIEW VISUAL DIFF"}
                 </button>
@@ -1208,8 +1234,48 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
 
             {/* RIGHT SIDE: EDITOR'S LOGS & ACTIONS */}
             <div className="w-[450px] overflow-y-auto space-y-4">
+              {/* ✅ SOURCE FILES SECTION */}
               <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
                 <h4 className="font-black text-gray-800 border-b pb-3 mb-6 flex items-center gap-2 text-sm">
+                  <span>📄</span> SOURCE FILES
+                </h4>
+                <div className="space-y-3">
+                  {/* Original DOCX */}
+                  <button
+                    onClick={() =>
+                      handleDownloadFile(
+                        selectedArticle.originalWordUrl || selectedArticle.originalPdfUrl,
+                        `Original_${selectedArticle.title}`,
+                        "Word"
+                      )
+                    }
+                    className="w-full py-3 bg-blue-50 text-blue-700 font-bold rounded-xl hover:bg-blue-100 border border-blue-200 transition flex items-center justify-center gap-2"
+                  >
+                    <DownloadIcon /> Download Original DOCX
+                  </button>
+
+                  {/* Final DOCX */}
+                  <button
+                    onClick={() =>
+                      handleDownloadFile(
+                        selectedArticle.currentWordUrl,
+                        `Final_${selectedArticle.title}`,
+                        "Word"
+                      )
+                    }
+                    disabled={!selectedArticle.currentWordUrl}
+                    className={`w-full py-3 font-bold rounded-xl transition flex items-center justify-center gap-2 ${selectedArticle.currentWordUrl
+                      ? "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
+                      : "bg-gray-100 text-gray-400 cursor-not-allowed text-xs"
+                      }`}
+                  >
+                    <DownloadIcon /> {selectedArticle.currentWordUrl ? "Download Final DOCX" : "Final DOCX Not Ready"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
+                {/* <h4 className="font-black text-gray-800 border-b pb-3 mb-6 flex items-center gap-2 text-sm">
                   <span>📜</span> EDITOR'S CHANGE HISTORY
                 </h4>
                 <div className="space-y-8">
@@ -1233,17 +1299,8 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
                         <div className="bg-red-50 p-3 rounded-lg text-xs italic text-gray-700 border border-red-100 mb-3">
                           "{log.comments}"
                         </div>
-                        
-                        {/* Download Buttons Grid */}
+
                         <div className="grid grid-cols-2 gap-2 mt-2 border-t pt-3">
-                          {/* <button
-                            onClick={() =>
-                              handleDownloadAdminReport(log.id, "diff", "pdf")
-                            }
-                            className="flex items-center justify-center text-[9px] font-black text-red-700 bg-red-50 p-2 rounded hover:bg-red-600 hover:text-white transition-all border border-red-200 uppercase"
-                          >
-                            <DownloadIcon /> Diff (PDF)
-                          </button> */}
                           <button
                             onClick={() =>
                               handleDownloadAdminReport(log.id, "diff", "word")
@@ -1252,31 +1309,14 @@ date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "J
                           >
                             <DownloadIcon /> Diff (Word)
                           </button>
-                          {/* <button
-                            onClick={() =>
-                              handleDownloadAdminReport(log.id, "track", "pdf")
-                            }
-                            className="flex items-center justify-center text-[9px] font-black text-green-700 bg-green-50 p-2 rounded hover:bg-green-600 hover:text-white transition-all border border-green-200 uppercase"
-                          >
-                            <DownloadIcon /> Track (PDF)
-                          </button> */}
-                          {/* <button
-                            onClick={() =>
-                              handleDownloadAdminReport(log.id, "track", "word")
-                            }
-                            className="flex items-center justify-center text-[9px] font-black text-purple-700 bg-purple-50 p-2 rounded hover:bg-purple-600 hover:text-white transition-all border border-purple-200 uppercase"
-                          >
-                            <DownloadIcon /> Track (Word)
-                          </button> */}
                         </div>
-                        
-                        {/* Inline Diff Viewer */}
+
                         <DiffViewer diffData={log.diffData} />
                       </div>
                     ))
                   )}
-                </div>
-                
+                </div> */}
+
                 {/* Final Publish Button */}
                 <button
                   onClick={() => {

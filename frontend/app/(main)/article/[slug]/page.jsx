@@ -98,7 +98,7 @@ export default function ArticlePage({ params }) {
       try {
         setLoading(true);
         const headers = { "Content-Type": "application/json" };
-        
+
         // ✅ Missing token fix: Tabhi bhejien jab token ho
         if (token) {
           headers["Authorization"] = `Bearer ${token}`;
@@ -242,7 +242,7 @@ export default function ArticlePage({ params }) {
             </div>
           )}
 
-          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight leading-[1.1] mb-8 text-gray-900">
+          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight leading-[1.1] mb-8 text-gray-900 break-words">
             {article.title}
           </h1>
 
@@ -270,31 +270,44 @@ export default function ArticlePage({ params }) {
           </div>
         </header>
 
-        {article.abstract && (
-          <div className="text-xl text-gray-600 leading-relaxed mb-10 not-italic font-normal">
+        {token && article.abstract && (
+          <div className="text-xl text-gray-600 leading-relaxed mb-10 not-italic font-normal break-words">
             {article.abstract}
           </div>
         )}
 
         <div
-          className={`prose prose-lg prose-slate max-w-none prose-headings:font-bold prose-a:text-blue-600 hover:prose-a:text-blue-500 prose-img:rounded-xl ${
-            isLimited ? "relative" : ""
-          }`}
+          className={`prose prose-lg prose-slate max-w-none prose-headings:font-bold prose-a:text-blue-600 hover:prose-a:text-blue-500 prose-img:rounded-xl break-words overflow-hidden ${(!token || isLimited) ? "relative" : ""
+            }`}
         >
-          {article.contentHtml ? (
-            <div dangerouslySetInnerHTML={{ __html: article.contentHtml }} />
-          ) : article.content ? (
-            <div className="whitespace-pre-wrap">{article.content}</div>
+          {token ? (
+            // ✅ Logged In: Show Full Content (HTML or Text)
+            article.contentHtml ? (
+              <div dangerouslySetInnerHTML={{ __html: article.contentHtml }} />
+            ) : article.content ? (
+              <div className="whitespace-pre-wrap">{article.content}</div>
+            ) : (
+              <div className="p-6 bg-gray-50 rounded-lg text-center text-gray-500 text-sm">
+                Content unavailable.
+              </div>
+            )
           ) : (
-            <div className="p-6 bg-gray-50 rounded-lg text-center text-gray-500 text-sm">
-              Preview text unavailable.
+            // 🔒 Guest: Show Truncated Plain Text Preview (Preserve Structure)
+            <div className="whitespace-pre-wrap">
+              {(article.content && !article.content.includes("Text extraction failed"))
+                ? (
+                  // Use character slice (~250 words * 6 chars) to preserve newlines/paragraphs
+                  article.content.length > 1500
+                    ? article.content.substring(0, 1500) + "..."
+                    : article.content
+                )
+                : article.abstract || "Preview unavailable."}
             </div>
           )}
 
-          {isLimited && (
+          {!token && (
             <div className="absolute bottom-0 left-0 w-full h-48 bg-gradient-to-t from-white via-white/90 to-transparent flex items-end justify-center pb-0">
               <div className="w-full text-center bg-white pt-4">
-                <p className="text-gray-600 mb-4">You are reading a preview.</p>
                 <Link
                   href={`/login?redirect=${pathname}`}
                   className="inline-flex items-center justify-center bg-red-700 text-white font-semibold px-8 py-3 rounded-full hover:bg-red-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"

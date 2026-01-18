@@ -95,6 +95,7 @@ export default function EditorDashboard() {
   const [visualDiffBlobUrl, setVisualDiffBlobUrl] = useState(null);
   const [isGeneratingDiff, setIsGeneratingDiff] = useState(false);
   const [currentDiffData, setCurrentDiffData] = useState(null);
+  const [isApproving, setIsApproving] = useState(false); // ✅ NEW Appoving State
 
   const [profile, setProfile] = useState({
     id: "",
@@ -111,17 +112,17 @@ export default function EditorDashboard() {
     try {
       setIsGeneratingDiff(true);
       toast.info("Generating Visual Diff from Frontend...");
-      
+
       const { extractTextFromPDF, generateComparisonPDF } = await import("../../utilis/pdfutils");
-      
+
       const token = localStorage.getItem("editorToken");
       const articleId = selectedArticle?.id || selectedArticle?._id;
-      
+
       const changeLog = changeHistory.find(log => (log.id || log._id) === changeLogId);
       if (!changeLog) throw new Error("Change log not found");
 
       if (!selectedArticle?.originalPdfUrl) throw new Error("Original PDF URL not found");
-      
+
       const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
       if (!editedPdfUrl) throw new Error("Edited PDF URL not found.");
 
@@ -129,7 +130,7 @@ export default function EditorDashboard() {
       const originalPdfUrl = selectedArticle.originalPdfUrl.startsWith("http")
         ? selectedArticle.originalPdfUrl
         : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`;
-      
+
       const originalRes = await fetch(originalPdfUrl, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -141,7 +142,7 @@ export default function EditorDashboard() {
       const editedPdfFullUrl = editedPdfUrl.startsWith("http")
         ? editedPdfUrl
         : `${NEXT_PUBLIC_BASE_URL}${editedPdfUrl}`;
-      
+
       const editedRes = await fetch(editedPdfFullUrl, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -167,21 +168,21 @@ export default function EditorDashboard() {
       const pdfBytes = await generateComparisonPDF(formattedDiff);
       const blob = new Blob([pdfBytes], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
-      
+
       setVisualDiffBlobUrl(url);
       setPdfViewMode("visual-diff");
-      
+
       if (isMobileMenuOpen) setIsMobileMenuOpen(false);
-      
+
       toast.success("Diff generated!");
-      
+
     } catch (err) {
       console.error("Visual Diff Error:", err);
       toast.error(err.message || "Could not generate visual diff.");
     } finally {
       setIsGeneratingDiff(false);
     }
-  }, [changeHistory, selectedArticle, isGeneratingDiff, isMobileMenuOpen]); 
+  }, [changeHistory, selectedArticle, isGeneratingDiff, isMobileMenuOpen]);
   // 👆 NOTE: NEXT_PUBLIC_BASE_URL yahan se hata diya kyunki wo ab constant hai
 
   const fetchAssignedArticles = async (editorId, token) => {
@@ -191,7 +192,7 @@ export default function EditorDashboard() {
       const res = await fetch(
         `${NEXT_PUBLIC_BASE_URL}/api/articles?assignedEditorId=${editorId}&cb=${cb}`,
         {
-          headers: { 
+          headers: {
             Authorization: `Bearer ${token}`,
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache"
@@ -256,7 +257,7 @@ export default function EditorDashboard() {
       const res = await fetch(
         `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`,
         {
-          headers: { 
+          headers: {
             Authorization: `Bearer ${token}`,
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache"
@@ -291,7 +292,16 @@ export default function EditorDashboard() {
 
   const handleUploadCorrection = async () => {
     if (!uploadedFile)
-      return toast.error("Please select a corrected file first");
+      return toast.error("Please select a corrected DOCX file first");
+
+    // Strict DOCX Check
+    const allowedExtensions = [".docx", ".doc"];
+    const fileExtension = uploadedFile.name.substring(uploadedFile.name.lastIndexOf(".")).toLowerCase();
+
+    if (!allowedExtensions.includes(fileExtension) &&
+      uploadedFile.type !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      return toast.error("Only DOCX/DOC files are supported for editor uploads.");
+    }
 
     try {
       setIsUploading(true);
@@ -307,8 +317,7 @@ export default function EditorDashboard() {
       }
 
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${
-          selectedArticle.id || selectedArticle._id
+        `${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id
         }/upload-corrected`,
         {
           method: "PATCH",
@@ -347,10 +356,10 @@ export default function EditorDashboard() {
 
   const handleEditorApprove = async () => {
     try {
+      setIsApproving(true); // ✅ Start Loading
       const token = localStorage.getItem("editorToken");
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${
-          selectedArticle.id || selectedArticle._id
+        `${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id
         }/editor-approve`,
         {
           method: "PATCH",
@@ -368,13 +377,15 @@ export default function EditorDashboard() {
       }
     } catch (err) {
       toast.error("Something went wrong");
+    } finally {
+      setIsApproving(false); // ✅ Stop Loading
     }
   };
- 
+
   const handleLogout = () => {
     // ✅ Fix: Logout karte hi purane toasts hata do
-    toast.dismiss(); 
-    
+    toast.dismiss();
+
     localStorage.removeItem("editorToken");
     localStorage.removeItem("editorUser");
     router.push("/management-login");
@@ -444,15 +455,15 @@ export default function EditorDashboard() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      
+
       const extension = format === "word" ? "docx" : "pdf";
       a.download = `diff-report-v${changeLogId}.${extension}`;
-      
+
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
+
       toast.success(`${typeLabel} Downloaded!`);
     } catch (err) {
       console.error(err);
@@ -481,7 +492,7 @@ export default function EditorDashboard() {
     const cleanUrl = path.startsWith("http")
       ? path
       : `${NEXT_PUBLIC_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
-    
+
     return `${cleanUrl}?cb=${Date.now()}`;
   };
 
@@ -505,11 +516,10 @@ export default function EditorDashboard() {
       {/* SIDEBAR */}
       <aside
         className={`fixed md:sticky top-0 z-40 h-screen w-72 bg-red-700 text-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out 
-        ${
-          isMobileMenuOpen
+        ${isMobileMenuOpen
             ? "translate-x-0"
             : "-translate-x-full md:translate-x-0"
-        }`}
+          }`}
       >
         <div className="p-8 border-b border-red-800 flex justify-between items-center">
           <div>
@@ -538,23 +548,21 @@ export default function EditorDashboard() {
                   setActiveTab("tasks");
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${
-                  activeTab === "tasks" ? "bg-red-800" : "hover:bg-red-600"
-                }`}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${activeTab === "tasks" ? "bg-red-800" : "hover:bg-red-600"
+                  }`}
               >
                 Assigned Tasks
               </button>
-              <button
+              {/* <button
                 onClick={() => {
                   setActiveTab("profile");
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${
-                  activeTab === "profile" ? "bg-red-800" : "hover:bg-red-600"
-                }`}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${activeTab === "profile" ? "bg-red-800" : "hover:bg-red-600"
+                  }`}
               >
                 Profile Settings
-              </button>
+              </button> */}
             </>
           ) : (
             <>
@@ -566,28 +574,26 @@ export default function EditorDashboard() {
                   setPdfViewMode("original");
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                  pdfViewMode === "original"
-                    ? "bg-white text-red-700 shadow-lg"
-                    : "hover:bg-red-800 text-white"
-                }`}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "original"
+                  ? "bg-white text-red-700 shadow-lg"
+                  : "hover:bg-red-800 text-white"
+                  }`}
               >
                 View Original PDF
                 {pdfViewMode === "original" && (
                   <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
                 )}
               </button>
-              
+
               <button
                 onClick={() => {
                   setPdfViewMode("current");
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                  pdfViewMode === "current"
-                    ? "bg-white text-red-700 shadow-lg"
-                    : "hover:bg-red-800 text-white"
-                }`}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "current"
+                  ? "bg-white text-red-700 shadow-lg"
+                  : "hover:bg-red-800 text-white"
+                  }`}
               >
                 View Edited PDF
                 {pdfViewMode === "current" && (
@@ -606,11 +612,10 @@ export default function EditorDashboard() {
                   }
                 }}
                 disabled={isGeneratingDiff}
-                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                  pdfViewMode === "visual-diff"
-                    ? "bg-white text-red-700 shadow-lg"
-                    : "hover:bg-red-800 text-white"
-                } ${isGeneratingDiff ? "opacity-50 cursor-not-allowed" : ""}`}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "visual-diff"
+                  ? "bg-white text-red-700 shadow-lg"
+                  : "hover:bg-red-800 text-white"
+                  } ${isGeneratingDiff ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 {isGeneratingDiff ? (
                   <>
@@ -619,7 +624,7 @@ export default function EditorDashboard() {
                   </>
                 ) : (
                   <>
-                    View Visual Diff
+                    View Track File
                     {pdfViewMode === "visual-diff" && (
                       <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
                     )}
@@ -672,8 +677,8 @@ export default function EditorDashboard() {
               {selectedArticle
                 ? `Reviewing: ${selectedArticle.title.substring(0, 30)}...`
                 : activeTab === "tasks"
-                ? "Editor Workspace"
-                : "Profile"}
+                  ? "Editor Workspace"
+                  : "Profile"}
             </h2>
           </div>
 
@@ -774,6 +779,7 @@ export default function EditorDashboard() {
               handleDownloadFile={handleDownloadFile}
               currentDiffData={currentDiffData}
               isGeneratingDiff={isGeneratingDiff}
+              isApproving={isApproving} // ✅ Pass Prop
             />
           )}
         </div>

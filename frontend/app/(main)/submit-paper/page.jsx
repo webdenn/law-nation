@@ -75,6 +75,20 @@ export default function SubmitPaperPage() {
   // Simple Input Change (HTML attributes will handle limits)
   const handleInputChange = (e) => {
     const { name, value, files, type, checked } = e.target;
+
+    // Explicit Check: If checking file input, ensure it is PDF
+    if (name === "file" && files && files[0]) {
+      if (files[0].type !== "application/pdf") {
+        toast.error("Only PDF files are supported.", {
+          position: "top-right",
+          theme: "colored"
+        });
+        // Clear value so invalid file is not kept
+        e.target.value = "";
+        return;
+      }
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : files ? files[0] : value,
@@ -223,7 +237,7 @@ export default function SubmitPaperPage() {
       // Fields Mapping
       const finalAuthorName =
         formData.authorDeclaration === "other" &&
-        formData.submissionOnBehalfName
+          formData.submissionOnBehalfName
           ? formData.submissionOnBehalfName
           : formData.fullName;
 
@@ -254,7 +268,7 @@ export default function SubmitPaperPage() {
       const token = localStorage.getItem("authToken");
       const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/submit-with-images`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/articles/submit-with-images`, {
         method: "POST",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -266,11 +280,11 @@ export default function SubmitPaperPage() {
 
       // --- 👇 ERROR HANDLING (Backend Error Ignore & Show Custom Msg) ---
       if (!response.ok) {
-        // Backend ka asli error console me dekho developer ke liye
         console.error("Backend Validation Error:", result);
-
-        // User ko sirf ye dikhao:
+        // Use backend error if available, otherwise fallback to generic
         throw new Error(
+          result.error ||
+          result.message ||
           "Submission failed. Please ensure all details comply with the guidelines."
         );
       }
@@ -407,9 +421,8 @@ export default function SubmitPaperPage() {
             {steps.map((step, index) => (
               <div
                 key={step.number}
-                className={`h-1.5 sm:h-2 flex-1 rounded ${
-                  step.number <= currentStep ? "bg-red-600" : "bg-gray-200"
-                }`}
+                className={`h-1.5 sm:h-2 flex-1 rounded ${step.number <= currentStep ? "bg-red-600" : "bg-gray-200"
+                  }`}
               />
             ))}
           </div>
@@ -427,13 +440,12 @@ export default function SubmitPaperPage() {
                     <div key={step.number} className="flex items-center">
                       <div className="flex flex-col items-center">
                         <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${
-                            step.number < currentStep
-                              ? "bg-red-600 text-white"
-                              : step.number === currentStep
+                          className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${step.number < currentStep
+                            ? "bg-red-600 text-white"
+                            : step.number === currentStep
                               ? "bg-red-600 text-white ring-2 ring-red-100"
                               : "bg-gray-200 text-gray-500"
-                          }`}
+                            }`}
                         >
                           {step.number < currentStep ? (
                             <svg
@@ -454,11 +466,10 @@ export default function SubmitPaperPage() {
                           )}
                         </div>
                         <p
-                          className={`text-xs font-medium mt-1 text-center ${
-                            step.number === currentStep
-                              ? "text-red-600"
-                              : "text-gray-500"
-                          }`}
+                          className={`text-xs font-medium mt-1 text-center ${step.number === currentStep
+                            ? "text-red-600"
+                            : "text-gray-500"
+                            }`}
                         >
                           {step.number}
                         </p>
@@ -466,11 +477,10 @@ export default function SubmitPaperPage() {
                       {index < steps.length - 1 && (
                         <div className="flex items-center mx-2 sm:mx-3">
                           <div
-                            className={`h-0.5 w-12 sm:w-16 ${
-                              step.number < currentStep
-                                ? "bg-red-600"
-                                : "bg-gray-200"
-                            }`}
+                            className={`h-0.5 w-12 sm:w-16 ${step.number < currentStep
+                              ? "bg-red-600"
+                              : "bg-gray-200"
+                              }`}
                           />
                         </div>
                       )}
@@ -487,13 +497,12 @@ export default function SubmitPaperPage() {
                     <div key={step.number} className="flex items-start">
                       <div className="flex flex-col items-center mr-4">
                         <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-base ${
-                            step.number < currentStep
-                              ? "bg-red-600 text-white"
-                              : step.number === currentStep
+                          className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-base ${step.number < currentStep
+                            ? "bg-red-600 text-white"
+                            : step.number === currentStep
                               ? "bg-red-600 text-white ring-4 ring-red-100"
                               : "bg-gray-200 text-gray-500"
-                          }`}
+                            }`}
                         >
                           {step.number < currentStep ? (
                             <svg
@@ -515,23 +524,21 @@ export default function SubmitPaperPage() {
                         </div>
                         {index < steps.length - 1 && (
                           <div
-                            className={`w-0.5 h-12 mt-2 ${
-                              step.number < currentStep
-                                ? "bg-red-600"
-                                : "bg-gray-200"
-                            }`}
+                            className={`w-0.5 h-12 mt-2 ${step.number < currentStep
+                              ? "bg-red-600"
+                              : "bg-gray-200"
+                              }`}
                           />
                         )}
                       </div>
                       <div className="flex-1 pt-2">
                         <p
-                          className={`text-base font-medium ${
-                            step.number === currentStep
-                              ? "text-red-600"
-                              : step.number < currentStep
+                          className={`text-base font-medium ${step.number === currentStep
+                            ? "text-red-600"
+                            : step.number < currentStep
                               ? "text-gray-900"
                               : "text-gray-500"
-                          }`}
+                            }`}
                         >
                           {step.number} {step.title}
                         </p>
@@ -570,11 +577,10 @@ export default function SubmitPaperPage() {
                     type="button"
                     onClick={handleVerifyOtp}
                     disabled={isLoading} // 👈 Disable button while loading
-                    className={`w-full py-2 rounded-md font-semibold transition-colors ${
-                      isLoading
-                        ? "bg-red-400 cursor-not-allowed text-white"
-                        : "bg-red-600 hover:bg-red-700 text-white"
-                    }`}
+                    className={`w-full py-2 rounded-md font-semibold transition-colors ${isLoading
+                      ? "bg-red-400 cursor-not-allowed text-white"
+                      : "bg-red-600 hover:bg-red-700 text-white"
+                      }`}
                   >
                     {/* 👇 Text change hoga loading ke time */}
                     {isLoading ? "Verifying..." : "Verify Code"}
@@ -783,11 +789,10 @@ export default function SubmitPaperPage() {
                         Article Title
                       </label>
                       <span
-                        className={`text-xs ${
-                          formData.articleTitle.length < 50
-                            ? "text-red-500"
-                            : "text-green-600"
-                        }`}
+                        className={`text-xs ${formData.articleTitle.length < 50
+                          ? "text-red-500"
+                          : "text-green-600"
+                          }`}
                       >
                         {formData.articleTitle.length}/100 chars (Min 50)
                       </span>
@@ -814,11 +819,10 @@ export default function SubmitPaperPage() {
                         Detailed Description
                       </label>
                       <span
-                        className={`text-xs sm:text-sm ${
-                          formData.detailedDescription.length < 50
-                            ? "text-red-500"
-                            : "text-gray-500"
-                        }`}
+                        className={`text-xs sm:text-sm ${formData.detailedDescription.length < 50
+                          ? "text-red-500"
+                          : "text-gray-500"
+                          }`}
                       >
                         {formData.detailedDescription.length}/500 characters
                         (Min 50)
@@ -907,7 +911,7 @@ export default function SubmitPaperPage() {
                         id="file-upload"
                         name="file"
                         ref={fileInputRef}
-                        accept=".docx,.pdf,.md"
+                        accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
                         onChange={handleInputChange}
                         className="hidden"
                       />
@@ -1086,11 +1090,10 @@ export default function SubmitPaperPage() {
                     type="button"
                     onClick={handlePrevious}
                     disabled={currentStep === 1}
-                    className={`w-full sm:w-auto px-4 sm:px-6 py-2 text-sm sm:text-base rounded-md font-medium ${
-                      currentStep === 1
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-                    }`}
+                    className={`w-full sm:w-auto px-4 sm:px-6 py-2 text-sm sm:text-base rounded-md font-medium ${currentStep === 1
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                      }`}
                   >
                     Previous
                   </button>

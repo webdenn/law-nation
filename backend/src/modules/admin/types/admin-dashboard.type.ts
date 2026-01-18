@@ -36,6 +36,8 @@ export interface ArticleTimeline {
   assignedEditorId?: string | null;
   originalPdfUrl?: string;
   currentPdfUrl?: string;
+  originalWordUrl?: string | null; // ✅ Added
+  currentWordUrl?: string | null;  // ✅ Added
   timeline: {
     submittedAt: Date;
     assignedAt: Date | null;

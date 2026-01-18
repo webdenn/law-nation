@@ -202,7 +202,7 @@ export class ArticleWorkflowService {
     // Allow corrections in multiple statuses
     const validStatuses = [
       "ASSIGNED_TO_EDITOR",
-      "EDITOR_EDITING", 
+      "EDITOR_EDITING",
       "EDITOR_APPROVED", // Allow re-editing
       "PENDING_ADMIN_REVIEW" // Allow editing before assignment
     ];
@@ -213,12 +213,12 @@ export class ArticleWorkflowService {
       );
     }
 
-  // NEW: Handle document vs article processing differently
-  if (article.contentType === 'DOCUMENT') {
-    return await this.handleDocumentEdit(article, editorId, data);
-  } else {
-    return await this.handleArticleEdit(article, editorId, data);
-  }
+    // NEW: Handle document vs article processing differently
+    if (article.contentType === 'DOCUMENT') {
+      return await this.handleDocumentEdit(article, editorId, data);
+    } else {
+      return await this.handleArticleEdit(article, editorId, data);
+    }
   }
 
   // NEW: Handle document editing (DOCX files)
@@ -227,25 +227,25 @@ export class ArticleWorkflowService {
 
     // For documents, the uploaded file should be DOCX
     let docxPath = data.pdfUrl; // This is actually a DOCX file for documents
-    
+
     // Fix path resolution - convert relative path to absolute if needed
     if (docxPath.startsWith('/uploads/')) {
       docxPath = docxPath.replace('/uploads/', 'uploads/');
       docxPath = path.join(process.cwd(), docxPath);
       console.log(`📂 [Document Edit] Resolved absolute path: ${docxPath}`);
     }
-    
+
     // Validate it's actually a DOCX file
     if (!docxPath.toLowerCase().endsWith('.docx')) {
       throw new Error('Document workflow requires DOCX files');
     }
-    
+
     // Verify file exists
     const fs = await import('fs');
     if (!fs.existsSync(docxPath)) {
       throw new Error(`DOCX file not found: ${docxPath}`);
     }
-    
+
     // Add watermark to edited DOCX
     const watermarkData = {
       userName: 'LAW NATION EDITOR',
@@ -304,10 +304,10 @@ export class ArticleWorkflowService {
   private async handleArticleEdit(article: any, editorId: string, data: UploadCorrectedPdfData) {
     // Check if this is a DOCX upload - if so, treat as document workflow
     const isDocxUpload = data.pdfUrl.toLowerCase().endsWith('.docx');
-    
+
     if (isDocxUpload) {
       console.log(`📄 [Article Edit] DOCX detected - switching to document workflow for ${article.id}`);
-      
+
       // Update article to document type if not already
       if (article.contentType !== 'DOCUMENT') {
         await prisma.article.update({
@@ -319,7 +319,7 @@ export class ArticleWorkflowService {
         });
         article.contentType = 'DOCUMENT'; // Update local object
       }
-      
+
       // Use document workflow with Adobe services
       return await this.handleDocumentEdit(article, editorId, data);
     }
@@ -427,7 +427,8 @@ export class ArticleWorkflowService {
 
     if (
       article.status !== "EDITOR_EDITING" &&
-      article.status !== "ASSIGNED_TO_EDITOR"
+      article.status !== "ASSIGNED_TO_EDITOR" &&
+      article.status !== "EDITOR_APPROVED" // Allow re-approval (idempotent-like)
     ) {
       throw new BadRequestError("Article cannot be approved in current status");
     }
@@ -565,7 +566,7 @@ export class ArticleWorkflowService {
     if (article.status !== "EDITOR_APPROVED") {
       throw new BadRequestError(
         "Article must be approved by editor before publishing. Current status: " +
-          article.status
+        article.status
       );
     }
 
@@ -582,7 +583,7 @@ export class ArticleWorkflowService {
     console.log(`📄 [Document Publish] Publishing document ${article.id} with Adobe text extraction from edited version`);
 
     let extractedText = '';
-    
+
     // Extract text from edited DOCX using Adobe services (corrected version for users)
     if (article.currentWordUrl) {
       try {
@@ -666,18 +667,78 @@ export class ArticleWorkflowService {
       );
     }
 
+
     // NEW: Extract text from current/edited version for user display
     let extractedText = '';
-    
+    const fs = await import('fs');
+    const path = await import('path');
+
     if (article.currentWordUrl) {
       try {
-        console.log(`🔍 [Article Publish] Extracting text from edited version: ${article.currentWordUrl}`);
-        extractedText = await adobeService.extractTextFromDocx(article.currentWordUrl);
-        console.log(`✅ [Article Publish] Extracted ${extractedText.length} characters from edited version`);
+        // Fix: Resolve absolute path properly for local/server filesystem
+        // article.currentWordUrl typically comes as "/uploads/words/filename.docx" or similar
+        const relativePath = article.currentWordUrl.startsWith('/')
+          ? article.currentWordUrl.substring(1)
+          : article.currentWordUrl;
+
+        let absoluteScanPath = "";
+
+        // Handle different environments (Local vs Production paths)
+        if (article.currentWordUrl.startsWith("http")) {
+          // If it's a full URL (SS3/Cloud), we can't extract locally easily without downloading
+          // skipping for now or assume path mapping
+          console.log(`ℹ️ [Article Publish] Skipping extraction for remote URL: ${article.currentWordUrl}`);
+          extractedText = article.content || "";
+        } else {
+          absoluteScanPath = path.join(process.cwd(), relativePath);
+
+          // Check if it exists, if not, try uploads folder specifically if not included
+          if (!fs.existsSync(absoluteScanPath) && !relativePath.startsWith('uploads')) {
+            absoluteScanPath = path.join(process.cwd(), 'uploads', relativePath);
+          }
+
+          if (fs.existsSync(absoluteScanPath)) {
+            extractedText = await adobeService.extractTextFromDocx(absoluteScanPath);
+            console.log(`✅ [Article Publish] Extracted ${extractedText.length} characters from edited version`);
+          } else {
+            throw new Error(`DOCX file not found at path: ${absoluteScanPath}`);
+          }
+        }
+
       } catch (error) {
-        console.error('❌ [Article Publish] Text extraction failed:', error);
-        // Fallback to existing content if available
-        extractedText = article.content || 'Text extraction failed. Please contact administrator.';
+        console.error('❌ [Article Publish] Adobe text extraction failed:', error);
+
+        // Fallback: Try extracting from PDF using pdf-parse (Robust backup)
+        if (article.currentPdfUrl) {
+          try {
+            console.log(`⚠️ [Article Publish] Attempting fallback extraction from PDF: ${article.currentPdfUrl}`);
+            const createRequire = (await import('module')).createRequire;
+            const require = createRequire(import.meta.url);
+            const pdfParse = require('pdf-parse');
+
+            const relativePdfPath = article.currentPdfUrl.startsWith('/') ? article.currentPdfUrl.substring(1) : article.currentPdfUrl;
+            let absolutePdfPath = path.join(process.cwd(), relativePdfPath);
+
+            if (!fs.existsSync(absolutePdfPath) && !relativePdfPath.startsWith('uploads')) {
+              absolutePdfPath = path.join(process.cwd(), 'uploads', relativePdfPath);
+            }
+
+            if (fs.existsSync(absolutePdfPath)) {
+              const dataBuffer = fs.readFileSync(absolutePdfPath);
+              const data = await pdfParse(dataBuffer);
+              extractedText = data.text;
+              console.log(`✅ [Article Publish] Fallback PDF extraction successful (${extractedText.length} chars)`);
+            } else {
+              console.error(`❌ [Article Publish] Fallback PDF file also not found: ${absolutePdfPath}`);
+              extractedText = article.content || 'Text extraction failed. Please contact administrator.';
+            }
+          } catch (pdfError) {
+            console.error('❌ [Article Publish] Fallback PDF extraction failed:', pdfError);
+            extractedText = article.content || 'Text extraction failed. Please contact administrator.';
+          }
+        } else {
+          extractedText = article.content || 'Text extraction failed. Please contact administrator.';
+        }
       }
     } else if (article.content) {
       // Use existing extracted content if no Word version available

@@ -81,8 +81,9 @@ const ReviewInterface = ({
   handleViewVisualDiff,
   handleDownloadDiffReport,
   handleDownloadFile,
-  currentDiffData, // ✅ NEW: Frontend-generated diff data
-  isGeneratingDiff, // ✅ NEW: Loading state
+  currentDiffData,
+  isGeneratingDiff,
+  isApproving, // ✅ NEW: Loading state for approval
 }) => {
   if (!selectedArticle) return null;
 
@@ -130,7 +131,7 @@ const ReviewInterface = ({
 
       {/* ---------------- ACTION PANEL (Right Side) ---------------- */}
       <div className="w-full lg:w-[350px] space-y-6 shrink-0 h-full overflow-y-auto pb-10">
-        
+
         {/* 1. UPLOAD SECTION */}
         <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
           <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -142,15 +143,15 @@ const ReviewInterface = ({
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center bg-gray-50 relative hover:bg-gray-100 transition cursor-pointer">
               <input
                 type="file"
-                accept=".pdf,.docx"
+                accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 onChange={(e) => setUploadedFile(e.target.files[0])}
                 className="absolute inset-0 opacity-0 cursor-pointer z-10"
               />
               <p className="text-[10px] font-bold text-gray-500 uppercase">
-                CORRECTED FILE
+                CORRECTED FILE (DOCX ONLY)
               </p>
               <p className="text-xs truncate font-medium text-gray-700">
-                {uploadedFile ? `📄 ${uploadedFile.name}` : "Select Corrected Version"}
+                {uploadedFile ? `📄 ${uploadedFile.name}` : "Select Corrected DOCX"}
               </p>
             </div>
 
@@ -167,11 +168,10 @@ const ReviewInterface = ({
             <button
               onClick={handleUploadCorrection}
               disabled={!uploadedFile || isUploading}
-              className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-2 ${
-                !uploadedFile
-                  ? "bg-gray-300 cursor-not-allowed"
-                  : "bg-blue-600 hover:bg-blue-700 active:scale-95"
-              }`}
+              className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-2 ${!uploadedFile
+                ? "bg-gray-300 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700 active:scale-95"
+                }`}
             >
               {isUploading ? "Processing Diff..." : "Upload & Generate Diff"}
             </button>
@@ -181,13 +181,26 @@ const ReviewInterface = ({
         {/* 2. APPROVE BUTTON */}
         <button
           onClick={handleEditorApprove}
-          className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 shadow-lg transition flex items-center justify-center gap-2 transform active:scale-95"
+          disabled={isApproving}
+          className={`w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl transition-all flex items-center justify-center gap-2 transform active:scale-95 ${isApproving
+            ? "bg-gray-400 text-white cursor-not-allowed"
+            : "bg-green-600 hover:bg-green-700 text-white hover:shadow-green-200"
+            }`}
         >
-          <CheckCircleIcon /> Approve & Notify Admin
+          {isApproving ? (
+            <>
+              <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              Processing...
+            </>
+          ) : (
+            <>
+              <CheckCircleIcon /> Approve & Notify Admin
+            </>
+          )}
         </button>
 
         {/* 3. CHANGE HISTORY LIST */}
-        <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
+        {/* <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
           <h3 className="font-bold text-gray-800 mb-4 border-b pb-2">Change History</h3>
 
           <div className="space-y-6">
@@ -196,9 +209,8 @@ const ReviewInterface = ({
             ) : (
               changeHistory.map((log) => (
                 <div key={log.id || log._id} className="relative pl-4 border-l-2 border-gray-200">
-                  {/* Timeline Dot */}
                   <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-white"></div>
-                  
+
                   <div className="mb-1">
                     <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
                       Version {log.versionNumber}
@@ -207,7 +219,7 @@ const ReviewInterface = ({
                       {new Date(log.editedAt).toLocaleDateString()}
                     </span>
                   </div>
-                  
+
                   <p className="text-xs text-gray-600 italic mb-2">
                     "{log.comments || "No comments provided"}"
                   </p>
@@ -218,7 +230,7 @@ const ReviewInterface = ({
                   >
                     <DownloadIcon /> Download PDF Report
                   </button>
-                  
+
                   <button
                     onClick={() => handleDownloadDiffReport(log.id || log._id, "word")}
                     className="flex items-center text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100 transition"
@@ -231,26 +243,30 @@ const ReviewInterface = ({
               ))
             )}
 
-            {/* Original Submission Marker */}
             <div className="relative pl-4 border-l-2 border-gray-200 opacity-60">
               <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-gray-400 ring-4 ring-white"></div>
               <p className="text-xs font-bold text-gray-500">Original Submission</p>
             </div>
           </div>
-        </div>
+        </div> */}
 
-        {/* 4. SOURCE FILES */}
+        {/* 4. USER ORIGINAL DOCUMENT */}
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-          <h3 className="font-bold text-gray-800 mb-4">Source Files</h3>
+          <h3 className="font-bold text-gray-800 mb-4">User Original Document</h3>
           <div className="flex flex-col gap-3">
-            {selectedArticle.originalWordUrl ? (
+            {/* Prefer current edited Word file, fallback to original */}
+            {(selectedArticle.currentWordUrl || selectedArticle.originalWordUrl) ? (
               <button
                 onClick={() =>
-                  handleDownloadFile(selectedArticle.originalWordUrl, selectedArticle.title, "Word")
+                  handleDownloadFile(
+                    selectedArticle.currentWordUrl || selectedArticle.originalWordUrl,
+                    selectedArticle.title + (selectedArticle.currentWordUrl ? "_edited" : ""),
+                    "Word"
+                  )
                 }
                 className="flex items-center justify-center w-full py-2 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold rounded-lg hover:bg-blue-100 transition"
               >
-                <WordIcon /> Download Word
+                <WordIcon /> Download DOCX
               </button>
             ) : (
               <div className="text-xs text-center text-gray-400">No Word file</div>

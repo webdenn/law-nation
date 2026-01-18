@@ -10,7 +10,7 @@ import type {
 } from "./types/admin-dashboard.type.js";
 
 class AdminDashboardService {
-  
+
   /**
    * Get overall dashboard summary
    */
@@ -220,6 +220,8 @@ class AdminDashboardService {
             assignedEditorId: true,
             originalPdfUrl: true,
             currentPdfUrl: true,
+            originalWordUrl: true, // ✅ Added
+            currentWordUrl: true,  // ✅ Added
             submittedAt: true,
             reviewedAt: true,
             approvedAt: true,
@@ -242,6 +244,8 @@ class AdminDashboardService {
         assignedEditorId: article.assignedEditorId,
         originalPdfUrl: article.originalPdfUrl,
         currentPdfUrl: article.currentPdfUrl,
+        originalWordUrl: article.originalWordUrl, // ✅ Added
+        currentWordUrl: article.currentWordUrl, // ✅ Added
         timeline: {
           submittedAt: article.submittedAt,
           assignedAt: article.createdAt, // Using createdAt as proxy

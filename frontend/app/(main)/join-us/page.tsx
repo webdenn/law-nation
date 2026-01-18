@@ -10,19 +10,19 @@ import ReCAPTCHA from "react-google-recaptcha";
 export default function JoinUsPage() {
   const router = useRouter()
   const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
-  
+
   // States
   const [formData, setFormData] = useState({
-    name: "", 
+    name: "",
     email: "",
     phone: "",
     password: "",
     confirmPassword: ""
   })
-  
+
   // OTP States
-  const [otp, setOtp] = useState("") 
-  const [isOtpSent, setIsOtpSent] = useState(false) 
+  const [otp, setOtp] = useState("")
+  const [isOtpSent, setIsOtpSent] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   // UI States
@@ -66,7 +66,7 @@ export default function JoinUsPage() {
         toast.success("OTP Sent to your email!", { position: "top-right", theme: "colored" });
         setIsOtpSent(true) // UI Change: Show OTP Input
       } else {
-        toast.error(data.message || "Failed to send OTP", { position: "top-right", theme: "colored" });
+        toast.error(data.error || data.message || "Failed to send OTP", { position: "top-right", theme: "colored" });
       }
     } catch (error) {
       console.error("Network Error:", error)
@@ -77,14 +77,14 @@ export default function JoinUsPage() {
   }
 
   // ✅ STEP 2: Verify OTP & Signup Logic
- // ✅ STEP 2: Verify OTP & Signup Logic (UPDATED CODE)
+  // ✅ STEP 2: Verify OTP & Signup Logic (UPDATED CODE)
   const handleVerifyAndSignup = async (e: React.FormEvent) => {
     e.preventDefault()
 
     // 1. Check if Captcha is completed
-    if (!captchaToken) { 
-        toast.error("Please complete the reCAPTCHA challenge", { position: "top-right", theme: "colored" }); 
-        return; 
+    if (!captchaToken) {
+      toast.error("Please complete the reCAPTCHA challenge", { position: "top-right", theme: "colored" });
+      return;
     }
 
     if (!otp) { toast.error("Please enter the OTP"); return; }
@@ -101,7 +101,7 @@ export default function JoinUsPage() {
       const verifyData = await verifyResponse.json()
 
       if (!verifyResponse.ok) {
-        toast.error(verifyData.message || "Invalid OTP", { position: "top-right", theme: "colored" });
+        toast.error(verifyData.error || verifyData.message || "Invalid OTP", { position: "top-right", theme: "colored" });
         setIsLoading(false)
         return
       }
@@ -132,10 +132,10 @@ export default function JoinUsPage() {
         });
 
         setTimeout(() => {
-          router.push("/login") 
+          router.push("/login")
         }, 2000)
       } else {
-        toast.error(signupData.message || "Signup failed", { position: "top-right", theme: "colored" });
+        toast.error(signupData.error || signupData.message || "Signup failed", { position: "top-right", theme: "colored" });
       }
 
     } catch (error) {
@@ -196,14 +196,14 @@ export default function JoinUsPage() {
           {/* Form Card */}
           <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-5 sm:p-6">
             <form onSubmit={isOtpSent ? handleVerifyAndSignup : handleSendOtp} className="space-y-4">
-              
+
               {/* Name Field */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </div>
                   <input
@@ -212,7 +212,7 @@ export default function JoinUsPage() {
                     value={formData.name}
                     onChange={handleInputChange}
                     placeholder="John Doe"
-                    disabled={isOtpSent} 
+                    disabled={isOtpSent}
                     className={`w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50 ${isOtpSent ? 'opacity-70 cursor-not-allowed' : ''}`}
                     required
                   />
@@ -237,7 +237,7 @@ export default function JoinUsPage() {
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder="Enter your email"
-                    disabled={isOtpSent} 
+                    disabled={isOtpSent}
                     className={`w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50 ${isOtpSent ? 'opacity-70 cursor-not-allowed' : ''}`}
                     required
                   />
@@ -250,7 +250,7 @@ export default function JoinUsPage() {
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                     </svg>
                   </div>
                   <input
@@ -259,7 +259,7 @@ export default function JoinUsPage() {
                     value={formData.phone}
                     onChange={handleInputChange}
                     placeholder="+1234567890"
-                    disabled={isOtpSent} 
+                    disabled={isOtpSent}
                     className={`w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50 ${isOtpSent ? 'opacity-70 cursor-not-allowed' : ''}`}
                     required
                   />
@@ -284,7 +284,7 @@ export default function JoinUsPage() {
                     value={formData.password}
                     onChange={handleInputChange}
                     placeholder="Create a password"
-                    disabled={isOtpSent} 
+                    disabled={isOtpSent}
                     className={`w-full pl-10 pr-12 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50 ${isOtpSent ? 'opacity-70 cursor-not-allowed' : ''}`}
                     required
                   />
@@ -326,7 +326,7 @@ export default function JoinUsPage() {
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
                     placeholder="Confirm your password"
-                    disabled={isOtpSent} 
+                    disabled={isOtpSent}
                     className={`w-full pl-10 pr-12 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50 ${isOtpSent ? 'opacity-70 cursor-not-allowed' : ''}`}
                     required
                   />
@@ -349,7 +349,7 @@ export default function JoinUsPage() {
                 </div>
               </div>
 
-                  <div className="mb-4">
+              <div className="mb-4">
                 <ReCAPTCHA
                   // || "" add karna hai taki undefined na jaye
                   sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ""}
@@ -408,12 +408,11 @@ export default function JoinUsPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className={`w-full px-6 py-2.5 bg-red-600 text-white rounded-lg font-semibold text-sm shadow-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-all duration-200 transform hover:scale-[1.02] ${
-                  isLoading ? "opacity-70 cursor-not-allowed" : ""
-                }`}
+                className={`w-full px-6 py-2.5 bg-red-600 text-white rounded-lg font-semibold text-sm shadow-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-all duration-200 transform hover:scale-[1.02] ${isLoading ? "opacity-70 cursor-not-allowed" : ""
+                  }`}
               >
-                {isLoading 
-                  ? (isOtpSent ? "Verifying..." : "Sending OTP...") 
+                {isLoading
+                  ? (isOtpSent ? "Verifying..." : "Sending OTP...")
                   : (isOtpSent ? "Verify & Create Account" : "Send OTP & Create Account")
                 }
               </button>

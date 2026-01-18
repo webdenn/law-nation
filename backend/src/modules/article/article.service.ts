@@ -5,13 +5,19 @@ import { articleDownloadService } from "./services/article-download.service.js";
 import { articleSearchService } from "./services/article-search.service.js";
 import { articleQueryService } from "./services/article-query.service.js";
 import { articleMediaService } from "./services/article-media.service.js";
-import { adobeService } from "@/services/adobe.service.js"; 
+import { adobeService } from "@/services/adobe.service.js";
 import type {
   ArticleSubmissionData,
   ArticleListFilters,
   AssignEditorData,
   UploadCorrectedPdfData,
 } from "./types/article-submission.type.js";
+import fs from "fs";
+import path from "path";
+import * as Diff from "diff";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 //Main service that delegates to specialized services
 //This maintains backward compatibility while using the new modular architecture:
 //ArticleSubmissionService: Handles submission and verification
@@ -25,16 +31,16 @@ export class ArticleService {
   async submitArticle(data: ArticleSubmissionData, userId?: string) {
     return articleSubmissionService.submitArticle(data, userId);
   }
-  
+
   // NEW: Document processing with Adobe services
   async processDocumentUpload(articleId: string, pdfPath: string) {
     try {
       console.log(`📄 [Document] Processing document ${articleId} with Adobe services`);
-      
+
       // Convert PDF to DOCX using Adobe
       const docxPath = pdfPath.replace('.pdf', '.docx');
       await adobeService.convertPdfToDocx(pdfPath, docxPath);
-      
+
       // Add watermark to DOCX
       const watermarkData = {
         userName: 'LAW NATION USER',
@@ -43,10 +49,10 @@ export class ArticleService {
         articleId: articleId,
         frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
       };
-      
+
       const watermarkedDocxPath = docxPath.replace('.docx', '_watermarked.docx');
       await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
-      
+
       // Update article with DOCX URL
       await prisma.article.update({
         where: { id: articleId },
@@ -55,29 +61,51 @@ export class ArticleService {
           status: 'PENDING_ADMIN_REVIEW', // Ready for admin assignment
         },
       });
-      
+
       console.log(`✅ [Document] Document processing completed for ${articleId}`);
-      
+
     } catch (error) {
       console.error(`❌ [Document] Processing failed for ${articleId}:`, error);
       throw error;
     }
   }
-  
+
   // NEW: Handle editor DOCX upload for documents
   async uploadEditedDocx(articleId: string, editorId: string, docxPath: string, comments?: string) {
     try {
       console.log(`✏️ [Document] Editor ${editorId} uploading edited DOCX for ${articleId}`);
-      
+
       const article = await prisma.article.findUnique({
         where: { id: articleId },
       });
-      
+
       if (!article || article.contentType !== 'DOCUMENT') {
         throw new Error('Article not found or not a document');
       }
-      
-      // Add watermark to edited DOCX
+
+      // 1. Get Previous Version (for Diff)
+      let oldPdfText = "";
+      if (article.currentPdfUrl) {
+        try {
+          // Resolve path if it's a URL or relative path
+          let oldPdfPath = article.currentPdfUrl;
+          if (oldPdfPath.startsWith('/') && !fs.existsSync(oldPdfPath)) {
+            oldPdfPath = path.join(process.cwd(), oldPdfPath.substring(1));
+          } else if (!path.isAbsolute(oldPdfPath)) {
+            oldPdfPath = path.join(process.cwd(), oldPdfPath);
+          }
+
+          if (fs.existsSync(oldPdfPath)) {
+            const dataBuffer = fs.readFileSync(oldPdfPath);
+            const data = await pdfParse(dataBuffer);
+            oldPdfText = data.text;
+          }
+        } catch (e) {
+          console.warn("Could not read old PDF for diff:", e);
+        }
+      }
+
+      // 2. Add watermark to edited DOCX
       const watermarkData = {
         userName: 'LAW NATION EDITOR',
         downloadDate: new Date(),
@@ -85,15 +113,78 @@ export class ArticleService {
         articleId: articleId,
         frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
       };
-      
+
       const watermarkedDocxPath = docxPath.replace('.docx', '_edited_watermarked.docx');
       await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
-      
-      // Convert to PDF for preview
+
+      // 3. Convert to PDF for preview
       const pdfPath = docxPath.replace('.docx', '_edited.pdf');
       await adobeService.convertDocxToPdf(watermarkedDocxPath, pdfPath);
-      
-      // Update article
+
+      // 4. Extract Text from New PDF
+      let newPdfText = "";
+      try {
+        const dataBuffer = fs.readFileSync(pdfPath);
+        const data = await pdfParse(dataBuffer);
+        newPdfText = data.text;
+      } catch (e) {
+        console.warn("Could not read new PDF for diff:", e);
+      }
+
+      // 5. Generate Diff
+      const diffResult = Diff.diffLines(oldPdfText, newPdfText);
+      const stats = { added: 0, removed: 0, modified: 0 };
+      const formattedDiff = {
+        added: [] as any[],
+        removed: [] as any[],
+        modified: [] as any[],
+        summary: stats
+      };
+
+      // Simple processing of diff results for stats and structure
+      let lineNumOld = 1;
+      let lineNumNew = 1;
+
+      diffResult.forEach((part) => {
+        const lines = part.value.split('\n').filter(l => l.trim());
+        if (lines.length === 0) return;
+
+        if (part.added) {
+          stats.added += lines.length;
+          lines.forEach(line => formattedDiff.added.push({ newLineNumber: lineNumNew++, content: line }));
+        } else if (part.removed) {
+          stats.removed += lines.length;
+          lines.forEach(line => formattedDiff.removed.push({ oldLineNumber: lineNumOld++, content: line }));
+        } else {
+          // Unchanged
+          lineNumOld += lines.length;
+          lineNumNew += lines.length;
+        }
+      });
+      // Detect modified (heuristic: remove followed by add) - simplifying for now to just A/R
+      // stats is already updated by reference in formattedDiff.summary
+
+      // 6. Create Change Log with Diff Data
+      const versionCount = await prisma.articleChangeLog.count({ where: { articleId } });
+      const versionNumber = versionCount + 1;
+
+      await prisma.articleChangeLog.create({
+        data: {
+          articleId,
+          editedBy: editorId,
+          versionNumber,
+          comments: comments || "Editor correction",
+          diffData: formattedDiff as any,
+          oldFileUrl: article.currentPdfUrl || "", // Required by schema
+          newFileUrl: pdfPath,
+          fileType: 'PDF', // We are comparing and storing PDF representations
+          editorDocumentUrl: watermarkedDocxPath,
+          editorDocumentType: 'DOCX',
+          status: 'approved' // Set as approved/pending
+        }
+      });
+
+      // 7. Update article
       await prisma.article.update({
         where: { id: articleId },
         data: {
@@ -102,29 +193,29 @@ export class ArticleService {
           status: 'EDITOR_APPROVED',
         },
       });
-      
+
       console.log(`✅ [Document] Editor DOCX upload completed for ${articleId}`);
-      
+
     } catch (error) {
       console.error(`❌ [Document] Editor DOCX upload failed:`, error);
       throw error;
     }
   }
-  
+
   // NEW: Extract text for document publishing
   async extractDocumentText(articleId: string) {
     try {
       const article = await prisma.article.findUnique({
         where: { id: articleId },
       });
-      
+
       if (!article || article.contentType !== 'DOCUMENT' || !article.currentWordUrl) {
         throw new Error('Document not ready for text extraction');
       }
-      
+
       // Extract text using Adobe services
       const extractedText = await adobeService.extractTextFromDocx(article.currentWordUrl);
-      
+
       // Update article with extracted text
       await prisma.article.update({
         where: { id: articleId },
@@ -132,9 +223,9 @@ export class ArticleService {
           content: extractedText, // Store in content field for compatibility
         },
       });
-      
+
       return extractedText;
-      
+
     } catch (error) {
       console.error(`❌ [Document] Text extraction failed:`, error);
       throw error;
@@ -193,22 +284,22 @@ export class ArticleService {
   async getArticleWordUrl(articleId: string) {
     return articleDownloadService.getArticleWordUrl(articleId);
   }
-  
+
   // NEW: Get original DOCX URL (converted from user's PDF)
   async getOriginalDocxUrl(articleId: string) {
     return articleDownloadService.getOriginalDocxUrl(articleId);
   }
-  
+
   // NEW: Download original DOCX with watermark
   async downloadOriginalDocxWithWatermark(articleId: string, watermarkData: any) {
     return articleDownloadService.downloadOriginalDocxWithWatermark(articleId, watermarkData);
   }
-  
+
   // NEW: Get editor's DOCX URL (corrected version)
   async getEditorDocxUrl(articleId: string) {
     return articleDownloadService.getEditorDocxUrl(articleId);
   }
-  
+
   // NEW: Download editor's DOCX with watermark
   async downloadEditorDocxWithWatermark(articleId: string, watermarkData: any) {
     return articleDownloadService.downloadEditorDocxWithWatermark(articleId, watermarkData);

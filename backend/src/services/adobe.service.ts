@@ -44,13 +44,13 @@ export class AdobeService {
 
   constructor() {
     this.isAvailable = false;
-    
+
     console.log("🚀 [Adobe] Initializing Adobe PDF Services...");
     console.log("📋 [Adobe] Environment variables check:");
     console.log(`   - ADOBE_CLIENT_ID: ${process.env.ADOBE_CLIENT_ID ? '✅ Set' : '❌ Missing'}`);
     console.log(`   - ADOBE_CLIENT_SECRET: ${process.env.ADOBE_CLIENT_SECRET ? '✅ Set' : '❌ Missing'}`);
     console.log(`   - ADOBE_ORGANIZATION_ID: ${process.env.ADOBE_ORGANIZATION_ID ? '✅ Set' : '❌ Missing'}`);
-    
+
     try {
       if (!AdobeSDK || !ServicePrincipalCredentials || !PDFServices) {
         throw new Error("Adobe PDF Services SDK not available");
@@ -65,7 +65,7 @@ export class AdobeService {
 
       this.pdfServices = new PDFServices({ credentials });
       this.isAvailable = true;
-      
+
       console.log("✅ [Adobe] Adobe PDF Services initialized successfully");
       console.log("🔧 [Adobe] Available methods: convertPdfToDocx, convertDocxToPdf, extractTextFromDocx, addWatermarkToDocx");
     } catch (error) {
@@ -86,7 +86,7 @@ export class AdobeService {
    */
   async convertPdfToDocx(pdfPath: string, outputPath: string): Promise<string> {
     this.checkAvailability();
-    
+
     try {
       console.log(`🔄 [Adobe] Converting PDF to DOCX: ${pdfPath}`);
 
@@ -147,30 +147,30 @@ export class AdobeService {
    */
   async convertDocxToPdf(docxPath: string, outputPath: string): Promise<string> {
     this.checkAvailability();
-    
+
     const startTime = Date.now();
     console.log(`🔄 [Adobe] Starting DOCX to PDF conversion`);
     console.log(`   📂 Input: ${docxPath}`);
     console.log(`   📂 Output: ${outputPath}`);
-    
+
     // Check if input file exists
     if (!fs.existsSync(docxPath)) {
       console.error(`❌ [Adobe] Input file not found: ${docxPath}`);
       throw new InternalServerError(`Input DOCX file not found: ${docxPath}`);
     }
-    
+
     const fileSize = fs.statSync(docxPath).size;
     console.log(`   📊 File size: ${(fileSize / 1024).toFixed(2)} KB`);
-    
+
     try {
       console.log(`⬆️ [Adobe] Uploading DOCX to Adobe Services...`);
-      
+
       // Create an ExecutionContext using credentials
       const inputAsset = await this.pdfServices.upload({
         readStream: fs.createReadStream(docxPath),
         mimeType: MimeType.DOCX
       });
-      
+
       console.log(`✅ [Adobe] File uploaded successfully`);
       console.log(`🔧 [Adobe] Creating PDF conversion job...`);
 
@@ -181,12 +181,12 @@ export class AdobeService {
       // Submit the job and get the job result
       const pollingURL = await this.pdfServices.submit({ job });
       console.log(`⏳ [Adobe] Job submitted, polling for results...`);
-      
+
       const pdfServicesResponse = await this.pdfServices.getJobResult({
         pollingURL,
         resultType: CreatePDFResult
       });
-      
+
       console.log(`✅ [Adobe] Job completed successfully`);
       console.log(`⬇️ [Adobe] Downloading converted PDF...`);
 
@@ -210,7 +210,7 @@ export class AdobeService {
           const endTime = Date.now();
           const duration = endTime - startTime;
           const outputSize = fs.statSync(outputPath).size;
-          
+
           console.log(`✅ [Adobe] DOCX converted to PDF successfully!`);
           console.log(`   📂 Output: ${outputPath}`);
           console.log(`   📊 Output size: ${(outputSize / 1024).toFixed(2)} KB`);
@@ -226,11 +226,11 @@ export class AdobeService {
     } catch (err: any) {
       const endTime = Date.now();
       const duration = endTime - startTime;
-      
+
       console.error(`❌ [Adobe] DOCX to PDF conversion failed after ${duration}ms`);
       console.error(`   Error type: ${err.constructor.name}`);
       console.error(`   Error message: ${err.message}`);
-      
+
       if (err instanceof SDKError) {
         console.error(`   SDK Error details:`, err);
       } else if (err instanceof ServiceUsageError) {
@@ -238,7 +238,7 @@ export class AdobeService {
       } else if (err instanceof ServiceApiError) {
         console.error(`   Service API Error - Check your credentials and network`);
       }
-      
+
       if (err instanceof SDKError || err instanceof ServiceUsageError || err instanceof ServiceApiError) {
         throw new InternalServerError(`Adobe DOCX conversion failed: ${err.message}`);
       }
@@ -251,9 +251,16 @@ export class AdobeService {
    */
   async extractTextFromDocx(docxPath: string): Promise<string> {
     this.checkAvailability();
-    
+
     try {
       console.log(`🔄 [Adobe] Extracting text from DOCX: ${docxPath}`);
+
+      if (!fs.existsSync(docxPath)) {
+        console.error(`❌ [Adobe] Input file missing: ${docxPath}`);
+        // Return empty string instead of throwing to prevent flow blockage if file missing
+        // or throw nice error
+        throw new Error(`Input file not found locally: ${docxPath}`);
+      }
 
       // Create an ExecutionContext using credentials
       const inputAsset = await this.pdfServices.upload({
@@ -286,12 +293,12 @@ export class AdobeService {
         streamAsset.readStream.on('data', (chunk: any) => {
           jsonData += chunk;
         });
-        
+
         streamAsset.readStream.on('end', () => {
           try {
             const extractedData = JSON.parse(jsonData);
             const textElements = extractedData.elements || [];
-            
+
             // Extract text from all text elements
             const extractedText = textElements
               .filter((element: any) => element.Text)
@@ -330,17 +337,17 @@ export class AdobeService {
       articleTitle: watermarkData.articleTitle,
       articleId: watermarkData.articleId
     });
-    
+
     try {
       // Use existing watermark utility
       const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
-      
+
       console.log(`🔧 [Adobe] Calling watermark utility...`);
       const watermarkedBuffer = await addSimpleWatermarkToWord(docxPath, watermarkData);
-      
+
       console.log(`✅ [Adobe] Watermark utility completed`);
       console.log(`   📊 Watermarked buffer size: ${watermarkedBuffer.length} bytes`);
-      
+
       // Create output directory if it doesn't exist
       const outputDir = path.dirname(outputPath);
       if (!fs.existsSync(outputDir)) {
@@ -350,12 +357,12 @@ export class AdobeService {
 
       // Write watermarked content to output path
       fs.writeFileSync(outputPath, watermarkedBuffer);
-      
+
       const outputSize = fs.statSync(outputPath).size;
       console.log(`✅ [Adobe] Watermark added to DOCX successfully!`);
       console.log(`   📂 Output: ${outputPath}`);
       console.log(`   📊 Output size: ${(outputSize / 1024).toFixed(2)} KB`);
-      
+
       return outputPath;
 
     } catch (err: any) {
@@ -371,13 +378,13 @@ export class AdobeService {
    */
   async testConnection(): Promise<{ success: boolean; message: string; details?: any }> {
     console.log(`🧪 [Adobe] Testing Adobe Services connection...`);
-    
+
     try {
       this.checkAvailability();
-      
+
       // Try to create a simple job to test credentials
       console.log(`🔐 [Adobe] Testing credentials...`);
-      
+
       // Create a minimal test - just check if we can initialize a job
       const testResult = {
         success: true,
@@ -388,10 +395,10 @@ export class AdobeService {
           serviceInitialized: this.isAvailable
         }
       };
-      
+
       console.log(`✅ [Adobe] Connection test passed:`, testResult);
       return testResult;
-      
+
     } catch (error: any) {
       const testResult = {
         success: false,
@@ -403,7 +410,7 @@ export class AdobeService {
           error: error.message
         }
       };
-      
+
       console.error(`❌ [Adobe] Connection test failed:`, testResult);
       return testResult;
     }

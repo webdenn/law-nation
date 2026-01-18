@@ -1,0 +1,1 @@
+{"version":3,"file":"correction.template.d.ts","sourceRoot":"","sources":["../../../../src/templates/email/article/correction.template.ts"],"names":[],"mappings":"AAEA,wBAAgB,6BAA6B,CAAC,IAAI,EAAE;IAClD,UAAU,EAAE,MAAM,CAAC;IACnB,YAAY,EAAE,MAAM,CAAC;IACrB,SAAS,EAAE,MAAM,CAAC;IAClB,cAAc,CAAC,EAAE,MAAM,CAAC;CACzB,GAAG;IAAE,OAAO,EAAE,MAAM,CAAC;IAAC,IAAI,EAAE,MAAM,CAAA;CAAE,CA8BpC"}

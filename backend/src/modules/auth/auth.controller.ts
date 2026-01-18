@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 import { AuthService } from "./auth.service.js";
 import { type AuthRequest } from "@/types/auth-request.js";
-import { sendAuthNotification } from "@/utils/email.utils.js"; 
+import { sendAuthNotification } from "@/utils/email.utils.js";
 import {
   loginSchema,
   signupSchema,
@@ -14,7 +14,6 @@ import {
 } from "./validators/auth.validator.js";
 import { UnauthorizedError } from "@/utils/http-errors.util.js";
 
-// --- SIGNUP HANDLER (Naya Registration) ---
 export async function signupHandler(
   req: Request,
   res: Response,
@@ -23,11 +22,13 @@ export async function signupHandler(
   try {
     const data = signupSchema.parse(req.body);
     const result = await AuthService.signup(data);
-    sendAuthNotification(data.email, data.name); 
+    sendAuthNotification(data.email, data.name);
     return res.status(201).json(result);
-  } catch (err) {
+  } catch (err: any) {
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ error: z.treeifyError(err) });
+      // Use the first validation error message to be user-friendly
+      const errorMessage = err.issues[0]?.message || "Validation failed";
+      return res.status(400).json({ error: errorMessage });
     }
     next(err);
   }
@@ -43,9 +44,10 @@ export async function loginHandler(
     const data = loginSchema.parse(req.body);
     const result = await AuthService.login(data.email, data.password, res, false);
     return res.json(result);
-  } catch (err) {
+  } catch (err: any) {
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ error: z.treeifyError(err) });
+      const errorMessage = err.issues[0]?.message || "Validation failed";
+      return res.status(400).json({ error: errorMessage });
     }
     next(err);
   }
@@ -66,7 +68,7 @@ export async function adminLoginHandler(
       return res.status(400).json({ error: z.treeifyError(err) });
     }
 
-    
+
     next(err);
   }
 }
