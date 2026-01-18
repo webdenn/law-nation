@@ -130,6 +130,16 @@ model Article {
   currentWordUrl     String?
   originalFileType   String                  @default("pdf")
   originalWordUrl    String?
+  
+  // NEW: Document-specific fields
+  contentType        ContentType             @default(ARTICLE)
+  documentType       DocumentType?           // Only for documents
+  documentStatus     DocumentStatus?         // Document processing status
+  docxUrl            String?                 // Converted DOCX for editing
+  editedDocxUrl      String?                 // Editor's edited DOCX
+  finalPdfUrl        String?                 // Final PDF with watermark
+  extractedText      String?                 // Text extracted for website
+  
   assignedEditor     User?                   @relation(fields: [assignedEditorId], references: [id])
   revisions          ArticleRevision[]
   changeLogs         ArticleChangeLog[]
@@ -141,6 +151,7 @@ model Article {
   @@index([authorEmail])
   @@index([secondAuthorEmail])
   @@index([slug])
+  @@index([contentType])
 }
 
 model ArticleRevision {
@@ -257,4 +268,23 @@ enum ArticleStatus {
   APPROVED
   REJECTED
   PUBLISHED
+}
+
+/// ---------- Content Type Enums ----------
+enum ContentType {
+  ARTICLE
+  DOCUMENT
+}
+
+enum DocumentType {
+  PDF
+  DOCX
+}
+
+enum DocumentStatus {
+  UPLOADED          // User uploaded PDF
+  PROCESSING        // Converting/watermarking
+  READY_FOR_EDIT    // Available for editor
+  EDITED            // Editor uploaded edited DOCX
+  PUBLISHED         // Admin published, text extracted
 }

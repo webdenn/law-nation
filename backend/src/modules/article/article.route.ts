@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth, optionalAuth } from "@/middlewares/auth.middleware.js";
 import { requirePermission } from "@/middlewares/require-premission.middleware.js";
 import { validateRecaptcha } from "@/middlewares/recaptcha.middleware.js";
-import { uploadDocument, uploadPdfOnly, uploadOptionalPdf, uploadImage, uploadMultipleImages, uploadArticleFiles, uploadEditorFiles } from "@/middlewares/upload.middleware.js";
+import { uploadDocument, uploadPdfOnly, uploadOptionalPdf, uploadImage, uploadMultipleImages, uploadArticleFiles, uploadEditorFiles, uploadDocxOnly } from "@/middlewares/upload.middleware.js";
 import { articleController } from "./article.controller.js";
 
 const router = Router();
@@ -12,7 +12,7 @@ router.post(
   "/submit",
   optionalAuth, // Check auth but don't require it
   uploadDocument, // Accept PDF or Word from users
-  validateRecaptcha, // ✅ NEW: Verify reCAPTCHA (REQUIRED - blocks bots)
+  validateRecaptcha, // NEW: Verify reCAPTCHA (REQUIRED - blocks bots)
   articleController.submitArticle.bind(articleController)
 );
 
@@ -21,7 +21,7 @@ router.post(
   "/submit-with-images",
   optionalAuth,
   uploadArticleFiles, // Handles PDF + thumbnail + multiple images
-  validateRecaptcha, // ✅ NEW: Verify reCAPTCHA (REQUIRED - blocks bots)
+  validateRecaptcha, // NEW: Verify reCAPTCHA (REQUIRED - blocks bots)
   articleController.submitArticle.bind(articleController)
 );
 
@@ -69,14 +69,14 @@ router.get(
   articleController.getArticleHistory.bind(articleController)
 );
 
-// ✅ NEW: Get article change history (with diff tracking)
+// NEW: Get article change history (with diff tracking)
 router.get(
   "/:id/change-history",
   requireAuth,
   articleController.getArticleChangeHistory.bind(articleController)
 );
 
-// ✅ NEW: Get editor assignment history (Admin only)
+// NEW: Get editor assignment history (Admin only)
 router.get(
   "/:id/editor-history",
   requireAuth,
@@ -84,28 +84,28 @@ router.get(
   articleController.getEditorAssignmentHistory.bind(articleController)
 );
 
-// ✅ NEW: Get specific change log diff
+// NEW: Get specific change log diff
 router.get(
   "/:id/change-log/:changeLogId",
   requireAuth,
   articleController.getChangeLogDiff.bind(articleController)
 );
 
-// ✅ NEW: View visual diff (inline PDF viewer)
+// NEW: View visual diff (inline PDF viewer)
 router.get(
   "/:id/change-log/:changeLogId/visual-diff",
   requireAuth,
   articleController.viewVisualDiff.bind(articleController)
 );
 
-// ✅ NEW: Download diff as PDF
+// NEW: Download diff as PDF
 router.get(
   "/:id/change-log/:changeLogId/download-diff",
   requireAuth,
   articleController.downloadDiff.bind(articleController)
 );
 
-// ✅ NEW: Download editor's uploaded document
+// NEW: Download editor's uploaded document
 router.get(
   "/change-logs/:changeLogId/editor-document",
   requireAuth,
@@ -166,14 +166,14 @@ router.patch(
   articleController.approveArticle.bind(articleController)
 );
 
-// ✅ NEW: Editor approves article (submits for publishing)
+// NEW: Editor approves article (submits for publishing)
 router.patch(
   "/:id/editor-approve",
   requirePermission("article", "write"),
   articleController.editorApproveArticle.bind(articleController)
 );
 
-// ✅ NEW: Admin publishes article (only after editor approval)
+// NEW: Admin publishes article (only after editor approval)
 router.patch(
   "/:id/admin-publish",
   requirePermission("article", "write"),
@@ -186,6 +186,36 @@ router.patch(
   requirePermission("article", "write"),
   uploadEditorFiles, // Editor can upload corrected article + optional editor document
   articleController.uploadCorrectedPdf.bind(articleController)
+);
+
+// NEW: Editor upload edited DOCX for documents
+router.patch(
+  "/:id/upload-edited-docx",
+  requirePermission("article", "write"),
+  uploadDocxOnly, // Accept only DOCX files
+  articleController.uploadEditedDocx.bind(articleController)
+);
+
+// NEW: Upload document (explicit document workflow) - PDF ONLY for users
+router.post(
+  "/submit-document",
+  optionalAuth,
+  uploadDocument, // Accept PDF ONLY (users can't upload DOCX)
+  validateRecaptcha,
+  (req: any, res: any, next: any) => {
+    // Force document classification - users can only upload PDF
+    req.body.contentType = 'DOCUMENT';
+    req.body.documentType = 'PDF'; // Always PDF for user uploads
+    next();
+  },
+  articleController.submitArticle.bind(articleController)
+);
+
+// NEW: Admin extract text from document (for publishing)
+router.patch(
+  "/:id/extract-text",
+  requirePermission("article", "write"),
+  articleController.extractDocumentText.bind(articleController)
 );
 
 // List articles with filters
@@ -207,6 +237,22 @@ router.get(
   "/:id/download/word",
   requireAuth,
   articleController.downloadArticleWord.bind(articleController)
+);
+
+// NEW: Download original user PDF converted to DOCX (for editors/admins)
+router.get(
+  "/:id/download/original-docx",
+  requireAuth,
+  requirePermission("article", "read"),
+  articleController.downloadOriginalDocx.bind(articleController)
+);
+
+// NEW: Download editor's uploaded DOCX (explicit route for admins)
+router.get(
+  "/:id/download/editor-docx",
+  requireAuth,
+  requirePermission("article", "read"),
+  articleController.downloadEditorDocx.bind(articleController)
 );
 
 

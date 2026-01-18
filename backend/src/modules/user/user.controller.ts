@@ -66,7 +66,7 @@ async function findUserByIdHandler(
   next: NextFunction
 ) {
   try {
-    const { id } = req.params;
+     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     if (!id) throw new BadRequestError("User ID is required");
     const currentUser = req.user; // middleware sets authenticated user object
     if (!currentUser)

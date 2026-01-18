@@ -43,7 +43,7 @@ async function list(_req: AuthRequest, res: Response) {
 
 async function get(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     if (!id) throw new BadRequestError("Permission ID is required");
     const perm = await PermissionService.getPermissionById(id);
     if (!perm) throw new NotFoundError("Permission not found");
@@ -55,7 +55,7 @@ async function get(req: AuthRequest, res: Response, next: NextFunction) {
 
 async function update(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const payload = permissionUpdateSchema.parse(req.body);
     if (!id) throw new BadRequestError("Permission ID is required");
     const perm = await PermissionService.updatePermission(id, payload);
@@ -70,7 +70,7 @@ async function update(req: AuthRequest, res: Response, next: NextFunction) {
 
 async function remove(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     if (!id) throw new BadRequestError("Permission ID is required");
     await PermissionService.deletePermission(id);
     return res.status(204).send();

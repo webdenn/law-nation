@@ -14,6 +14,7 @@ declare global {
       fileUrl?: string;
       fileUrls?: Array<{ url: string; storageKey?: string }>;
       fileMeta?: { url: string; storageKey?: string } | null;
+      isDocumentUpload?: boolean; // NEW: Flag for document processing
     }
   }
 }
@@ -31,27 +32,41 @@ const supabase = !isLocal && SUPABASE_URL && SUPABASE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_KEY)
   : null;
 
-// ---------- PDF AND WORD VALIDATION ----------
+// ---------- PDF ONLY VALIDATION (STRICT) ----------
 const allowedDocumentMimes = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-  "application/msword" // .doc
+  "application/pdf", // Only PDF for users
 ];
 const MAX_DOCUMENT_SIZE = parseInt(
   process.env.MAX_DOCUMENT_SIZE_BYTES ?? String(10 * 1024 * 1024),
   10
 ); // default 10MB
 
-// For user uploads (PDF or Word)
+// For user uploads (PDF ONLY) - STRICT: Users can only upload PDF
 const documentFileFilter = (req: Request, file: Express.Multer.File, cb: any) => {
-  if (allowedDocumentMimes.includes(file.mimetype)) cb(null, true);
-  else cb(new Error("Only PDF and Word (.docx, .doc) files are allowed"), false);
+  const allowedMimes = [
+    "application/pdf", // Only PDF allowed for users
+  ];
+  
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only PDF files are allowed for user uploads. Editors can upload DOCX files."), false);
+  }
 };
 
 // For editor uploads (PDF only)
 const pdfOnlyFileFilter = (req: Request, file: Express.Multer.File, cb: any) => {
   if (file.mimetype === "application/pdf") cb(null, true);
   else cb(new Error("Only PDF files are allowed for editor uploads"), false);
+};
+
+// For editor uploads (DOCX only) - STRICT: Only modern .docx format
+const docxOnlyFileFilter = (req: Request, file: Express.Multer.File, cb: any) => {
+  if (file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    cb(null, true);
+  } else {
+    cb(new Error("Only DOCX files are allowed. Please convert .doc files to .docx format before uploading."), false);
+  }
 };
 
 // ---------- IMAGE VALIDATION ----------
@@ -143,6 +158,30 @@ const localUploadPdfOnly = multer({
 const supabaseMemoryPdfOnly = multer({
   storage: multer.memoryStorage(),
   fileFilter: pdfOnlyFileFilter,
+  limits: { fileSize: MAX_DOCUMENT_SIZE },
+});
+
+// ---------- DOCX ONLY UPLOAD CONFIG (for editor edited documents) ----------
+const localDocxOnlyStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    // Editor DOCX uploads go to words directory
+    cb(null, 'uploads/words/');
+  },
+  filename: (_req, file, cb) => {
+    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, unique + path.extname(file.originalname));
+  },
+});
+
+const localUploadDocxOnly = multer({
+  storage: localDocxOnlyStorage,
+  fileFilter: docxOnlyFileFilter,
+  limits: { fileSize: MAX_DOCUMENT_SIZE },
+});
+
+const supabaseMemoryDocxOnly = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: docxOnlyFileFilter,
   limits: { fileSize: MAX_DOCUMENT_SIZE },
 });
 
@@ -960,13 +999,13 @@ export const uploadArticleFiles = (req: Request, res: Response, next: NextFuncti
       const isLoggedIn = !!(req as any).user?.id;
       
       try {
-        // Handle PDF with watermark
+        // Handle PDF with watermark and document processing
         if (files.pdf && files.pdf[0]) {
           const pdfFile = files.pdf[0];
           const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
           const pdfFilePath = path.join(process.cwd(), directory, pdfFile.filename);
           
-          console.log(`🔖 [Upload] Adding watermark to article PDF...`);
+          console.log(`🔖 [Upload] Adding watermark to PDF...`);
           
           // Add watermark
           const watermarkedBuffer = await addUploadWatermark(pdfFilePath, pdfFile.mimetype);
@@ -974,12 +1013,32 @@ export const uploadArticleFiles = (req: Request, res: Response, next: NextFuncti
           // Save watermarked file (overwrite original)
           fs.writeFileSync(pdfFilePath, watermarkedBuffer);
           
-          console.log(`✅ [Upload] Watermarked article PDF saved`);
+          console.log(`✅ [Upload] Watermarked PDF saved`);
           
           req.fileMeta = {
             url: `/${directory}${pdfFile.filename}`,
             storageKey: pdfFile.filename
           };
+
+          // NEW: Enhanced document detection
+          const isDocumentUpload = req.body.contentType === 'DOCUMENT' || 
+                                   req.body.documentType === 'PDF' ||
+                                   req.body.documentType === 'DOCX' ||
+                                   // Auto-detect: No article-specific fields = document
+                                   (!req.body.abstract && !req.body.keywords && !files.thumbnail && !files.images);
+          
+          if (isDocumentUpload) {
+            req.body.contentType = 'DOCUMENT';
+            req.body.documentType = 'PDF';
+            console.log(`📄 [Upload] Processing as document upload`);
+            
+            // For documents, trigger Adobe conversion in background
+            req.body.requiresAdobeProcessing = true;
+            req.isDocumentUpload = true;
+          } else {
+            req.body.contentType = 'ARTICLE';
+            console.log(`📰 [Upload] Processing as article upload`);
+          }
         }
         
         // Handle thumbnail
@@ -1104,6 +1163,65 @@ export const uploadArticleFiles = (req: Request, res: Response, next: NextFuncti
       } catch (e) {
         console.error("Supabase upload error:", e);
         return res.status(500).json({ error: "File upload failed" });
+      }
+    });
+  }
+};
+// ---------- DOCX ONLY UPLOAD HANDLER (for editor edited documents) ----------
+export const uploadDocxOnly = (req: Request, res: Response, next: NextFunction) => {
+  if (isLocal) {
+    localUploadDocxOnly.single("docx")(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file)
+        return res.status(400).json({ error: "DOCX file required" });
+      
+      try {
+        const tempFilePath = path.join(process.cwd(), 'uploads/words/', req.file.filename);
+        
+        console.log(`🔖 [Upload] Processing editor DOCX: ${tempFilePath}`);
+        
+        // For DOCX files, we don't add watermark here as it will be handled by Adobe service
+        // Just set the file path for the service to process
+        const url = `/uploads/words/${req.file.filename}`;
+        
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+        
+        console.log(`✅ [Upload] DOCX file ready for processing: ${url}`);
+        next();
+      } catch (error) {
+        console.error('❌ [Upload] DOCX processing failed:', error);
+        const url = `/uploads/words/${req.file.filename}`;
+        
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+        next();
+      }
+    });
+  } else {
+    supabaseMemoryDocxOnly.single("docx")(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      const file = req.file as Express.Multer.File | undefined;
+      if (!file) return res.status(400).json({ error: "DOCX file required" });
+      
+      try {
+        console.log(`🔖 [Upload] Processing editor DOCX for Supabase...`);
+        
+        // Upload DOCX to Supabase (watermarking will be handled by Adobe service)
+        const { url, storageKey } = await uploadBufferToSupabase(
+          file.buffer,
+          file.originalname,
+          file.mimetype
+        );
+        
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey };
+        
+        console.log(`✅ [Upload] DOCX uploaded to Supabase: ${url}`);
+        next();
+      } catch (error) {
+        console.error('❌ [Upload] DOCX Supabase upload failed:', error);
+        res.status(500).json({ error: "DOCX upload failed" });
       }
     });
   }

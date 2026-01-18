@@ -50,6 +50,13 @@ export class ArticleController {
       const userId = req.user?.id;
       const result = await articleService.submitArticle(data, userId);
 
+      // NEW: Handle document processing if this is a document upload
+      if (req.isDocumentUpload && 'article' in result) {
+        // Start background document processing for logged-in users
+        articleService.processDocumentUpload(result.article.id, req.fileMeta.url)
+          .catch(console.error);
+      }
+
       // Different response based on whether verification is required
       // Use property checking to narrow the type
       if ('expiresAt' in result) {
@@ -58,6 +65,7 @@ export class ArticleController {
           message: result.message,
           expiresAt: result.expiresAt,
           requiresVerification: true,
+          contentType: req.body.contentType || 'ARTICLE', // NEW: Include content type
         });
       } else {
         // Logged-in user - article created directly
@@ -65,6 +73,7 @@ export class ArticleController {
           message: result.message,
           article: result.article,
           requiresVerification: false,
+          contentType: req.body.contentType || 'ARTICLE', // NEW: Include content type
         });
       }
     } catch (error) {
@@ -393,6 +402,112 @@ export class ArticleController {
     }
   }
 
+  // NEW: Download original user PDF converted to DOCX (for editors/admins)
+  async downloadOriginalDocx(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+      
+      if (!req.user?.id) {
+        throw new BadRequestError("Authentication required");
+      }
+
+      console.log(`📥 [Download Original DOCX] User ${req.user.id} requesting original DOCX for article ${articleId}`);
+
+      const originalDocxUrl = await articleService.getOriginalDocxUrl(articleId);
+      
+      if (!originalDocxUrl) {
+        throw new BadRequestError("Original DOCX not available for this article");
+      }
+
+      // Get user info for watermarking
+      const userName = req.user.name || 'User';
+      
+      // Get article info
+      const article = await articleService.getArticleById(articleId);
+      
+      console.log(`📄 [Download Original DOCX] Processing original DOCX: ${originalDocxUrl}`);
+
+      // Add watermark to original DOCX
+      const watermarkedDocx = await articleService.downloadOriginalDocxWithWatermark(
+        articleId,
+        {
+          userName,
+          downloadDate: new Date(),
+          articleTitle: article.title,
+          articleId: articleId,
+          frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+        }
+      );
+
+      // Send watermarked DOCX file
+      const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}_original.docx`;
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', watermarkedDocx.length.toString());
+      
+      console.log(`✅ [Download Original DOCX] Sending watermarked original DOCX file (${watermarkedDocx.length} bytes)`);
+      
+      res.send(watermarkedDocx);
+    } catch (error) {
+      console.error('❌ [Download Original DOCX] Failed:', error);
+      next(error);
+    }
+  }
+
+  // NEW: Download editor's uploaded DOCX (explicit route for admins)
+  async downloadEditorDocx(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+      
+      if (!req.user?.id) {
+        throw new BadRequestError("Authentication required");
+      }
+
+      console.log(`📥 [Download Editor DOCX] User ${req.user.id} requesting editor's DOCX for article ${articleId}`);
+
+      const editorDocxUrl = await articleService.getEditorDocxUrl(articleId);
+      
+      if (!editorDocxUrl) {
+        throw new BadRequestError("Editor's DOCX not available for this article");
+      }
+
+      // Get user info for watermarking
+      const userName = req.user.name || 'Admin';
+      
+      // Get article info
+      const article = await articleService.getArticleById(articleId);
+      
+      console.log(`📄 [Download Editor DOCX] Processing editor's DOCX: ${editorDocxUrl}`);
+
+      // Add watermark to editor's DOCX
+      const watermarkedDocx = await articleService.downloadEditorDocxWithWatermark(
+        articleId,
+        {
+          userName,
+          downloadDate: new Date(),
+          articleTitle: article.title,
+          articleId: articleId,
+          frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+        }
+      );
+
+      // Send watermarked DOCX file
+      const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}_editor_corrected.docx`;
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', watermarkedDocx.length.toString());
+      
+      console.log(`✅ [Download Editor DOCX] Sending watermarked editor's DOCX file (${watermarkedDocx.length} bytes)`);
+      
+      res.send(watermarkedDocx);
+    } catch (error) {
+      console.error('❌ [Download Editor DOCX] Failed:', error);
+      next(error);
+    }
+  }
+
   // Delete article
   async deleteArticle(req: AuthRequest, res: Response, next: NextFunction) {
     try {
@@ -603,11 +718,21 @@ export class ArticleController {
 
       const result = await articleService.adminPublishArticle(articleId, adminId);
 
-      res.json({
+      // Handle different response types (document vs article)
+      const response: any = {
         message: "Article published successfully",
         article: result.article,
-        diffSummary: result.diffSummary,
-      });
+      };
+
+      if ('diffSummary' in result) {
+        response.diffSummary = result.diffSummary;
+      }
+
+      if ('extractedText' in result) {
+        response.extractedText = result.extractedText;
+      }
+
+      res.json(response);
     } catch (error) {
       next(error);
     }
@@ -979,6 +1104,57 @@ export class ArticleController {
 
     } catch (error) {
       console.error('❌ [Visual Diff] Unexpected error:', error);
+      next(error);
+    }
+  }
+
+  // NEW: Upload edited DOCX for documents
+  async uploadEditedDocx(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.id) {
+        throw new BadRequestError("Authentication required");
+      }
+
+      const articleId = getStringParam(req.params.id, "Article ID");
+
+      if (!req.fileMeta?.url) {
+        throw new BadRequestError("DOCX file is required");
+      }
+
+      const comments = req.body.comments;
+
+      await articleService.uploadEditedDocx(
+        articleId,
+        req.user.id,
+        req.fileMeta.url,
+        comments
+      );
+
+      res.status(200).json({
+        message: "Edited document uploaded successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // NEW: Extract text from document for publishing
+  async extractDocumentText(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.id) {
+        throw new BadRequestError("Authentication required");
+      }
+
+      const articleId = getStringParam(req.params.id, "Article ID");
+
+      const extractedText = await articleService.extractDocumentText(articleId);
+
+      res.status(200).json({
+        message: "Text extracted successfully",
+        extractedText,
+        textLength: extractedText.length,
+      });
+    } catch (error) {
       next(error);
     }
   }
