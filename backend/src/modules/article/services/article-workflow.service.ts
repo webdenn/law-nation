@@ -370,9 +370,27 @@ export class ArticleWorkflowService {
 
     let pdfContent = { text: "", html: "", images: [] as string[] };
     try {
-      pdfContent = await extractPdfContent(pdfPath, article.id);
+      // Extract text from the converted DOCX using Adobe services for better quality
+      const extractedText = await adobeService.extractTextFromDocx(wordPath);
+      
+      // Still extract images from PDF
+      const pdfImageContent = await extractPdfContent(pdfPath, article.id);
+      
+      pdfContent = {
+        text: extractedText,
+        html: extractedText.replace(/\n/g, '<br>'), // Simple HTML conversion
+        images: pdfImageContent.images || []
+      };
+      
+      console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from DOCX`);
     } catch (error) {
-      console.error("Failed to extract PDF content:", error);
+      console.error("Failed to extract content using Adobe:", error);
+      // Fallback to old method
+      try {
+        pdfContent = await extractPdfContent(pdfPath, article.id);
+      } catch (fallbackError) {
+        console.error("Fallback extraction also failed:", fallbackError);
+      }
     }
 
     await prisma.articleRevision.create({
@@ -517,13 +535,39 @@ export class ArticleWorkflowService {
       updateData.currentPdfUrl = newPdfUrl;
 
       try {
-        const pdfContent = await extractPdfContent(newPdfUrl, article.id);
-        if (pdfContent.text) {
-          updateData.content = pdfContent.text;
-          updateData.contentHtml = pdfContent.html;
+        // Extract text from the converted DOCX using Adobe services for better quality
+        // First ensure both formats exist
+        const { wordPath } = await ensureBothFormats(newPdfUrl);
+        const extractedText = await adobeService.extractTextFromDocx(wordPath);
+        
+        // Still extract images from PDF
+        const pdfImageContent = await extractPdfContent(newPdfUrl, article.id);
+        
+        if (extractedText) {
+          updateData.content = extractedText;
+          updateData.contentHtml = extractedText.replace(/\n/g, '<br>');
         }
-      } catch (e) {
-        console.error("Failed to extract content from new approval PDF", e);
+        
+        if (pdfImageContent.images && pdfImageContent.images.length > 0) {
+          updateData.imageUrls = [
+            ...(article.imageUrls || []),
+            ...pdfImageContent.images
+          ];
+        }
+        
+        console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from DOCX`);
+      } catch (error) {
+        console.error("Failed to extract content using Adobe:", error);
+        // Fallback to old method
+        try {
+          const pdfContent = await extractPdfContent(newPdfUrl, article.id);
+          if (pdfContent.text) {
+            updateData.content = pdfContent.text;
+            updateData.contentHtml = pdfContent.html;
+          }
+        } catch (fallbackError) {
+          console.error("Fallback extraction also failed:", fallbackError);
+        }
       }
     }
 

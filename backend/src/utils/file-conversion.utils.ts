@@ -1,16 +1,13 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { promisify } from 'util';
-import { createRequire } from 'module';
 import { createClient } from '@supabase/supabase-js';
-import { addSimpleWatermarkToWord } from './word-watermark.utils.js';
+import { AdobeService } from '@/services/adobe.service.js';
 
 // Create require for CommonJS modules in ES module context
-const require = createRequire(import.meta.url);
+// No longer needed as we're using Adobe services
 
 // Import docx-pdf (CommonJS module)
-const docxPdf = require('docx-pdf');
-const convertDocxToPdfAsync = promisify(docxPdf);
+// No longer needed as we're using Adobe services
 
 // Supabase client for uploading converted files (production only)
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
@@ -21,6 +18,9 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const supabase = SUPABASE_URL && SUPABASE_KEY && NODE_ENV === 'production'
   ? createClient(SUPABASE_URL, SUPABASE_KEY)
   : null;
+
+// Initialize Adobe service
+const adobeService = new AdobeService();
 
 /**
  * Check if we should use local storage (development) or cloud storage (production)
@@ -149,17 +149,15 @@ async function uploadToSupabase(
 }
 
 /**
- * Convert Word document to PDF
+ * Convert Word document to PDF using Adobe Services
  * Handles both local paths and remote URLs (Supabase)
  */
 export async function convertWordToPdf(
   wordFilePath: string
 ): Promise<string> {
   let localWordPath: string;
-  let localPdfPath: string;
   let isRemote = false;
   let tempWordPath: string | null = null;
-  let tempPdfPath: string | null = null;
   
   try {
     // Check if it's a URL (Supabase) or local path
@@ -169,60 +167,45 @@ export async function convertWordToPdf(
       // Download Word file from URL to temp location
       tempWordPath = await downloadFile(wordFilePath, '.docx');
       localWordPath = tempWordPath;
-      
-      // Create temp path for PDF output
-      tempPdfPath = `/tmp/temp-${Date.now()}.pdf`;
-      localPdfPath = tempPdfPath;
     } else {
       // Local file path
       localWordPath = path.join(process.cwd(), wordFilePath);
-      const pdfPath = wordFilePath.replace(/\.docx?$/i, '.pdf');
-      localPdfPath = path.join(process.cwd(), pdfPath);
     }
     
-    console.log(`🔄 [Conversion] Converting Word to PDF: ${wordFilePath}`);
+    console.log(`🔄 [Adobe] Converting DOCX to PDF: ${wordFilePath}`);
     
-    // Convert using docx-pdf
-    await convertDocxToPdfAsync(localWordPath, localPdfPath);
+    // Generate output path
+    const outputPath = localWordPath.replace(/\.docx?$/i, '.pdf');
     
-    console.log(`✅ [Conversion] Word to PDF successful`);
+    // Use Adobe service for conversion
+    const pdfAbsolutePath = await adobeService.convertDocxToPdf(localWordPath, outputPath);
     
-    // Save converted file (local in development, Supabase in production)
-    if (isRemote) {
-      const savedUrl = await saveConvertedFile(localPdfPath, wordFilePath, '.pdf');
-      
-      // Clean up temp files
-      if (tempWordPath) await fs.unlink(tempWordPath).catch(() => {});
-      if (tempPdfPath) await fs.unlink(tempPdfPath).catch(() => {});
-      
-      return savedUrl;
-    }
+    console.log(`✅ [Adobe] DOCX to PDF conversion successful`);
     
-    // Return local path for local files
-    return wordFilePath.replace(/\.docx?$/i, '.pdf');
+    // Clean up temp files
+    if (tempWordPath) await fs.unlink(tempWordPath).catch(() => {});
+    
+    // Convert absolute path to relative web path before returning
+    return convertToRelativePath(pdfAbsolutePath);
   } catch (error) {
     // Clean up temp files on error
     if (tempWordPath) await fs.unlink(tempWordPath).catch(() => {});
-    if (tempPdfPath) await fs.unlink(tempPdfPath).catch(() => {});
     
-    console.error('❌ [Conversion] Word to PDF error:', error);
-    throw new Error(`Failed to convert Word to PDF: ${error}`);
+    console.error('❌ [Adobe] DOCX to PDF conversion error:', error);
+    throw new Error(`Failed to convert DOCX to PDF: ${error}`);
   }
 }
 
 /**
- * Convert PDF to Word document
+ * Convert PDF to Word document using Adobe Services
  * Handles both local paths and remote URLs (Supabase)
- * Note: This is a basic conversion that extracts text and creates a simple Word doc
  */
 export async function convertPdfToWord(
   pdfFilePath: string
 ): Promise<string> {
   let localPdfPath: string;
-  let localWordPath: string;
   let isRemote = false;
   let tempPdfPath: string | null = null;
-  let tempWordPath: string | null = null;
   
   try {
     // Check if it's a URL (Supabase) or local path
@@ -232,52 +215,23 @@ export async function convertPdfToWord(
       // Download PDF file from URL to temp location
       tempPdfPath = await downloadFile(pdfFilePath, '.pdf');
       localPdfPath = tempPdfPath;
-      
-      // Create temp path for Word output
-      tempWordPath = `/tmp/temp-${Date.now()}.docx`;
-      localWordPath = tempWordPath;
     } else {
       // Local file path
       localPdfPath = path.join(process.cwd(), pdfFilePath);
-      const wordPath = pdfFilePath.replace(/\.pdf$/i, '.docx');
-      localWordPath = path.join(process.cwd(), wordPath);
     }
     
-    console.log(`🔄 [Conversion] Converting PDF to Word: ${pdfFilePath}`);
+    console.log(`🔄 [Adobe] Converting PDF to DOCX: ${pdfFilePath}`);
     
-    // For PDF to Word, we'll use pdf-parse to extract text
-    const { PDFParse } = require('pdf-parse');
-    const pdfBuffer = await fs.readFile(localPdfPath);
+    // Generate output path
+    const outputPath = localPdfPath.replace(/\.pdf$/i, '.docx');
     
-    // Create parser instance and extract text
-    const parser = new PDFParse({ data: pdfBuffer });
-    const result = await parser.getText();
-    await parser.destroy();
+    // Use Adobe service for conversion
+    const docxAbsolutePath = await adobeService.convertPdfToDocx(localPdfPath, outputPath);
     
-    // Create a simple Word document with the extracted text
-    const { Document, Packer, Paragraph, TextRun } = await import('docx');
+    console.log(`✅ [Adobe] PDF to DOCX conversion successful`);
     
-    // Split text into paragraphs
-    const paragraphs = result.text.split('\n\n').map((text: string) => 
-      new Paragraph({
-        children: [new TextRun(text.trim())],
-      })
-    );
-    
-    const doc = new Document({
-      sections: [{
-        properties: {},
-        children: paragraphs,
-      }],
-    });
-    
-    const buffer = await Packer.toBuffer(doc);
-    await fs.writeFile(localWordPath, buffer);
-    
-    console.log(`✅ [Conversion] PDF to Word successful`);
-    
-    // ✅ Add watermark to converted Word file
-    console.log(`🔖 [Conversion] Adding watermark to converted Word file...`);
+    // ✅ Add watermark to converted Word file using Adobe service
+    console.log(`🔖 [Adobe] Adding watermark to converted DOCX file...`);
     try {
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const watermarkData = {
@@ -288,38 +242,62 @@ export async function convertPdfToWord(
         frontendUrl,
       };
       
-      const watermarkedBuffer = await addSimpleWatermarkToWord(localWordPath, watermarkData);
+      const watermarkedOutputPath = docxAbsolutePath.replace('.docx', '_watermarked.docx');
+      // Pass absolute paths to watermark function, get absolute path back
+      const watermarkedAbsolutePath = await adobeService.addWatermarkToDocx(docxAbsolutePath, watermarkedOutputPath, watermarkData);
       
-      // Overwrite with watermarked version
-      await fs.writeFile(localWordPath, watermarkedBuffer);
-      
-      console.log(`✅ [Conversion] Watermark added to Word file`);
-    } catch (watermarkError) {
-      console.warn(`⚠️ [Conversion] Failed to add watermark to Word file:`, watermarkError);
-      // Continue without watermark if it fails
-    }
-    
-    // Save converted file (local in development, Supabase in production)
-    if (isRemote) {
-      const savedUrl = await saveConvertedFile(localWordPath, pdfFilePath, '.docx');
+      console.log(`✅ [Adobe] Watermark added to DOCX file`);
       
       // Clean up temp files
       if (tempPdfPath) await fs.unlink(tempPdfPath).catch(() => {});
-      if (tempWordPath) await fs.unlink(tempWordPath).catch(() => {});
       
-      return savedUrl;
+      // Convert absolute path to relative web path before returning
+      return convertToRelativePath(watermarkedAbsolutePath);
+    } catch (watermarkError) {
+      console.warn(`⚠️ [Adobe] Failed to add watermark to DOCX file:`, watermarkError);
+      
+      // Clean up temp files
+      if (tempPdfPath) await fs.unlink(tempPdfPath).catch(() => {});
+      
+      // Return non-watermarked version if watermarking fails
+      return convertToRelativePath(docxAbsolutePath);
     }
-    
-    // Return local path for local files
-    return pdfFilePath.replace(/\.pdf$/i, '.docx');
   } catch (error) {
     // Clean up temp files on error
     if (tempPdfPath) await fs.unlink(tempPdfPath).catch(() => {});
-    if (tempWordPath) await fs.unlink(tempWordPath).catch(() => {});
     
-    console.error('❌ [Conversion] PDF to Word error:', error);
-    throw new Error(`Failed to convert PDF to Word: ${error}`);
+    console.error('❌ [Adobe] PDF to DOCX conversion error:', error);
+    throw new Error(`Failed to convert PDF to DOCX: ${error}`);
   }
+}
+
+/**
+ * Convert absolute file path to relative web path
+ */
+function convertToRelativePath(absolutePath: string): string {
+  const workspaceRoot = process.cwd();
+  
+  // If it's already a relative web path (starts with /), return as is
+  if (absolutePath.startsWith('/') && !path.isAbsolute(absolutePath)) {
+    console.log(`🔄 [Path Convert] Already relative: ${absolutePath}`);
+    return absolutePath;
+  }
+  
+  // If it's not an absolute path, return as is
+  if (!path.isAbsolute(absolutePath)) {
+    const webPath = '/' + absolutePath.replace(/\\/g, '/');
+    console.log(`🔄 [Path Convert] ${absolutePath} → ${webPath}`);
+    return webPath;
+  }
+  
+  // Convert absolute path to relative path
+  const relativePath = path.relative(workspaceRoot, absolutePath);
+  
+  // Convert Windows backslashes to forward slashes for web URLs
+  const webPath = '/' + relativePath.replace(/\\/g, '/');
+  
+  console.log(`🔄 [Path Convert] ${absolutePath} → ${webPath}`);
+  return webPath;
 }
 
 /**

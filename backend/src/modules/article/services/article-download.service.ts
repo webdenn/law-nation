@@ -7,6 +7,7 @@ import {
 import { ensureBothFormats } from "@/utils/file-conversion.utils.js";
 import { generateDiffPdf } from "@/utils/diff-pdf-generator.utils.js";
 import { generateDiffWord } from "@/utils/diff-word-generator.utils.js";
+import { adobeService } from "@/services/adobe.service.js";
 import path from "path";
 //Article Download Service Handles PDF/Word downloads and diff generation
 export class ArticleDownloadService {
@@ -79,7 +80,7 @@ export class ArticleDownloadService {
     return article;
   }
   
-  // NEW: Download original DOCX with watermark
+  // NEW: Download original DOCX with watermark using Adobe services
   async downloadOriginalDocxWithWatermark(articleId: string, watermarkData: any) {
     const article = await this.getOriginalDocxUrl(articleId);
     
@@ -87,20 +88,42 @@ export class ArticleDownloadService {
       throw new NotFoundError("Original DOCX not available");
     }
 
-    console.log(`💧 [Original DOCX] Adding watermark to: ${article.originalWordUrl}`);
+    console.log(`💧 [Adobe] Adding watermark to original DOCX: ${article.originalWordUrl}`);
 
-    // Import watermark utility
-    const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
-    
-    // Add watermark to original DOCX
-    const watermarkedBuffer = await addSimpleWatermarkToWord(
-      article.originalWordUrl,
-      watermarkData
-    );
-
-    console.log(`✅ [Original DOCX] Watermark added successfully`);
-    
-    return watermarkedBuffer;
+    try {
+      // Generate temporary output path for watermarked file
+      const timestamp = Date.now();
+      const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `original-watermarked-${timestamp}.docx`);
+      
+      // Use Adobe service for watermarking
+      const watermarkedPath = await adobeService.addWatermarkToDocx(
+        article.originalWordUrl,
+        tempOutputPath,
+        watermarkData
+      );
+      
+      // Adobe service now returns relative path, convert to absolute for file reading
+      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath) 
+        ? watermarkedPath 
+        : path.join(process.cwd(), watermarkedPath.replace(/^\//, ''));
+      
+      // Read the watermarked file as buffer
+      const fs = await import('fs/promises');
+      const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
+      
+      // Clean up temp file
+      await fs.unlink(absoluteWatermarkedPath).catch(() => {});
+      
+      console.log(`✅ [Adobe] Watermark added to original DOCX successfully`);
+      return watermarkedBuffer;
+    } catch (error) {
+      console.error(`❌ [Adobe] Failed to add watermark to original DOCX:`, error);
+      
+      // Fallback to old watermarking method
+      console.log(`🔄 [Fallback] Using local watermarking for original DOCX`);
+      const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
+      return await addSimpleWatermarkToWord(article.originalWordUrl, watermarkData);
+    }
   }
   
   // NEW: Get editor's DOCX URL (corrected version)
@@ -131,7 +154,7 @@ export class ArticleDownloadService {
     return article;
   }
   
-  // NEW: Download editor's DOCX with watermark
+  // NEW: Download editor's DOCX with watermark using Adobe services
   async downloadEditorDocxWithWatermark(articleId: string, watermarkData: any) {
     const article = await this.getEditorDocxUrl(articleId);
     
@@ -139,21 +162,44 @@ export class ArticleDownloadService {
       throw new NotFoundError("Editor's DOCX not available");
     }
 
-    console.log(`💧 [Editor DOCX] Adding watermark to: ${article.currentWordUrl}`);
+    console.log(`💧 [Adobe] Adding watermark to editor's DOCX: ${article.currentWordUrl}`);
 
-    // Import watermark utility
-    const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
-    
-    // Add watermark to editor's DOCX
-    const watermarkedBuffer = await addSimpleWatermarkToWord(
-      article.currentWordUrl,
-      watermarkData
-    );
-
-    console.log(`✅ [Editor DOCX] Watermark added successfully`);
-    
-    return watermarkedBuffer;
+    try {
+      // Generate temporary output path for watermarked file
+      const timestamp = Date.now();
+      const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `editor-watermarked-${timestamp}.docx`);
+      
+      // Use Adobe service for watermarking
+      const watermarkedPath = await adobeService.addWatermarkToDocx(
+        article.currentWordUrl,
+        tempOutputPath,
+        watermarkData
+      );
+      
+      // Adobe service now returns relative path, convert to absolute for file reading
+      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath) 
+        ? watermarkedPath 
+        : path.join(process.cwd(), watermarkedPath.replace(/^\//, ''));
+      
+      // Read the watermarked file as buffer
+      const fs = await import('fs/promises');
+      const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
+      
+      // Clean up temp file
+      await fs.unlink(absoluteWatermarkedPath).catch(() => {});
+      
+      console.log(`✅ [Adobe] Watermark added to editor's DOCX successfully`);
+      return watermarkedBuffer;
+    } catch (error) {
+      console.error(`❌ [Adobe] Failed to add watermark to editor's DOCX:`, error);
+      
+      // Fallback to old watermarking method
+      console.log(`🔄 [Fallback] Using local watermarking for editor's DOCX`);
+      const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
+      return await addSimpleWatermarkToWord(article.currentWordUrl, watermarkData);
+    }
   }
+  
   //Download diff as PDF or Word
   async downloadDiff(
     changeLogId: string,

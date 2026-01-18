@@ -91,13 +91,31 @@ export class ArticleSubmissionService {
       console.log(`📄 [Document] Starting Adobe processing for document ${article.id}`);
       this.processDocumentInBackground(article.id, pdfPath).catch(console.error);
     } else {
-      // Existing article processing
-      console.log(`🔍 [PDF Extract] Starting extraction...`);
+      // Existing article processing - now using Adobe text extraction from converted DOCX
+      console.log(`🔍 [Adobe Extract] Starting text extraction from converted DOCX...`);
       let pdfContent = { text: "", html: "", images: [] as string[] };
       try {
-        pdfContent = await extractPdfContent(pdfPath, article.id);
+        // Extract text from the converted DOCX using Adobe services for better quality
+        const extractedText = await adobeService.extractTextFromDocx(wordPath);
+        
+        // Still extract images from PDF
+        const pdfImageContent = await extractPdfContent(pdfPath, article.id);
+        
+        pdfContent = {
+          text: extractedText,
+          html: extractedText.replace(/\n/g, '<br>'), // Simple HTML conversion
+          images: pdfImageContent.images || []
+        };
+        
+        console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from DOCX`);
       } catch (error) {
-        console.error("Failed to extract PDF content:", error);
+        console.error("Failed to extract content using Adobe:", error);
+        // Fallback to old method
+        try {
+          pdfContent = await extractPdfContent(pdfPath, article.id);
+        } catch (fallbackError) {
+          console.error("Fallback extraction also failed:", fallbackError);
+        }
       }
 
       const allImageUrls = [
@@ -240,9 +258,27 @@ export class ArticleSubmissionService {
 
     let pdfContent = { text: "", html: "", images: [] as string[] };
     try {
-      pdfContent = await extractPdfContent(pdfPath, article.id);
+      // Extract text from the converted DOCX using Adobe services for better quality
+      const extractedText = await adobeService.extractTextFromDocx(wordPath);
+      
+      // Still extract images from PDF
+      const pdfImageContent = await extractPdfContent(pdfPath, article.id);
+      
+      pdfContent = {
+        text: extractedText,
+        html: extractedText.replace(/\n/g, '<br>'), // Simple HTML conversion
+        images: pdfImageContent.images || []
+      };
+      
+      console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from DOCX`);
     } catch (error) {
-      console.error("Failed to extract PDF content:", error);
+      console.error("Failed to extract content using Adobe:", error);
+      // Fallback to old method
+      try {
+        pdfContent = await extractPdfContent(pdfPath, article.id);
+      } catch (fallbackError) {
+        console.error("Fallback extraction also failed:", fallbackError);
+      }
     }
 
     const allImageUrls = [
@@ -356,9 +392,27 @@ export class ArticleSubmissionService {
 
     let pdfContent = { text: "", html: "", images: [] as string[] };
     try {
-      pdfContent = await extractPdfContent(pdfPath, article.id);
+      // Extract text from the converted DOCX using Adobe services for better quality
+      const extractedText = await adobeService.extractTextFromDocx(wordPath);
+      
+      // Still extract images from PDF
+      const pdfImageContent = await extractPdfContent(pdfPath, article.id);
+      
+      pdfContent = {
+        text: extractedText,
+        html: extractedText.replace(/\n/g, '<br>'), // Simple HTML conversion
+        images: pdfImageContent.images || []
+      };
+      
+      console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from DOCX`);
     } catch (error) {
-      console.error("Failed to extract PDF content:", error);
+      console.error("Failed to extract content using Adobe:", error);
+      // Fallback to old method
+      try {
+        pdfContent = await extractPdfContent(pdfPath, article.id);
+      } catch (fallbackError) {
+        console.error("Fallback extraction also failed:", fallbackError);
+      }
     }
 
     const allImageUrls = [

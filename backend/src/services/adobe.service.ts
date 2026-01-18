@@ -33,6 +33,25 @@ try {
   SDKError = adobeModule.SDKError;
   ServiceUsageError = adobeModule.ServiceUsageError;
   ServiceApiError = adobeModule.ServiceApiError;
+  
+  // Import the target format and params classes
+  const ExportPDFParams = adobeModule.ExportPDFParams;
+  const ExportPDFTargetFormat = adobeModule.ExportPDFTargetFormat;
+  const ExtractPDFParams = adobeModule.ExtractPDFParams;
+  const ExtractElementType = adobeModule.ExtractElementType;
+  
+  // Debug: Check the target format options
+  console.log("🔍 [Adobe Debug] ExportPDFTargetFormat:", ExportPDFTargetFormat);
+  if (ExportPDFTargetFormat) {
+    console.log("🔍 [Adobe Debug] ExportPDFTargetFormat keys:", Object.keys(ExportPDFTargetFormat));
+  }
+  
+  // Debug: Check the extract element types
+  console.log("🔍 [Adobe Debug] ExtractElementType:", ExtractElementType);
+  if (ExtractElementType) {
+    console.log("🔍 [Adobe Debug] ExtractElementType keys:", Object.keys(ExtractElementType));
+  }
+  
   console.log("✅ [Adobe] Adobe PDF Services SDK loaded successfully");
 } catch (error) {
   console.warn("⚠️ [Adobe] Adobe PDF Services SDK not available:", error);
@@ -82,7 +101,28 @@ export class AdobeService {
   }
 
   /**
-   * Convert PDF to DOCX using Adobe Services
+   * Convert absolute file path to relative web path
+   */
+  private convertToRelativePath(absolutePath: string): string {
+    const workspaceRoot = process.cwd();
+    
+    // If it's already a relative path, return as is
+    if (!path.isAbsolute(absolutePath)) {
+      return absolutePath;
+    }
+    
+    // Convert absolute path to relative path
+    const relativePath = path.relative(workspaceRoot, absolutePath);
+    
+    // Convert Windows backslashes to forward slashes for web URLs
+    const webPath = '/' + relativePath.replace(/\\/g, '/');
+    
+    console.log(`🔄 [Adobe Path Convert] ${absolutePath} → ${webPath}`);
+    return webPath;
+  }
+
+  /**
+   * Convert PDF to DOCX using Adobe Services v4.1.0
    */
   async convertPdfToDocx(pdfPath: string, outputPath: string): Promise<string> {
     this.checkAvailability();
@@ -96,13 +136,35 @@ export class AdobeService {
         mimeType: MimeType.PDF
       });
 
-      // Create parameters for the job
-      const params = new ExportPDFJob.Params({
-        targetFormat: ExportPDFJob.TargetFormat.DOCX
-      });
+      // For Adobe SDK v4.1.0, we need to use ExportPDFParams and ExportPDFTargetFormat
+      const ExportPDFParams = AdobeSDK.ExportPDFParams;
+      const ExportPDFTargetFormat = AdobeSDK.ExportPDFTargetFormat;
+      
+      console.log(`🔧 [Adobe] ExportPDFTargetFormat available:`, !!ExportPDFTargetFormat);
+      console.log(`🔧 [Adobe] ExportPDFParams available:`, !!ExportPDFParams);
+      
+      // Create parameters with the correct target format
+      let params;
+      if (ExportPDFParams && ExportPDFTargetFormat) {
+        if (ExportPDFTargetFormat.DOCX) {
+          params = new ExportPDFParams({ targetFormat: ExportPDFTargetFormat.DOCX });
+          console.log(`🔧 [Adobe] Using ExportPDFTargetFormat.DOCX`);
+        } else if (ExportPDFTargetFormat.WORD) {
+          params = new ExportPDFParams({ targetFormat: ExportPDFTargetFormat.WORD });
+          console.log(`🔧 [Adobe] Using ExportPDFTargetFormat.WORD`);
+        } else {
+          // List available formats
+          console.log(`🔧 [Adobe] Available target formats:`, Object.keys(ExportPDFTargetFormat));
+          params = new ExportPDFParams({ targetFormat: ExportPDFTargetFormat.DOCX || 'DOCX' });
+          console.log(`🔧 [Adobe] Using fallback target format`);
+        }
+      } else {
+        throw new InternalServerError('ExportPDFParams or ExportPDFTargetFormat not available in Adobe SDK');
+      }
 
-      // Create a new job instance
+      // Create the job with input asset and parameters
       const job = new ExportPDFJob({ inputAsset, params });
+      console.log(`🔧 [Adobe] Created ExportPDFJob with parameters`);
 
       // Submit the job and get the job result
       const pollingURL = await this.pdfServices.submit({ job });
@@ -128,6 +190,7 @@ export class AdobeService {
       return new Promise((resolve, reject) => {
         outputStream.on('finish', () => {
           console.log(`✅ [Adobe] PDF converted to DOCX: ${outputPath}`);
+          // Return absolute path - let caller handle conversion to relative
           resolve(outputPath);
         });
         outputStream.on('error', reject);
@@ -215,6 +278,7 @@ export class AdobeService {
           console.log(`   📂 Output: ${outputPath}`);
           console.log(`   📊 Output size: ${(outputSize / 1024).toFixed(2)} KB`);
           console.log(`   ⏱️ Duration: ${duration}ms`);
+          // Return absolute path - let caller handle conversion to relative
           resolve(outputPath);
         });
         outputStream.on('error', (error) => {
@@ -247,34 +311,71 @@ export class AdobeService {
   }
 
   /**
-   * Extract text from DOCX using Adobe Services
+   * Extract text from DOCX using Adobe Services v4.1.0
    */
   async extractTextFromDocx(docxPath: string): Promise<string> {
     this.checkAvailability();
 
     try {
+      console.log(`� [Adobe Extract] Starting text extraction from converted DOCX...`);
       console.log(`🔄 [Adobe] Extracting text from DOCX: ${docxPath}`);
 
-      if (!fs.existsSync(docxPath)) {
-        console.error(`❌ [Adobe] Input file missing: ${docxPath}`);
-        // Return empty string instead of throwing to prevent flow blockage if file missing
-        // or throw nice error
-        throw new Error(`Input file not found locally: ${docxPath}`);
+      // Convert relative path to absolute path if needed
+      let absolutePath;
+      if (path.isAbsolute(docxPath)) {
+        absolutePath = docxPath;
+      } else if (docxPath.startsWith('/')) {
+        // Handle web-style relative paths that start with /
+        absolutePath = path.join(process.cwd(), docxPath.substring(1));
+      } else {
+        // Handle regular relative paths
+        absolutePath = path.join(process.cwd(), docxPath);
+      }
+
+      console.log(`📂 [Adobe] Input path: ${docxPath}`);
+      console.log(`📂 [Adobe] Resolved absolute path: ${absolutePath}`);
+
+      if (!fs.existsSync(absolutePath)) {
+        console.error(`❌ [Adobe] Input file missing: ${absolutePath}`);
+        throw new Error(`Input file not found locally: ${absolutePath}`);
       }
 
       // Create an ExecutionContext using credentials
       const inputAsset = await this.pdfServices.upload({
-        readStream: fs.createReadStream(docxPath),
+        readStream: fs.createReadStream(absolutePath),
         mimeType: MimeType.DOCX
       });
 
-      // Create parameters for the job
-      const params = new ExtractPDFJob.Params({
-        elementsToExtract: [ExtractPDFJob.ElementsToExtract.TEXT]
-      });
+      // For Adobe SDK v4.1.0, use ExtractPDFParams and ExtractElementType
+      const ExtractPDFParams = AdobeSDK.ExtractPDFParams;
+      const ExtractElementType = AdobeSDK.ExtractElementType;
+      
+      console.log(`🔧 [Adobe] ExtractElementType available:`, !!ExtractElementType);
+      console.log(`🔧 [Adobe] ExtractPDFParams available:`, !!ExtractPDFParams);
+      
+      // Create parameters with the correct element type
+      let params;
+      if (ExtractPDFParams && ExtractElementType) {
+        if (ExtractElementType.TEXT) {
+          params = new ExtractPDFParams({ 
+            elementsToExtract: [ExtractElementType.TEXT] 
+          });
+          console.log(`🔧 [Adobe] Using ExtractElementType.TEXT`);
+        } else {
+          // List available element types
+          console.log(`🔧 [Adobe] Available element types:`, Object.keys(ExtractElementType));
+          params = new ExtractPDFParams({ 
+            elementsToExtract: [ExtractElementType.TEXT || 'TEXT'] 
+          });
+          console.log(`🔧 [Adobe] Using fallback element type`);
+        }
+      } else {
+        throw new InternalServerError('ExtractPDFParams or ExtractElementType not available in Adobe SDK');
+      }
 
-      // Create a new job instance
+      // Create the job with input asset and parameters
       const job = new ExtractPDFJob({ inputAsset, params });
+      console.log(`🔧 [Adobe] Created ExtractPDFJob with parameters`);
 
       // Submit the job and get the job result
       const pollingURL = await this.pdfServices.submit({ job });
@@ -339,10 +440,11 @@ export class AdobeService {
     });
 
     try {
-      // Use existing watermark utility
+      // Use existing watermark utility - pass absolute paths
       const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
 
       console.log(`🔧 [Adobe] Calling watermark utility...`);
+      // Pass absolute paths to the watermark utility
       const watermarkedBuffer = await addSimpleWatermarkToWord(docxPath, watermarkData);
 
       console.log(`✅ [Adobe] Watermark utility completed`);
@@ -363,6 +465,7 @@ export class AdobeService {
       console.log(`   📂 Output: ${outputPath}`);
       console.log(`   📊 Output size: ${(outputSize / 1024).toFixed(2)} KB`);
 
+      // Return absolute path - let caller handle conversion to relative
       return outputPath;
 
     } catch (err: any) {

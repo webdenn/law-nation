@@ -21,9 +21,20 @@ const require = createRequire(import.meta.url);
  * Handles both relative paths and absolute Windows paths
  */
 function resolveFilePath(filePath: string): string {
-  return path.isAbsolute(filePath)
-    ? filePath
-    : path.join(process.cwd(), filePath);
+  // If it's already absolute, return as is
+  if (path.isAbsolute(filePath)) {
+    return filePath;
+  }
+  
+  // Handle relative paths that start with / (web-style paths)
+  if (filePath.startsWith('/')) {
+    // Remove leading slash and join with process.cwd()
+    const relativePath = filePath.substring(1);
+    return path.join(process.cwd(), relativePath);
+  }
+  
+  // Handle regular relative paths
+  return path.join(process.cwd(), filePath);
 }
 
 /**
