@@ -297,3 +297,12 @@ enum DocumentStatus {
   EDITED            // Editor uploaded edited DOCX
   PUBLISHED         // Admin published, text extracted
 }
+
+/// ---------- System/Site Settings ----------
+model SystemSettings {
+  id              String   @id @default(cuid())
+  key             String   @unique // e.g. "footer_content"
+  value           Json     // Stores structured data
+  updatedAt       DateTime @updatedAt
+  updatedBy       String?
+}

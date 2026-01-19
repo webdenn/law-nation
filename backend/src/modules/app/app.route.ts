@@ -7,6 +7,7 @@ import ArticleRouter from "@/modules/article/article.route.js";
 import AdminDashboardRouter from "@/modules/admin/admin-dashboard.route.js";
 import NotificationRouter from "@/modules/notification/notification.route.js";
 import BannerRouter from "@/modules/banners/banner.routes.js";
+import SettingsRouter from "@/modules/settings/settings.routes.js";
 
 // /src/modules/app/app.route.ts
 
@@ -20,6 +21,7 @@ AppRouter.use("/articles", ArticleRouter);
 AppRouter.use("/admin/dashboard", AdminDashboardRouter);
 AppRouter.use("/notifications", NotificationRouter);
 AppRouter.use("/banners", BannerRouter);
+AppRouter.use("/settings", SettingsRouter);
 
 // Health check
 AppRouter.get("/health", (_req, res) => {

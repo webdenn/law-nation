@@ -2,47 +2,67 @@
 
 import React from "react";
 import Link from "next/link";
-import { 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Linkedin, 
-  Twitter, 
-  Instagram, 
-  Facebook, 
+import {
+  Mail,
+  Phone,
+  MapPin,
+  Linkedin,
+  Twitter,
+  Instagram,
+  Facebook,
   Scale, // Briefcase ki jagah Scale use kiya (Law icon)
-  BookOpen 
+  BookOpen
 } from "lucide-react";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000";
+
+  const [footerContent, setFooterContent] = React.useState({
+    aboutText: "Bridging the gap between legal scholarship and global practice. We provide open-access research, peer-reviewed journals, and a platform for legal innovation. Connecting scholars, practitioners, and students to the future of law.",
+    researchersText: "From citations to publication, we offer industry-standard reviewing processes, DOI assignments, and global indexing to ensure your work reaches the right audience."
+  });
+
+  React.useEffect(() => {
+    const fetchFooterSettings = async () => {
+      try {
+        const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/settings/footer`);
+        const data = await res.json();
+        if (data.success && data.settings) {
+          setFooterContent({
+            aboutText: data.settings.aboutText || footerContent.aboutText,
+            researchersText: data.settings.researchersText || footerContent.researchersText
+          });
+        }
+      } catch (error) {
+        console.error("Footer fetch error:", error);
+      }
+    };
+    fetchFooterSettings();
+  }, []);
 
   return (
     <footer className="bg-white text-slate-600 font-sans pt-16 pb-8 border-t border-slate-200">
       <div className="max-w-7xl mx-auto px-6">
-        
+
         {/* --- Top Section: Main Content --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-16">
-          
+
           {/* Brand and Mission - 5 columns wide */}
           <div className="lg:col-span-5 space-y-6">
             <Link href="/" className="flex items-center gap-2 text-red-700 font-bold text-2xl">
               <Scale size={28} />
               <span>LAW<span className="text-slate-900">NATION</span></span>
             </Link>
-            
-            <p className="text-[15px] leading-relaxed">
-              Bridging the gap between legal scholarship and global practice. 
-              We provide <strong>open-access research, peer-reviewed journals</strong>, and a platform for legal innovation.
-              Connecting scholars, practitioners, and students to the future of law.
+
+            <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
+              {footerContent.aboutText}
             </p>
-            
+
             <p className="text-[14px]">
-              <span className="font-bold text-slate-900">For Researchers:</span> From citations to publication, 
-              we offer industry-standard reviewing processes, DOI assignments, and global indexing 
-              to ensure your work reaches the right audience.
+              <span className="font-bold text-slate-900">For Researchers:</span> {footerContent.researchersText}
             </p>
-            
+
             <p className="italic text-red-700 font-medium">"Justice through Knowledge, Our Ultimate Mission."</p>
           </div>
 
@@ -63,14 +83,14 @@ export default function Footer() {
               <li><Link href="/submit-paper" className="hover:text-red-700 transition-colors">Submit Your Paper</Link></li>
               <li><Link href="/guidelines" className="hover:text-red-700 transition-colors">Submission Guidelines</Link></li>
               <li><Link href="/guidelines" className="hover:text-red-700 transition-colors"> Terms & Conditions</Link></li>
-              
+
             </ul>
           </div>
 
           {/* Quick Support - 2 columns */}
           <div className="lg:col-span-2">
-             <h3 className="text-slate-900 font-bold text-lg mb-6">Support</h3>
-             <ul className="space-y-3 text-[15px]">
+            <h3 className="text-slate-900 font-bold text-lg mb-6">Support</h3>
+            <ul className="space-y-3 text-[15px]">
               <li><Link href="/help" className="hover:text-red-700">Help Center</Link></li>
               <li><Link href="/editorial-board" className="hover:text-red-700">Editorial Board</Link></li>
               <li><Link href="/privacy" className="hover:text-red-700">Privacy Policy</Link></li>
@@ -95,7 +115,7 @@ export default function Footer() {
               <div className="flex items-start gap-3">
                 <MapPin size={18} className="text-red-700 mt-1 shrink-0" />
                 <span>101-102, First Floor , Tolstoy House , Tolstoy Marg, New Delhi - 110001
-</span>
+                </span>
               </div>
             </div>
           </div>
@@ -109,7 +129,7 @@ export default function Footer() {
                 </a>
               ))}
             </div>
-            
+
           </div>
         </div>
 

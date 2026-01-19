@@ -19,6 +19,7 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
         { name: "Dashboard", path: "/admin" },
         { name: "Add New Editor", path: "/admin/add-editor" },
         { name: "Banner Management", path: "/admin/banners" },
+        { name: "Site Settings", path: "/admin/settings" },
         // { name: "Live Database", path: "/admin/live-database" },
     ];
 
@@ -67,8 +68,8 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
                         href={item.path}
                         onClick={() => setIsMobileMenuOpen(false)}
                         className={`block w-full text-left p-3 rounded-lg transition-all ${pathname === item.path
-                                ? "bg-red-900 font-bold"
-                                : "hover:bg-red-600 text-red-100"
+                            ? "bg-red-900 font-bold"
+                            : "hover:bg-red-600 text-red-100"
                             }`}
                     >
                         {item.name}
