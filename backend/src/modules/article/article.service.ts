@@ -209,18 +209,18 @@ export class ArticleService {
         where: { id: articleId },
       });
 
-      if (!article || article.contentType !== 'DOCUMENT' || !article.currentWordUrl) {
+      if (!article || article.contentType !== 'DOCUMENT' || !article.currentPdfUrl) {
         throw new Error('Document not ready for text extraction');
       }
 
-      // Extract text using Adobe services
-      const extractedText = await adobeService.extractTextFromDocxUsingMammoth(article.currentWordUrl);
+      // Extract text using Adobe PDF extraction instead of mammoth
+      const extractedText = await adobeService.extractTextFromPdf(article.currentPdfUrl);
 
       // Update article with extracted text
       await prisma.article.update({
         where: { id: articleId },
         data: {
-          content: extractedText, // Store in content field for compatibility
+          content: extractedText, // Store text in content field for compatibility
         },
       });
 

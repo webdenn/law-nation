@@ -1032,9 +1032,9 @@ export class ArticleController {
       }
 
       // Step 2: Resolve file path using production-safe method
-      const { resolveUploadPath, fileExists } = await import('@/utils/file-path.utils.js');
+      const { resolveToAbsolutePath, fileExistsAtPath } = await import('@/utils/file-path.utils.js');
       const path = await import('path');
-      const fullPath = resolveUploadPath(visualDiffUrl);
+      const fullPath = resolveToAbsolutePath(visualDiffUrl);
 
       // Step 3: Check if file exists (flexible approach)
       const fs = await import('fs/promises');
@@ -1074,7 +1074,7 @@ export class ArticleController {
         } else if (editedPdfUrl.startsWith('uploads/')) {
           pdfPath = path.join(process.cwd(), editedPdfUrl);
         } else {
-          pdfPath = resolveUploadPath(editedPdfUrl);
+          pdfPath = resolveToAbsolutePath(editedPdfUrl);
         }
         
         console.log(`📄 [Visual Diff] Using edited PDF: ${editedPdfUrl}`);
