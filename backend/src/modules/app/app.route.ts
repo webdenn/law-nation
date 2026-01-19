@@ -6,6 +6,7 @@ import RbacRouter from "@/modules/rbac/rbac.route.js";
 import ArticleRouter from "@/modules/article/article.route.js";
 import AdminDashboardRouter from "@/modules/admin/admin-dashboard.route.js";
 import NotificationRouter from "@/modules/notification/notification.route.js";
+import BannerRouter from "@/modules/banners/banner.routes.js";
 
 // /src/modules/app/app.route.ts
 
@@ -15,9 +16,10 @@ export const AppRouter: Router = Router();
 AppRouter.use("/auth", AuthRouter);
 AppRouter.use("/users", requireAuth, UserRouter);
 AppRouter.use("/rbac", requireAuth, RbacRouter);
-AppRouter.use("/articles", ArticleRouter); 
+AppRouter.use("/articles", ArticleRouter);
 AppRouter.use("/admin/dashboard", AdminDashboardRouter);
 AppRouter.use("/notifications", NotificationRouter);
+AppRouter.use("/banners", BannerRouter);
 
 // Health check
 AppRouter.get("/health", (_req, res) => {

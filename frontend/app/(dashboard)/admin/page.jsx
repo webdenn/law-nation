@@ -7,6 +7,7 @@ import { diffWords } from 'diff';
 // import { toast } from "react-toastify";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import AdminSidebar from "../../components/AdminSidebar";
 // ✅ Ye poora block copy karke paste karo
 const DiffViewer = ({ diffData }) => {
   if (!diffData || !diffData.summary)
@@ -106,13 +107,15 @@ export default function AdminDashboard() {
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   // ✅ 0. UI STATE (Responsive Sidebar)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  // ✅ 1. SECURITY STATES
+
+  // ✅ 1. SECURITY STATES (Restored)
   const [currentAdmin, setCurrentAdmin] = useState({
     name: "Admin",
     email: "",
   });
   const [isAuthorized, setIsAuthorized] = useState(false);
-  // ✅ 2. ROUTE PROTECTION
+
+  // ✅ 2. ROUTE PROTECTION (Restored)
   useEffect(() => {
     const token = localStorage.getItem("adminToken");
     const adminData = localStorage.getItem("adminUser");
@@ -130,15 +133,6 @@ export default function AdminDashboard() {
       }
     }
   }, [router]);
-  // ✅ 3. ADMIN LOGOUT
-  const handleLogout = () => {
-    // Saara data saaf karo
-    localStorage.clear(); // Sabse safe tareeka (Saari keys delete ho jayengi)
-    toast.info("Admin Logged Out");
-    router.push("/management-login");
-    // Page refresh kar do taaki states poori tarah reset ho jayein
-    window.location.reload();
-  };
   // --- DASHBOARD DATA & LOGIC ---
   // --- REPLACE YOUR OLD STATE VARIABLES WITH THIS ---
   // ✅ 1. Nayi Data States (Backend se aayengi)
@@ -676,72 +670,11 @@ export default function AdminDashboard() {
         />
       )}
       {/* 🔴 SIDEBAR (Responsive) */}
-      <aside
-        className={`fixed md:sticky top-0 h-screen w-72 bg-red-700 text-white flex flex-col shadow-2xl z-50 transition-transform duration-300 ease-in-out
-        ${isMobileMenuOpen
-            ? "translate-x-0"
-            : "-translate-x-full md:translate-x-0"
-          }`}
-      >
-        <div className="p-8 border-b border-red-800 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-black italic tracking-tighter">
-              LAW NATION
-            </h1>
-            <span className="text-[10px] bg-white text-red-700 px-2 py-0.5 rounded-full font-bold uppercase mt-2 inline-block">
-              Admin Panel
-            </span>
-          </div>
-          {/* Close Button Mobile */}
-          <button
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="md:hidden text-white"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="w-6 h-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-        <nav className="flex-1 px-4 mt-6 space-y-2">
-          <button
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="w-full text-left p-3 bg-red-800 rounded-lg font-bold"
-          >
-            Dashboard
-          </button>
-          <Link
-            href="/admin/add-editor"
-            className="block w-full text-left p-3 hover:bg-red-600 rounded-lg text-red-100"
-          >
-            Add New Editor
-          </Link>
-          {/* <Link
-            href="/admin/live-database"
-            className="block w-full text-left p-3 hover:bg-red-600 rounded-lg text-red-100 transition-all"
-          >
-            Live Database
-          </Link> */}
-        </nav>
-        <div className="p-4 border-t border-red-800">
-          <button
-            onClick={handleLogout}
-            className="w-full p-2 text-sm bg-red-900 rounded font-bold uppercase hover:bg-black transition-colors"
-          >
-            Logout
-          </button>
-        </div>
-      </aside>
+      {/* 🔴 SIDEBAR (Refactored) */}
+      <AdminSidebar
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+      />
       {/* MAIN CONTENT */}
       <main className="flex-1 h-screen overflow-y-auto bg-gray-50 flex flex-col">
         {/* HEADER */}

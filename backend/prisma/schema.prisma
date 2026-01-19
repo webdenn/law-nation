@@ -38,6 +38,15 @@ model Role {
   users       UserRole[]
 }
 
+/// ---------- banner management ----------
+model Banner {
+  id        String   @id @default(cuid())
+  title     String?
+  imageUrl  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
 /// ---------- permissions ----------
 model Permission {
   id          String           @id @default(cuid())

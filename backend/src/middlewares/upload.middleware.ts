@@ -1231,3 +1231,35 @@ export const uploadDocxOnly = (req: Request, res: Response, next: NextFunction) 
     });
   }
 };
+// ✅ NEW: Banner Image Upload Handler
+export const uploadBannerImage = (req: Request, res: Response, next: NextFunction) => {
+    if (isLocal) {
+        localUploadImage.single("image")(req, res, async (err) => {
+            if (err) return res.status(400).json({ error: err.message });
+            if (req.file) {
+                req.fileUrl = `/uploads/images/${req.file.filename}`;
+            }
+            next();
+        });
+    } else {
+        supabaseMemoryImage.single("image")(req, res, async (err) => {
+            if (err) return res.status(400).json({ error: err.message });
+            const file = req.file;
+            if (!file) return next();
+
+            try {
+                const { url } = await uploadBufferToSupabase(
+                    file.buffer,
+                    file.originalname,
+                    file.mimetype,
+                    'image'
+                );
+                req.fileUrl = url;
+                next();
+            } catch (error) {
+                console.error("Supabase Image Upload Error:", error);
+                res.status(500).json({ error: "Image upload failed" });
+            }
+        });
+    }
+};

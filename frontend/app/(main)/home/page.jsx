@@ -6,11 +6,13 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
+import BackgroundCarousel from "../../components/BackgroundCarousel";
 
 export default function HomePage() {
   const router = useRouter();
   // 1. Pehle ye states add karein (top par)
   const [publishedArticles, setPublishedArticles] = useState([]);
+  const [banners, setBanners] = useState([]); // Added banners state
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -96,9 +98,25 @@ export default function HomePage() {
     }
   };
 
+  // Fetch Banners Logic
+  const fetchBanners = async () => {
+    try {
+      const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/banners`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.banners) {
+          setBanners(data.banners);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load banners", error);
+    }
+  };
+
   // useEffect ab sirf ise call karega
   useEffect(() => {
     fetchArticles();
+    fetchBanners(); // Fetch banners on mount
   }, []);
 
   const [query, setQuery] = useState("");
@@ -228,15 +246,10 @@ export default function HomePage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.55)), url(${heroIllustration})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 relative">
+        {/* Carousel Background */}
+        <BackgroundCarousel banners={banners} />
+
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 relative z-10">
           <div className="bg-white/98 backdrop-blur shadow-xl rounded-3xl border border-neutral-200 px-6 sm:px-10 py-10 space-y-6">
             <div className="space-y-2">
               <p className="inline-flex items-center gap-2 rounded-full bg-black text-white px-3 py-1 text-xs font-semibold">
@@ -254,7 +267,7 @@ export default function HomePage() {
                 href="/about"
                 className="text-sm font-semibold text-red-700 hover:text-red-800"
               >
-                Learn More About Law Nation Prime Times Journal 
+                Learn More About Law Nation Prime Times Journal
               </Link>
             </div>
 
@@ -301,7 +314,7 @@ export default function HomePage() {
                   {showAdvanced ? "Hide advanced filters" : "Advanced filters"}
                 </button>
                 <span className="h-1 w-1 rounded-full bg-gray-300" />
-                
+
               </div>
 
               {showAdvanced && (
@@ -350,7 +363,7 @@ export default function HomePage() {
                   href="/research-paper"
                   className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-neutral-300 text-black font-semibold hover:border-red-300 transition"
                 >
-                   Browse Issues
+                  Browse Issues
                 </Link>
               </div>
             </form>
@@ -365,7 +378,7 @@ export default function HomePage() {
           <div className="mb-12">
             {/* text-center se headline beech mein aa jayegi, agar left mein chahiye toh text-center hata dena */}
             <h2 className="text-4xl font-bold text-black leading-tight text-center">
-               Latest  <span className="text-black"> Updates</span>
+              Latest  <span className="text-black"> Updates</span>
             </h2>
           </div>
 
@@ -437,7 +450,7 @@ export default function HomePage() {
           <div className="mt-16 text-center">
             <Link href="/articles">
               <button className="bg-red-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-gray-800 transition">
-                View All 
+                View All
               </button>
             </Link>
           </div>
