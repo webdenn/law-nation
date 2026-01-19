@@ -12,30 +12,10 @@ import {
 } from "docx";
 import { createRequire } from "module";
 import { NotFoundError } from "@/utils/http-errors.util.js";
+import { resolveToAbsolutePath, fileExistsAtPath } from "@/utils/file-path.utils.js";
 
 // Create require for CommonJS modules (mammoth)
 const require = createRequire(import.meta.url);
-
-/**
- * Helper function to safely resolve file path
- * Handles both relative paths and absolute Windows paths
- */
-function resolveFilePath(filePath: string): string {
-  // If it's already absolute, return as is
-  if (path.isAbsolute(filePath)) {
-    return filePath;
-  }
-  
-  // Handle relative paths that start with / (web-style paths)
-  if (filePath.startsWith('/')) {
-    // Remove leading slash and join with process.cwd()
-    const relativePath = filePath.substring(1);
-    return path.join(process.cwd(), relativePath);
-  }
-  
-  // Handle regular relative paths
-  return path.join(process.cwd(), filePath);
-}
 
 /**
  * Add watermark to Word document (simple version - returns original for now)
@@ -53,24 +33,18 @@ export async function addWatermarkToWord(
   try {
     console.log(`💧 [Word Watermark] Adding watermark to: ${wordPath}`);
 
-    const fullPath = resolveFilePath(wordPath);
+    const fullPath = resolveToAbsolutePath(wordPath);
     console.log(`📂 [Word Watermark] Resolved full path: ${fullPath}`);
 
-    // ✅ Check if file exists before attempting to read
-    try {
-      await fs.access(fullPath);
-      console.log(`✅ [Word Watermark] File exists and is accessible`);
-    } catch (accessError: any) {
+    // ✅ Check if file exists using utility
+    if (!fileExistsAtPath(wordPath)) {
       console.error(`❌ [Word Watermark] File not found: ${fullPath}`);
-      if (accessError?.code === "ENOENT") {
-        throw new NotFoundError(
-          `Document file not found on server: ${path.basename(fullPath)}`
-        );
-      }
-      throw new Error(
-        `Cannot access file: ${accessError?.message || "Unknown access error"}`
+      throw new NotFoundError(
+        `Document file not found on server: ${path.basename(fullPath)}`
       );
     }
+
+    console.log(`✅ [Word Watermark] File exists and is accessible`);
 
     // Read the original Word file
     const originalBuffer = await fs.readFile(fullPath);
@@ -141,24 +115,18 @@ export async function addSimpleWatermarkToWord(
       `💧 [Word Watermark] Adding watermark with logo to: ${wordPath}`
     );
 
-    const fullPath = resolveFilePath(wordPath);
+    const fullPath = resolveToAbsolutePath(wordPath);
     console.log(`📂 [Word Watermark] Resolved full path: ${fullPath}`);
 
-    // ✅ Check if file exists before attempting to read
-    try {
-      await fs.access(fullPath);
-      console.log(`✅ [Word Watermark] File exists and is accessible`);
-    } catch (accessError: any) {
+    // ✅ Check if file exists using utility
+    if (!fileExistsAtPath(wordPath)) {
       console.error(`❌ [Word Watermark] File not found: ${fullPath}`);
-      if (accessError?.code === "ENOENT") {
-        throw new NotFoundError(
-          `Document file not found on server: ${path.basename(fullPath)}`
-        );
-      }
-      throw new Error(
-        `Cannot access file: ${accessError?.message || "Unknown access error"}`
+      throw new NotFoundError(
+        `Document file not found on server: ${path.basename(fullPath)}`
       );
     }
+
+    console.log(`✅ [Word Watermark] File exists and is accessible`);
 
     // Read the original Word file
     const originalBuffer = await fs.readFile(fullPath);
