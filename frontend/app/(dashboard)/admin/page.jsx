@@ -586,39 +586,54 @@ export default function AdminDashboard() {
       toast.error("Server error while assigning");
     }
   };
+  const [isPublishing, setIsPublishing] = useState(false); // ✅ NEW State
+
   const overrideAndPublish = async (id) => {
     try {
+      setIsPublishing(true); // Start Loading
       const token = localStorage.getItem("adminToken");
-      // Check agar token nahi hai
+
       if (!token) {
         toast.error("Admin token missing! Please login again.");
+        setIsPublishing(false);
         return;
       }
+
       const response = await fetch(
         `${NEXT_PUBLIC_BASE_URL}/api/articles/${id}/admin-publish`,
         {
           method: "PATCH",
           headers: {
-            "Content-Type": "application/json", // 👈 YE MISSING THA (Zaroori hai)
+            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
         }
       );
+
       if (response.ok) {
-        // UI Update (Optimistic Update)
+        toast.success("Article Approved & Published!");
+
+        // Optimistic Update
         setArticles((prev) =>
           prev.map((a) => (a.id === id ? { ...a, status: "Published" } : a))
         );
-        toast.success("Article Approved & Published!");
+
+        // ✅ Redirect/Close after success (Delay for user to see success)
+        setTimeout(() => {
+          setSelectedArticle(null);
+          setIsPublishing(false);
+        }, 1500);
+
       } else {
         const errorData = await response.json();
-        // Server jo error bhej raha hai wo dikhao
         console.error("Server Error:", errorData);
         toast.error(errorData.message || "Approval failed");
+        setIsPublishing(false);
       }
     } catch (e) {
       console.error("Network Error:", e);
       toast.error("Something went wrong while publishing.");
+      setIsPublishing(false);
     }
   };
   const filteredArticles = articles.filter((art) => {
@@ -1252,13 +1267,24 @@ export default function AdminDashboard() {
 
                 {/* Final Publish Button */}
                 <button
-                  onClick={() => {
-                    overrideAndPublish(selectedArticle.id);
-                    setSelectedArticle(null);
-                  }}
-                  className="w-full mt-10 bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-black shadow-lg hover:shadow-green-200 transition-all uppercase tracking-tighter"
+                  onClick={() => overrideAndPublish(selectedArticle.id)}
+                  disabled={isPublishing}
+                  className={`w-full mt-10 text-white py-4 rounded-xl font-black shadow-lg transition-all uppercase tracking-tighter ${isPublishing
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-green-600 hover:bg-green-700 hover:shadow-green-200"
+                    }`}
                 >
-                  Final Approve & Publish
+                  {isPublishing ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      PUBLISHING...
+                    </span>
+                  ) : (
+                    "Final Approve & Publish"
+                  )}
                 </button>
               </div>
             </div>

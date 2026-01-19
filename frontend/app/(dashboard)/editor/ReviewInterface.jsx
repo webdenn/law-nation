@@ -168,7 +168,7 @@ const ReviewInterface = ({
             <button
               onClick={handleUploadCorrection}
               disabled={!uploadedFile || isUploading}
-              className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-2 ${!uploadedFile
+              className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-2 ${!uploadedFile || isUploading
                 ? "bg-gray-300 cursor-not-allowed"
                 : "bg-blue-600 hover:bg-blue-700 active:scale-95"
                 }`}

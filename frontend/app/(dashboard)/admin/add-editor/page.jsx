@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import AdminSidebar from "../../components/AdminSidebar";
+import AdminSidebar from "../../../components/AdminSidebar";
 
 export default function AddEditorPage() {
   const router = useRouter();

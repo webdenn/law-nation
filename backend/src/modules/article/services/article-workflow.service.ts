@@ -227,13 +227,22 @@ export class ArticleWorkflowService {
 
       // Step 4: Extract text from clean PDF using Adobe ExtractPDF (with validation and fallbacks)
       console.log(`🔍 [Adobe] Extracting text from clean PDF with validation and fallbacks`);
-      const extractedText = await adobeService.extractTextFromPdf(cleanPdfPath);
+      let extractedText: string = await adobeService.extractTextFromPdf(cleanPdfPath);
       console.log(`✅ [Adobe] Extracted ${extractedText.length} characters from clean PDF`);
 
       // Check if extraction returned an error message about corruption
       if (extractedText.includes('PDF file is corrupted') || extractedText.includes('text cannot be extracted')) {
-        console.warn(`⚠️ [Improved Workflow] PDF corruption detected during text extraction`);
-        // Continue with workflow but store the error message for user feedback
+        console.warn(`⚠️ [Improved Workflow] PDF corruption detected during text extraction, trying Mammoth fallback...`);
+
+        try {
+          const mammothText = await adobeService.extractTextFromDocxUsingMammoth(cleanDocxPath);
+          if (mammothText && mammothText.length > 0) {
+            extractedText = mammothText;
+            console.log(`✅ [Fallback] Extracted ${extractedText.length} characters using Mammoth`);
+          }
+        } catch (mammothError: any) {
+          console.error(`❌ [Fallback] Mammoth extraction also failed:`, mammothError.message);
+        }
       }
 
       // Step 5: Create watermarked versions
@@ -268,11 +277,11 @@ export class ArticleWorkflowService {
           // Store extracted text for user display
           content: extractedText,
           contentHtml: extractedText.replace(/\n/g, '<br>'),
-          
+
           // Store file paths
           currentPdfUrl: relativeWatermarkedPdf, // Watermarked PDF for downloads
           currentWordUrl: relativeWatermarkedDocx, // Watermarked DOCX for downloads
-          
+
           // Update status
           status: "EDITOR_APPROVED",
         },
@@ -286,8 +295,8 @@ export class ArticleWorkflowService {
           oldFileUrl: article.currentWordUrl || "",
           newFileUrl: relativeWatermarkedDocx,
           fileType: "DOCX",
-          diffData: { 
-            type: "improved_workflow", 
+          diffData: {
+            type: "improved_workflow",
             message: "Clean processing with Adobe text extraction and validation",
             extractedTextLength: extractedText.length,
             hasCorruption: extractedText.includes('PDF file is corrupted')
@@ -339,12 +348,12 @@ export class ArticleWorkflowService {
     try {
       // Try to find the clean PDF (before watermarking) for text extraction
       let cleanPdfUrl = article.currentPdfUrl;
-      
+
       // If the current PDF is watermarked, try to find the clean version
       if (cleanPdfUrl && cleanPdfUrl.includes('_watermarked.pdf')) {
         const cleanVersion = cleanPdfUrl.replace('_watermarked.pdf', '.pdf');
         console.log(`🔍 [Text Extract] Looking for clean PDF: ${cleanVersion}`);
-        
+
         // Check if clean version exists
         const cleanPath = path.join(process.cwd(), cleanVersion.startsWith('/') ? cleanVersion.substring(1) : cleanVersion);
         if (fs.existsSync(cleanPath)) {
@@ -358,23 +367,36 @@ export class ArticleWorkflowService {
       // Try Adobe extraction with enhanced error handling (includes validation, repair, and fallbacks)
       if (cleanPdfUrl) {
         console.log(`🔍 [Text Extract] Attempting Adobe PDF extraction with validation and repair...`);
-        
+
         try {
           const extractedText = await adobeService.extractTextFromPdf(cleanPdfUrl);
-          
+
           if (extractedText && extractedText.length > 0) {
             // Check if the extracted text indicates corruption
             if (extractedText.includes('PDF file is corrupted') || extractedText.includes('text cannot be extracted')) {
-              console.warn(`⚠️ [Text Extract] Adobe detected corrupted PDF, but provided fallback message`);
-              return extractedText; // Return the error message for user feedback
+              console.warn(`⚠️ [Text Extract] Adobe detected corrupted PDF, trying Mammoth fallback...`);
+
+              if (article.currentWordUrl) {
+                try {
+                  const mammothText = await adobeService.extractTextFromDocxUsingMammoth(article.currentWordUrl);
+                  if (mammothText && mammothText.length > 0) {
+                    console.log(`✅ [Text Extract] Mammoth fallback successful (${mammothText.length} characters)`);
+                    return mammothText;
+                  }
+                } catch (fallbackError) {
+                  console.warn(`⚠️ [Text Extract] Mammoth fallback failed:`, fallbackError);
+                }
+              }
+
+              return extractedText; // Return the error message if fallback failed
             }
-            
+
             console.log(`✅ [Text Extract] Adobe extraction successful (${extractedText.length} characters)`);
             return extractedText;
           }
         } catch (error: any) {
           console.error(`❌ [Text Extract] Adobe extraction failed:`, error.message);
-          
+
           // Check if this is a BAD_PDF error
           if (error.message && error.message.includes('BAD_PDF')) {
             console.warn(`⚠️ [Text Extract] BAD_PDF error - Adobe service already tried fallback methods`);
@@ -385,7 +407,7 @@ export class ArticleWorkflowService {
       }
     } catch (error: any) {
       console.error('❌ [Text Extract] Adobe extraction completely failed:', error.message);
-      
+
       // If Adobe service returned a user-friendly error message, use it
       if (error.message && error.message.includes('PDF file is corrupted')) {
         return error.message;
@@ -396,12 +418,26 @@ export class ArticleWorkflowService {
     if (article.content && article.content.trim().length > 0) {
       // Check if existing content looks corrupted
       const hasCorruptedData = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|PKx|��|AEstructuredData/.test(article.content);
-      
+
       if (!hasCorruptedData) {
         console.log(`ℹ️ [Text Extract] Using existing clean content as fallback (${article.content.length} characters)`);
         return article.content;
       } else {
         console.warn(`⚠️ [Text Extract] Existing content appears corrupted, not using as fallback`);
+      }
+    }
+
+    // Try Mammoth extraction from DOCX as last resort
+    if (article.currentWordUrl) {
+      try {
+        console.log(`🔄 [Text Extract] Attempting Mammoth extraction from DOCX as last resort...`);
+        const mammothText = await adobeService.extractTextFromDocxUsingMammoth(article.currentWordUrl);
+        if (mammothText && mammothText.length > 0) {
+          console.log(`✅ [Text Extract] Mammoth extraction successful (${mammothText.length} characters)`);
+          return mammothText;
+        }
+      } catch (error: any) {
+        console.warn(`⚠️ [Text Extract] Mammoth extraction failed:`, error.message);
       }
     }
 
@@ -608,16 +644,16 @@ export class ArticleWorkflowService {
     try {
       // Extract text from the converted PDF using Adobe services
       const extractedText = await adobeService.extractTextFromPdf(pdfPath);
-      
+
       // Still extract images from PDF
       const pdfImageContent = await extractPdfContent(pdfPath, article.id);
-      
+
       pdfContent = {
         text: extractedText,
         html: extractedText.replace(/\n/g, '<br>'), // Simple HTML conversion
         images: pdfImageContent.images || []
       };
-      
+
       console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from PDF`);
     } catch (error) {
       console.error("Failed to extract content using Adobe:", error);
@@ -775,22 +811,22 @@ export class ArticleWorkflowService {
         // First ensure both formats exist
         const { pdfPath } = await ensureBothFormats(newPdfUrl);
         const extractedText = await adobeService.extractTextFromPdf(pdfPath);
-        
+
         // Still extract images from PDF
         const pdfImageContent = await extractPdfContent(newPdfUrl, article.id);
-        
+
         if (extractedText) {
           updateData.content = extractedText;
           updateData.contentHtml = extractedText.replace(/\n/g, '<br>');
         }
-        
+
         if (pdfImageContent.images && pdfImageContent.images.length > 0) {
           updateData.imageUrls = [
             ...(article.imageUrls || []),
             ...pdfImageContent.images
           ];
         }
-        
+
         console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from PDF`);
       } catch (error) {
         console.error("Failed to extract content using Adobe:", error);
@@ -950,12 +986,12 @@ export class ArticleWorkflowService {
 
     // NEW: Extract text from current/edited version for user display
     let extractedText = '';
-    
+
     // First, check if we already have clean extracted text
     if (article.content && article.content.trim().length > 0) {
       // Check if the content looks clean (not corrupted binary data)
       const hasCorruptedData = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|PKx|��|AEstructuredData/.test(article.content);
-      
+
       if (!hasCorruptedData) {
         console.log(`✅ [Article Publish] Using existing clean content (${article.content.length} characters)`);
         extractedText = article.content;

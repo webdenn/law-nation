@@ -96,6 +96,7 @@ export default function EditorDashboard() {
   const [isGeneratingDiff, setIsGeneratingDiff] = useState(false);
   const [currentDiffData, setCurrentDiffData] = useState(null);
   const [isApproving, setIsApproving] = useState(false); // ✅ NEW Appoving State
+  const [pdfTimestamp, setPdfTimestamp] = useState(Date.now()); // ✅ Fix Jitter State
 
   const [profile, setProfile] = useState({
     id: "",
@@ -342,6 +343,7 @@ export default function EditorDashboard() {
         if (data.article && data.article.currentPdfUrl) {
           setSelectedArticle((prev) => ({ ...prev, ...data.article }));
           setPdfViewMode("current");
+          setPdfTimestamp(Date.now()); // ✅ Refresh PDF
         }
       } else {
         toast.error(data.error || data.message || "Upload failed");
@@ -493,7 +495,7 @@ export default function EditorDashboard() {
       ? path
       : `${NEXT_PUBLIC_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
 
-    return `${cleanUrl}?cb=${Date.now()}`;
+    return `${cleanUrl}?cb=${pdfTimestamp}`;
   };
 
   if (!isAuthorized)
