@@ -57,7 +57,16 @@ const TEAM_MEMBERS = [
     }
 ];
 
-const TeamCard = ({ member }) => (
+interface Member {
+    id: number;
+    name: string;
+    role: string;
+    image: string;
+    bio: string;
+    specialization: string;
+}
+
+const TeamCard = ({ member }: { member: Member }) => (
     <div className="group bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:border-red-100 transition-all duration-300 flex flex-col items-center text-center">
         <div className="relative w-32 h-32 mb-6">
             <div className="absolute inset-0 bg-red-600 rounded-full opacity-0 group-hover:opacity-10 transition-opacity duration-300 scale-110"></div>
@@ -94,7 +103,7 @@ const TeamCard = ({ member }) => (
 
 export default function OurTeamPage() {
     return (
-        <main className="min-h-screen bg-slate-50 pt-32 pb-20">
+        <div className="bg-slate-50 pt-32 pb-20">
             {/* Hero Section */}
             <section className="max-w-7xl mx-auto px-6 mb-20 text-center">
                 <div className="inline-block mb-4 px-4 py-1 bg-red-50 text-red-700 text-xs font-bold uppercase rounded-full tracking-widest border border-red-100">
@@ -148,6 +157,6 @@ export default function OurTeamPage() {
                     </div>
                 </div>
             </section>
-        </main>
+        </div>
     );
 }

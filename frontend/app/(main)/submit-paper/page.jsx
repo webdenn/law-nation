@@ -141,6 +141,14 @@ export default function SubmitPaperPage() {
         return;
       }
 
+      // Check if email contains @
+      if (!formData.email.includes("@")) {
+        toast.error("Please enter a valid email address (must contain '@').", {
+          position: "top-center"
+        });
+        return;
+      }
+
       // 2. Second Author Partial Check (Refinement Logic)
       if (
         (formData.secondAuthorName && !formData.secondAuthorEmail) ||
@@ -158,6 +166,15 @@ export default function SubmitPaperPage() {
         !nameRegex.test(formData.secondAuthorName)
       ) {
         toast.error("Second Author name must contain only letters and spaces.");
+        return;
+      }
+
+      // Check Second Author Email if exists
+      if (
+        formData.secondAuthorEmail &&
+        !formData.secondAuthorEmail.includes("@")
+      ) {
+        toast.error("Second Author email must be a valid email address.");
         return;
       }
     }
