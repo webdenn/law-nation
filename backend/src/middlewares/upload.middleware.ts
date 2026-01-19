@@ -690,13 +690,20 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
 
           console.log(`🔖 [Upload] Adding watermark to editor's corrected document...`);
 
-          // Add watermark
-          const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
-
-          // Save watermarked file (overwrite original)
-          fs.writeFileSync(docFilePath, watermarkedBuffer);
-
-          console.log(`✅ [Upload] Watermarked corrected document saved`);
+          // For DOCX files, save clean version for improved workflow and create watermarked version
+          const ext = path.extname(docFile.originalname).toLowerCase();
+          if (ext === '.docx') {
+            console.log(`📄 [Upload] DOCX detected - preserving clean version for improved workflow`);
+            
+            // Keep the original clean file as-is for improved workflow
+            // The improved workflow will handle watermarking properly
+            console.log(`✅ [Upload] Clean DOCX preserved for improved workflow`);
+          } else {
+            // For non-DOCX files, apply watermark as before
+            const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
+            fs.writeFileSync(docFilePath, watermarkedBuffer);
+            console.log(`✅ [Upload] Watermarked corrected document saved`);
+          }
 
           req.fileMeta = {
             url: `/uploads/pdfs/${docFile.filename}`,
@@ -782,17 +789,26 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
           const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(docFile.originalname)}`);
           fs.writeFileSync(tempFilePath, docFile.buffer);
 
-          // Add watermark
-          const watermarkedBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
+          // For DOCX files, skip watermarking to preserve clean version for improved workflow
+          const ext = path.extname(docFile.originalname).toLowerCase();
+          let uploadBuffer;
+          
+          if (ext === '.docx') {
+            console.log(`📄 [Upload] DOCX detected - preserving clean version for improved workflow`);
+            uploadBuffer = docFile.buffer; // Use original clean buffer
+            console.log(`✅ [Upload] Clean DOCX preserved for improved workflow`);
+          } else {
+            // Add watermark for non-DOCX files
+            uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
+            console.log(`✅ [Upload] Watermark added, uploading to Supabase...`);
+          }
 
           // Delete temp file
           fs.unlinkSync(tempFilePath);
 
-          console.log(`✅ [Upload] Watermark added, uploading to Supabase...`);
-
-          // Upload watermarked buffer to Supabase
+          // Upload buffer to Supabase
           const { url, storageKey } = await uploadBufferToSupabase(
-            watermarkedBuffer,
+            uploadBuffer,
             docFile.originalname,
             docFile.mimetype,
             'pdf'

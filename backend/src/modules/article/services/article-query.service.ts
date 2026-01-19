@@ -168,32 +168,60 @@ export class ArticleQueryService {
       );
 
       try {
-        const pdfContent = await extractPdfContent(
-          article.currentPdfUrl,
-          articleId
-        );
+        // Use Adobe PDF extraction instead of old extractPdfContent method
+        const { adobeService } = await import('@/services/adobe.service.js');
+        
+        try {
+          console.log(`🔍 [Lazy Extract] Using Adobe PDF extraction for clean text`);
+          const cleanText = await adobeService.extractTextFromPdf(article.currentPdfUrl);
+          
+          if (cleanText && cleanText.length > 0) {
+            console.log(`✅ [Lazy Extract] Adobe extracted ${cleanText.length} characters`);
 
-        if (pdfContent.text && pdfContent.text.length > 0) {
-          console.log(
-            `✅ [Lazy Extract] Extracted ${pdfContent.text.length} characters and ${pdfContent.images.length} images`
+            await prisma.article.update({
+              where: { id: articleId },
+              data: {
+                content: cleanText,
+                contentHtml: cleanText.replace(/\n/g, '<br>'),
+              },
+            });
+
+            article.content = cleanText;
+            article.contentHtml = cleanText.replace(/\n/g, '<br>');
+          } else {
+            console.warn(`⚠️ [Lazy Extract] Adobe extraction returned empty text`);
+          }
+        } catch (adobeError) {
+          console.error(`❌ [Lazy Extract] Adobe extraction failed, falling back to old method:`, adobeError);
+          
+          // Fallback to old method only if Adobe fails
+          const pdfContent = await extractPdfContent(
+            article.currentPdfUrl,
+            articleId
           );
 
-          await prisma.article.update({
-            where: { id: articleId },
-            data: {
-              content: pdfContent.text,
-              contentHtml: pdfContent.html,
-              imageUrls: pdfContent.images || [],
-            },
-          });
+          if (pdfContent.text && pdfContent.text.length > 0) {
+            console.log(
+              `✅ [Lazy Extract] Fallback extracted ${pdfContent.text.length} characters and ${pdfContent.images.length} images`
+            );
 
-          article.content = pdfContent.text;
-          article.contentHtml = pdfContent.html;
-          article.imageUrls = pdfContent.images || [];
-        } else {
-          console.warn(
-            `⚠️ [Lazy Extract] No text extracted (might be scanned PDF)`
-          );
+            await prisma.article.update({
+              where: { id: articleId },
+              data: {
+                content: pdfContent.text,
+                contentHtml: pdfContent.html,
+                imageUrls: pdfContent.images || [],
+              },
+            });
+
+            article.content = pdfContent.text;
+            article.contentHtml = pdfContent.html;
+            article.imageUrls = pdfContent.images || [];
+          } else {
+            console.warn(
+              `⚠️ [Lazy Extract] No text extracted (might be scanned PDF)`
+            );
+          }
         }
       } catch (error) {
         console.error(`❌ [Lazy Extract] Failed:`, error);

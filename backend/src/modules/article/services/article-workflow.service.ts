@@ -4,7 +4,9 @@ import {
   NotFoundError,
   BadRequestError,
   ForbiddenError,
+  InternalServerError,
 } from "@/utils/http-errors.util.js";
+import { resolveToAbsolutePath, fileExistsAtPath } from "@/utils/file-path.utils.js";
 import { extractPdfContent } from "@/utils/pdf-extract.utils.js";
 import {
   ensureBothFormats,
@@ -180,6 +182,234 @@ export class ArticleWorkflowService {
     };
   }
 
+  // NEW: Improved editor upload workflow with clean processing and text extraction
+  async uploadCorrectedDocxImproved(
+    articleId: string,
+    editorId: string,
+    data: UploadCorrectedPdfData
+  ) {
+    console.log(`🚀 [Improved Workflow] Starting improved editor upload for article ${articleId}`);
+
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
+
+    if (article.assignedEditorId !== editorId) {
+      throw new ForbiddenError("You are not assigned to this article");
+    }
+
+    // Validate uploaded file is DOCX
+    if (!data.pdfUrl.toLowerCase().endsWith('.docx')) {
+      throw new BadRequestError('Please upload a DOCX file');
+    }
+
+    try {
+      // Step 1: Process clean DOCX (editor's upload)
+      const cleanDocxPath = resolveToAbsolutePath(data.pdfUrl);
+      console.log(`📄 [Clean Process] Processing clean DOCX: ${cleanDocxPath}`);
+
+      if (!fileExistsAtPath(data.pdfUrl)) {
+        throw new Error(`DOCX file not found: ${cleanDocxPath}`);
+      }
+
+      // Step 2: Convert clean DOCX to clean PDF using Adobe
+      const cleanPdfPath = cleanDocxPath.replace(/\.docx$/i, '_clean.pdf');
+      console.log(`🔄 [Adobe] Converting clean DOCX to clean PDF`);
+      await adobeService.convertDocxToPdf(cleanDocxPath, cleanPdfPath);
+
+      // Step 3: Validate the generated PDF before text extraction
+      console.log(`🔍 [Validation] Validating generated PDF structure...`);
+      // Note: PDF validation is now handled inside Adobe service extractTextFromPdf method
+
+      // Step 4: Extract text from clean PDF using Adobe ExtractPDF (with validation and fallbacks)
+      console.log(`🔍 [Adobe] Extracting text from clean PDF with validation and fallbacks`);
+      const extractedText = await adobeService.extractTextFromPdf(cleanPdfPath);
+      console.log(`✅ [Adobe] Extracted ${extractedText.length} characters from clean PDF`);
+
+      // Check if extraction returned an error message about corruption
+      if (extractedText.includes('PDF file is corrupted') || extractedText.includes('text cannot be extracted')) {
+        console.warn(`⚠️ [Improved Workflow] PDF corruption detected during text extraction`);
+        // Continue with workflow but store the error message for user feedback
+      }
+
+      // Step 5: Create watermarked versions
+      const watermarkData = {
+        userName: 'LAW NATION EDITOR',
+        downloadDate: new Date(),
+        articleTitle: article.title,
+        articleId: article.id,
+        frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+      };
+
+      // Create watermarked DOCX (header/footer style)
+      const watermarkedDocxPath = cleanDocxPath.replace(/\.docx$/i, '_watermarked.docx');
+      console.log(`💧 [Watermark] Adding DOCX-style watermark (header/footer)`);
+      await adobeService.addWatermarkToDocx(cleanDocxPath, watermarkedDocxPath, watermarkData);
+
+      // Create watermarked PDF (overlay/background style) - Apply to clean PDF directly
+      const watermarkedPdfPath = cleanPdfPath.replace(/\.pdf$/i, '_watermarked.pdf');
+      console.log(`💧 [Watermark] Adding PDF-style watermark (overlay/background)`);
+      await adobeService.addWatermarkToPdf(cleanPdfPath, watermarkedPdfPath, watermarkData);
+
+      // Step 6: Convert paths to relative for database storage
+      const { convertToWebPath } = await import('@/utils/file-path.utils.js');
+      const relativeCleanPdf = convertToWebPath(cleanPdfPath);
+      const relativeWatermarkedDocx = convertToWebPath(watermarkedDocxPath);
+      const relativeWatermarkedPdf = convertToWebPath(watermarkedPdfPath);
+
+      // Step 7: Update article with extracted text and file paths
+      const updatedArticle = await prisma.article.update({
+        where: { id: articleId },
+        data: {
+          // Store extracted text for user display
+          content: extractedText,
+          contentHtml: extractedText.replace(/\n/g, '<br>'),
+          
+          // Store file paths
+          currentPdfUrl: relativeWatermarkedPdf, // Watermarked PDF for downloads
+          currentWordUrl: relativeWatermarkedDocx, // Watermarked DOCX for downloads
+          
+          // Update status
+          status: "EDITOR_APPROVED",
+        },
+      });
+
+      // Step 8: Create change log
+      await prisma.articleChangeLog.create({
+        data: {
+          articleId: article.id,
+          versionNumber: await this.getNextVersionNumber(articleId),
+          oldFileUrl: article.currentWordUrl || "",
+          newFileUrl: relativeWatermarkedDocx,
+          fileType: "DOCX",
+          diffData: { 
+            type: "improved_workflow", 
+            message: "Clean processing with Adobe text extraction and validation",
+            extractedTextLength: extractedText.length,
+            hasCorruption: extractedText.includes('PDF file is corrupted')
+          } as any,
+          editedBy: editorId,
+          status: "approved",
+          comments: data.comments || "Processed with improved workflow: clean DOCX → clean PDF → validated text extraction → watermarking",
+        },
+      });
+
+      console.log(`✅ [Improved Workflow] Article ${articleId} processed successfully`);
+      console.log(`   📊 Extracted text: ${extractedText.length} characters`);
+      console.log(`   📄 Clean PDF: ${relativeCleanPdf}`);
+      console.log(`   💧 Watermarked DOCX: ${relativeWatermarkedDocx}`);
+      console.log(`   💧 Watermarked PDF: ${relativeWatermarkedPdf}`);
+
+      return {
+        message: "Article processed successfully with improved workflow and validation",
+        article: updatedArticle,
+        extractedTextLength: extractedText.length,
+        hasCorruption: extractedText.includes('PDF file is corrupted'),
+        files: {
+          cleanPdf: relativeCleanPdf,
+          watermarkedDocx: relativeWatermarkedDocx,
+          watermarkedPdf: relativeWatermarkedPdf,
+        }
+      };
+
+    } catch (error: any) {
+      console.error(`❌ [Improved Workflow] Failed to process article ${articleId}:`, error);
+      throw new InternalServerError(`Failed to process article: ${error.message}`);
+    }
+  }
+
+  // Helper method to get next version number
+  private async getNextVersionNumber(articleId: string): Promise<number> {
+    const lastLog = await prisma.articleChangeLog.findFirst({
+      where: { articleId },
+      orderBy: { versionNumber: 'desc' },
+    });
+    return (lastLog?.versionNumber || 0) + 1;
+  }
+
+  // Helper method to extract text for publishing with proper fallbacks and retries
+  private async extractTextForPublishing(article: any): Promise<string> {
+    const fs = await import('fs');
+    const path = await import('path');
+
+    try {
+      // Try to find the clean PDF (before watermarking) for text extraction
+      let cleanPdfUrl = article.currentPdfUrl;
+      
+      // If the current PDF is watermarked, try to find the clean version
+      if (cleanPdfUrl && cleanPdfUrl.includes('_watermarked.pdf')) {
+        const cleanVersion = cleanPdfUrl.replace('_watermarked.pdf', '.pdf');
+        console.log(`🔍 [Text Extract] Looking for clean PDF: ${cleanVersion}`);
+        
+        // Check if clean version exists
+        const cleanPath = path.join(process.cwd(), cleanVersion.startsWith('/') ? cleanVersion.substring(1) : cleanVersion);
+        if (fs.existsSync(cleanPath)) {
+          cleanPdfUrl = cleanVersion;
+          console.log(`✅ [Text Extract] Found clean PDF for extraction: ${cleanPdfUrl}`);
+        } else {
+          console.log(`⚠️ [Text Extract] Clean PDF not found, will try watermarked version`);
+        }
+      }
+
+      // Try Adobe extraction with enhanced error handling (includes validation, repair, and fallbacks)
+      if (cleanPdfUrl) {
+        console.log(`🔍 [Text Extract] Attempting Adobe PDF extraction with validation and repair...`);
+        
+        try {
+          const extractedText = await adobeService.extractTextFromPdf(cleanPdfUrl);
+          
+          if (extractedText && extractedText.length > 0) {
+            // Check if the extracted text indicates corruption
+            if (extractedText.includes('PDF file is corrupted') || extractedText.includes('text cannot be extracted')) {
+              console.warn(`⚠️ [Text Extract] Adobe detected corrupted PDF, but provided fallback message`);
+              return extractedText; // Return the error message for user feedback
+            }
+            
+            console.log(`✅ [Text Extract] Adobe extraction successful (${extractedText.length} characters)`);
+            return extractedText;
+          }
+        } catch (error: any) {
+          console.error(`❌ [Text Extract] Adobe extraction failed:`, error.message);
+          
+          // Check if this is a BAD_PDF error
+          if (error.message && error.message.includes('BAD_PDF')) {
+            console.warn(`⚠️ [Text Extract] BAD_PDF error - Adobe service already tried fallback methods`);
+            // Adobe service already tried alternative methods, so we trust its result
+            throw error;
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ [Text Extract] Adobe extraction completely failed:', error.message);
+      
+      // If Adobe service returned a user-friendly error message, use it
+      if (error.message && error.message.includes('PDF file is corrupted')) {
+        return error.message;
+      }
+    }
+
+    // Fallback to existing content if available and not corrupted
+    if (article.content && article.content.trim().length > 0) {
+      // Check if existing content looks corrupted
+      const hasCorruptedData = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|PKx|��|AEstructuredData/.test(article.content);
+      
+      if (!hasCorruptedData) {
+        console.log(`ℹ️ [Text Extract] Using existing clean content as fallback (${article.content.length} characters)`);
+        return article.content;
+      } else {
+        console.warn(`⚠️ [Text Extract] Existing content appears corrupted, not using as fallback`);
+      }
+    }
+
+    // Last resort: return meaningful error message
+    console.warn('⚠️ [Text Extract] All extraction methods failed');
+    return 'This document could not be processed due to file corruption. Please upload a new, uncorrupted version of the document for proper text extraction and display.';
+  }
+
   //Editor uploads corrected PDF
 
   async uploadCorrectedPdf(
@@ -213,7 +443,13 @@ export class ArticleWorkflowService {
       );
     }
 
-    // NEW: Handle document vs article processing differently
+    // NEW: Use improved workflow for DOCX uploads
+    if (data.pdfUrl.toLowerCase().endsWith('.docx')) {
+      console.log(`🚀 [Upload] Using improved workflow for DOCX upload`);
+      return await this.uploadCorrectedDocxImproved(articleId, editorId, data);
+    }
+
+    // Existing logic for PDF uploads and other cases
     if (article.contentType === 'DOCUMENT') {
       return await this.handleDocumentEdit(article, editorId, data);
     } else {
@@ -370,8 +606,8 @@ export class ArticleWorkflowService {
 
     let pdfContent = { text: "", html: "", images: [] as string[] };
     try {
-      // Extract text from the converted DOCX using Adobe services for better quality
-      const extractedText = await adobeService.extractTextFromDocx(wordPath);
+      // Extract text from the converted PDF using Adobe services
+      const extractedText = await adobeService.extractTextFromPdf(pdfPath);
       
       // Still extract images from PDF
       const pdfImageContent = await extractPdfContent(pdfPath, article.id);
@@ -382,7 +618,7 @@ export class ArticleWorkflowService {
         images: pdfImageContent.images || []
       };
       
-      console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from DOCX`);
+      console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from PDF`);
     } catch (error) {
       console.error("Failed to extract content using Adobe:", error);
       // Fallback to old method
@@ -535,10 +771,10 @@ export class ArticleWorkflowService {
       updateData.currentPdfUrl = newPdfUrl;
 
       try {
-        // Extract text from the converted DOCX using Adobe services for better quality
+        // Extract text using Adobe PDF extraction instead of mammoth
         // First ensure both formats exist
-        const { wordPath } = await ensureBothFormats(newPdfUrl);
-        const extractedText = await adobeService.extractTextFromDocxUsingMammoth(wordPath);
+        const { pdfPath } = await ensureBothFormats(newPdfUrl);
+        const extractedText = await adobeService.extractTextFromPdf(pdfPath);
         
         // Still extract images from PDF
         const pdfImageContent = await extractPdfContent(newPdfUrl, article.id);
@@ -555,7 +791,7 @@ export class ArticleWorkflowService {
           ];
         }
         
-        console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from DOCX`);
+        console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from PDF`);
       } catch (error) {
         console.error("Failed to extract content using Adobe:", error);
         // Fallback to old method
@@ -628,18 +864,18 @@ export class ArticleWorkflowService {
 
     let extractedText = '';
 
-    // Extract text from edited DOCX using Adobe services (corrected version for users)
-    if (article.currentWordUrl) {
+    // Extract text from edited version using Adobe PDF extraction
+    if (article.currentPdfUrl) {
       try {
-        console.log(`🔍 [Adobe Extract] Extracting text from edited version: ${article.currentWordUrl}`);
-        extractedText = await adobeService.extractTextFromDocxUsingMammoth(article.currentWordUrl);
+        console.log(`🔍 [Adobe Extract] Extracting text from edited PDF version: ${article.currentPdfUrl}`);
+        extractedText = await adobeService.extractTextFromPdf(article.currentPdfUrl);
         console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from edited version`);
       } catch (error) {
         console.error('❌ [Adobe Extract] Text extraction failed:', error);
         extractedText = 'Text extraction failed. Please contact administrator.';
       }
     } else {
-      console.warn('⚠️ [Document Publish] No edited DOCX version available for text extraction');
+      console.warn('⚠️ [Document Publish] No edited PDF version available for text extraction');
       extractedText = 'Document not yet edited. Please contact administrator.';
     }
 
@@ -714,80 +950,22 @@ export class ArticleWorkflowService {
 
     // NEW: Extract text from current/edited version for user display
     let extractedText = '';
-    const fs = await import('fs');
-    const path = await import('path');
-
-    if (article.currentWordUrl) {
-      try {
-        // Fix: Resolve absolute path properly for local/server filesystem
-        // article.currentWordUrl typically comes as "/uploads/words/filename.docx" or similar
-        const relativePath = article.currentWordUrl.startsWith('/')
-          ? article.currentWordUrl.substring(1)
-          : article.currentWordUrl;
-
-        let absoluteScanPath = "";
-
-        // Handle different environments (Local vs Production paths)
-        if (article.currentWordUrl.startsWith("http")) {
-          // If it's a full URL (SS3/Cloud), we can't extract locally easily without downloading
-          // skipping for now or assume path mapping
-          console.log(`ℹ️ [Article Publish] Skipping extraction for remote URL: ${article.currentWordUrl}`);
-          extractedText = article.content || "";
-        } else {
-          absoluteScanPath = path.join(process.cwd(), relativePath);
-
-          // Check if it exists, if not, try uploads folder specifically if not included
-          if (!fs.existsSync(absoluteScanPath) && !relativePath.startsWith('uploads')) {
-            absoluteScanPath = path.join(process.cwd(), 'uploads', relativePath);
-          }
-
-          if (fs.existsSync(absoluteScanPath)) {
-            extractedText = await adobeService.extractTextFromDocxUsingMammoth(absoluteScanPath);
-            console.log(`✅ [Article Publish] Extracted ${extractedText.length} characters from edited version`);
-          } else {
-            throw new Error(`DOCX file not found at path: ${absoluteScanPath}`);
-          }
-        }
-
-      } catch (error) {
-        console.error('❌ [Article Publish] Adobe text extraction failed:', error);
-
-        // Fallback: Try extracting from PDF using pdf-parse (Robust backup)
-        if (article.currentPdfUrl) {
-          try {
-            console.log(`⚠️ [Article Publish] Attempting fallback extraction from PDF: ${article.currentPdfUrl}`);
-            const createRequire = (await import('module')).createRequire;
-            const require = createRequire(import.meta.url);
-            const pdfParse = require('pdf-parse');
-
-            const relativePdfPath = article.currentPdfUrl.startsWith('/') ? article.currentPdfUrl.substring(1) : article.currentPdfUrl;
-            let absolutePdfPath = path.join(process.cwd(), relativePdfPath);
-
-            if (!fs.existsSync(absolutePdfPath) && !relativePdfPath.startsWith('uploads')) {
-              absolutePdfPath = path.join(process.cwd(), 'uploads', relativePdfPath);
-            }
-
-            if (fs.existsSync(absolutePdfPath)) {
-              const dataBuffer = fs.readFileSync(absolutePdfPath);
-              const data = await pdfParse(dataBuffer);
-              extractedText = data.text;
-              console.log(`✅ [Article Publish] Fallback PDF extraction successful (${extractedText.length} chars)`);
-            } else {
-              console.error(`❌ [Article Publish] Fallback PDF file also not found: ${absolutePdfPath}`);
-              extractedText = article.content || 'Text extraction failed. Please contact administrator.';
-            }
-          } catch (pdfError) {
-            console.error('❌ [Article Publish] Fallback PDF extraction failed:', pdfError);
-            extractedText = article.content || 'Text extraction failed. Please contact administrator.';
-          }
-        } else {
-          extractedText = article.content || 'Text extraction failed. Please contact administrator.';
-        }
+    
+    // First, check if we already have clean extracted text
+    if (article.content && article.content.trim().length > 0) {
+      // Check if the content looks clean (not corrupted binary data)
+      const hasCorruptedData = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|PKx|��|AEstructuredData/.test(article.content);
+      
+      if (!hasCorruptedData) {
+        console.log(`✅ [Article Publish] Using existing clean content (${article.content.length} characters)`);
+        extractedText = article.content;
+      } else {
+        console.log(`⚠️ [Article Publish] Existing content appears corrupted, re-extracting...`);
+        extractedText = await this.extractTextForPublishing(article);
       }
-    } else if (article.content) {
-      // Use existing extracted content if no Word version available
-      extractedText = article.content;
-      console.log(`ℹ️ [Article Publish] Using existing extracted content (${extractedText.length} characters)`);
+    } else {
+      console.log(`ℹ️ [Article Publish] No existing content, extracting text...`);
+      extractedText = await this.extractTextForPublishing(article);
     }
 
     const updatedArticle = await prisma.article.update({
