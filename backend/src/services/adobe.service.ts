@@ -557,7 +557,14 @@ export class AdobeService {
 
             resolve(extractedText);
           } catch (parseError) {
-            // If JSON parsing fails, treat the response as raw text
+            // If JSON parsing fails, check if we received binary data (ZIP)
+            if (jsonData.startsWith('PK')) {
+              console.warn(`⚠️ [Adobe] Received binary ZIP data instead of JSON text. Treating as extraction failure.`);
+              resolve('PDF file is corrupted (Binary output received)');
+              return;
+            }
+
+            // Treat as raw text only if it's not binary
             console.log(`ℹ️ [Adobe] Response is raw text, not JSON. Using direct text content.`);
             const cleanedText = cleanTextForDatabase(jsonData);
             console.log(`✅ [Adobe] Text extracted from PDF as raw text and cleaned (${cleanedText.length} characters)`);

@@ -73,6 +73,7 @@ export default function Footer() {
               <li><Link href="/articles" className="hover:text-red-700 transition-colors">Browse Recent Issues</Link></li>
               <li><Link href="/latest" className="hover:text-red-700 transition-colors">Latest Reads</Link></li>
               <li><Link href="/latest" className="hover:text-red-700 transition-colors">Join Us As Reviewer </Link></li>
+              <li><Link href="/our-team" className="hover:text-red-700 transition-colors">Our Team</Link></li>
             </ul>
           </div>
 

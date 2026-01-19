@@ -287,6 +287,11 @@ export class ArticleWorkflowService {
         },
       });
 
+      // Step 7.5: Calculate Diff
+      console.log(`📊 [Diff] Calculating changes for Improved Workflow...`);
+      const diff = await calculateFileDiff(article.currentPdfUrl, cleanPdfPath);
+      console.log(`✅ [Diff] Calculation complete`);
+
       // Step 8: Create change log
       await prisma.articleChangeLog.create({
         data: {
@@ -296,6 +301,7 @@ export class ArticleWorkflowService {
           newFileUrl: relativeWatermarkedDocx,
           fileType: "DOCX",
           diffData: {
+            ...diff,
             type: "improved_workflow",
             message: "Clean processing with Adobe text extraction and validation",
             extractedTextLength: extractedText.length,
