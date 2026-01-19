@@ -1,6 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { InternalServerError } from "@/utils/http-errors.util.js";
+import { resolveToAbsolutePath, fileExistsAtPath } from "@/utils/file-path.utils.js";
+import { cleanWatermarkText } from "@/utils/text-cleaning.utils.js";
 
 // Adobe SDK types and classes
 let AdobeSDK: any = null;
@@ -86,7 +88,7 @@ export class AdobeService {
       this.isAvailable = true;
 
       console.log("✅ [Adobe] Adobe PDF Services initialized successfully");
-      console.log("🔧 [Adobe] Available methods: convertPdfToDocx, convertDocxToPdf, extractTextFromDocx, addWatermarkToDocx");
+      console.log("🔧 [Adobe] Available methods: convertPdfToDocx, convertDocxToPdf, extractTextFromDocxUsingMammoth (with watermark cleaning), addWatermarkToDocx");
     } catch (error) {
       console.error("❌ [Adobe] Failed to initialize Adobe PDF Services:", error);
       this.isAvailable = false;
@@ -311,6 +313,45 @@ export class AdobeService {
   }
 
   /**
+   * Extract text from DOCX using mammoth library (since Adobe ExtractPDF only works with PDFs)
+   */
+  async extractTextFromDocxUsingMammoth(docxPath: string): Promise<string> {
+    console.log(`🔄 [Adobe] Extracting text from DOCX using mammoth: ${docxPath}`);
+
+    try {
+      // Convert relative path to absolute path using utility
+      const absolutePath = resolveToAbsolutePath(docxPath);
+
+      if (!fileExistsAtPath(docxPath)) {
+        console.error(`❌ [Adobe] Input file missing: ${absolutePath}`);
+        throw new Error(`Input file not found locally: ${absolutePath}`);
+      }
+
+      // Use mammoth to extract text from DOCX
+      const { createRequire } = await import('module');
+      const require = createRequire(import.meta.url);
+      const mammoth = require('mammoth');
+      const fs = await import('fs');
+
+      const buffer = fs.readFileSync(absolutePath);
+      const result = await mammoth.extractRawText({ buffer });
+      const rawText = result.value;
+
+      console.log(`✅ [Adobe] Raw text extracted from DOCX using mammoth (${rawText.length} characters)`);
+      
+      // Clean watermark content from extracted text
+      const cleanText = cleanWatermarkText(rawText);
+      
+      console.log(`✅ [Adobe] Text cleaned and ready (${cleanText.length} characters)`);
+      return cleanText;
+
+    } catch (err: any) {
+      console.error('❌ [Adobe] DOCX text extraction failed:', err);
+      throw new InternalServerError(`DOCX text extraction failed: ${err.message}`);
+    }
+  }
+
+  /**
    * Extract text from DOCX using Adobe Services v4.1.0
    */
   async extractTextFromDocx(docxPath: string): Promise<string> {
@@ -320,22 +361,10 @@ export class AdobeService {
       console.log(`� [Adobe Extract] Starting text extraction from converted DOCX...`);
       console.log(`🔄 [Adobe] Extracting text from DOCX: ${docxPath}`);
 
-      // Convert relative path to absolute path if needed
-      let absolutePath;
-      if (path.isAbsolute(docxPath)) {
-        absolutePath = docxPath;
-      } else if (docxPath.startsWith('/')) {
-        // Handle web-style relative paths that start with /
-        absolutePath = path.join(process.cwd(), docxPath.substring(1));
-      } else {
-        // Handle regular relative paths
-        absolutePath = path.join(process.cwd(), docxPath);
-      }
+      // Convert relative path to absolute path using utility
+      const absolutePath = resolveToAbsolutePath(docxPath);
 
-      console.log(`📂 [Adobe] Input path: ${docxPath}`);
-      console.log(`📂 [Adobe] Resolved absolute path: ${absolutePath}`);
-
-      if (!fs.existsSync(absolutePath)) {
+      if (!fileExistsAtPath(docxPath)) {
         console.error(`❌ [Adobe] Input file missing: ${absolutePath}`);
         throw new Error(`Input file not found locally: ${absolutePath}`);
       }

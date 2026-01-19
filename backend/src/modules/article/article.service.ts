@@ -214,7 +214,7 @@ export class ArticleService {
       }
 
       // Extract text using Adobe services
-      const extractedText = await adobeService.extractTextFromDocx(article.currentWordUrl);
+      const extractedText = await adobeService.extractTextFromDocxUsingMammoth(article.currentWordUrl);
 
       // Update article with extracted text
       await prisma.article.update({

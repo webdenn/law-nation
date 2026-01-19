@@ -538,7 +538,7 @@ export class ArticleWorkflowService {
         // Extract text from the converted DOCX using Adobe services for better quality
         // First ensure both formats exist
         const { wordPath } = await ensureBothFormats(newPdfUrl);
-        const extractedText = await adobeService.extractTextFromDocx(wordPath);
+        const extractedText = await adobeService.extractTextFromDocxUsingMammoth(wordPath);
         
         // Still extract images from PDF
         const pdfImageContent = await extractPdfContent(newPdfUrl, article.id);
@@ -632,7 +632,7 @@ export class ArticleWorkflowService {
     if (article.currentWordUrl) {
       try {
         console.log(`🔍 [Adobe Extract] Extracting text from edited version: ${article.currentWordUrl}`);
-        extractedText = await adobeService.extractTextFromDocx(article.currentWordUrl);
+        extractedText = await adobeService.extractTextFromDocxUsingMammoth(article.currentWordUrl);
         console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from edited version`);
       } catch (error) {
         console.error('❌ [Adobe Extract] Text extraction failed:', error);
@@ -742,7 +742,7 @@ export class ArticleWorkflowService {
           }
 
           if (fs.existsSync(absoluteScanPath)) {
-            extractedText = await adobeService.extractTextFromDocx(absoluteScanPath);
+            extractedText = await adobeService.extractTextFromDocxUsingMammoth(absoluteScanPath);
             console.log(`✅ [Article Publish] Extracted ${extractedText.length} characters from edited version`);
           } else {
             throw new Error(`DOCX file not found at path: ${absoluteScanPath}`);

@@ -1,99 +1,72 @@
 import path from 'path';
-import fs from 'fs/promises';
+import fs from 'fs';
 
 /**
- * Get the uploads directory path
- * Works consistently across environments (dev, prod, Docker)
+ * Resolve file path to absolute path
+ * Handles web-style paths, relative paths, and absolute paths
  */
-export function getUploadsDir(): string {
-  // Use environment variable if set, otherwise default to uploads
-  const uploadsDir = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
-  return uploadsDir;
-}
-
-/**
- * Resolve a relative path to absolute path from uploads directory
- * @param relativePath - Path relative to uploads directory (e.g., "visual-diffs/file.pdf")
- * @returns Absolute path
- */
-export function resolveUploadPath(relativePath: string): string {
-  const uploadsDir = getUploadsDir();
-  return path.join(uploadsDir, relativePath);
-}
-
-/**
- * Convert absolute path to relative path from uploads directory
- * @param absolutePath - Absolute file path
- * @returns Relative path from uploads directory
- */
-export function getRelativeUploadPath(absolutePath: string): string {
-  const uploadsDir = getUploadsDir();
-  return path.relative(uploadsDir, absolutePath);
-}
-
-/**
- * Generate a stable visual diff file path
- * @param articleId - Article ID
- * @param versionNumber - Version number (optional)
- * @returns Relative path from uploads directory
- */
-export function generateVisualDiffPath(articleId: string, versionNumber?: number): string {
-  const fileName = versionNumber 
-    ? `visual-diff-v${versionNumber}-${articleId}.pdf`
-    : `visual-diff-${articleId}.pdf`;
+export function resolveToAbsolutePath(filePath: string): string {
+  console.log(`🔧 [Path Utils] Resolving: ${filePath}`);
   
-  return `visual-diffs/${fileName}`;
+  // Check if it's a Windows absolute path (C:\... or D:\...)
+  const isWindowsAbsolute = /^[A-Za-z]:\\/.test(filePath);
+  // Check if it's a Unix absolute path (starts with / and has more than just /)
+  const isUnixAbsolute = path.isAbsolute(filePath) && !filePath.startsWith('/uploads') && !filePath.startsWith('/temp') && !filePath.startsWith('/pdfs') && !filePath.startsWith('/words');
+  
+  if (isWindowsAbsolute || isUnixAbsolute) {
+    console.log(`🔧 [Path Utils] Already absolute: ${filePath}`);
+    return filePath;
+  }
+  
+  // Handle web-style paths that start with / (these are NOT absolute paths in our context)
+  if (filePath.startsWith('/')) {
+    const relativePart = filePath.substring(1); // Remove leading /
+    const absolutePath = path.join(process.cwd(), relativePart);
+    console.log(`🔧 [Path Utils] Web-style path: ${filePath} → ${absolutePath}`);
+    return absolutePath;
+  }
+  
+  // Handle regular relative paths
+  const absolutePath = path.join(process.cwd(), filePath);
+  console.log(`🔧 [Path Utils] Relative path: ${filePath} → ${absolutePath}`);
+  return absolutePath;
 }
 
 /**
- * Ensure directory exists
- * @param dirPath - Directory path to create
+ * Check if file exists at the resolved absolute path
  */
-export async function ensureDirectoryExists(dirPath: string): Promise<void> {
-  try {
-    await fs.mkdir(dirPath, { recursive: true });
-  } catch (error: any) {
-    // Ignore error if directory already exists
-    if (error.code !== 'EEXIST') {
-      throw error;
-    }
-  }
+export function fileExistsAtPath(filePath: string): boolean {
+  const absolutePath = resolveToAbsolutePath(filePath);
+  const exists = fs.existsSync(absolutePath);
+  console.log(`🔧 [Path Utils] File exists check: ${absolutePath} → ${exists ? '✅' : '❌'}`);
+  return exists;
 }
 
 /**
- * Check if file exists and is readable
- * @param filePath - File path to check
- * @returns True if file exists and is readable
+ * Convert absolute path to web-style relative path
  */
-export async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    const stats = await fs.stat(filePath);
-    return stats.isFile() && stats.size > 0;
-  } catch {
-    return false;
+export function convertToWebPath(absolutePath: string): string {
+  const workspaceRoot = process.cwd();
+  
+  // If it's already a web-style path, return as-is
+  if (absolutePath.startsWith('/') && (absolutePath.includes('/uploads') || absolutePath.includes('/temp') || absolutePath.includes('/pdfs') || absolutePath.includes('/words'))) {
+    console.log(`🔧 [Path Utils] Already web path: ${absolutePath}`);
+    return absolutePath;
   }
-}
-
-/**
- * Validate file exists and has content
- * @param filePath - File path to validate
- * @throws Error if file is missing, empty, or unreadable
- */
-export async function validateFile(filePath: string): Promise<void> {
-  try {
-    const stats = await fs.stat(filePath);
-    
-    if (!stats.isFile()) {
-      throw new Error(`Path is not a file: ${filePath}`);
-    }
-    
-    if (stats.size === 0) {
-      throw new Error(`File is empty: ${filePath}`);
-    }
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      throw new Error(`File not found: ${filePath}`);
-    }
-    throw error;
+  
+  // If not absolute, convert to web path
+  if (!path.isAbsolute(absolutePath)) {
+    const webPath = '/' + absolutePath.replace(/\\/g, '/');
+    console.log(`🔧 [Path Utils] Converting to web path: ${absolutePath} → ${webPath}`);
+    return webPath;
   }
+  
+  // Convert absolute path to relative path
+  const relativePath = path.relative(workspaceRoot, absolutePath);
+  
+  // Convert Windows backslashes to forward slashes for web URLs
+  const webPath = '/' + relativePath.replace(/\\/g, '/');
+  
+  console.log(`🔧 [Path Utils] Absolute to web path: ${absolutePath} → ${webPath}`);
+  return webPath;
 }

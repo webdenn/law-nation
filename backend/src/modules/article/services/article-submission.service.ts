@@ -91,46 +91,29 @@ export class ArticleSubmissionService {
       console.log(`📄 [Document] Starting Adobe processing for document ${article.id}`);
       this.processDocumentInBackground(article.id, pdfPath).catch(console.error);
     } else {
-      // Existing article processing - now using Adobe text extraction from converted DOCX
-      console.log(`🔍 [Adobe Extract] Starting text extraction from converted DOCX...`);
-      let pdfContent = { text: "", html: "", images: [] as string[] };
+      // ✅ REMOVED: Text extraction moved to admin publish time
+      console.log(`📝 [Submission] Text extraction will be done when admin publishes the article`);
+      
+      // Still extract images from PDF for thumbnail purposes
       try {
-        // Extract text from the converted DOCX using Adobe services for better quality
-        const extractedText = await adobeService.extractTextFromDocx(wordPath);
-        
-        // Still extract images from PDF
         const pdfImageContent = await extractPdfContent(pdfPath, article.id);
+        const allImageUrls = [
+          ...(data.imageUrls || []),
+          ...(pdfImageContent.images || []),
+        ];
+
+        await prisma.article.update({
+          where: { id: article.id },
+          data: {
+            imageUrls: allImageUrls,
+          },
+        });
         
-        pdfContent = {
-          text: extractedText,
-          html: extractedText.replace(/\n/g, '<br>'), // Simple HTML conversion
-          images: pdfImageContent.images || []
-        };
-        
-        console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from DOCX`);
+        console.log(`🖼️ [Submission] Extracted ${pdfImageContent.images?.length || 0} images from PDF`);
       } catch (error) {
-        console.error("Failed to extract content using Adobe:", error);
-        // Fallback to old method
-        try {
-          pdfContent = await extractPdfContent(pdfPath, article.id);
-        } catch (fallbackError) {
-          console.error("Fallback extraction also failed:", fallbackError);
-        }
+        console.error("Failed to extract images from PDF:", error);
+        // Continue without images - not critical for submission
       }
-
-      const allImageUrls = [
-        ...(data.imageUrls || []),
-        ...(pdfContent.images || []),
-      ];
-
-      await prisma.article.update({
-        where: { id: article.id },
-        data: {
-          content: pdfContent.text || null,
-          contentHtml: pdfContent.html || null,
-          imageUrls: allImageUrls,
-        },
-      });
     }
 
     await sendArticleSubmissionConfirmation(
@@ -256,44 +239,29 @@ export class ArticleSubmissionService {
       },
     });
 
-    let pdfContent = { text: "", html: "", images: [] as string[] };
+    // ✅ REMOVED: Text extraction moved to admin publish time
+    console.log(`📝 [Token Verification] Text extraction will be done when admin publishes the article`);
+    
+    // Still extract images from PDF for thumbnail purposes
     try {
-      // Extract text from the converted DOCX using Adobe services for better quality
-      const extractedText = await adobeService.extractTextFromDocx(wordPath);
-      
-      // Still extract images from PDF
       const pdfImageContent = await extractPdfContent(pdfPath, article.id);
+      const allImageUrls = [
+        ...(metadata.imageUrls || []),
+        ...(pdfImageContent.images || []),
+      ];
+
+      await prisma.article.update({
+        where: { id: article.id },
+        data: {
+          imageUrls: allImageUrls,
+        },
+      });
       
-      pdfContent = {
-        text: extractedText,
-        html: extractedText.replace(/\n/g, '<br>'), // Simple HTML conversion
-        images: pdfImageContent.images || []
-      };
-      
-      console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from DOCX`);
+      console.log(`🖼️ [Token Verification] Extracted ${pdfImageContent.images?.length || 0} images from PDF`);
     } catch (error) {
-      console.error("Failed to extract content using Adobe:", error);
-      // Fallback to old method
-      try {
-        pdfContent = await extractPdfContent(pdfPath, article.id);
-      } catch (fallbackError) {
-        console.error("Fallback extraction also failed:", fallbackError);
-      }
+      console.error("Failed to extract images from PDF:", error);
+      // Continue without images - not critical
     }
-
-    const allImageUrls = [
-      ...(metadata.imageUrls || []),
-      ...(pdfContent.images || []),
-    ];
-
-    await prisma.article.update({
-      where: { id: article.id },
-      data: {
-        content: pdfContent.text || null,
-        contentHtml: pdfContent.html || null,
-        imageUrls: allImageUrls,
-      },
-    });
 
     await VerificationService.markAsVerified(token);
     await VerificationService.deleteVerification(token);
@@ -390,44 +358,29 @@ export class ArticleSubmissionService {
       },
     });
 
-    let pdfContent = { text: "", html: "", images: [] as string[] };
+    // ✅ REMOVED: Text extraction moved to admin publish time
+    console.log(`📝 [Code Verification] Text extraction will be done when admin publishes the article`);
+    
+    // Still extract images from PDF for thumbnail purposes
     try {
-      // Extract text from the converted DOCX using Adobe services for better quality
-      const extractedText = await adobeService.extractTextFromDocx(wordPath);
-      
-      // Still extract images from PDF
       const pdfImageContent = await extractPdfContent(pdfPath, article.id);
+      const allImageUrls = [
+        ...(metadata.imageUrls || []),
+        ...(pdfImageContent.images || []),
+      ];
+
+      await prisma.article.update({
+        where: { id: article.id },
+        data: {
+          imageUrls: allImageUrls,
+        },
+      });
       
-      pdfContent = {
-        text: extractedText,
-        html: extractedText.replace(/\n/g, '<br>'), // Simple HTML conversion
-        images: pdfImageContent.images || []
-      };
-      
-      console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from DOCX`);
+      console.log(`🖼️ [Code Verification] Extracted ${pdfImageContent.images?.length || 0} images from PDF`);
     } catch (error) {
-      console.error("Failed to extract content using Adobe:", error);
-      // Fallback to old method
-      try {
-        pdfContent = await extractPdfContent(pdfPath, article.id);
-      } catch (fallbackError) {
-        console.error("Fallback extraction also failed:", fallbackError);
-      }
+      console.error("Failed to extract images from PDF:", error);
+      // Continue without images - not critical
     }
-
-    const allImageUrls = [
-      ...(metadata.imageUrls || []),
-      ...(pdfContent.images || []),
-    ];
-
-    await prisma.article.update({
-      where: { id: article.id },
-      data: {
-        content: pdfContent.text || null,
-        contentHtml: pdfContent.html || null,
-        imageUrls: allImageUrls,
-      },
-    });
 
     await VerificationService.markAsVerifiedByCode(email, code);
     await VerificationService.deleteVerificationByCode(email, code);

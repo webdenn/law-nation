@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { AdobeService } from '@/services/adobe.service.js';
+import { convertToWebPath } from '@/utils/file-path.utils.js';
 
 // Create require for CommonJS modules in ES module context
 // No longer needed as we're using Adobe services
@@ -186,7 +187,7 @@ export async function convertWordToPdf(
     if (tempWordPath) await fs.unlink(tempWordPath).catch(() => {});
     
     // Convert absolute path to relative web path before returning
-    return convertToRelativePath(pdfAbsolutePath);
+    return convertToWebPath(pdfAbsolutePath);
   } catch (error) {
     // Clean up temp files on error
     if (tempWordPath) await fs.unlink(tempWordPath).catch(() => {});
@@ -252,7 +253,7 @@ export async function convertPdfToWord(
       if (tempPdfPath) await fs.unlink(tempPdfPath).catch(() => {});
       
       // Convert absolute path to relative web path before returning
-      return convertToRelativePath(watermarkedAbsolutePath);
+      return convertToWebPath(watermarkedAbsolutePath);
     } catch (watermarkError) {
       console.warn(`⚠️ [Adobe] Failed to add watermark to DOCX file:`, watermarkError);
       
@@ -260,7 +261,7 @@ export async function convertPdfToWord(
       if (tempPdfPath) await fs.unlink(tempPdfPath).catch(() => {});
       
       // Return non-watermarked version if watermarking fails
-      return convertToRelativePath(docxAbsolutePath);
+      return convertToWebPath(docxAbsolutePath);
     }
   } catch (error) {
     // Clean up temp files on error
