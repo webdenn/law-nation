@@ -14,10 +14,23 @@ model User {
   phone                     String?
   passwordHash              String
   isActive                  Boolean                 @default(true)
+  
+  // NEW FIELDS FOR EDITORS/REVIEWERS
+  userType                  UserType                @default(USER) // ADMIN, EDITOR, REVIEWER, USER
+  title                     String?                 // "B.Com (Hons.), FCA"
+  designation               String?                 // "Chartered Accountant"
+  specialization            String[]                @default([]) // Editor specializations
+  expertise                 String[]                @default([]) // Reviewer expertise areas
+  qualification             String?                 // Educational background
+  experience                Int?                    // Years of experience
+  bio                       String?                 // Professional background
+  
   createdAt                 DateTime                @default(now())
   updatedAt                 DateTime                @updatedAt
   version                   Int                     @default(1)
-  assignedArticles          Article[]
+  
+  // EXISTING RELATIONS
+  assignedArticles          Article[]               @relation("AssignedEditor")
   auditLogs                 AuditLog[]
   refreshTokens             RefreshToken[]
   roles                     UserRole[]
@@ -25,6 +38,9 @@ model User {
   notifications             Notification[]
   editorHistory             ArticleEditorHistory[]  @relation("EditorHistory")
   assignedEditorHistory     ArticleEditorHistory[]  @relation("AssignedByHistory")
+  
+  // NEW RELATIONS FOR REVIEWERS
+  reviewedArticles          Article[]               @relation("AssignedReviewer")
 }
 
 /// ---------- roles ----------
@@ -126,6 +142,10 @@ model Article {
   currentPdfUrl      String
   status             ArticleStatus           @default(PENDING_ADMIN_REVIEW)
   assignedEditorId   String?
+  
+  // NEW REVIEWER RELATION
+  assignedReviewerId String?
+  
   editorApprovedAt   DateTime?
   submittedAt        DateTime                @default(now())
   reviewedAt         DateTime?
@@ -149,7 +169,11 @@ model Article {
   finalPdfUrl        String?                 // Final PDF with watermark
   extractedText      String?                 // Text extracted for website
   
-  assignedEditor     User?                   @relation(fields: [assignedEditorId], references: [id])
+  assignedEditor     User?                   @relation("AssignedEditor", fields: [assignedEditorId], references: [id])
+  
+  // NEW REVIEWER RELATION
+  assignedReviewer   User?                   @relation("AssignedReviewer", fields: [assignedReviewerId], references: [id])
+  
   revisions          ArticleRevision[]
   changeLogs         ArticleChangeLog[]
   notifications      Notification[]
@@ -157,6 +181,7 @@ model Article {
 
   @@index([status])
   @@index([assignedEditorId])
+  @@index([assignedReviewerId])
   @@index([authorEmail])
   @@index([secondAuthorEmail])
   @@index([slug])
@@ -268,11 +293,23 @@ model ArticleEditorHistory {
   @@index([assignedAt])
 }
 
+/// ---------- User Type Enum ----------
+enum UserType {
+  ADMIN
+  EDITOR
+  REVIEWER
+  USER
+}
+
 enum ArticleStatus {
   PENDING_ADMIN_REVIEW
   ASSIGNED_TO_EDITOR
   EDITOR_EDITING
+  EDITOR_IN_PROGRESS
   EDITOR_APPROVED
+  ASSIGNED_TO_REVIEWER
+  REVIEWER_IN_PROGRESS
+  REVIEWER_APPROVED
   PENDING_APPROVAL
   APPROVED
   REJECTED
@@ -305,4 +342,32 @@ model SystemSettings {
   value           Json     // Stores structured data
   updatedAt       DateTime @updatedAt
   updatedBy       String?
+}
+
+/// ---------- Audit Events ----------
+model AuditEvent {
+  id                    String   @id @default(cuid())
+  eventType             String   // USER_UPLOAD, EDITOR_ASSIGN, etc.
+  eventDate             String   // "2026-01-21"
+  eventTime             String   // "09:30:15"
+  eventYear             Int      // 2026
+  userId                String
+  userName              String
+  userEmail             String
+  userOrganization      String
+  articleId             String
+  articleTitle          String
+  articleCategory       String
+  articleAuthor         String
+  targetEditorId        String?
+  targetEditorName      String?
+  previousEditorId      String?
+  previousEditorName    String?
+  decisionOutcome       String?  // PUBLISHED, REJECTED
+  editingDuration       String?  // "2 days, 5 hours, 15 minutes"
+  createdAt             DateTime @default(now())
+
+  @@index([articleId, eventDate, eventTime])
+  @@index([userId, eventDate, eventTime])
+  @@index([eventType, eventDate, eventTime])
 }

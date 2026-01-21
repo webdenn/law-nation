@@ -48,8 +48,8 @@ export function fileExistsAtPath(filePath: string): boolean {
 export function convertToWebPath(absolutePath: string): string {
   const workspaceRoot = process.cwd();
   
-  // If it's already a web-style path, return as-is
-  if (absolutePath.startsWith('/') && (absolutePath.includes('/uploads') || absolutePath.includes('/temp') || absolutePath.includes('/pdfs') || absolutePath.includes('/words'))) {
+  // If it's already a web-style path (starts with /uploads, /temp, etc.), return as-is
+  if (absolutePath.startsWith('/uploads') || absolutePath.startsWith('/temp') || absolutePath.startsWith('/pdfs') || absolutePath.startsWith('/words')) {
     console.log(`🔧 [Path Utils] Already web path: ${absolutePath}`);
     return absolutePath;
   }
