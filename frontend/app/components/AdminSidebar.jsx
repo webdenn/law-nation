@@ -17,6 +17,7 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
 
     const menuItems = [
         { name: "Dashboard", path: "/admin" },
+        { name: "Our People", path: "/admin/our-people" },
         { name: "Add New Editor", path: "/admin/add-editor" },
         { name: "Banner Management", path: "/admin/banners" },
         { name: "Site Settings", path: "/admin/settings" },
