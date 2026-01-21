@@ -43,8 +43,7 @@ router.get('/admins/:adminId/decisions', auditController.getAdminDecisions);
  * @desc Get all audit events with filtering and pagination
  * @access Admin only
  */
-router.get('/events', 
-  requirePermission('audit', 'read'), 
+router.get('/events',
   auditController.getAllAuditEvents
 );
 

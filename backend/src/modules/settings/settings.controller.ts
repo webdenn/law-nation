@@ -48,7 +48,7 @@ export const getOurPeopleSettings = async (req: Request, res: Response) => {
 
 export const updateOurPeopleSettings = async (req: AuthRequest, res: Response) => {
     try {
-        const { teamMembers } = req.body;
+        const { teamMembers, editors, reviewers } = req.body;
 
         // Validate authentication
         if (!req.user) {
@@ -57,6 +57,8 @@ export const updateOurPeopleSettings = async (req: AuthRequest, res: Response) =
 
         const value = {
             teamMembers: Array.isArray(teamMembers) ? teamMembers : [],
+            editors: Array.isArray(editors) ? editors : [],
+            reviewers: Array.isArray(reviewers) ? reviewers : [],
         };
 
         const updated = await settingsService.updateSettings("our_people_content", value, req.user.id);

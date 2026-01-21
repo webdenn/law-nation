@@ -54,6 +54,7 @@ export default function Footer() {
               <Scale size={28} />
               <span>LAW<span className="text-slate-900">NATION</span></span>
             </Link>
+            <h1>LAWNATION – LAW NATION PRIME TIMES JOURNAL</h1>
 
             <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
               {footerContent.aboutText}
@@ -121,7 +122,7 @@ export default function Footer() {
             </div>
           </div>
 
-          <div className="md:text-right">
+          {/* <div className="md:text-right">
             <h3 className="text-slate-900 font-bold text-lg mb-6 md:pr-2">Connect With Us</h3>
             <div className="flex md:justify-end gap-3 mb-6">
               {[Linkedin, Twitter, Instagram, Facebook].map((Icon, idx) => (
@@ -131,7 +132,7 @@ export default function Footer() {
               ))}
             </div>
 
-          </div>
+          </div> */}
         </div>
 
         {/* --- Legal Keywords SEO Tag Cloud --- */}

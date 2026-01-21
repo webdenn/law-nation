@@ -5,8 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Linkedin, Twitter, Mail, Award, Globe } from "lucide-react";
 
-
-
 interface Member {
     id: number;
     name: string;
@@ -53,6 +51,7 @@ const TeamCard = ({ member }: { member: Member }) => (
 
 export default function OurTeamPage() {
     const [teamMembers, setTeamMembers] = React.useState<Member[]>([]);
+    const [reviewers, setReviewers] = React.useState<Member[]>([]);
     const [loading, setLoading] = React.useState(true);
     const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000";
 
@@ -64,8 +63,9 @@ export default function OurTeamPage() {
         try {
             const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/settings/our-people`);
             const data = await res.json();
-            if (data.success && data.settings && data.settings.teamMembers) {
-                setTeamMembers(data.settings.teamMembers);
+            if (data.success && data.settings) {
+                setTeamMembers(Array.isArray(data.settings.teamMembers) ? data.settings.teamMembers : []);
+                setReviewers(Array.isArray(data.settings.reviewers) ? data.settings.reviewers : []);
             }
         } catch (error) {
             console.error("Failed to load team:", error);
@@ -94,13 +94,11 @@ export default function OurTeamPage() {
                 </p>
             </section>
 
-            {/* Team Grid */}
-            <section className="max-w-7xl mx-auto px-6">
+            {/* Team Members */}
+            <section className="max-w-7xl mx-auto px-6 mb-24">
                 {loading ? (
                     <div className="text-center py-20 text-gray-500">Loading team members...</div>
-                ) : teamMembers.length === 0 ? (
-                    <div className="text-center py-20 text-gray-500">No team members listed yet.</div>
-                ) : (
+                ) : teamMembers.length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {teamMembers.map((member) => (
                             <TeamCard key={member.id} member={member} />
@@ -108,6 +106,21 @@ export default function OurTeamPage() {
                     </div>
                 )}
             </section>
+
+            {/* Reviewers Section */}
+            {!loading && reviewers.length > 0 && (
+                <section className="max-w-7xl mx-auto px-6 mb-24">
+                    <div className="text-center mb-12">
+                        <h2 className="text-3xl font-bold text-slate-900 mb-3">Our Reviewers</h2>
+                        <div className="w-16 h-1 bg-red-600 mx-auto rounded-full"></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {reviewers.map((member) => (
+                            <TeamCard key={member.id} member={member} />
+                        ))}
+                    </div>
+                </section>
+            )}
 
             {/* Call to Action: Join Us */}
             <section className="max-w-5xl mx-auto px-6 mt-32">

@@ -16,6 +16,9 @@ import type {
   AssignEditorData,
   UploadCorrectedPdfData,
 } from "./types/article-submission.type.js";
+import { AuditService } from "../audit/services/audit.service.js";
+
+const auditService = new AuditService();
 
 
 function getStringParam(param: string | string[] | undefined, paramName: string): string {
@@ -69,6 +72,17 @@ export class ArticleController {
         });
       } else {
         // Logged-in user - article created directly
+        // AUDIT: Record user upload
+        if (req.user) {
+          const userProfile: any = req.user;
+          await auditService.recordUserUpload(userProfile, {
+            id: result.article.id,
+            title: result.article.title,
+            category: result.article.category,
+            author: result.article.authorName
+          });
+        }
+
         res.status(201).json({
           message: result.message,
           article: result.article,
@@ -156,8 +170,30 @@ export class ArticleController {
 
       const result = await articleService.assignEditor(articleId, validatedData, adminId);
 
+      // AUDIT: Record assignment or reassignment
+      if (req.user) {
+        const userProfile: any = req.user;
+        const articleInfo = {
+          id: result.article.id,
+          title: result.article.title,
+          category: result.article.category,
+          author: result.article.authorName
+        };
+
+        if (result.isReassignment && result.oldEditor) {
+          // Construct EditorInfo manually to avoid type issues with optional fields
+          const oldEditorInfo = {
+            id: result.oldEditor.id!, // Assert non-null as implied by isReassignment logic
+            name: result.oldEditor.name!
+          };
+          await auditService.recordEditorReassignment(userProfile, articleInfo, oldEditorInfo, result.newEditor);
+        } else {
+          await auditService.recordEditorAssignment(userProfile, articleInfo, result.newEditor);
+        }
+      }
+
       res.json({
-        message: result.isReassignment 
+        message: result.isReassignment
           ? `Editor reassigned successfully from ${result.oldEditor?.name} to ${result.newEditor.name}`
           : `Editor ${result.newEditor.name} assigned successfully`,
         article: result.article,
@@ -192,10 +228,10 @@ export class ArticleController {
 
   async getPublishedArticles(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      
+
       const filters: ArticleListFilters = {
-        ...req.query,       
-        status: "PUBLISHED" 
+        ...req.query,
+        status: "PUBLISHED"
       };
 
       const result = await articleService.listArticles(filters);
@@ -227,7 +263,20 @@ export class ArticleController {
         editorDocumentType: req.body.editorDocumentType,    // ✅ Pass editor document type from middleware
       };
 
-      const article = await articleService.uploadCorrectedPdf(articleId, editorId, data);
+      const result = await articleService.uploadCorrectedPdf(articleId, editorId, data);
+      const article = result.article;
+
+      // AUDIT: Record editor upload
+      if (req.user) {
+        // Cast to any to bypass strict type check for now - ensuring audit works
+        const userProfile: any = req.user;
+        await auditService.recordEditorUpload(userProfile, {
+          id: article.id,
+          title: article.title,
+          category: article.category,
+          author: article.authorName
+        }, "N/A");
+      }
 
       res.json({
         message: "Corrected PDF uploaded successfully. Article pending approval.",
@@ -257,9 +306,9 @@ export class ArticleController {
 
       const article = await articleService.getArticlePreview(articleId);
 
-      res.json({ 
+      res.json({
         article,
-        message: "Login to read full article and download PDF" 
+        message: "Login to read full article and download PDF"
       });
     } catch (error) {
       next(error);
@@ -305,7 +354,7 @@ export class ArticleController {
       const content = await articleService.getArticleContent(article.id, isAuthenticated);
 
       res.json({
-        message: isAuthenticated 
+        message: isAuthenticated
           ? "Article content retrieved successfully"
           : "Preview mode: Login to read the full article",
         article: content,
@@ -322,12 +371,12 @@ export class ArticleController {
       const articleId = getStringParam(req.params.id, "Article ID");
 
       const userName = req.user?.name || 'Guest User';
-      
+
       console.log(`📥 [Download] User "${userName}" requesting PDF for article ${articleId}`);
 
       // Get article PDF info
       const article = await articleService.getArticlePdfUrl(articleId);
-      
+
       console.log(`📄 [Download] Article: "${article.title}"`);
       console.log(`📂 [Download] PDF path: ${article.currentPdfUrl}`);
 
@@ -345,13 +394,13 @@ export class ArticleController {
 
       // Send watermarked PDF
       const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', watermarkedPdf.length.toString());
-      
+
       console.log(`✅ [Download] Sending watermarked PDF (${watermarkedPdf.length} bytes)`);
-      
+
       res.send(watermarkedPdf);
     } catch (error) {
       console.error('❌ [Download] Failed:', error);
@@ -365,12 +414,12 @@ export class ArticleController {
       const articleId = getStringParam(req.params.id, "Article ID");
 
       const userName = req.user?.name || 'User';
-      
+
       console.log(`📥 [Download] User "${userName}" requesting Word for article ${articleId}`);
 
       // Get article Word info
       const article = await articleService.getArticleWordUrl(articleId);
-      
+
       console.log(`📄 [Download] Article: "${article.title}"`);
       console.log(`📂 [Download] Word path: ${article.currentWordUrl}`);
 
@@ -388,13 +437,13 @@ export class ArticleController {
 
       // Send watermarked Word file
       const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}.docx`;
-      
+
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', watermarkedWord.length.toString());
-      
+
       console.log(`✅ [Download] Sending watermarked Word file (${watermarkedWord.length} bytes)`);
-      
+
       res.send(watermarkedWord);
     } catch (error) {
       console.error('❌ [Download] Failed:', error);
@@ -406,7 +455,7 @@ export class ArticleController {
   async downloadOriginalDocx(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = getStringParam(req.params.id, "Article ID");
-      
+
       if (!req.user?.id) {
         throw new BadRequestError("Authentication required");
       }
@@ -414,17 +463,17 @@ export class ArticleController {
       console.log(`📥 [Download Original DOCX] User ${req.user.id} requesting original DOCX for article ${articleId}`);
 
       const originalDocxUrl = await articleService.getOriginalDocxUrl(articleId);
-      
+
       if (!originalDocxUrl) {
         throw new BadRequestError("Original DOCX not available for this article");
       }
 
       // Get user info for watermarking
       const userName = req.user.name || 'User';
-      
+
       // Get article info
       const article = await articleService.getArticleById(articleId);
-      
+
       console.log(`📄 [Download Original DOCX] Processing original DOCX: ${originalDocxUrl}`);
 
       // Add watermark to original DOCX
@@ -441,13 +490,24 @@ export class ArticleController {
 
       // Send watermarked DOCX file
       const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}_original.docx`;
-      
+
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', watermarkedDocx.length.toString());
-      
+
       console.log(`✅ [Download Original DOCX] Sending watermarked original DOCX file (${watermarkedDocx.length} bytes)`);
-      
+
+      // AUDIT: Record editor download of original file
+      if (req.user && (req.user.roles?.some((r: any) => r.name === 'editor' || r.name === 'admin'))) {
+        const userProfile: any = req.user;
+        await auditService.recordEditorDownload(userProfile, {
+          id: article.id,
+          title: article.title,
+          category: article.category,
+          author: article.authorName
+        });
+      }
+
       res.send(watermarkedDocx);
     } catch (error) {
       console.error('❌ [Download Original DOCX] Failed:', error);
@@ -459,7 +519,7 @@ export class ArticleController {
   async downloadEditorDocx(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = getStringParam(req.params.id, "Article ID");
-      
+
       if (!req.user?.id) {
         throw new BadRequestError("Authentication required");
       }
@@ -467,17 +527,17 @@ export class ArticleController {
       console.log(`📥 [Download Editor DOCX] User ${req.user.id} requesting editor's DOCX for article ${articleId}`);
 
       const editorDocxUrl = await articleService.getEditorDocxUrl(articleId);
-      
+
       if (!editorDocxUrl) {
         throw new BadRequestError("Editor's DOCX not available for this article");
       }
 
       // Get user info for watermarking
       const userName = req.user.name || 'Admin';
-      
+
       // Get article info
       const article = await articleService.getArticleById(articleId);
-      
+
       console.log(`📄 [Download Editor DOCX] Processing editor's DOCX: ${editorDocxUrl}`);
 
       // Add watermark to editor's DOCX
@@ -494,13 +554,24 @@ export class ArticleController {
 
       // Send watermarked DOCX file
       const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}_editor_corrected.docx`;
-      
+
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', watermarkedDocx.length.toString());
-      
+
       console.log(`✅ [Download Editor DOCX] Sending watermarked editor's DOCX file (${watermarkedDocx.length} bytes)`);
-      
+
+      // AUDIT: Record editor download
+      if (req.user) {
+        const userProfile: any = req.user;
+        await auditService.recordEditorDownload(userProfile, {
+          id: article.id,
+          title: article.title,
+          category: article.category,
+          author: article.authorName
+        });
+      }
+
       res.send(watermarkedDocx);
     } catch (error) {
       console.error('❌ [Download Editor DOCX] Failed:', error);
@@ -569,11 +640,11 @@ export class ArticleController {
   // Search articles (public endpoint with enhanced filters)
   async searchArticles(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { 
-        q, 
-        category, 
-        author, 
-        organization, 
+      const {
+        q,
+        category,
+        author,
+        organization,
         keyword,
         dateFrom,
         dateTo,
@@ -581,8 +652,8 @@ export class ArticleController {
         sortOrder,
         minScore,
         exclude,
-        page, 
-        limit 
+        page,
+        limit
       } = req.query;
 
       if (!q || typeof q !== "string") {
@@ -654,13 +725,13 @@ export class ArticleController {
   async uploadThumbnail(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = getStringParam(req.params.id, "Article ID");
-      
+
       if (!req.fileMeta?.url) {
         throw new BadRequestError("Image file is required");
       }
-      
+
       const article = await articleService.uploadThumbnail(articleId, req.fileMeta.url);
-      
+
       res.json({
         message: "Thumbnail uploaded successfully",
         article,
@@ -674,14 +745,14 @@ export class ArticleController {
   async uploadImages(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = getStringParam(req.params.id, "Article ID");
-      
+
       if (!req.fileUrls || req.fileUrls.length === 0) {
         throw new BadRequestError("Image files are required");
       }
-      
+
       const imageUrls = req.fileUrls.map(f => f.url);
       const article = await articleService.uploadImages(articleId, imageUrls);
-      
+
       res.json({
         message: `${imageUrls.length} images uploaded successfully`,
         article,
@@ -723,6 +794,17 @@ export class ArticleController {
         message: "Article published successfully",
         article: result.article,
       };
+
+      // AUDIT: Record final decision
+      if (req.user) {
+        const userProfile: any = req.user;
+        await auditService.recordFinalDecision(userProfile, {
+          id: result.article.id,
+          title: result.article.title,
+          category: result.article.category,
+          author: result.article.authorName
+        }, 'PUBLISHED');
+      }
 
       if ('diffSummary' in result) {
         response.diffSummary = result.diffSummary;
@@ -784,7 +866,7 @@ export class ArticleController {
 
       // Validate format
       const downloadFormat = format === 'word' ? 'word' : 'pdf';
-      
+
       const userId = req.user!.id;
       const userName = req.user!.name || 'User';
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
@@ -806,22 +888,22 @@ export class ArticleController {
 
       // Add watermark to diff
       let watermarkedBuffer: Buffer;
-      
+
       if (downloadFormat === 'pdf') {
         // Save buffer to temp file, add watermark, then delete
         const fs = await import('fs/promises');
         const path = await import('path');
         const os = await import('os');
-        
+
         const tempDir = os.tmpdir();
         const tempFilePath = path.join(tempDir, `diff-temp-${Date.now()}.pdf`);
-        
+
         try {
           // Write buffer to temp file
           await fs.writeFile(tempFilePath, result.buffer);
-          
+
           console.log(`💧 [Diff Download] Adding watermark to PDF diff`);
-          
+
           // Add logo watermark
           watermarkedBuffer = await addWatermarkToPdf(
             tempFilePath,
@@ -833,14 +915,14 @@ export class ArticleController {
               frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
             }
           );
-          
+
           // Clean up temp file
           await fs.unlink(tempFilePath);
         } catch (error) {
           // Clean up temp file on error
           try {
             await fs.unlink(tempFilePath);
-          } catch {}
+          } catch { }
           next(error);
           return;
         }
@@ -849,16 +931,16 @@ export class ArticleController {
         const fs = await import('fs/promises');
         const path = await import('path');
         const os = await import('os');
-        
+
         const tempDir = os.tmpdir();
         const tempFilePath = path.join(tempDir, `diff-temp-${Date.now()}.docx`);
-        
+
         try {
           // Write buffer to temp file
           await fs.writeFile(tempFilePath, result.buffer);
-          
+
           console.log(`💧 [Diff Download] Adding watermark to Word diff`);
-          
+
           // Add text watermark
           watermarkedBuffer = await addSimpleWatermarkToWord(
             tempFilePath,
@@ -870,19 +952,19 @@ export class ArticleController {
               frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
             }
           );
-          
+
           // Clean up temp file
           await fs.unlink(tempFilePath);
         } catch (error) {
           // Clean up temp file on error
           try {
             await fs.unlink(tempFilePath);
-          } catch {}
+          } catch { }
           next(error);
           return;
         }
       }
-      
+
       // Set headers for file download
       res.setHeader('Content-Type', result.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
@@ -906,7 +988,7 @@ export class ArticleController {
 
       // Validate format
       const downloadFormat = format === 'word' ? 'word' : 'pdf';
-      
+
       const userId = req.user!.id;
       const userName = req.user!.name || 'User';
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
@@ -928,7 +1010,7 @@ export class ArticleController {
 
       // Add watermark based on format
       let watermarkedBuffer: Buffer;
-      
+
       if (downloadFormat === 'pdf') {
         // Add logo watermark to PDF
         console.log(`💧 [Editor Doc Download] Adding watermark to PDF`);
@@ -1003,12 +1085,12 @@ export class ArticleController {
 
       // Step 1: Get or generate visual diff (service handles all logic)
       let visualDiffUrl: string;
-      
+
       try {
         visualDiffUrl = await articleService.generateVisualDiff(changeLogId);
       } catch (error: any) {
         console.error('❌ [Visual Diff] Generation failed:', error);
-        
+
         // Handle specific error cases
         if (error.message?.includes('generation in progress')) {
           return res.status(202).json({
@@ -1016,14 +1098,14 @@ export class ArticleController {
             status: 'generating'
           });
         }
-        
+
         if (error.message?.includes('only supported for PDF files')) {
           return res.status(400).json({
             message: 'Visual diff is only available for PDF documents.',
             status: 'unsupported'
           });
         }
-        
+
         // Generic error
         return res.status(500).json({
           message: 'Could not generate visual diff. Please try again later.',
@@ -1039,35 +1121,35 @@ export class ArticleController {
       // Step 3: Check if file exists (flexible approach)
       const fs = await import('fs/promises');
       let pdfPath = fullPath;
-      
+
       try {
         // Try to access the visual-diff file
         await fs.access(fullPath);
         console.log(`✅ [Visual Diff] Found visual-diff file: ${visualDiffUrl}`);
       } catch (error: any) {
         console.log(`⚠️ [Visual Diff] Visual-diff file not found, checking for edited PDF...`);
-        
+
         // Visual-diff file doesn't exist, try to serve the edited PDF directly (overlay approach)
         const changeLog = await prisma.articleChangeLog.findUnique({
           where: { id: changeLogId },
-          select: { 
+          select: {
             newFileUrl: true,
             article: {
               select: { currentPdfUrl: true }
             }
           }
         });
-        
+
         if (!changeLog?.newFileUrl && !changeLog?.article?.currentPdfUrl) {
           return res.status(404).json({
             message: 'No PDF available for visual diff.',
             status: 'no_pdf'
           });
         }
-        
+
         // Use the edited PDF from change log or current article PDF
         const editedPdfUrl = changeLog.newFileUrl || changeLog.article.currentPdfUrl;
-        
+
         // If path already starts with /uploads/, remove the leading slash and resolve directly
         if (editedPdfUrl.startsWith('/uploads/')) {
           pdfPath = path.join(process.cwd(), editedPdfUrl.substring(1));
@@ -1076,7 +1158,7 @@ export class ArticleController {
         } else {
           pdfPath = resolveToAbsolutePath(editedPdfUrl);
         }
-        
+
         console.log(`📄 [Visual Diff] Using edited PDF: ${editedPdfUrl}`);
       }
 
@@ -1095,7 +1177,7 @@ export class ArticleController {
         res.send(pdfBuffer);
       } catch (error: any) {
         console.error(`❌ [Visual Diff] Failed to read file: ${error.message}`);
-        
+
         return res.status(500).json({
           message: 'Failed to read visual diff file.',
           status: 'read_error'

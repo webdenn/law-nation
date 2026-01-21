@@ -1,5 +1,5 @@
 import { prisma } from "@/db/db.js";
-import type { 
+import type {
   AuditEvent,
   AuditEventType,
   UserProfile,
@@ -23,7 +23,7 @@ export class AuditService {
       const now = new Date();
       const eventDate = now.toISOString().split('T')[0] || now.getFullYear() + '-01-01';
       const eventTime = now.toTimeString().split(' ')[0] || '00:00:00';
-      
+
       await prisma.auditEvent.create({
         data: {
           eventType: 'USER_UPLOAD',
@@ -31,13 +31,13 @@ export class AuditService {
           eventTime,
           eventYear: now.getFullYear(),
           userId: userProfile.id,
-          userName: userProfile.name,
-          userEmail: userProfile.email,
-          userOrganization: userProfile.organization,
+          userName: userProfile.name || 'Unknown User',
+          userEmail: userProfile.email || 'N/A',
+          userOrganization: userProfile.organization || 'N/A',
           articleId: articleInfo.id,
           articleTitle: articleInfo.title,
-          articleCategory: articleInfo.category,
-          articleAuthor: articleInfo.author
+          articleCategory: articleInfo.category || 'General',
+          articleAuthor: articleInfo.author || 'Unknown'
         }
       });
 
@@ -45,7 +45,6 @@ export class AuditService {
 
     } catch (error: any) {
       console.error(`❌ [Audit] Failed to record user upload:`, error);
-      // Don't throw - audit failures shouldn't break main functionality
     }
   }
 
@@ -53,15 +52,15 @@ export class AuditService {
    * Record admin editor assignment
    */
   async recordEditorAssignment(
-    adminProfile: UserProfile, 
-    articleInfo: ArticleInfo, 
+    adminProfile: UserProfile,
+    articleInfo: ArticleInfo,
     editorInfo: EditorInfo
   ): Promise<void> {
     try {
       const now = new Date();
       const eventDate = now.toISOString().split('T')[0] || now.getFullYear() + '-01-01';
       const eventTime = now.toTimeString().split(' ')[0] || '00:00:00';
-      
+
       await prisma.auditEvent.create({
         data: {
           eventType: 'EDITOR_ASSIGN',
@@ -69,15 +68,15 @@ export class AuditService {
           eventTime,
           eventYear: now.getFullYear(),
           userId: adminProfile.id,
-          userName: adminProfile.name,
-          userEmail: adminProfile.email,
-          userOrganization: adminProfile.organization,
+          userName: adminProfile.name || 'Unknown Admin',
+          userEmail: adminProfile.email || 'N/A',
+          userOrganization: adminProfile.organization || 'N/A',
           articleId: articleInfo.id,
           articleTitle: articleInfo.title,
-          articleCategory: articleInfo.category,
-          articleAuthor: articleInfo.author,
+          articleCategory: articleInfo.category || 'General',
+          articleAuthor: articleInfo.author || 'Unknown',
           targetEditorId: editorInfo.id,
-          targetEditorName: editorInfo.name
+          targetEditorName: editorInfo.name || 'Unknown Editor'
         }
       });
 
@@ -85,7 +84,6 @@ export class AuditService {
 
     } catch (error: any) {
       console.error(`❌ [Audit] Failed to record editor assignment:`, error);
-      // Don't throw - audit failures shouldn't break main functionality
     }
   }
 
@@ -102,7 +100,7 @@ export class AuditService {
       const now = new Date();
       const eventDate = now.toISOString().split('T')[0] || now.getFullYear() + '-01-01';
       const eventTime = now.toTimeString().split(' ')[0] || '00:00:00';
-      
+
       await prisma.auditEvent.create({
         data: {
           eventType: 'EDITOR_REASSIGN',
@@ -110,17 +108,17 @@ export class AuditService {
           eventTime,
           eventYear: now.getFullYear(),
           userId: adminProfile.id,
-          userName: adminProfile.name,
-          userEmail: adminProfile.email,
-          userOrganization: adminProfile.organization,
+          userName: adminProfile.name || 'Unknown Admin',
+          userEmail: adminProfile.email || 'N/A',
+          userOrganization: adminProfile.organization || 'N/A',
           articleId: articleInfo.id,
           articleTitle: articleInfo.title,
-          articleCategory: articleInfo.category,
-          articleAuthor: articleInfo.author,
+          articleCategory: articleInfo.category || 'General',
+          articleAuthor: articleInfo.author || 'Unknown',
           previousEditorId: previousEditor.id,
-          previousEditorName: previousEditor.name,
+          previousEditorName: previousEditor.name || 'Unknown Editor',
           targetEditorId: newEditor.id,
-          targetEditorName: newEditor.name
+          targetEditorName: newEditor.name || 'Unknown Editor'
         }
       });
 
@@ -128,7 +126,6 @@ export class AuditService {
 
     } catch (error: any) {
       console.error(`❌ [Audit] Failed to record editor reassignment:`, error);
-      // Don't throw - audit failures shouldn't break main functionality
     }
   }
 
@@ -140,7 +137,7 @@ export class AuditService {
       const now = new Date();
       const eventDate = now.toISOString().split('T')[0] || now.getFullYear() + '-01-01';
       const eventTime = now.toTimeString().split(' ')[0] || '00:00:00';
-      
+
       await prisma.auditEvent.create({
         data: {
           eventType: 'EDITOR_DOWNLOAD',
@@ -148,13 +145,13 @@ export class AuditService {
           eventTime,
           eventYear: now.getFullYear(),
           userId: editorProfile.id,
-          userName: editorProfile.name,
-          userEmail: editorProfile.email,
-          userOrganization: editorProfile.organization,
+          userName: editorProfile.name || 'Unknown Editor',
+          userEmail: editorProfile.email || 'N/A',
+          userOrganization: editorProfile.organization || 'N/A',
           articleId: articleInfo.id,
           articleTitle: articleInfo.title,
-          articleCategory: articleInfo.category,
-          articleAuthor: articleInfo.author
+          articleCategory: articleInfo.category || 'General',
+          articleAuthor: articleInfo.author || 'Unknown'
         }
       });
 
@@ -162,7 +159,6 @@ export class AuditService {
 
     } catch (error: any) {
       console.error(`❌ [Audit] Failed to record editor download:`, error);
-      // Don't throw - audit failures shouldn't break main functionality
     }
   }
 
@@ -170,15 +166,15 @@ export class AuditService {
    * Record editor document upload with editing duration
    */
   async recordEditorUpload(
-    editorProfile: UserProfile, 
-    articleInfo: ArticleInfo, 
+    editorProfile: UserProfile,
+    articleInfo: ArticleInfo,
     editingDuration: string
   ): Promise<void> {
     try {
       const now = new Date();
       const eventDate = now.toISOString().split('T')[0] || now.getFullYear() + '-01-01';
       const eventTime = now.toTimeString().split(' ')[0] || '00:00:00';
-      
+
       await prisma.auditEvent.create({
         data: {
           eventType: 'EDITOR_UPLOAD',
@@ -186,13 +182,13 @@ export class AuditService {
           eventTime,
           eventYear: now.getFullYear(),
           userId: editorProfile.id,
-          userName: editorProfile.name,
-          userEmail: editorProfile.email,
-          userOrganization: editorProfile.organization,
+          userName: editorProfile.name || 'Unknown Editor',
+          userEmail: editorProfile.email || 'N/A',
+          userOrganization: editorProfile.organization || 'N/A',
           articleId: articleInfo.id,
           articleTitle: articleInfo.title,
-          articleCategory: articleInfo.category,
-          articleAuthor: articleInfo.author,
+          articleCategory: articleInfo.category || 'General',
+          articleAuthor: articleInfo.author || 'Unknown',
           editingDuration: editingDuration
         }
       });
@@ -201,7 +197,6 @@ export class AuditService {
 
     } catch (error: any) {
       console.error(`❌ [Audit] Failed to record editor upload:`, error);
-      // Don't throw - audit failures shouldn't break main functionality
     }
   }
 
@@ -217,7 +212,7 @@ export class AuditService {
       const now = new Date();
       const eventDate = now.toISOString().split('T')[0] || now.getFullYear() + '-01-01';
       const eventTime = now.toTimeString().split(' ')[0] || '00:00:00';
-      
+
       await prisma.auditEvent.create({
         data: {
           eventType: 'FINAL_DECISION',
@@ -225,13 +220,13 @@ export class AuditService {
           eventTime,
           eventYear: now.getFullYear(),
           userId: adminProfile.id,
-          userName: adminProfile.name,
-          userEmail: adminProfile.email,
-          userOrganization: adminProfile.organization,
+          userName: adminProfile.name || 'Unknown Admin',
+          userEmail: adminProfile.email || 'N/A',
+          userOrganization: adminProfile.organization || 'N/A',
           articleId: articleInfo.id,
           articleTitle: articleInfo.title,
-          articleCategory: articleInfo.category,
-          articleAuthor: articleInfo.author,
+          articleCategory: articleInfo.category || 'General',
+          articleAuthor: articleInfo.author || 'Unknown',
           decisionOutcome: outcome
         }
       });
@@ -241,7 +236,6 @@ export class AuditService {
 
     } catch (error: any) {
       console.error(`❌ [Audit] Failed to record final decision:`, error);
-      // Don't throw - audit failures shouldn't break main functionality
     }
   }
 
@@ -510,6 +504,47 @@ export class AuditService {
     } catch (error: any) {
       console.error(`❌ [Audit] Failed to get admin decisions:`, error);
       throw new InternalServerError('Failed to retrieve admin decisions');
+    }
+  }
+
+  /**
+   * Get all audit events with filtering and pagination
+   */
+  async getAllAuditEvents(where: any, limit: number, offset: number): Promise<any[]> {
+    try {
+      console.log(`📋 [Audit] Fetching audit events with filters:`, where);
+
+      const events = await prisma.auditEvent.findMany({
+        where,
+        orderBy: [
+          { eventDate: 'desc' },
+          { eventTime: 'desc' }
+        ],
+        take: limit,
+        skip: offset
+      });
+
+      console.log(`✅ [Audit] Retrieved ${events.length} audit events`);
+      return events;
+
+    } catch (error: any) {
+      console.error(`❌ [Audit] Failed to get audit events:`, error);
+      throw new InternalServerError('Failed to retrieve audit events');
+    }
+  }
+
+  /**
+   * Get total count of audit events for pagination
+   */
+  async getAuditEventsCount(where: any): Promise<number> {
+    try {
+      const count = await prisma.auditEvent.count({ where });
+      console.log(`📊 [Audit] Total audit events count: ${count}`);
+      return count;
+
+    } catch (error: any) {
+      console.error(`❌ [Audit] Failed to get audit events count:`, error);
+      throw new InternalServerError('Failed to get audit events count');
     }
   }
 }
