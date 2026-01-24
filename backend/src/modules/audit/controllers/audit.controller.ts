@@ -37,7 +37,7 @@ export class AuditController {
 
     } catch (error: any) {
       console.error(`❌ [Audit Controller] Failed to get article timeline:`, error);
-      
+
       res.status(500).json({
         success: false,
         message: 'Failed to retrieve article timeline'
@@ -73,7 +73,7 @@ export class AuditController {
 
     } catch (error: any) {
       console.error(`❌ [Audit Controller] Failed to get user history:`, error);
-      
+
       res.status(500).json({
         success: false,
         message: 'Failed to retrieve user history'
@@ -109,7 +109,7 @@ export class AuditController {
 
     } catch (error: any) {
       console.error(`❌ [Audit Controller] Failed to get editor activity:`, error);
-      
+
       res.status(500).json({
         success: false,
         message: 'Failed to retrieve editor activity'
@@ -145,7 +145,7 @@ export class AuditController {
 
     } catch (error: any) {
       console.error(`❌ [Audit Controller] Failed to get admin decisions:`, error);
-      
+
       res.status(500).json({
         success: false,
         message: 'Failed to retrieve admin decisions'
@@ -159,11 +159,11 @@ export class AuditController {
    */
   getAllAuditEvents = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { 
-        page = '1', 
-        limit = '50', 
-        articleId, 
-        userId, 
+      const {
+        page = '1',
+        limit = '50',
+        articleId,
+        userId,
         eventType,
         startDate,
         endDate
@@ -177,26 +177,26 @@ export class AuditController {
 
       // Build where clause for filtering
       const where: any = {};
-      
+
       if (articleId && typeof articleId === 'string') {
         where.articleId = articleId;
       }
-      
+
       if (userId && typeof userId === 'string') {
         where.userId = userId;
       }
-      
+
       if (eventType && typeof eventType === 'string') {
         where.eventType = eventType;
       }
-      
+
       if (startDate && typeof startDate === 'string') {
         where.eventDate = {
           ...where.eventDate,
           gte: startDate
         };
       }
-      
+
       if (endDate && typeof endDate === 'string') {
         where.eventDate = {
           ...where.eventDate,
@@ -237,7 +237,7 @@ export class AuditController {
 
     } catch (error: any) {
       console.error(`❌ [Audit Controller] Failed to get audit events:`, error);
-      
+
       res.status(500).json({
         success: false,
         message: 'Failed to retrieve audit events'

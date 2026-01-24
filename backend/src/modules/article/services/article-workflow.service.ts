@@ -546,13 +546,14 @@ export class ArticleWorkflowService {
     const relativeDocxPath = watermarkedDocxPath.replace(process.cwd(), '').replace(/\\/g, '/').replace(/^\//, '');
 
     // Update article with edited versions
-    await prisma.article.update({
+    const updatedArticle = await prisma.article.update({
       where: { id: article.id },
       data: {
         currentPdfUrl: `/${relativePdfPath}`,
         currentWordUrl: `/${relativeDocxPath}`,
         status: "EDITOR_APPROVED",
       },
+      include: { assignedEditor: true }, // Include editor info usually needed
     });
 
     // Create change log for document
@@ -574,7 +575,7 @@ export class ArticleWorkflowService {
 
     return {
       message: "Document edited successfully using Adobe Services",
-      article: { id: article.id, status: "EDITOR_APPROVED" },
+      article: updatedArticle,
     };
   }
 

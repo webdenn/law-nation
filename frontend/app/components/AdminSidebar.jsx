@@ -15,8 +15,27 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
         window.location.reload();
     };
 
+    const [expandedMenu, setExpandedMenu] = useState(null);
+
+    const toggleSubmenu = (menuName) => {
+        if (expandedMenu === menuName) {
+            setExpandedMenu(null);
+        } else {
+            setExpandedMenu(menuName);
+        }
+    };
+
     const menuItems = [
         { name: "Dashboard", path: "/admin" },
+        { name: "Our People", path: "/admin/our-people" },
+        {
+            name: "Audit History",
+            path: "#",
+            children: [
+                { name: "User Audit", path: "/admin/audit/users" },
+                { name: "Editor Audit", path: "/admin/audit/editors" },
+            ]
+        },
         { name: "Add New Editor", path: "/admin/add-editor" },
         { name: "Banner Management", path: "/admin/banners" },
         { name: "Site Settings", path: "/admin/settings" },
@@ -61,19 +80,62 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
                     </svg>
                 </button>
             </div>
-            <nav className="flex-1 px-4 mt-6 space-y-2">
+            <nav className="flex-1 px-4 mt-6 space-y-2 overflow-y-auto">
                 {menuItems.map((item) => (
-                    <Link
-                        key={item.path}
-                        href={item.path}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={`block w-full text-left p-3 rounded-lg transition-all ${pathname === item.path
-                            ? "bg-red-900 font-bold"
-                            : "hover:bg-red-600 text-red-100"
-                            }`}
-                    >
-                        {item.name}
-                    </Link>
+                    <div key={item.name}>
+                        {item.children ? (
+                            // Dropdown Menu Item
+                            <div>
+                                <button
+                                    onClick={() => toggleSubmenu(item.name)}
+                                    className={`w-full text-left p-3 rounded-lg transition-all flex justify-between items-center ${expandedMenu === item.name || item.children.some(child => pathname === child.path)
+                                        ? "bg-red-800 text-white font-bold"
+                                        : "hover:bg-red-600 text-red-100"
+                                        }`}
+                                >
+                                    {item.name}
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className={`h-4 w-4 transition-transform ${expandedMenu === item.name ? 'rotate-180' : ''}`}
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+                                {expandedMenu === item.name && (
+                                    <div className="pl-4 mt-1 space-y-1">
+                                        {item.children.map((child) => (
+                                            <Link
+                                                key={child.path}
+                                                href={child.path}
+                                                onClick={() => setIsMobileMenuOpen(false)}
+                                                className={`block w-full text-left p-2 rounded-lg transition-all text-sm ${pathname === child.path
+                                                    ? "bg-red-900 text-white font-bold"
+                                                    : "text-red-200 hover:text-white hover:bg-red-600/50"
+                                                    }`}
+                                            >
+                                                {child.name}
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            // Standard Menu Item
+                            <Link
+                                href={item.path}
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className={`block w-full text-left p-3 rounded-lg transition-all ${pathname === item.path
+                                    ? "bg-red-900 font-bold"
+                                    : "hover:bg-red-600 text-red-100"
+                                    }`}
+                            >
+                                {item.name}
+                            </Link>
+                        )}
+                    </div>
                 ))}
             </nav>
             <div className="p-4 border-t border-red-800">

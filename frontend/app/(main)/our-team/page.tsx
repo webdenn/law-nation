@@ -5,65 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { Linkedin, Twitter, Mail, Award, Globe } from "lucide-react";
 
-// Placeholder Team Data
-const TEAM_MEMBERS = [
-    {
-        id: 1,
-        name: "Dr. Rajesh Kumar",
-        role: "Editor-in-Chief",
-        image: "/images/team-placeholder-1.jpg", // Use placeholder or generic avatar if not available
-        bio: "Ph.D. in Constitutional Law with over 20 years of academic experience. Passionate about bridging the gap between legal theory and practice.",
-        specialization: "Constitutional Law, Human Rights"
-    },
-    {
-        id: 2,
-        name: "Sarah Williams",
-        role: "Managing Editor",
-        image: "/images/team-placeholder-2.jpg",
-        bio: "Former corporate attorney turned legal scholar. Oversees the editorial process and ensures the highest standards of peer review.",
-        specialization: "Corporate Law, International Trade"
-    },
-    {
-        id: 3,
-        name: "Amitabh Singh",
-        role: "Senior Legal Advisor",
-        image: "/images/team-placeholder-3.jpg",
-        bio: "Advocate at the Supreme Court of India. Provides strategic guidance on content policy and legal trends.",
-        specialization: "Criminal Litigation, Public Policy"
-    },
-    {
-        id: 4,
-        name: "Priya Sharma",
-        role: "Head of Research",
-        image: "/images/team-placeholder-4.jpg",
-        bio: "Expert in legal research methodologies. Leads our initiative to open-access awareness and digital archiving.",
-        specialization: "Legal Research, Cyber Law"
-    },
-    {
-        id: 5,
-        name: "Michael Chen",
-        role: "Technical Lead",
-        image: "/images/team-placeholder-5.jpg",
-        bio: "Ensures our digital platform remains cutting-edge, accessible, and secure for scholars worldwide.",
-        specialization: "Legal Tech, AI in Law"
-    },
-    {
-        id: 6,
-        name: "Anjali Gupta",
-        role: "Editorial Coordinator",
-        image: "/images/team-placeholder-6.jpg",
-        bio: "Coordinates with authors and reviewers to streamline the publication journey from submission to approval.",
-        specialization: "Academic Publishing"
-    }
-];
-
 interface Member {
     id: number;
     name: string;
     role: string;
-    image: string;
+    image?: string;
     bio: string;
-    specialization: string;
+    specialization?: string;
 }
 
 const TeamCard = ({ member }: { member: Member }) => (
@@ -102,6 +50,30 @@ const TeamCard = ({ member }: { member: Member }) => (
 );
 
 export default function OurTeamPage() {
+    const [teamMembers, setTeamMembers] = React.useState<Member[]>([]);
+    const [reviewers, setReviewers] = React.useState<Member[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000";
+
+    React.useEffect(() => {
+        fetchTeam();
+    }, []);
+
+    const fetchTeam = async () => {
+        try {
+            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/settings/our-people`);
+            const data = await res.json();
+            if (data.success && data.settings) {
+                setTeamMembers(Array.isArray(data.settings.teamMembers) ? data.settings.teamMembers : []);
+                setReviewers(Array.isArray(data.settings.reviewers) ? data.settings.reviewers : []);
+            }
+        } catch (error) {
+            console.error("Failed to load team:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="bg-slate-50 pt-32 pb-20">
             {/* Hero Section */}
@@ -122,14 +94,33 @@ export default function OurTeamPage() {
                 </p>
             </section>
 
-            {/* Team Grid */}
-            <section className="max-w-7xl mx-auto px-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {TEAM_MEMBERS.map((member) => (
-                        <TeamCard key={member.id} member={member} />
-                    ))}
-                </div>
+            {/* Team Members */}
+            <section className="max-w-7xl mx-auto px-6 mb-24">
+                {loading ? (
+                    <div className="text-center py-20 text-gray-500">Loading team members...</div>
+                ) : teamMembers.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {teamMembers.map((member) => (
+                            <TeamCard key={member.id} member={member} />
+                        ))}
+                    </div>
+                )}
             </section>
+
+            {/* Reviewers Section */}
+            {!loading && reviewers.length > 0 && (
+                <section className="max-w-7xl mx-auto px-6 mb-24">
+                    <div className="text-center mb-12">
+                        <h2 className="text-3xl font-bold text-slate-900 mb-3">Our Reviewers</h2>
+                        <div className="w-16 h-1 bg-red-600 mx-auto rounded-full"></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {reviewers.map((member) => (
+                            <TeamCard key={member.id} member={member} />
+                        ))}
+                    </div>
+                </section>
+            )}
 
             {/* Call to Action: Join Us */}
             <section className="max-w-5xl mx-auto px-6 mt-32">

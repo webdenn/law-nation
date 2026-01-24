@@ -256,12 +256,10 @@ export default function HomePage() {
                 Tomorrow&apos;s Research Today
               </p>
               <h1 className="text-3xl sm:text-4xl font-semibold text-gray-900">
-                Share, discover, and evaluate legal scholarship faster
+                Where legal minds meet and discover Contribute and discover legal research faster
               </h1>
               <p className="text-base sm:text-lg text-gray-700 leading-relaxed max-w-4xl">
-                Connect with a global community of scholars and practitioners.
-                Surface preprints, law reviews, and primary sources with
-                librarian-grade search and transparent workflows.
+                Read literary pieces with research and reflective writing which offer perspectives that bridge the gap between theory and practice while encouraging open and informed dialogue amongst readers.
               </p>
               <Link
                 href="/about"
