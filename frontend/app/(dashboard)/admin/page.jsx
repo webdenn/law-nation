@@ -8,7 +8,7 @@ import { diffWords } from 'diff';
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import AdminSidebar from "../../components/AdminSidebar";
-// ✅ Ye poora block copy karke paste karo
+
 const DiffViewer = ({ diffData }) => {
   if (!diffData || !diffData.summary)
     return (
@@ -1223,49 +1223,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
-                {/* <h4 className="font-black text-gray-800 border-b pb-3 mb-6 flex items-center gap-2 text-sm">
-                  <span>📜</span> EDITOR'S CHANGE HISTORY
-                </h4>
-                <div className="space-y-8">
-                  {changeHistory.length === 0 ? (
-                    <div className="text-center py-10 text-gray-400 italic text-sm">
-                      No edits recorded for this article.
-                    </div>
-                  ) : (
-                    changeHistory.map((log) => (
-                      <div
-                        key={log.id}
-                        className="relative pl-6 border-l-2 border-red-200"
-                      >
-                        <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-red-600 border-4 border-white shadow-sm"></div>
-                        <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">
-                          Version {log.versionNumber}
-                        </p>
-                        <p className="text-[10px] text-gray-400 mb-2">
-                          {new Date(log.editedAt).toLocaleString()}
-                        </p>
-                        <div className="bg-red-50 p-3 rounded-lg text-xs italic text-gray-700 border border-red-100 mb-3">
-                          "{log.comments}"
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 mt-2 border-t pt-3">
-                          <button
-                            onClick={() =>
-                              handleDownloadAdminReport(log.id, "diff", "word")
-                            }
-                            className="flex items-center justify-center text-[9px] font-black text-blue-700 bg-blue-50 p-2 rounded hover:bg-blue-600 hover:text-white transition-all border border-blue-200 uppercase"
-                          >
-                            <DownloadIcon /> Diff (Word)
-                          </button>
-                        </div>
-
-                        <DiffViewer diffData={log.diffData} />
-                      </div>
-                    ))
-                  )}
-                </div> */}
-
-                {/* Final Publish Button */}
+                
                 <button
                   onClick={() => overrideAndPublish(selectedArticle.id)}
                   disabled={isPublishing}

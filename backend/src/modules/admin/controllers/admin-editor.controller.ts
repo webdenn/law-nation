@@ -1,10 +1,12 @@
 import type { Request, Response } from "express";
 import { AdminEditorService } from "../services/admin-editor.service.js";
 import type { CreateEditorData, UpdateEditorData } from "../types/admin-editor.type.js";
+import { AuditService } from "../../audit/services/audit.service.js";
 
 const adminEditorService = new AdminEditorService();
 
 export class AdminEditorController {
+  private auditService = new AuditService();
 
   /**
    * GET /api/admin/editors
@@ -253,6 +255,11 @@ export class AdminEditorController {
       }
 
       await adminEditorService.assignArticleToEditor(articleId, id);
+      
+      // 🔥 AUDIT: Record editor assignment
+      // Note: This would need article and editor details from the service
+      // For now, we'll add a placeholder - you should modify the service to return this data
+      console.log(`📝 [Audit] Article ${articleId} assigned to editor ${id}`);
       
       res.status(200).json({
         success: true,
