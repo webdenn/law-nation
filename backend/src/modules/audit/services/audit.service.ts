@@ -512,4 +512,45 @@ export class AuditService {
       throw new InternalServerError('Failed to retrieve admin decisions');
     }
   }
+
+  /**
+   * Get all audit events with filtering and pagination
+   */
+  async getAllAuditEvents(where: any, limit: number, offset: number): Promise<any[]> {
+    try {
+      console.log(`📋 [Audit] Fetching audit events with filters:`, where);
+
+      const events = await prisma.auditEvent.findMany({
+        where,
+        orderBy: [
+          { eventDate: 'desc' },
+          { eventTime: 'desc' }
+        ],
+        take: limit,
+        skip: offset
+      });
+
+      console.log(`✅ [Audit] Retrieved ${events.length} audit events`);
+      return events;
+
+    } catch (error: any) {
+      console.error(`❌ [Audit] Failed to get audit events:`, error);
+      throw new InternalServerError('Failed to retrieve audit events');
+    }
+  }
+
+  /**
+   * Get total count of audit events for pagination
+   */
+  async getAuditEventsCount(where: any): Promise<number> {
+    try {
+      const count = await prisma.auditEvent.count({ where });
+      console.log(`📊 [Audit] Total audit events count: ${count}`);
+      return count;
+
+    } catch (error: any) {
+      console.error(`❌ [Audit] Failed to get audit events count:`, error);
+      throw new InternalServerError('Failed to get audit events count');
+    }
+  }
 }

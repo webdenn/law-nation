@@ -5,6 +5,7 @@ import { BadRequestError } from "@/utils/http-errors.util.js";
 import { addWatermarkToPdf } from "@/utils/pdf-watermark.utils.js";
 import { addSimpleWatermarkToWord } from "@/utils/word-watermark.utils.js";
 import { prisma } from "@/db/db.js";
+import { AuditService } from "../audit/services/audit.service.js";
 import {
   articleSubmissionSchema,
   assignEditorSchema,
@@ -28,6 +29,46 @@ function getStringParam(param: string | string[] | undefined, paramName: string)
   return param;
 }
 export class ArticleController {
+  private auditService = new AuditService();
+
+  // Helper function to calculate editing duration
+  private async calculateEditingDuration(articleId: string, editorId: string): Promise<string> {
+    try {
+      // Find the latest editor assignment for this article and editor
+      const assignment = await prisma.articleEditorHistory.findFirst({
+        where: {
+          articleId,
+          editorId,
+        },
+        orderBy: {
+          assignedAt: 'desc'
+        }
+      });
+
+      if (!assignment) {
+        return "N/A";
+      }
+
+      const assignedAt = assignment.assignedAt;
+      const now = new Date();
+      const diffMs = now.getTime() - assignedAt.getTime();
+      
+      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+      if (days > 0) {
+        return `${days} days, ${hours} hours, ${minutes} minutes`;
+      } else if (hours > 0) {
+        return `${hours} hours, ${minutes} minutes`;
+      } else {
+        return `${minutes} minutes`;
+      }
+    } catch (error) {
+      console.error('Failed to calculate editing duration:', error);
+      return "N/A";
+    }
+  }
   // Article submission (works for both guest and logged-in users)
   async submitArticle(req: AuthRequest, res: Response, next: NextFunction) {
     try {
@@ -49,6 +90,24 @@ export class ArticleController {
       // Pass user ID if logged in (null for guests)
       const userId = req.user?.id;
       const result = await articleService.submitArticle(data, userId);
+
+      // 🔥 AUDIT: Record user upload for logged-in users
+      if (userId && 'article' in result) {
+        await this.auditService.recordUserUpload(
+          {
+            id: req.user!.id,
+            name: req.user!.name || 'User',
+            email: req.user!.email || '',
+            organization: result.article.authorOrganization || 'N/A'
+          },
+          {
+            id: result.article.id,
+            title: result.article.title,
+            category: result.article.category || 'General',
+            author: result.article.authorName
+          }
+        );
+      }
 
       // NEW: Handle document processing if this is a document upload
       if (req.isDocumentUpload && 'article' in result) {
@@ -156,6 +215,51 @@ export class ArticleController {
 
       const result = await articleService.assignEditor(articleId, validatedData, adminId);
 
+      // 🔥 AUDIT: Record editor assignment/reassignment
+      if (result.isReassignment && result.oldEditor) {
+        await this.auditService.recordEditorReassignment(
+          {
+            id: req.user!.id,
+            name: req.user!.name || 'Admin',
+            email: req.user!.email || '',
+            organization: 'N/A' // User model doesn't have organization field
+          },
+          {
+            id: result.article.id,
+            title: result.article.title,
+            category: result.article.category || 'General',
+            author: result.article.authorName
+          },
+          {
+            id: result.oldEditor?.id || 'unknown',
+            name: result.oldEditor?.name || 'Unknown Editor'
+          },
+          {
+            id: result.newEditor.id,
+            name: result.newEditor.name
+          }
+        );
+      } else {
+        await this.auditService.recordEditorAssignment(
+          {
+            id: req.user!.id,
+            name: req.user!.name || 'Admin',
+            email: req.user!.email || '',
+            organization: 'N/A' // User model doesn't have organization field
+          },
+          {
+            id: result.article.id,
+            title: result.article.title,
+            category: result.article.category || 'General',
+            author: result.article.authorName
+          },
+          {
+            id: result.newEditor.id,
+            name: result.newEditor.name
+          }
+        );
+      }
+
       res.json({
         message: result.isReassignment 
           ? `Editor reassigned successfully from ${result.oldEditor?.name} to ${result.newEditor.name}`
@@ -228,6 +332,32 @@ export class ArticleController {
       };
 
       const article = await articleService.uploadCorrectedPdf(articleId, editorId, data);
+
+      // 🔥 AUDIT: Record editor upload with editing duration
+      const editingDuration = await this.calculateEditingDuration(articleId, editorId);
+      
+      // Get full article data for audit (since uploadCorrectedPdf might return limited data)
+      try {
+        const fullArticle = await articleService.getArticleById(articleId);
+        await this.auditService.recordEditorUpload(
+          {
+            id: req.user!.id,
+            name: req.user!.name || 'Editor',
+            email: req.user!.email || '',
+            organization: 'N/A' // User model doesn't have organization field
+          },
+          {
+            id: articleId,
+            title: fullArticle.title,
+            category: fullArticle.category || 'General',
+            author: fullArticle.authorName
+          },
+          editingDuration
+        );
+      } catch (auditError) {
+        console.error('Failed to record audit event:', auditError);
+        // Continue with response even if audit fails
+      }
 
       res.json({
         message: "Corrected PDF uploaded successfully. Article pending approval.",
@@ -328,6 +458,22 @@ export class ArticleController {
       // Get article PDF info
       const article = await articleService.getArticlePdfUrl(articleId);
       
+      // 🔥 AUDIT: Record editor download
+      await this.auditService.recordEditorDownload(
+        {
+          id: req.user!.id,
+          name: req.user!.name || 'User',
+          email: req.user!.email || '',
+          organization: 'N/A' // User model doesn't have organization field
+        },
+        {
+          id: articleId,
+          title: article.title,
+          category: 'General', // PDF info doesn't have category
+          author: 'Unknown' // PDF info doesn't have author
+        }
+      );
+      
       console.log(`📄 [Download] Article: "${article.title}"`);
       console.log(`📂 [Download] PDF path: ${article.currentPdfUrl}`);
 
@@ -370,6 +516,22 @@ export class ArticleController {
 
       // Get article Word info
       const article = await articleService.getArticleWordUrl(articleId);
+      
+      // 🔥 AUDIT: Record editor download
+      await this.auditService.recordEditorDownload(
+        {
+          id: req.user!.id,
+          name: req.user!.name || 'User',
+          email: req.user!.email || '',
+          organization: 'N/A' // User model doesn't have organization field
+        },
+        {
+          id: articleId,
+          title: article.title,
+          category: 'General', // Word info doesn't have category
+          author: 'Unknown' // Word info doesn't have author
+        }
+      );
       
       console.log(`📄 [Download] Article: "${article.title}"`);
       console.log(`📂 [Download] Word path: ${article.currentWordUrl}`);
@@ -717,6 +879,31 @@ export class ArticleController {
       const adminId = req.user!.id;
 
       const result = await articleService.adminPublishArticle(articleId, adminId);
+
+      // 🔥 AUDIT: Record final decision
+      try {
+        // Use type assertion to handle union type safely
+        const articleData = result.article as any;
+        
+        await this.auditService.recordFinalDecision(
+          {
+            id: req.user!.id,
+            name: req.user!.name || 'Admin',
+            email: req.user!.email || '',
+            organization: 'N/A' // User model doesn't have organization field
+          },
+          {
+            id: articleData.id || articleId,
+            title: articleData.title || 'Unknown Title',
+            category: articleData.category || 'General',
+            author: articleData.authorName || 'Unknown Author'
+          },
+          'PUBLISHED'
+        );
+      } catch (auditError) {
+        console.error('Failed to record audit event:', auditError);
+        // Continue with response even if audit fails
+      }
 
       // Handle different response types (document vs article)
       const response: any = {
@@ -1128,6 +1315,26 @@ export class ArticleController {
         req.user.id,
         req.fileMeta.url,
         comments
+      );
+
+      // 🔥 AUDIT: Record editor upload for document
+      const article = await articleService.getArticleById(articleId);
+      const editingDuration = await this.calculateEditingDuration(articleId, req.user.id);
+      
+      await this.auditService.recordEditorUpload(
+        {
+          id: req.user.id,
+          name: req.user.name || 'Editor',
+          email: req.user.email || '',
+          organization: 'N/A' // User model doesn't have organization field
+        },
+        {
+          id: article.id,
+          title: article.title,
+          category: article.category || 'General',
+          author: article.authorName
+        },
+        editingDuration
       );
 
       res.status(200).json({
