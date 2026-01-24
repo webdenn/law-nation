@@ -134,6 +134,13 @@ router.get(
   articleController.getArticleContentBySlug.bind(articleController)
 );
 
+// NEW: Authentication check route for PDF URL access
+router.get(
+  "/:id/auth-check",
+  optionalAuth,  // Check auth but don't require it
+  articleController.checkArticleAccess.bind(articleController)
+);
+
 // Protected routes - Require authentication
 router.use(requireAuth);
 

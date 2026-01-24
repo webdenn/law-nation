@@ -244,13 +244,18 @@ async function addUploadWatermark(
 
   try {
     if (mimetype === 'application/pdf') {
-      console.log(`📄 [Upload Watermark] Processing PDF...`);
-      return await addWatermarkToPdf(filePath, watermarkData);
+      console.log(`📄 [Upload Watermark] Processing PDF for upload (no URL - internal use)...`);
+      return await addWatermarkToPdf(
+        filePath, 
+        watermarkData,
+        'ADMIN',  // Upload watermarks are for internal/editorial use - no URLs
+        'DRAFT'   // Upload status is always draft
+      );
     } else if (
       mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       mimetype === 'application/msword'
     ) {
-      console.log(`📝 [Upload Watermark] Processing Word document...`);
+      console.log(`📝 [Upload Watermark] Processing Word document (no URLs in DOCX)...`);
       return await addSimpleWatermarkToWord(filePath, watermarkData);
     } else {
       console.warn(`⚠️ [Upload Watermark] Unsupported file type: ${mimetype}`);
