@@ -1,7 +1,7 @@
 import type { Response, NextFunction } from "express";
 import type { AuthRequest } from "@/types/auth-request.js";
 import { articleService } from "./article.service.js";
-import { BadRequestError } from "@/utils/http-errors.util.js";
+import { BadRequestError, ForbiddenError } from "@/utils/http-errors.util.js";
 import { addWatermarkToPdf } from "@/utils/pdf-watermark.utils.js";
 import { addSimpleWatermarkToWord } from "@/utils/word-watermark.utils.js";
 import { prisma } from "@/db/db.js";
@@ -1363,6 +1363,266 @@ export class ArticleController {
       });
     } catch (error) {
       next(error);
+    }
+  }
+
+  // NEW: Admin assigns reviewer (after editor approval)
+  async assignReviewer(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+      const { reviewerId, reason } = req.body;
+
+      if (!reviewerId) {
+        throw new BadRequestError("Reviewer ID is required");
+      }
+
+      const adminId = req.user!.id;
+
+      const result = await articleService.assignReviewer(articleId, reviewerId, adminId, reason);
+
+      // 🔥 AUDIT: Record reviewer assignment/reassignment
+      if (result.isReassignment && result.oldReviewer) {
+        await this.auditService.recordReviewerReassignment(
+          {
+            id: req.user!.id,
+            name: req.user!.name || 'Admin',
+            email: req.user!.email || '',
+            organization: 'N/A'
+          },
+          {
+            id: result.article.id,
+            title: result.article.title,
+            category: result.article.category || 'General',
+            author: result.article.authorName
+          },
+          {
+            id: result.oldReviewer?.id || 'unknown',
+            name: result.oldReviewer?.name || 'Unknown Reviewer'
+          },
+          {
+            id: result.newReviewer.id,
+            name: result.newReviewer.name
+          }
+        );
+      } else {
+        await this.auditService.recordReviewerAssignment(
+          {
+            id: req.user!.id,
+            name: req.user!.name || 'Admin',
+            email: req.user!.email || '',
+            organization: 'N/A'
+          },
+          {
+            id: result.article.id,
+            title: result.article.title,
+            category: result.article.category || 'General',
+            author: result.article.authorName
+          },
+          {
+            id: result.newReviewer.id,
+            name: result.newReviewer.name
+          }
+        );
+      }
+
+      res.json({
+        message: result.isReassignment 
+          ? `Reviewer reassigned successfully from ${result.oldReviewer?.name} to ${result.newReviewer.name}`
+          : `Reviewer ${result.newReviewer.name} assigned successfully`,
+        article: result.article,
+        isReassignment: result.isReassignment,
+        oldReviewer: result.oldReviewer,
+        newReviewer: result.newReviewer,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // NEW: Reviewer uploads corrected document (DOCX only)
+  async reviewerUploadCorrectedDocument(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+      const reviewerId = req.user!.id;
+
+      if (!req.fileMeta?.url) {
+        throw new BadRequestError("DOCX file is required");
+      }
+
+      // Validate request body
+      const validatedData = uploadCorrectedPdfSchema.parse(req.body);
+
+      const data: UploadCorrectedPdfData = {
+        pdfUrl: req.fileMeta.url, // Actually DOCX for reviewers
+        comments: validatedData.comments,
+      };
+
+      const result = await articleService.reviewerUploadCorrectedDocument(articleId, reviewerId, data);
+
+      // 🔥 AUDIT: Record reviewer upload with editing duration
+      const editingDuration = await this.calculateEditingDuration(articleId, reviewerId);
+      
+      try {
+        const fullArticle = await articleService.getArticleById(articleId);
+        await this.auditService.recordReviewerUpload(
+          {
+            id: req.user!.id,
+            name: req.user!.name || 'Reviewer',
+            email: req.user!.email || '',
+            organization: 'N/A'
+          },
+          {
+            id: articleId,
+            title: fullArticle.title,
+            category: fullArticle.category || 'General',
+            author: fullArticle.authorName
+          },
+          this.parseEditingDuration(editingDuration)
+        );
+      } catch (auditError) {
+        console.error('Failed to record reviewer upload audit event:', auditError);
+        // Continue with response even if audit fails
+      }
+
+      res.json({
+        message: "Document reviewed and uploaded successfully. Pending reviewer approval.",
+        article: result.article,
+        extractedTextLength: result.extractedTextLength,
+        files: result.files,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // NEW: Reviewer approves article (sends to admin for publishing)
+  async reviewerApproveArticle(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+      const reviewerId = req.user!.id;
+
+      const article = await articleService.reviewerApproveArticle(articleId, reviewerId);
+
+      // 🔥 AUDIT: Record reviewer approval (using final decision audit)
+      try {
+        await this.auditService.recordFinalDecision(
+          {
+            id: req.user!.id,
+            name: req.user!.name || 'Reviewer',
+            email: req.user!.email || '',
+            organization: 'N/A'
+          },
+          {
+            id: article.id,
+            title: article.title,
+            category: article.category || 'General',
+            author: article.authorName
+          },
+          'REVIEWER_APPROVED'
+        );
+      } catch (auditError) {
+        console.error('Failed to record reviewer approval audit event:', auditError);
+        // Continue with response even if audit fails
+      }
+
+      res.json({
+        message: "Article approved by reviewer successfully. Admin has been notified and can now publish it.",
+        article,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // NEW: Reviewer downloads editor's document
+  async reviewerDownloadEditorDocument(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+      const reviewerId = req.user!.id;
+
+      // Verify reviewer is assigned to this article
+      const article = await articleService.getArticleById(articleId);
+      if (article.assignedReviewerId !== reviewerId) {
+        throw new ForbiddenError("You are not assigned as reviewer to this article");
+      }
+
+      const userName = req.user?.name || 'Reviewer';
+      
+      console.log(`📥 [Reviewer Download] Reviewer "${userName}" requesting editor's document for article ${articleId}`);
+
+      // Get editor's DOCX
+      const editorDocxUrl = await articleService.getEditorDocxUrl(articleId);
+      
+      if (!editorDocxUrl) {
+        throw new BadRequestError("Editor's document not available for this article");
+      }
+
+      // 🔥 AUDIT: Record reviewer download
+      await this.auditService.recordReviewerDownload(
+        {
+          id: req.user!.id,
+          name: req.user!.name || 'Reviewer',
+          email: req.user!.email || '',
+          organization: 'N/A'
+        },
+        {
+          id: articleId,
+          title: article.title,
+          category: article.category || 'General',
+          author: article.authorName
+        }
+      );
+
+      // Add watermark to editor's DOCX
+      const watermarkedDocx = await articleService.downloadEditorDocxWithWatermark(
+        articleId,
+        {
+          userName,
+          downloadDate: new Date(),
+          articleTitle: article.title,
+          articleId: articleId,
+          frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+        }
+      );
+
+      // Send watermarked DOCX file
+      const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}_editor_version.docx`;
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', watermarkedDocx.length.toString());
+      
+      console.log(`✅ [Reviewer Download] Sending watermarked editor's DOCX file (${watermarkedDocx.length} bytes)`);
+      
+      res.send(watermarkedDocx);
+    } catch (error) {
+      console.error('❌ [Reviewer Download] Failed:', error);
+      next(error);
+    }
+  }
+
+  // Helper method to parse editing duration string into object
+  private parseEditingDuration(durationString: string): { days: number; hours: number; minutes: number } {
+    const defaultDuration = { days: 0, hours: 0, minutes: 0 };
+    
+    if (!durationString || durationString === "N/A") {
+      return defaultDuration;
+    }
+
+    try {
+      // Parse strings like "2 days, 3 hours, 45 minutes" or "3 hours, 45 minutes" or "45 minutes"
+      const dayMatch = durationString.match(/(\d+)\s+days?/);
+      const hourMatch = durationString.match(/(\d+)\s+hours?/);
+      const minuteMatch = durationString.match(/(\d+)\s+minutes?/);
+
+      return {
+        days: dayMatch ? parseInt(dayMatch[1] || '0') : 0,
+        hours: hourMatch ? parseInt(hourMatch[1] || '0') : 0,
+        minutes: minuteMatch ? parseInt(minuteMatch[1] || '0') : 0,
+      };
+    } catch (error) {
+      console.error('Failed to parse editing duration:', error);
+      return defaultDuration;
     }
   }
 }

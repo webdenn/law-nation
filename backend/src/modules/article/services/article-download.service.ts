@@ -8,6 +8,8 @@ import { ensureBothFormats } from "@/utils/file-conversion.utils.js";
 import { generateDiffPdf } from "@/utils/diff-pdf-generator.utils.js";
 import { generateDiffWord } from "@/utils/diff-word-generator.utils.js";
 import { adobeService } from "@/services/adobe.service.js";
+import { resolveToAbsolutePath, fileExistsAtPath } from "@/utils/file-path.utils.js";
+import fs from "fs";
 import path from "path";
 //Article Download Service Handles PDF/Word downloads and diff generation
 export class ArticleDownloadService {
@@ -154,20 +156,55 @@ export class ArticleDownloadService {
     return article;
   }
   
-  // NEW: Download editor's DOCX with watermark using Adobe services
-  async downloadEditorDocxWithWatermark(articleId: string, watermarkData: any) {
-    const article = await this.getEditorDocxUrl(articleId);
-    
-    if (!article.currentWordUrl) {
-      throw new NotFoundError("Editor's DOCX not available");
+  // NEW: Get reviewer's DOCX URL (corrected version after editor)
+  async getReviewerDocxUrl(articleId: string) {
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+      select: { 
+        currentWordUrl: true, // This could be reviewer's version if they uploaded
+        title: true,
+        contentType: true,
+        status: true,
+        assignedReviewerId: true,
+        assignedEditorId: true
+      },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found");
     }
 
-    console.log(`💧 [Adobe] Adding watermark to editor's DOCX: ${article.currentWordUrl}`);
+    if (!article.assignedReviewerId) {
+      throw new NotFoundError("No reviewer assigned to this article");
+    }
+
+    // Check if article has been through reviewer workflow
+    const reviewerStatuses = ['REVIEWER_EDITING', 'REVIEWER_APPROVED', 'PUBLISHED'];
+    if (!reviewerStatuses.includes(article.status)) {
+      throw new NotFoundError("Reviewer has not yet processed this article");
+    }
+
+    if (!article.currentWordUrl) {
+      throw new NotFoundError("Reviewer's DOCX not available - reviewer may not have uploaded corrected version yet");
+    }
+
+    return article;
+  }
+  
+  // NEW: Download reviewer's DOCX with watermark using Adobe services
+  async downloadReviewerDocxWithWatermark(articleId: string, watermarkData: any) {
+    const article = await this.getReviewerDocxUrl(articleId);
+    
+    if (!article.currentWordUrl) {
+      throw new NotFoundError("Reviewer's DOCX not available");
+    }
+
+    console.log(`💧 [Adobe] Adding watermark to reviewer's DOCX: ${article.currentWordUrl}`);
 
     try {
       // Generate temporary output path for watermarked file
       const timestamp = Date.now();
-      const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `editor-watermarked-${timestamp}.docx`);
+      const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `reviewer-watermarked-${timestamp}.docx`);
       
       // Use Adobe service for watermarking
       const watermarkedPath = await adobeService.addWatermarkToDocx(
@@ -188,15 +225,191 @@ export class ArticleDownloadService {
       // Clean up temp file
       await fs.unlink(absoluteWatermarkedPath).catch(() => {});
       
-      console.log(`✅ [Adobe] Watermark added to editor's DOCX successfully`);
+      console.log(`✅ [Adobe] Watermark added to reviewer's DOCX successfully`);
       return watermarkedBuffer;
     } catch (error) {
-      console.error(`❌ [Adobe] Failed to add watermark to editor's DOCX:`, error);
+      console.error(`❌ [Adobe] Failed to add watermark to reviewer's DOCX:`, error);
       
       // Fallback to old watermarking method
-      console.log(`🔄 [Fallback] Using local watermarking for editor's DOCX`);
+      console.log(`🔄 [Fallback] Using local watermarking for reviewer's DOCX`);
       const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
       return await addSimpleWatermarkToWord(article.currentWordUrl, watermarkData);
+    }
+  }
+
+  // NEW: Admin access to all document versions in DOCX format
+  async getAdminAllVersionsAccess(articleId: string, userId: string, userRoles: string[]) {
+    // Verify admin access
+    const isAdmin = userRoles.includes("admin");
+    if (!isAdmin) {
+      throw new ForbiddenError("Only admins can access all document versions");
+    }
+
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        originalWordUrl: true,
+        currentWordUrl: true,
+        assignedEditorId: true,
+        assignedReviewerId: true,
+        contentType: true
+      }
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
+
+    // Get change logs to identify different versions
+    const changeLogs = await prisma.articleChangeLog.findMany({
+      where: { articleId },
+      select: {
+        id: true,
+        versionNumber: true,
+        newFileUrl: true,
+        editedBy: true,
+        status: true,
+        editedAt: true
+      },
+      orderBy: { versionNumber: 'asc' }
+    });
+
+    const versions = {
+      original: {
+        available: !!article.originalWordUrl,
+        url: article.originalWordUrl || '',
+        description: "User's original submission (converted to DOCX if needed)"
+      },
+      editor: {
+        available: false,
+        url: '',
+        description: "Editor's corrected version"
+      },
+      reviewer: {
+        available: false,
+        url: '',
+        description: "Reviewer's final version"
+      },
+      current: {
+        available: !!article.currentWordUrl,
+        url: article.currentWordUrl || '',
+        description: "Current published version"
+      }
+    };
+
+    // Identify editor and reviewer versions from change logs
+    for (const log of changeLogs) {
+      // For now, we'll identify by the editedBy field and check user type separately
+      const editor = await prisma.user.findUnique({
+        where: { id: log.editedBy },
+        select: { userType: true, name: true }
+      });
+
+      if (editor?.userType === 'EDITOR' && log.status === 'approved') {
+        versions.editor.available = true;
+        versions.editor.url = log.newFileUrl;
+      } else if (editor?.userType === 'REVIEWER' && log.status === 'approved') {
+        versions.reviewer.available = true;
+        versions.reviewer.url = log.newFileUrl;
+      }
+    }
+
+    console.log(`📋 [Admin Access] All versions for article ${articleId}:`, {
+      original: versions.original.available,
+      editor: versions.editor.available,
+      reviewer: versions.reviewer.available,
+      current: versions.current.available
+    });
+
+    return {
+      articleId: article.id,
+      articleTitle: article.title,
+      status: article.status,
+      versions,
+      workflow: {
+        hasEditor: !!article.assignedEditorId,
+        hasReviewer: !!article.assignedReviewerId
+      }
+    };
+  }
+
+  // NEW: Admin download specific version with watermark
+  async downloadAdminVersionWithWatermark(
+    articleId: string, 
+    versionType: 'original' | 'editor' | 'reviewer' | 'current',
+    userId: string, 
+    userRoles: string[],
+    watermarkData: any
+  ) {
+    // Verify admin access
+    const isAdmin = userRoles.includes("admin");
+    if (!isAdmin) {
+      throw new ForbiddenError("Only admins can download all document versions");
+    }
+
+    const versionsInfo = await this.getAdminAllVersionsAccess(articleId, userId, userRoles);
+    const version = versionsInfo.versions[versionType];
+
+    if (!version.available || !version.url) {
+      throw new NotFoundError(`${versionType} version not available for this article`);
+    }
+
+    console.log(`💧 [Admin Download] Adding watermark to ${versionType} version: ${version.url}`);
+
+    try {
+      // Generate temporary output path for watermarked file
+      const timestamp = Date.now();
+      const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `admin-${versionType}-${timestamp}.docx`);
+      
+      // Use Adobe service for watermarking
+      const watermarkedPath = await adobeService.addWatermarkToDocx(
+        version.url,
+        tempOutputPath,
+        {
+          ...watermarkData,
+          userName: `ADMIN - ${watermarkData.userName}`,
+          versionType: versionType.toUpperCase()
+        }
+      );
+      
+      // Adobe service now returns relative path, convert to absolute for file reading
+      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath) 
+        ? watermarkedPath 
+        : path.join(process.cwd(), watermarkedPath.replace(/^\//, ''));
+      
+      // Read the watermarked file as buffer
+      const fs = await import('fs/promises');
+      const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
+      
+      // Clean up temp file
+      await fs.unlink(absoluteWatermarkedPath).catch(() => {});
+      
+      console.log(`✅ [Admin Download] Watermark added to ${versionType} version successfully`);
+      return {
+        buffer: watermarkedBuffer,
+        filename: `${versionsInfo.articleTitle}-${versionType}-version.docx`,
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      };
+    } catch (error) {
+      console.error(`❌ [Admin Download] Failed to add watermark to ${versionType} version:`, error);
+      
+      // Fallback to old watermarking method
+      console.log(`🔄 [Fallback] Using local watermarking for ${versionType} version`);
+      const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
+      const watermarkedBuffer = await addSimpleWatermarkToWord(version.url, {
+        ...watermarkData,
+        userName: `ADMIN - ${watermarkData.userName}`,
+        versionType: versionType.toUpperCase()
+      });
+      
+      return {
+        buffer: watermarkedBuffer,
+        filename: `${versionsInfo.articleTitle}-${versionType}-version.docx`,
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      };
     }
   }
   
@@ -415,12 +628,9 @@ export class ArticleDownloadService {
     }
 
     if (changeLog.visualDiffStatus === "READY" && changeLog.visualDiffUrl) {
-      const { resolveUploadPath, fileExists } = await import(
-        "@/utils/file-path.utils.js"
-      );
-      const fullPath = resolveUploadPath(changeLog.visualDiffUrl);
+      const fullPath = resolveToAbsolutePath(changeLog.visualDiffUrl);
 
-      if (await fileExists(fullPath)) {
+      if (fileExistsAtPath(changeLog.visualDiffUrl)) {
         console.log(
           `✅ [Visual Diff] Already exists: ${changeLog.visualDiffUrl}`
         );
@@ -484,23 +694,18 @@ export class ArticleDownloadService {
         );
       }
 
-      const {
-        generateVisualDiffPath,
-        resolveUploadPath,
-        ensureDirectoryExists,
-      } = await import("@/utils/file-path.utils.js");
       const { generateVisualDiffFromChangeLog } = await import(
         "@/utils/pdf-visual-diff.utils.js"
       );
 
-      const relativePath = generateVisualDiffPath(
-        changeLog.article.id,
-        changeLog.versionNumber
-      );
-      const fullPath = resolveUploadPath(relativePath);
+      const relativePath = `visual-diffs/${changeLog.article.id}-v${changeLog.versionNumber}.pdf`;
+      const fullPath = resolveToAbsolutePath(relativePath);
 
       const outputDir = path.dirname(fullPath);
-      await ensureDirectoryExists(outputDir);
+      const fsSync = await import('fs');
+      if (!fsSync.existsSync(outputDir)) {
+        fsSync.mkdirSync(outputDir, { recursive: true });
+      }
 
       console.log(`🎨 [Visual Diff] Generating to: ${relativePath}`);
 

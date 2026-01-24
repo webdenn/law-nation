@@ -258,6 +258,28 @@ export class ArticleService {
   async editorApproveArticle(articleId: string, editorId: string) {
     return articleWorkflowService.editorApproveArticle(articleId, editorId);
   }
+
+  // NEW: Reviewer workflow methods
+  async assignReviewer(
+    articleId: string,
+    reviewerId: string,
+    adminId: string,
+    reason?: string
+  ) {
+    return articleWorkflowService.assignReviewer(articleId, reviewerId, adminId, reason);
+  }
+
+  async reviewerUploadCorrectedDocument(
+    articleId: string,
+    reviewerId: string,
+    data: UploadCorrectedPdfData
+  ) {
+    return articleWorkflowService.reviewerUploadCorrectedDocument(articleId, reviewerId, data);
+  }
+
+  async reviewerApproveArticle(articleId: string, reviewerId: string) {
+    return articleWorkflowService.reviewerApproveArticle(articleId, reviewerId);
+  }
   async approveArticle(
     articleId: string,
     userId: string,
@@ -302,7 +324,7 @@ export class ArticleService {
 
   // NEW: Download editor's DOCX with watermark
   async downloadEditorDocxWithWatermark(articleId: string, watermarkData: any) {
-    return articleDownloadService.downloadEditorDocxWithWatermark(articleId, watermarkData);
+    return articleDownloadService.downloadReviewerDocxWithWatermark(articleId, watermarkData);
   }
   async downloadDiff(
     changeLogId: string,

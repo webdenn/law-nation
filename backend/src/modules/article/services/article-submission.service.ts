@@ -12,6 +12,7 @@ import {
   sendArticleVerificationCodeEmail,
   sendCoAuthorNotification,
 } from "@/utils/email.utils.js";
+import { notifyAdminsOfArticleUpload } from "@/utils/admin-notification.utils.js";
 import { adobeService } from "@/services/adobe.service.js";
 import type {
   ArticleSubmissionData,
@@ -132,6 +133,16 @@ export class ArticleSubmissionService {
         article.id
       );
     }
+
+    // 🔥 NEW: Notify all admins of new article upload
+    await notifyAdminsOfArticleUpload(
+      data.authorName,
+      data.authorEmail,
+      data.title,
+      article.id,
+      data.category,
+      data.authorOrganization
+    );
 
     return {
       message: "Article submitted successfully!",
@@ -283,6 +294,16 @@ export class ArticleSubmissionService {
       );
     }
 
+    // 🔥 NEW: Notify all admins of new article upload (guest verification)
+    await notifyAdminsOfArticleUpload(
+      metadata.authorName,
+      metadata.authorEmail,
+      metadata.title,
+      article.id,
+      metadata.category,
+      metadata.authorOrganization
+    );
+
     return article;
   }
 
@@ -401,6 +422,16 @@ export class ArticleSubmissionService {
         article.id
       );
     }
+
+    // 🔥 NEW: Notify all admins of new article upload (code verification)
+    await notifyAdminsOfArticleUpload(
+      metadata.authorName,
+      metadata.authorEmail,
+      metadata.title,
+      article.id,
+      metadata.category,
+      metadata.authorOrganization
+    );
 
     return {
       message: "Article verified and submitted successfully!",

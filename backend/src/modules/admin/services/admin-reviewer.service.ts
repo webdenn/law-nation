@@ -306,12 +306,28 @@ export class AdminReviewerService {
   }
 
   /**
-   * Assign article to reviewer
+   * Assign article to reviewer (NEW: Enhanced for post-editor assignment)
    */
-  async assignArticleToReviewer(articleId: string, reviewerId: string): Promise<void> {
+  async assignArticleToReviewer(articleId: string, reviewerId: string, adminId: string): Promise<void> {
     try {
-      console.log(`📝 [Admin Reviewer] Assigning article ${articleId} to reviewer ${reviewerId}`);
+      console.log(`📝 [Admin Reviewer] Assigning article ${articleId} to reviewer ${reviewerId} after editor approval`);
       
+      // Verify article is in correct state for reviewer assignment
+      const article = await prisma.article.findUnique({
+        where: { id: articleId },
+        select: { status: true, title: true }
+      });
+
+      if (!article) {
+        throw new NotFoundError('Article not found');
+      }
+
+      // NEW: Allow reviewer assignment after editor approval
+      const validStatuses = ['EDITOR_APPROVED', 'ASSIGNED_TO_REVIEWER', 'REVIEWER_IN_PROGRESS'];
+      if (!validStatuses.includes(article.status)) {
+        throw new Error(`Cannot assign reviewer in status: ${article.status}. Must be editor approved first.`);
+      }
+
       await prisma.article.update({
         where: { id: articleId },
         data: {
@@ -320,11 +336,69 @@ export class AdminReviewerService {
         }
       });
 
-      console.log(`✅ [Admin Reviewer] Article assigned successfully`);
+      console.log(`✅ [Admin Reviewer] Article "${article.title}" assigned to reviewer after editor approval`);
 
     } catch (error: any) {
       console.error(`❌ [Admin Reviewer] Failed to assign article:`, error);
-      throw new InternalServerError('Failed to assign article to reviewer');
+      throw new InternalServerError(`Failed to assign article to reviewer: ${error.message}`);
+    }
+  }
+
+  /**
+   * NEW: Get available reviewers for post-editor assignment
+   */
+  async getAvailableReviewersForAssignment(): Promise<Reviewer[]> {
+    try {
+      console.log(`📋 [Admin Reviewer] Fetching available reviewers for assignment`);
+      
+      const users = await prisma.user.findMany({
+        where: {
+          userType: 'REVIEWER',
+          isActive: true
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          expertise: true,
+          qualification: true,
+          experience: true,
+          bio: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true
+        },
+        orderBy: [
+          { isActive: 'desc' },
+          { createdAt: 'desc' }
+        ]
+      });
+
+      const reviewers: Reviewer[] = users.map(user => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        expertise: user.expertise || [],
+        qualification: user.qualification,
+        experience: user.experience,
+        bio: user.bio,
+        assignedReviews: 0, // Will be calculated separately if needed
+        completedReviews: 0, // TODO: Calculate completed reviews
+        averageReviewTime: 0, // TODO: Calculate from review history
+        status: user.isActive ? 'ACTIVE' : 'INACTIVE',
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      }));
+
+      // Sort by workload (fewer active reviews first)
+      reviewers.sort((a, b) => a.assignedReviews - b.assignedReviews);
+
+      console.log(`✅ [Admin Reviewer] Found ${reviewers.length} available reviewers`);
+      return reviewers;
+
+    } catch (error: any) {
+      console.error(`❌ [Admin Reviewer] Failed to fetch available reviewers:`, error);
+      throw new InternalServerError('Failed to fetch available reviewers');
     }
   }
 
