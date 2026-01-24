@@ -124,15 +124,15 @@ async function login(
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) throw new UnauthorizedError("invalid credentials");
 
-  // Check if admin access is required (for admin/editor login)
+  // Check if admin access is required (for admin/editor/reviewer login)
   if (requireAdminAccess) {
-    const hasAdminAccess = user.roles.some(
-      (r) => r.role.name === "admin" || r.role.name === "editor"
+    const hasManagementAccess = user.roles.some(
+      (r) => r.role.name === "admin" || r.role.name === "editor" || r.role.name === "reviewer"
     );
 
-    if (!hasAdminAccess) {
+    if (!hasManagementAccess) {
       throw new UnauthorizedError(
-        "Access denied. Admin or Editor privileges required."
+        "Access denied. Admin, Editor, or Reviewer privileges required."
       );
     }
   }
@@ -339,8 +339,8 @@ async function verifyOtp(email: string, otp: string) {
 }
 
 /**
- * Setup password for invited editor
- * Verifies token, creates user with editor role, and sets password
+ * Setup password for invited editor or reviewer
+ * Verifies token, creates user with appropriate role, and sets password
  */
 async function setupPassword(token: string, password: string) {
   // Find verification record
@@ -364,8 +364,8 @@ async function setupPassword(token: string, password: string) {
     );
   }
 
-  // Check if this is an editor invitation
-  if (verification.resourceType !== "EDITOR_INVITE") {
+  // Check if this is an editor or reviewer invitation
+  if (verification.resourceType !== "EDITOR_INVITE" && verification.resourceType !== "REVIEWER_INVITE") {
     throw new BadRequestError("Invalid invitation type");
   }
 
@@ -389,7 +389,7 @@ async function setupPassword(token: string, password: string) {
   // Hash password
   const passwordHash = await bcrypt.hash(password, SALT);
 
-  // Create user with editor role
+  // Create user with appropriate role (editor or reviewer)
   const user = await prisma.user.create({
     data: {
       name,

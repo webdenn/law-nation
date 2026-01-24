@@ -100,6 +100,10 @@ const [captchaToken, setCaptchaToken] = useState(null);
         (role.name?.toLowerCase() === "editor") || 
         (role.role?.name?.toLowerCase() === "editor")
       )
+      const isReviewer = userRoles.some(role => 
+        (role.name?.toLowerCase() === "reviewer") || 
+        (role.role?.name?.toLowerCase() === "reviewer")
+      )
       const tokenToSave = data.accessToken || data.token;
 
       setTimeout(() => {
@@ -107,6 +111,10 @@ const [captchaToken, setCaptchaToken] = useState(null);
           localStorage.setItem("editorToken", tokenToSave)
           localStorage.setItem("editorUser", JSON.stringify(data.user))
           router.push("/editor")
+        } else if (isReviewer) {
+          localStorage.setItem("reviewerToken", tokenToSave)
+          localStorage.setItem("reviewerUser", JSON.stringify(data.user))
+          router.push("/reviewer") // We'll need to create this page
         } else {
           localStorage.setItem("adminToken", tokenToSave)
           localStorage.setItem("adminUser", JSON.stringify(data.user))

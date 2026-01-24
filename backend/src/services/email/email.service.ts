@@ -16,6 +16,9 @@ import { generateCoAuthorNotificationHtml } from "@/templates/email/article/coau
 import { generateArticlePublishedHtml } from "@/templates/email/article/published.template.js";
 import { generateEditorApprovalNotificationHtml } from "@/templates/email/admin/editor-approval.template.js";
 import { generateEditorReassignmentNotificationHtml } from "@/templates/email/editor/reassignment-notification.template.js";
+import { generateReviewerInvitationHtml } from "@/templates/email/reviewer/invitation.template.js";
+import { generateReviewerTaskAssignedHtml } from "@/templates/email/reviewer/task-assigned.template.js";
+import { generateReviewerReassignmentNotificationHtml } from "@/templates/email/reviewer/reassignment-notification.template.js";
 
 /**
  * Email Service
@@ -265,6 +268,68 @@ export class EmailService {
     });
     
     await this.sendEmail(editorEmail, subject, html);
+  }
+
+  // ==================== REVIEWER EMAILS ====================
+
+  /**
+   * Send reviewer invitation email
+   */
+  async sendReviewerInvitationEmail(
+    reviewerEmail: string,
+    reviewerName: string,
+    token: string
+  ): Promise<void> {
+    console.log(`📧 [EmailService] Preparing reviewer invitation for: ${reviewerEmail}`);
+    
+    const { subject, html } = generateReviewerInvitationHtml({
+      reviewerName,
+      token,
+      frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
+    });
+    
+    await this.sendEmail(reviewerEmail, subject, html);
+  }
+
+  /**
+   * Send reviewer assignment notification
+   */
+  async sendReviewerAssignmentNotification(
+    reviewerEmail: string,
+    reviewerName: string,
+    articleTitle: string,
+    authorName: string,
+    category: string,
+    articleId: string
+  ): Promise<void> {
+    const { subject, html } = generateReviewerTaskAssignedHtml({
+      reviewerName,
+      articleTitle,
+      authorName,
+      category,
+      articleId,
+    });
+    await this.sendEmail(reviewerEmail, subject, html);
+  }
+
+  /**
+   * Send reviewer reassignment notification
+   */
+  async sendReviewerReassignmentNotification(
+    reviewerEmail: string,
+    reviewerName: string,
+    articleTitle: string,
+    articleId: string
+  ): Promise<void> {
+    console.log(`📧 [EmailService] Sending reviewer reassignment notification to: ${reviewerEmail}`);
+    
+    const { subject, html } = generateReviewerReassignmentNotificationHtml({
+      reviewerName,
+      articleTitle,
+      articleId,
+    });
+    
+    await this.sendEmail(reviewerEmail, subject, html);
   }
 
   // ==================== ADMIN EMAILS ====================

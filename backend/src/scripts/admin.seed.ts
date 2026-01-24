@@ -63,6 +63,15 @@ async function main() {
     },
   });
 
+  const reviewerRole = await prisma.role.upsert({
+    where: { name: "reviewer" },
+    update: {},
+    create: {
+      name: "reviewer",
+      description: "Can review and evaluate articles",
+    },
+  });
+
   const userRole = await prisma.role.upsert({
     where: { name: "user" },
     update: {},
@@ -72,7 +81,7 @@ async function main() {
     },
   });
 
-  console.log("Created 3 roles: admin, editor, user");
+  console.log("Created 4 roles: admin, editor, reviewer, user");
 
   // 3. Assign ALL Permissions to Admin Role
   console.log("Assigning permissions to admin role...");
@@ -126,7 +135,37 @@ async function main() {
   }
   console.log(`Editor role has ${editorPermissions.length} permissions`);
 
-  // 5. Assign Permissions to User Role
+  // 5. Assign Specific Permissions to Reviewer Role
+  console.log("Assigning permissions to reviewer role...");
+  const reviewerPermissions = [
+    "article.read",
+    "article.write", // Can provide feedback/comments
+    "user.read",
+  ];
+
+  for (const permKey of reviewerPermissions) {
+    const perm = await prisma.permission.findUnique({
+      where: { key: permKey },
+    });
+    if (perm) {
+      await prisma.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId: reviewerRole.id,
+            permissionId: perm.id,
+          },
+        },
+        update: {},
+        create: {
+          roleId: reviewerRole.id,
+          permissionId: perm.id,
+        },
+      });
+    }
+  }
+  console.log(`Reviewer role has ${reviewerPermissions.length} permissions`);
+
+  // 6. Assign Permissions to User Role
   console.log("Assigning permissions to user role...");
   const userPermissions = ["article.read", "article.write"];
 
@@ -193,7 +232,7 @@ async function main() {
   console.log("Database seeding completed successfully!");
   console.log("Summary:");
   console.log(`   - Permissions: ${allPermissions.length}`);
-  console.log(`   - Roles: 3 (admin, editor, user)`);
+  console.log(`   - Roles: 4 (admin, editor, reviewer, user)`);
   console.log(`   - Admin User: admin@lawnation.com`);
   // console.log(`   - Admin Password: ${adminPassword}`);
   console.log("IMPORTANT: Change the admin password after first login");

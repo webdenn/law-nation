@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 import { UserService } from "./user.service.js";
-import { createUserSchema, inviteEditorSchema } from "@/modules/user/validators/user.validator.js";
+import { createUserSchema, inviteEditorSchema, inviteReviewerSchema } from "@/modules/user/validators/user.validator.js";
 import type { AuthRequest } from "@/types/auth-request.js";
 import {
   BadRequestError,
@@ -17,6 +17,8 @@ export const UserController = {
   findUserByIdHandler,
   inviteEditorHandler,
   listEditorsHandler,
+  inviteReviewerHandler,
+  listReviewersHandler,
 };
 
 export default UserController;
@@ -107,6 +109,40 @@ async function listEditorsHandler(
   try {
     const editors = await UserService.listEditors();
     return res.json(editors);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function inviteReviewerHandler(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = inviteReviewerSchema.parse(req.body);
+    const currentUser = req.user;
+    if (!currentUser) {
+      throw new UnauthorizedError("Authenticated user not found");
+    }
+    const result = await UserService.inviteReviewer(data, currentUser);
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: z.treeifyError(err) });
+    }
+    next(err);
+  }
+}
+
+async function listReviewersHandler(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const reviewers = await UserService.listReviewers();
+    return res.json(reviewers);
   } catch (err) {
     next(err);
   }

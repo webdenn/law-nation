@@ -121,6 +121,32 @@ export async function sendEditorInvitationEmail(
   return emailService.sendEditorInvitationEmail(editorEmail, editorName, token);
 }
 
+export async function sendReviewerInvitationEmail(
+  reviewerEmail: string,
+  reviewerName: string,
+  token: string
+) {
+  return emailService.sendReviewerInvitationEmail(reviewerEmail, reviewerName, token);
+}
+
+export async function sendReviewerAssignmentNotification(
+  reviewerEmail: string,
+  reviewerName: string,
+  articleTitle: string,
+  authorName: string,
+  category: string,
+  articleId: string
+) {
+  return emailService.sendReviewerAssignmentNotification(
+    reviewerEmail,
+    reviewerName,
+    articleTitle,
+    authorName,
+    category,
+    articleId
+  );
+}
+
 // ==================== ADMIN EMAILS ====================
 // All functions now delegate to EmailService
 

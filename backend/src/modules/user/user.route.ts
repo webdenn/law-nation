@@ -29,6 +29,13 @@ UserRouter.post(
   UserController.inviteEditorHandler
 );
 
+// Invite a reviewer (sends email with password setup link)
+UserRouter.post(
+  "/invite-reviewer",
+  requirePermission("user", "write"),
+  UserController.inviteReviewerHandler
+);
+
 // ✅ 1. Editors List (YE NAYA ROUTE YAHAN ADD KARO)
 // Isko hamesha '/:id' se pehle rakhna
 UserRouter.get(
@@ -37,18 +44,19 @@ UserRouter.get(
   UserController.listEditorsHandler
 );
 
+// ✅ 2. Reviewers List
+// Isko hamesha '/:id' se pehle rakhna
+UserRouter.get(
+  "/reviewers",
+  requirePermission("user", "read"), // Permission same rakhi hai
+  UserController.listReviewersHandler
+);
+
 // List all users
 UserRouter.get(
   "/",
   requirePermission("user", "read"),
   UserController.listUsersHandler
-);
-
-// List all editors (for dropdown in assign editor feature)
-UserRouter.get(
-  "/editors",
-  requirePermission("user", "read"),
-  UserController.listEditorsHandler
 );
 
 // Get a single user by ID
