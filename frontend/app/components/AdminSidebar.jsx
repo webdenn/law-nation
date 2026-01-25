@@ -37,6 +37,7 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
             ]
         },
         { name: "Add New Editor", path: "/admin/add-editor" },
+        { name: "Add New Reviewer", path: "/admin/add-reviewer" },
         { name: "Banner Management", path: "/admin/banners" },
         { name: "Site Settings", path: "/admin/settings" },
         // { name: "Live Database", path: "/admin/live-database" },

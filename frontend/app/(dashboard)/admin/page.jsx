@@ -148,6 +148,7 @@ export default function AdminDashboard() {
   const [statusDist, setStatusDist] = useState([]); // Chart data
   const [articles, setArticles] = useState([]); // Table data
   const [editors, setEditors] = useState([]); // Editors list
+  const [reviewers, setReviewers] = useState([]); // ✅ Reviewers list
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [pdfViewMode, setPdfViewMode] = useState("original");
   const [changeHistory, setChangeHistory] = useState([]);
@@ -422,13 +423,14 @@ export default function AdminDashboard() {
           "Pragma": "no-cache"
         };
 
-        const [summaryRes, metricsRes, statusRes, timelineRes, editorsRes] =
+        const [summaryRes, metricsRes, statusRes, timelineRes, editorsRes, reviewersRes] =
           await Promise.all([
             fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/summary?cb=${cb}`, { headers }),
             fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/time-metrics?cb=${cb}`, { headers }),
             fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/status-distribution?cb=${cb}`, { headers }),
             fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/articles-timeline?limit=50&cb=${cb}`, { headers }),
             fetch(`${NEXT_PUBLIC_BASE_URL}/api/users/editors?cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/api/users/reviewers?cb=${cb}`, { headers }), // ✅ Fetch Reviewers
           ]);
 
         // 1. Summary Data
@@ -477,6 +479,7 @@ export default function AdminDashboard() {
             author: item.authorName || "Unknown",
             status: mapBackendStatus(item.status), // ✅ Ab ye sahi chalega
             assignedTo: item.assignedEditor?.id || item.assignedEditorId || "",
+            assignedReviewer: item.assignedReviewer?.id || item.assignedReviewerId || "", // ✅ Added Reviewer Mapping
             // ✅ Is line ko dhundo aur replace karo:
             date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "Just Now",
             abstract: item.abstract,
@@ -494,6 +497,15 @@ export default function AdminDashboard() {
           const data = await editorsRes.json();
           setEditors(Array.isArray(data) ? data : data.editors || []);
         }
+
+        // 6. Reviewers List
+        if (reviewersRes && reviewersRes.ok) {
+          const data = await reviewersRes.json();
+          setReviewers(Array.isArray(data) ? data : data.reviewers || []);
+        }
+
+
+
 
       } catch (error) {
         console.error("Dashboard Load Error:", error);
@@ -584,6 +596,48 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error("Error assigning:", error);
       toast.error("Server error while assigning");
+    }
+  };
+
+  // ✅ ASSIGN REVIEWER LOGIC
+  const assignReviewer = async (articleId, reviewerId) => {
+    if (!reviewerId) return;
+    try {
+      const token = localStorage.getItem("adminToken");
+      const response = await fetch(
+        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/assign-reviewer`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ reviewerId: reviewerId }),
+        }
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setArticles((prev) =>
+          prev.map((a) =>
+            a.id === articleId
+              ? {
+                ...a,
+                assignedReviewer: reviewerId,
+              }
+              : a
+          )
+        );
+        toast.success(data.message || "Reviewer assigned successfully!");
+      } else {
+        if (response.status === 409 || data.message?.toLowerCase().includes("already")) {
+          toast.warning("msg: Article Already Assigned!");
+        } else {
+          toast.error(data.message || "Failed to assign reviewer");
+        }
+      }
+    } catch (error) {
+      console.error("Error assigning reviewer:", error);
+      toast.error("Server error while assigning reviewer");
     }
   };
   const [isPublishing, setIsPublishing] = useState(false); // ✅ NEW State
@@ -943,6 +997,7 @@ export default function AdminDashboard() {
                     <th className="p-5">Author & Date</th>
                     <th className="p-5">Status</th>
                     <th className="p-5 text-center">Assign Editor</th>
+                    <th className="p-5 text-center">Assign Reviewer</th>
                     <th className="p-5 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1024,6 +1079,31 @@ export default function AdminDashboard() {
                               {editors.map((e) => (
                                 <option key={e._id || e.id} value={e._id || e.id}>
                                   {e.name || e.email}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+                        {/* 4.5 Assign Reviewer Dropdown */}
+                        <td className="p-5 text-center">
+                          <div className="flex flex-col items-center">
+                            {art.assignedReviewer && (
+                              <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full mb-1 border border-blue-200 uppercase tracking-wide">
+                                ✅ Assigned
+                              </span>
+                            )}
+                            <select
+                              className={`p-2 border rounded text-xs font-bold outline-none cursor-pointer w-32 transition-all ${art.assignedReviewer
+                                ? "bg-blue-50 border-blue-300 text-blue-800"
+                                : "bg-white border-gray-200"
+                                }`}
+                              value={art.assignedReviewer || ""}
+                              onChange={(e) => assignReviewer(art.id, e.target.value)}
+                            >
+                              <option value="">Assign Reviewer...</option>
+                              {reviewers.map((r) => (
+                                <option key={r._id || r.id} value={r._id || r.id}>
+                                  {r.name || r.email}
                                 </option>
                               ))}
                             </select>
@@ -1223,7 +1303,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
-                
+
                 <button
                   onClick={() => overrideAndPublish(selectedArticle.id)}
                   disabled={isPublishing}
