@@ -30,6 +30,7 @@ export interface ArticleListFilters {
   category?: string;
   authorEmail?: string;
   assignedEditorId?: string;
+  assignedReviewerId?: string;
   page?: number;
   limit?: number;
 }

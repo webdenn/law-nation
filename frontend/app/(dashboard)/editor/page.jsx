@@ -357,6 +357,11 @@ export default function EditorDashboard() {
   };
 
   const handleEditorApprove = async () => {
+    // ✅ Safety Check
+    if (!window.confirm("Are you sure you want to APPROVE this article? This action cannot be undone.")) {
+      return;
+    }
+
     try {
       setIsApproving(true); // ✅ Start Loading
       const token = localStorage.getItem("editorToken");
@@ -604,7 +609,10 @@ export default function EditorDashboard() {
               </button>
 
               <button
-                onClick={() => {
+                type="button" // ✅ Explicitly defined type
+                onClick={(e) => {
+                  e.preventDefault(); // ✅ Prevent any default behavior
+                  e.stopPropagation(); // ✅ Stop event bubbling
                   if (changeHistory && changeHistory.length > 0) {
                     const latestLog = changeHistory[0];
                     handleViewVisualDiff(latestLog.id || latestLog._id);

@@ -184,6 +184,9 @@ export default function ReviewerDashboard() {
         }
     }, []);
 
+    const [lastEditorPdf, setLastEditorPdf] = useState(null); // ✅ NEW: Track Editor's PDF
+    const [hasReviewerUploaded, setHasReviewerUploaded] = useState(false); // ✅ NEW: Track Reviewer activity
+
     const fetchChangeHistory = async (articleId) => {
         try {
             // ✅ CHANGED: reviewerToken
@@ -201,7 +204,34 @@ export default function ReviewerDashboard() {
             );
             if (res.ok) {
                 const data = await res.json();
-                setChangeHistory(data.changeLogs || []);
+                const logs = data.changeLogs || [];
+                setChangeHistory(logs);
+
+                // ✅ LOGIC: Find Editor's Last PDF & Check Reviewer Upload
+                let editorPdf = null;
+                let reviewerUploaded = false;
+
+                console.log("Reviewer History Logs:", logs);
+
+                // Loop logs (assuming sorted new -> old, or find based on timestamp if needed)
+                // We want the LATEST Editor PDF. 
+                // Since logs are likely ASC (oldest first), we need to reverse to find the latest
+                const reversedLogs = [...logs].reverse();
+
+                const editorLog = reversedLogs.find(log =>
+                    (log.role?.toLowerCase() === "editor") && (log.pdfUrl || log.documentUrl)
+                );
+
+                if (editorLog) {
+                    editorPdf = editorLog.pdfUrl || editorLog.documentUrl;
+                }
+
+                // Check if Reviewer has uploaded anything
+                const reviewerLog = logs.find(log => log.role?.toLowerCase() === "reviewer");
+                if (reviewerLog) reviewerUploaded = true;
+
+                setLastEditorPdf(editorPdf);
+                setHasReviewerUploaded(reviewerUploaded);
 
                 if (
                     data.article?.editorDocumentUrl &&
@@ -243,7 +273,7 @@ export default function ReviewerDashboard() {
             const token = localStorage.getItem("reviewerToken");
             const formData = new FormData();
 
-            formData.append("document", uploadedFile);
+            formData.append("docx", uploadedFile);
             if (trackFile) {
                 formData.append("editorDocument", trackFile);
             }
@@ -251,14 +281,10 @@ export default function ReviewerDashboard() {
                 formData.append("comments", uploadComment);
             }
 
-            // ✅ Note: Reviewers might also upload corrections, using same/similar endpoint or specific reviewer one?
-            // Assuming reuse of upload-corrected or a specific one. 
-            // For now, I'll use the same 'upload-corrected' as it likely updates the article's current doc.
-            // If backend distinguishes, it might need 'reviewer-upload-corrected'.
-            // Based on typical flows, reviewers might just comment or approve. But if they upload, it goes here.
+            // ✅ CHANGED: Using correct reviewer endpoint
             const res = await fetch(
                 `${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id
-                }/upload-corrected`,
+                }/reviewer-upload`,
                 {
                     method: "PATCH",
                     headers: {
@@ -296,6 +322,11 @@ export default function ReviewerDashboard() {
     };
 
     const handleReviewerApprove = async () => {
+        // ✅ Safety Check
+        if (!window.confirm("Are you sure you want to APPROVE this article? This action cannot be undone.")) {
+            return;
+        }
+
         try {
             setIsApproving(true);
             // ✅ CHANGED: reviewerToken
@@ -418,10 +449,13 @@ export default function ReviewerDashboard() {
 
         let path = "";
         if (pdfViewMode === "original") {
-            path = selectedArticle.originalPdfUrl;
+            // ✅ Editor PDF: Prefer the one found in logs, else fallback
+            path = lastEditorPdf || selectedArticle.editorDocumentUrl || selectedArticle.originalPdfUrl;
         } else if (pdfViewMode === "current") {
+            // ✅ Reviewer PDF = The document Reviewer uploaded
             path = selectedArticle.currentPdfUrl;
         } else if (pdfViewMode === "track") {
+            // Redundant if visual-diff is used, but keeping for safety
             path = selectedArticle.editorDocumentUrl;
         }
 
@@ -508,7 +542,7 @@ export default function ReviewerDashboard() {
                                     : "hover:bg-red-800 text-white"
                                     }`}
                             >
-                                View Original PDF
+                                View Editor PDF
                                 {pdfViewMode === "original" && (
                                     <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
                                 )}
@@ -516,6 +550,12 @@ export default function ReviewerDashboard() {
 
                             <button
                                 onClick={() => {
+                                    // ✅ Validation: Only show if Reviewer has uploaded
+                                    if (!hasReviewerUploaded) {
+                                        toast.warning("Please upload a file to view Reviewer PDF");
+                                        return;
+                                    }
+
                                     setPdfViewMode("current");
                                     setIsMobileMenuOpen(false);
                                 }}
@@ -524,14 +564,17 @@ export default function ReviewerDashboard() {
                                     : "hover:bg-red-800 text-white"
                                     }`}
                             >
-                                View Edited PDF
+                                View Reviewer PDF
                                 {pdfViewMode === "current" && (
                                     <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
                                 )}
                             </button>
 
                             <button
-                                onClick={() => {
+                                type="button" // ✅ Explicitly defined type
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
                                     if (changeHistory && changeHistory.length > 0) {
                                         const latestLog = changeHistory[0];
                                         handleViewVisualDiff(latestLog.id || latestLog._id);
@@ -670,7 +713,7 @@ export default function ReviewerDashboard() {
                                                             </span>
                                                         </td>
                                                         <td className="p-5 text-right">
-                                                            {/* <button
+                                                            <button
                                                                 onClick={() => {
                                                                     setSelectedArticle(art);
                                                                     setPdfViewMode("original");
@@ -678,7 +721,7 @@ export default function ReviewerDashboard() {
                                                                 className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-800 transition"
                                                             >
                                                                 Open Review
-                                                            </button> */}
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 ))

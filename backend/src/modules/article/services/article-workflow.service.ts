@@ -105,6 +105,7 @@ export class ArticleWorkflowService {
       where: { id: articleId },
       data: {
         assignedEditorId: data.editorId,
+        assignedReviewerId: null, // ✅ Clear reviewer assignment to ensure exclusive ownership
         status: "ASSIGNED_TO_EDITOR",
       },
       include: { assignedEditor: true },
@@ -732,7 +733,7 @@ export class ArticleWorkflowService {
 
     // NEW WORKFLOW: Check if reviewer is assigned
     const nextStatus = article.assignedReviewerId ? "ASSIGNED_TO_REVIEWER" : "EDITOR_APPROVED";
-    
+
     const updatedArticle = await prisma.article.update({
       where: { id: articleId },
       data: {
@@ -753,7 +754,7 @@ export class ArticleWorkflowService {
       const reviewer = await prisma.user.findUnique({
         where: { id: article.assignedReviewerId }
       });
-      
+
       if (reviewer) {
         // Import reviewer notification function (will be created)
         const { sendReviewerAssignmentNotification } = await import("@/utils/email.utils.js");
@@ -839,7 +840,7 @@ export class ArticleWorkflowService {
 
     // Send notifications
     const { sendReviewerAssignmentNotification, sendReviewerReassignmentNotification } = await import("@/utils/email.utils.js");
-    
+
     if (isReassignment && oldReviewer) {
       await sendReviewerReassignmentNotification(
         oldReviewer.email,
@@ -892,7 +893,7 @@ export class ArticleWorkflowService {
       throw new ForbiddenError("You are not assigned as reviewer to this article");
     }
 
-    const validStatuses = ["ASSIGNED_TO_REVIEWER", "REVIEWER_EDITING"];
+    const validStatuses = ["ASSIGNED_TO_REVIEWER", "REVIEWER_EDITING", "REVIEWER_IN_PROGRESS"];
     if (!validStatuses.includes(article.status)) {
       throw new BadRequestError(
         `Cannot upload corrections in current status: ${article.status}`
@@ -1009,7 +1010,7 @@ export class ArticleWorkflowService {
       throw new ForbiddenError("You are not assigned as reviewer to this article");
     }
 
-    const validStatuses = ["ASSIGNED_TO_REVIEWER", "REVIEWER_EDITING"];
+    const validStatuses = ["ASSIGNED_TO_REVIEWER", "REVIEWER_EDITING", "REVIEWER_IN_PROGRESS"];
     if (!validStatuses.includes(article.status)) {
       throw new BadRequestError("Article cannot be approved in current status");
     }
@@ -1342,7 +1343,7 @@ export class ArticleWorkflowService {
 
     // Use custom message if provided, otherwise use diff summary
     const notificationMessage = publishingMessage || finalDiffSummary;
-    
+
     await notifyUploaderOfPublication(
       article.id,
       article.title,

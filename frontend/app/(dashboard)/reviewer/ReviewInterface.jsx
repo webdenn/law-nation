@@ -93,7 +93,7 @@ const ReviewInterface = ({
             <div className="flex-1 bg-gray-100 rounded-xl border border-gray-300 p-4 flex flex-col h-[500px] lg:h-auto min-h-[500px]">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bold text-gray-700 uppercase text-sm md:text-base">
-                        {pdfViewMode === "original" ? " Original Submission" : " Latest Edited Version"}
+                        {pdfViewMode === "original" ? " Editor PDF" : " Reviewer PDF"}
                     </h3>
                     {getPdfUrlToView() && (
                         <a
@@ -181,8 +181,8 @@ const ReviewInterface = ({
                 {/* 2. APPROVE BUTTON */}
                 <button
                     onClick={handleApprove}
-                    disabled={isApproving}
-                    className={`w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl transition-all flex items-center justify-center gap-2 transform active:scale-95 ${isApproving
+                    disabled={isApproving || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED" || selectedArticle.status === "APPROVED"}
+                    className={`w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl transition-all flex items-center justify-center gap-2 transform active:scale-95 ${isApproving || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED" || selectedArticle.status === "APPROVED"
                         ? "bg-gray-400 text-white cursor-not-allowed"
                         : "bg-green-600 hover:bg-green-700 text-white hover:shadow-green-200"
                         }`}

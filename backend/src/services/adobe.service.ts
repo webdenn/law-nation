@@ -11,6 +11,7 @@ let AdobeSDK: any = null;
 let ServicePrincipalCredentials: any = null;
 let PDFServices: any = null;
 let MimeType: any = null;
+let ClientConfig: any = null;
 let CreatePDFJob: any = null;
 let CreatePDFResult: any = null;
 let ExportPDFJob: any = null;
@@ -28,6 +29,7 @@ try {
   ServicePrincipalCredentials = adobeModule.ServicePrincipalCredentials;
   PDFServices = adobeModule.PDFServices;
   MimeType = adobeModule.MimeType;
+  ClientConfig = adobeModule.ClientConfig;
   CreatePDFJob = adobeModule.CreatePDFJob;
   CreatePDFResult = adobeModule.CreatePDFResult;
   ExportPDFJob = adobeModule.ExportPDFJob;
@@ -65,42 +67,65 @@ export class AdobeService {
   private pdfServices: any;
   private isAvailable: boolean;
 
+  private initError: any = null;
+
   constructor() {
     this.isAvailable = false;
 
     console.log("🚀 [Adobe] Initializing Adobe PDF Services...");
-    console.log("📋 [Adobe] Environment variables check:");
-    console.log(`   - ADOBE_CLIENT_ID: ${process.env.ADOBE_CLIENT_ID ? '✅ Set' : '❌ Missing'}`);
-    console.log(`   - ADOBE_CLIENT_SECRET: ${process.env.ADOBE_CLIENT_SECRET ? '✅ Set' : '❌ Missing'}`);
-    console.log(`   - ADOBE_ORGANIZATION_ID: ${process.env.ADOBE_ORGANIZATION_ID ? '✅ Set' : '❌ Missing'}`);
+    // Check env vars immediately
+    const hasClientId = !!process.env.ADOBE_CLIENT_ID;
+    const hasClientSecret = !!process.env.ADOBE_CLIENT_SECRET;
+    const hasOrgId = !!process.env.ADOBE_ORGANIZATION_ID;
+
+    if (!hasClientId || !hasClientSecret || !hasOrgId) {
+      console.warn("⚠️ [Adobe] Missing credentials:");
+      console.log(`   - ADOBE_CLIENT_ID: ${hasClientId ? '✅ Set' : '❌ Missing'}`);
+      console.log(`   - ADOBE_CLIENT_SECRET: ${hasClientSecret ? '✅ Set' : '❌ Missing'}`);
+      console.log(`   - ADOBE_ORGANIZATION_ID: ${hasOrgId ? '✅ Set' : '❌ Missing'}`);
+      this.initError = "Missing environment variables: " +
+        [!hasClientId && 'ADOBE_CLIENT_ID', !hasClientSecret && 'ADOBE_CLIENT_SECRET', !hasOrgId && 'ADOBE_ORGANIZATION_ID'].filter(Boolean).join(', ');
+      return;
+    }
 
     try {
       if (!AdobeSDK || !ServicePrincipalCredentials || !PDFServices) {
-        throw new Error("Adobe PDF Services SDK not available");
+        throw new Error("Adobe PDF Services SDK not loaded properly. Modules are missing.");
       }
 
       // Initialize Adobe PDF Services with credentials
       const credentials = new ServicePrincipalCredentials({
         clientId: process.env.ADOBE_CLIENT_ID!,
-        clientSecret: process.env.ADOBE_CLIENT_SECRET!,
-        organizationId: process.env.ADOBE_ORGANIZATION_ID!
+        clientSecret: process.env.ADOBE_CLIENT_SECRET!
       });
 
-      this.pdfServices = new PDFServices({ credentials });
+      // Configure timeout settings (60 seconds)
+      let clientConfig;
+      if (ClientConfig) {
+        // SDK v4.x: ClientConfig overrides default timeout (in ms)
+        clientConfig = new ClientConfig({
+          timeout: 60000,
+        });
+        console.log("⏱️ [Adobe] Client configuration applied with 60s timeout");
+      }
+
+      this.pdfServices = new PDFServices({ credentials, clientConfig });
       this.isAvailable = true;
 
       console.log("✅ [Adobe] Adobe PDF Services initialized successfully");
       console.log("🔧 [Adobe] Available methods: convertPdfToDocx, convertDocxToPdf, extractTextFromPdf, addWatermarkToDocx, addWatermarkToPdf");
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ [Adobe] Failed to initialize Adobe PDF Services:", error);
       this.isAvailable = false;
+      this.initError = error.message || error;
     }
   }
 
   private checkAvailability(): void {
     console.log(`🔍 [Adobe] Checking availability: ${this.isAvailable ? '✅ Available' : '❌ Not Available'}`);
     if (!this.isAvailable) {
-      throw new InternalServerError("Adobe PDF Services not available");
+      console.error(`❌ [Adobe] Service unavailable due to: ${this.initError}`);
+      throw new InternalServerError(`Adobe PDF Services not available: ${this.initError}`);
     }
   }
 

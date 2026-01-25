@@ -170,12 +170,60 @@ export default function AdminDashboard() {
       if (res.ok) {
         const data = await res.json();
         setChangeHistory(data.changeLogs || []);
-        if (data.article?.editorDocumentUrl && selectedArticle?.editorDocumentUrl !== data.article.editorDocumentUrl) {
-          setSelectedArticle((prev) => ({
-            ...prev,
-            editorDocumentUrl: data.article.editorDocumentUrl,
-          }));
-        }
+
+        // ✅ Extract Latest Editor & Reviewer PDFs from logs
+        const logs = data.changeLogs || [];
+        // Note: logs are likely ASC or DESC. Let's assume consistent with backend (which I fixed to be DESC or ASC? Backend sends `orderBy: { versionNumber: "asc" }`)
+        // If ASC, we want the LAST occurrence.
+
+        let editorPdf = null;
+        let reviewerPdf = null;
+
+        // Iterate through all logs to find the latest for each role
+        logs.forEach(log => {
+          const role = log.role?.toLowerCase() || (log.editedBy?.role || "").toLowerCase(); // Check role helper from backend or user object
+          // NOTE: admin dashboard might not have 'role' directly on log if not joined properly, but I added it in backend `getArticleChangeHistory`.
+          // Let's rely on my previous backend change which added `role` to the log object.
+
+          if (role === 'editor' && (log.pdfUrl || log.newFileUrl)) {
+            editorPdf = log.pdfUrl || log.newFileUrl;
+          }
+          if (role === 'reviewer' && (log.pdfUrl || log.newFileUrl)) {
+            reviewerPdf = log.pdfUrl || log.newFileUrl;
+          }
+        });
+
+        // Backend fixes for PDF URL (clean watermarked)
+        // Backend fixes for PDF URL (clean watermarked)
+        const cleanUrl = (url) => {
+          if (!url) return null;
+          let clean = url;
+
+          if (clean.endsWith('_reviewer_watermarked.docx')) {
+            clean = clean.replace(/\.docx$/i, '.pdf');
+          } else if (clean.endsWith('_watermarked.docx')) {
+            clean = clean.replace(/_watermarked\.docx$/i, '_clean_watermarked.pdf');
+          } else if (clean.endsWith('.docx')) {
+            clean = clean.replace(/\.docx$/i, '.pdf');
+          }
+
+          // Handle directory change: DOCX in /words/, PDF in /pdfs/
+          if (clean.includes('/uploads/words/') && !clean.includes('reviewer')) {
+            clean = clean.replace('/uploads/words/', '/uploads/pdfs/');
+          }
+
+          return clean;
+        };
+
+        if (editorPdf) editorPdf = cleanUrl(editorPdf);
+        if (reviewerPdf) reviewerPdf = cleanUrl(reviewerPdf);
+
+        setSelectedArticle((prev) => ({
+          ...prev,
+          editorDocumentUrl: data.article.editorDocumentUrl, // Keeps existing logic
+          latestEditorPdfUrl: editorPdf, // ✅ NEW
+          latestReviewerPdfUrl: reviewerPdf, // ✅ NEW
+        }));
       }
     } catch (err) {
       console.error("Failed to fetch history", err);
@@ -316,6 +364,8 @@ export default function AdminDashboard() {
     let path = "";
     if (pdfViewMode === "original") path = selectedArticle.originalPdfUrl;
     else if (pdfViewMode === "current") path = selectedArticle.currentPdfUrl;
+    else if (pdfViewMode === "editor") path = selectedArticle.latestEditorPdfUrl || selectedArticle.editorDocumentUrl; // ✅ NEW MODE
+    else if (pdfViewMode === "reviewer") path = selectedArticle.latestReviewerPdfUrl; // ✅ NEW MODE
     else if (pdfViewMode === "track") path = selectedArticle.editorDocumentUrl;
 
     if (!path) return null;
@@ -1219,13 +1269,25 @@ export default function AdminDashboard() {
                   1. ORIGINAL SUBMISSION
                 </button>
                 <button
-                  onClick={() => setPdfViewMode("current")}
-                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${pdfViewMode === "current"
+                  onClick={() => setPdfViewMode("editor")} // ✅ Changed to "editor" mode to explicitly show Editor's PDF
+                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${pdfViewMode === "editor"
                     ? "bg-blue-600 text-white shadow-lg"
                     : "bg-white text-gray-400 border"
                     }`}
                 >
-                  2. FINAL EDITED VERSION
+                  2. EDITOR EDITED VERSION
+                </button>
+
+                {/* ✅ 3. REVIEWER PDF TAB */}
+                <button
+                  onClick={() => setPdfViewMode("reviewer")}
+                  disabled={!selectedArticle.latestReviewerPdfUrl}
+                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${pdfViewMode === "reviewer"
+                    ? "bg-purple-600 text-white shadow-lg"
+                    : !selectedArticle.latestReviewerPdfUrl ? "bg-gray-100 text-gray-300 cursor-not-allowed border" : "bg-white text-gray-400 border"
+                    }`}
+                >
+                  3. REVIEWER EDITED VERSION
                 </button>
 
                 {/* ✅ VISUAL DIFF BUTTON (Track File Removed) */}
@@ -1237,7 +1299,7 @@ export default function AdminDashboard() {
                     : "bg-white text-gray-400 border"
                     }`}
                 >
-                  {isGeneratingDiff ? "GENERATING..." : "3. VIEW VISUAL DIFF"}
+                  {isGeneratingDiff ? "GENERATING..." : "4. VIEW VISUAL DIFF"}
                 </button>
               </div>
 

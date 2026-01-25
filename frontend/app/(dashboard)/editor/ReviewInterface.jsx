@@ -181,8 +181,8 @@ const ReviewInterface = ({
         {/* 2. APPROVE BUTTON */}
         <button
           onClick={handleEditorApprove}
-          disabled={isApproving}
-          className={`w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl transition-all flex items-center justify-center gap-2 transform active:scale-95 ${isApproving
+          disabled={isApproving || selectedArticle.status === "EDITOR_APPROVED" || selectedArticle.status === "ASSIGNED_TO_REVIEWER" || selectedArticle.status === "REVIEWER_IN_PROGRESS" || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED"}
+          className={`w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl transition-all flex items-center justify-center gap-2 transform active:scale-95 ${isApproving || selectedArticle.status === "EDITOR_APPROVED" || selectedArticle.status === "ASSIGNED_TO_REVIEWER" || selectedArticle.status === "REVIEWER_IN_PROGRESS" || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED"
             ? "bg-gray-400 text-white cursor-not-allowed"
             : "bg-green-600 hover:bg-green-700 text-white hover:shadow-green-200"
             }`}
@@ -199,56 +199,7 @@ const ReviewInterface = ({
           )}
         </button>
 
-        {/* 3. CHANGE HISTORY LIST */}
-        {/* <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
-          <h3 className="font-bold text-gray-800 mb-4 border-b pb-2">Change History</h3>
-
-          <div className="space-y-6">
-            {changeHistory.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-2">No edits made yet.</p>
-            ) : (
-              changeHistory.map((log) => (
-                <div key={log.id || log._id} className="relative pl-4 border-l-2 border-gray-200">
-                  <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-white"></div>
-
-                  <div className="mb-1">
-                    <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                      Version {log.versionNumber}
-                    </span>
-                    <span className="text-[10px] text-gray-400 ml-2">
-                      {new Date(log.editedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-gray-600 italic mb-2">
-                    "{log.comments || "No comments provided"}"
-                  </p>
-
-                  <button
-                    onClick={() => handleDownloadDiffReport(log.id || log._id, "pdf")}
-                    className="mb-2 flex items-center text-[10px] font-bold text-red-600 hover:text-red-800 bg-red-50 px-2 py-1 rounded border border-red-100 transition"
-                  >
-                    <DownloadIcon /> Download PDF Report
-                  </button>
-
-                  <button
-                    onClick={() => handleDownloadDiffReport(log.id || log._id, "word")}
-                    className="flex items-center text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100 transition"
-                  >
-                    <WordIcon /> Download Word Report
-                  </button>
-
-                  <DiffViewer diffData={log.diffData} />
-                </div>
-              ))
-            )}
-
-            <div className="relative pl-4 border-l-2 border-gray-200 opacity-60">
-              <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-gray-400 ring-4 ring-white"></div>
-              <p className="text-xs font-bold text-gray-500">Original Submission</p>
-            </div>
-          </div>
-        </div> */}
+      
 
         {/* 4. USER ORIGINAL DOCUMENT */}
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
@@ -285,7 +236,7 @@ const ReviewInterface = ({
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

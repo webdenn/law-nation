@@ -19,6 +19,7 @@ export class ArticleQueryService {
       category,
       authorEmail,
       assignedEditorId,
+      assignedReviewerId, // ✅ Use destructuring to capture it
       page = 1,
       limit = 20,
     } = filters;
@@ -28,6 +29,7 @@ export class ArticleQueryService {
     if (category) where.category = category;
     if (authorEmail) where.authorEmail = authorEmail;
     if (assignedEditorId) where.assignedEditorId = assignedEditorId;
+    if (assignedReviewerId) where.assignedReviewerId = assignedReviewerId; // ✅ Apply filter
 
     const skip = (page - 1) * limit;
 
@@ -170,11 +172,11 @@ export class ArticleQueryService {
       try {
         // Use Adobe PDF extraction instead of old extractPdfContent method
         const { adobeService } = await import('@/services/adobe.service.js');
-        
+
         try {
           console.log(`🔍 [Lazy Extract] Using Adobe PDF extraction for clean text`);
           const cleanText = await adobeService.extractTextFromPdf(article.currentPdfUrl);
-          
+
           if (cleanText && cleanText.length > 0) {
             console.log(`✅ [Lazy Extract] Adobe extracted ${cleanText.length} characters`);
 
@@ -193,7 +195,7 @@ export class ArticleQueryService {
           }
         } catch (adobeError) {
           console.error(`❌ [Lazy Extract] Adobe extraction failed, falling back to old method:`, adobeError);
-          
+
           // Fallback to old method only if Adobe fails
           const pdfContent = await extractPdfContent(
             article.currentPdfUrl,
@@ -251,8 +253,7 @@ export class ArticleQueryService {
     }
 
     console.log(
-      `✅ [Full Access] ${
-        isAuthenticated ? "Authenticated" : "Guest"
+      `✅ [Full Access] ${isAuthenticated ? "Authenticated" : "Guest"
       } user - full content available`
     );
 
@@ -378,6 +379,7 @@ export class ArticleQueryService {
         title: true,
         status: true,
         assignedEditorId: true,
+        assignedReviewerId: true,
         authorEmail: true,
         secondAuthorEmail: true,
         originalPdfUrl: true,
@@ -391,6 +393,7 @@ export class ArticleQueryService {
 
     const isAdmin = userRoles.includes("admin");
     const isAssignedEditor = article.assignedEditorId === userId;
+    const isAssignedReviewer = article.assignedReviewerId === userId;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -401,7 +404,7 @@ export class ArticleQueryService {
       (user.email === article.authorEmail ||
         user.email === article.secondAuthorEmail);
 
-    if (!isAdmin && !isAssignedEditor && !isUploader) {
+    if (!isAdmin && !isAssignedEditor && !isAssignedReviewer && !isUploader) {
       throw new ForbiddenError(
         "You do not have permission to view this article's change history"
       );
@@ -411,6 +414,7 @@ export class ArticleQueryService {
       isUploader &&
       !isAdmin &&
       !isAssignedEditor &&
+      !isAssignedReviewer &&
       article.status !== "PUBLISHED"
     ) {
       throw new ForbiddenError(
@@ -432,7 +436,7 @@ export class ArticleQueryService {
       },
     });
 
-    if (isUploader && !isAdmin && !isAssignedEditor) {
+    if (isUploader && !isAdmin && !isAssignedEditor && !isAssignedReviewer) {
       try {
         console.log(
           `📊 [Author View] Calculating final diff (original vs current)...`
@@ -516,6 +520,20 @@ export class ArticleQueryService {
         diffData: log.diffData,
         editorDocumentUrl: log.editorDocumentUrl,
         editorDocumentType: log.editorDocumentType,
+        newFileUrl: log.newFileUrl,
+        oldFileUrl: log.oldFileUrl,
+        pdfUrl: (() => {
+          if (log.fileType !== 'DOCX' || !log.newFileUrl) return log.newFileUrl;
+
+          // Handle improved workflow naming convention (watermarked DOCX -> clean watermarked PDF)
+          if (log.newFileUrl.endsWith('_watermarked.docx')) {
+            return log.newFileUrl.replace(/_watermarked\.docx$/i, '_clean_watermarked.pdf');
+          }
+
+          // Default fallback
+          return log.newFileUrl.replace(/\.docx$/i, '.pdf');
+        })(),
+        role: (log.diffData as any)?.type === 'reviewer_edit' ? 'Reviewer' : 'Editor',
       })),
       totalVersions: changeLogs.length + 1,
       accessLevel: isAdmin ? "admin" : "editor",
@@ -537,6 +555,7 @@ export class ArticleQueryService {
             id: true,
             title: true,
             assignedEditorId: true,
+            assignedReviewerId: true,
             authorEmail: true,
             secondAuthorEmail: true,
           },
@@ -558,6 +577,8 @@ export class ArticleQueryService {
     const isAdmin = userRoles.includes("admin");
     const isAssignedEditor = changeLog.article.assignedEditorId === userId;
 
+    const isAssignedReviewer = changeLog.article.assignedReviewerId === userId;
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { email: true },
@@ -567,7 +588,7 @@ export class ArticleQueryService {
       (user.email === changeLog.article.authorEmail ||
         user.email === changeLog.article.secondAuthorEmail);
 
-    if (!isAdmin && !isAssignedEditor && !isUploader) {
+    if (!isAdmin && !isAssignedEditor && !isAssignedReviewer && !isUploader) {
       throw new ForbiddenError(
         "You do not have permission to view this change log"
       );
