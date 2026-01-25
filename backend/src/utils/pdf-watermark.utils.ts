@@ -24,11 +24,11 @@ export async function addWatermarkToPdf(
   userRole: 'USER' | 'EDITOR' | 'REVIEWER' | 'ADMIN' = 'USER',
   articleStatus: string = 'PUBLISHED'
 ): Promise<Buffer> {
-  console.log('\n🔖 [Watermark] Starting watermarking process...');
-  console.log('📄 [Watermark] PDF path:', pdfPath);
-  console.log('👤 [Watermark] User role:', userRole);
-  console.log('📊 [Watermark] Article status:', articleStatus);
-  console.log('� [Watermark] Include URL:', userRole === 'USER' && articleStatus === 'PUBLISHED');
+  console.log('\n[Watermark] Starting watermarking process...');
+  console.log('[Watermark] PDF path:', pdfPath);
+  console.log('[Watermark] User role:', userRole);
+  console.log('[Watermark] Article status:', articleStatus);
+  console.log('[Watermark] Include URL:', userRole === 'USER' && articleStatus === 'PUBLISHED');
   
   try {
     // 1. Load original PDF
@@ -102,11 +102,11 @@ export async function addWatermarkToPdf(
       articleUrl = options.articleSlug 
         ? `${options.frontendUrl}/article/${options.articleSlug}`
         : `${options.frontendUrl}/articles/${options.articleId}`;
-      linkText = `🔗 Read online: ${articleUrl}`;
+      linkText = `Link: ${articleUrl}`;
       noteText = `(Login required for full article)`;
       
-      console.log('✅ [Watermark] User download - URL included');
-      console.log('🔗 [Watermark] Article URL:', articleUrl);
+      console.log('[Watermark] User download - URL included');
+      console.log('[Watermark] Article URL:', articleUrl);
     } else {
       // Editorial staff or unpublished article - no URL
       const roleMap = {
@@ -124,11 +124,11 @@ export async function addWatermarkToPdf(
       }
       
       includeUrl = false;
-      console.log('❌ [Watermark] Editorial/unpublished - No URL included');
-      console.log('📝 [Watermark] Role text:', roleText);
+      console.log('[Watermark] Editorial/unpublished - No URL included');
+      console.log('[Watermark] Role text:', roleText);
     }
     
-    console.log('🔖 [Watermark] Watermark text:', watermarkText);
+    console.log('[Watermark] Watermark text:', watermarkText);
     
     // 5. Add watermark to each page
     console.log('✍️ [Watermark] Adding watermark to all pages...');
@@ -175,7 +175,7 @@ export async function addWatermarkToPdf(
       
       // Add clickable link ONLY for users with published articles on FIRST page
       if (index === 0 && includeUrl) {
-        console.log('� [Watermark] Adding clickable link to first page');
+        console.log('[Watermark] Adding clickable link to first page');
         
         // Clickable link text
         page.drawText(linkText, {

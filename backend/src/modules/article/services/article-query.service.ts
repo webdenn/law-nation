@@ -525,9 +525,16 @@ export class ArticleQueryService {
         pdfUrl: (() => {
           if (log.fileType !== 'DOCX' || !log.newFileUrl) return log.newFileUrl;
 
-          // Handle improved workflow naming convention (watermarked DOCX -> clean watermarked PDF)
+          // Handle improved workflow naming convention (watermarked DOCX -> PDF)
           if (log.newFileUrl.endsWith('_watermarked.docx')) {
-            return log.newFileUrl.replace(/_watermarked\.docx$/i, '_clean_watermarked.pdf');
+            // 🔧 FIX: Check if it's a reviewer file (don't add "clean" to reviewer files)
+            if (log.newFileUrl.includes('_reviewer_watermarked.docx')) {
+              // Reviewer files: filename_reviewer_watermarked.docx -> filename_reviewer_watermarked.pdf
+              return log.newFileUrl.replace(/_watermarked\.docx$/i, '_watermarked.pdf');
+            } else {
+              // Editor files: filename_watermarked.docx -> filename_clean_watermarked.pdf
+              return log.newFileUrl.replace(/_watermarked\.docx$/i, '_clean_watermarked.pdf');
+            }
           }
 
           // Default fallback

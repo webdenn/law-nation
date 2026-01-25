@@ -32,6 +32,10 @@ async function main() {
     // Admin permissions
     { key: "admin.read", description: "View admin dashboard", module: "admin" },
     { key: "admin.write", description: "Manage admin settings", module: "admin" },
+
+    // Audit permissions
+    { key: "audit.read", description: "View audit logs and events", module: "audit" },
+    { key: "audit.write", description: "Manage audit settings", module: "audit" },
   ];
 
   for (const perm of permissions) {

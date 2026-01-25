@@ -7,7 +7,6 @@ import { startCleanupCron } from "@/jobs/cleanup.cron.js";
 
 const PORT = process.env.PORT ?? 4000;
 
-// 👇 YEH LINE ADD KARO: Isse hi images browser par dikhengi
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 app.listen(PORT, () => {

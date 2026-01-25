@@ -194,29 +194,54 @@ export default function AdminDashboard() {
         });
 
         // Backend fixes for PDF URL (clean watermarked)
-        // Backend fixes for PDF URL (clean watermarked)
+        // ✅ FIXED: Match exact backend file generation patterns
         const cleanUrl = (url) => {
           if (!url) return null;
           let clean = url;
 
-          if (clean.endsWith('_reviewer_watermarked.docx')) {
+          // 🔧 FIX: Handle reviewer PDFs correctly (no extra "clean" in filename)
+          if (clean.includes('_reviewer_watermarked.docx')) {
+            // Backend creates: filename_reviewer_watermarked.pdf (no "clean")
             clean = clean.replace(/\.docx$/i, '.pdf');
-          } else if (clean.endsWith('_watermarked.docx')) {
-            clean = clean.replace(/_watermarked\.docx$/i, '_clean_watermarked.pdf');
-          } else if (clean.endsWith('.docx')) {
-            clean = clean.replace(/\.docx$/i, '.pdf');
+            // Keep in /uploads/words/ directory - don't change directory
+            return clean;
           }
-
-          // Handle directory change: DOCX in /words/, PDF in /pdfs/
-          if (clean.includes('/uploads/words/') && !clean.includes('reviewer')) {
-            clean = clean.replace('/uploads/words/', '/uploads/pdfs/');
+          // 🔧 ADDITIONAL FIX: Handle reviewer PDFs that are already .pdf
+          else if (clean.includes('_reviewer_watermarked.pdf')) {
+            // Already correct format, just return as-is
+            return clean;
+          } 
+          // Handle editor PDFs (they have "clean" in the name)
+          else if (clean.endsWith('_watermarked.docx')) {
+            // Editor files have "clean" in the name
+            clean = clean.replace(/_watermarked\.docx$/i, '_clean_watermarked.pdf');
+            // Move editor PDFs to /pdfs/ directory
+            if (clean.includes('/uploads/words/')) {
+              clean = clean.replace('/uploads/words/', '/uploads/pdfs/');
+            }
+          } 
+          // Handle other DOCX files
+          else if (clean.endsWith('.docx')) {
+            clean = clean.replace(/\.docx$/i, '.pdf');
+            // Move other PDFs to /pdfs/ directory
+            if (clean.includes('/uploads/words/')) {
+              clean = clean.replace('/uploads/words/', '/uploads/pdfs/');
+            }
           }
 
           return clean;
         };
 
+        // 🔍 Debug logging for URL transformation
+        if (reviewerPdf) {
+          console.log('🔍 [URL Debug] Original reviewer PDF:', reviewerPdf);
+        }
+
         if (editorPdf) editorPdf = cleanUrl(editorPdf);
-        if (reviewerPdf) reviewerPdf = cleanUrl(reviewerPdf);
+        if (reviewerPdf) {
+          reviewerPdf = cleanUrl(reviewerPdf);
+          console.log('🔍 [URL Debug] Cleaned reviewer PDF:', reviewerPdf);
+        }
 
         setSelectedArticle((prev) => ({
           ...prev,
