@@ -32,6 +32,13 @@ router.get('/users/:userId/history', auditController.getUserHistory);
 router.get('/editors/:editorId/activity', auditController.getEditorActivity);
 
 /**
+ * @route GET /api/audit/reviewers/:reviewerId/activity
+ * @desc Get reviewer's download/upload activity
+ * @access Admin only
+ */
+router.get('/reviewers/:reviewerId/activity', auditController.getReviewerActivity);
+
+/**
  * @route GET /api/audit/admins/:adminId/decisions
  * @desc Get admin's assignment and decision history
  * @access Admin only

@@ -147,8 +147,39 @@ export async function sendReviewerAssignmentNotification(
   );
 }
 
+export async function sendReviewerReassignmentNotification(
+  reviewerEmail: string,
+  reviewerName: string,
+  articleTitle: string,
+  articleId: string
+) {
+  return emailService.sendReviewerReassignmentNotification(reviewerEmail, reviewerName, articleTitle, articleId);
+}
+
 // ==================== ADMIN EMAILS ====================
 // All functions now delegate to EmailService
+
+export async function sendArticleUploadNotificationToAdmin(
+  adminEmail: string,
+  adminName: string,
+  uploaderName: string,
+  uploaderEmail: string,
+  articleTitle: string,
+  articleId: string,
+  category?: string,
+  organization?: string
+) {
+  return emailService.sendArticleUploadNotificationToAdmin(
+    adminEmail,
+    adminName,
+    uploaderName,
+    uploaderEmail,
+    articleTitle,
+    articleId,
+    category,
+    organization
+  );
+}
 
 export async function sendEditorApprovalNotificationToAdmin(
   adminEmail: string,

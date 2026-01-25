@@ -308,6 +308,7 @@ enum ArticleStatus {
   EDITOR_IN_PROGRESS
   EDITOR_APPROVED
   ASSIGNED_TO_REVIEWER
+  REVIEWER_EDITING
   REVIEWER_IN_PROGRESS
   REVIEWER_APPROVED
   PENDING_APPROVAL
@@ -365,6 +366,11 @@ model AuditEvent {
   previousEditorName    String?
   decisionOutcome       String?  // PUBLISHED, REJECTED
   editingDuration       String?  // "2 days, 5 hours, 15 minutes"
+  editingDurationDays   Int?     // For reviewer workflow
+  editingDurationHours  Int?     // For reviewer workflow  
+  editingDurationMinutes Int?    // For reviewer workflow
+  overrideReason        String?  // For admin override actions
+  overrideType          String?  // DIRECT_PUBLISH, BYPASS_EDITOR, etc.
   createdAt             DateTime @default(now())
 
   @@index([articleId, eventDate, eventTime])

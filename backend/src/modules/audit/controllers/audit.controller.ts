@@ -118,6 +118,42 @@ export class AuditController {
   };
 
   /**
+   * Get reviewer activity
+   * GET /api/audit/reviewers/:reviewerId/activity
+   */
+  getReviewerActivity = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { reviewerId } = req.params;
+
+      if (!reviewerId || Array.isArray(reviewerId)) {
+        res.status(400).json({
+          success: false,
+          message: 'Valid Reviewer ID is required'
+        });
+        return;
+      }
+
+      console.log(`📋 [Audit Controller] Getting activity for reviewer: ${reviewerId}`);
+
+      const activity = await this.auditService.getReviewerActivity(reviewerId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Reviewer activity retrieved successfully',
+        data: activity
+      });
+
+    } catch (error: any) {
+      console.error(`❌ [Audit Controller] Failed to get reviewer activity:`, error);
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve reviewer activity'
+      });
+    }
+  };
+
+  /**
    * Get admin decisions
    * GET /api/audit/admins/:adminId/decisions
    */

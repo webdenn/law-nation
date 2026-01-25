@@ -1,7 +1,7 @@
 import type { Response, NextFunction } from "express";
 import type { AuthRequest } from "@/types/auth-request.js";
 import { articleService } from "./article.service.js";
-import { BadRequestError } from "@/utils/http-errors.util.js";
+import { BadRequestError, ForbiddenError } from "@/utils/http-errors.util.js";
 import { addWatermarkToPdf } from "@/utils/pdf-watermark.utils.js";
 import { addSimpleWatermarkToWord } from "@/utils/word-watermark.utils.js";
 import { prisma } from "@/db/db.js";
@@ -446,6 +446,60 @@ export class ArticleController {
     }
   }
 
+  // NEW: Authentication check for PDF URL access
+  async checkArticleAccess(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+
+      console.log(`🔐 [Auth Check] Checking access for article ${articleId}`);
+
+      // Get article info
+      const article = await articleService.getArticleById(articleId);
+
+      // Check if user is authenticated
+      const isAuthenticated = !!req.user;
+
+      console.log(`👤 [Auth Check] User authenticated: ${isAuthenticated}`);
+      console.log(`📊 [Auth Check] Article status: ${article.status}`);
+
+      if (!isAuthenticated) {
+        // User not logged in - redirect to login with return URL
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const returnUrl = `${frontendUrl}/article/${article.slug || article.id}`;
+        
+        console.log(`🔄 [Auth Check] Redirecting to login with return URL: ${returnUrl}`);
+        
+        return res.status(401).json({
+          message: "Authentication required to access full article",
+          requiresLogin: true,
+          loginUrl: `${frontendUrl}/login?returnUrl=${encodeURIComponent(returnUrl)}`,
+          articlePreview: {
+            id: article.id,
+            title: article.title,
+            authorName: article.authorName,
+            category: article.category,
+            slug: article.slug
+          }
+        });
+      }
+
+      // User is authenticated - allow access to full article
+      const content = await articleService.getArticleContent(articleId, true);
+
+      console.log(`✅ [Auth Check] Access granted for authenticated user`);
+
+      res.json({
+        message: "Access granted - full article available",
+        article: content,
+        requiresLogin: false,
+        authenticated: true
+      });
+    } catch (error) {
+      console.error('❌ [Auth Check] Failed:', error);
+      next(error);
+    }
+  }
+
   // Download article PDF (protected - auth required)
   async downloadArticlePdf(req: AuthRequest, res: Response, next: NextFunction) {
     try {
@@ -453,31 +507,33 @@ export class ArticleController {
 
       const userName = req.user?.name || 'Guest User';
       
-      console.log(`📥 [Download] User "${userName}" requesting PDF for article ${articleId}`);
+      console.log(`\n📥 [Download PDF] User "${userName}" requesting PDF for article ${articleId}`);
 
-      // Get article PDF info
-      const article = await articleService.getArticlePdfUrl(articleId);
+      // Get article PDF info with status
+      const article = await articleService.getArticleById(articleId);
       
-      // 🔥 AUDIT: Record editor download
+      console.log(`📄 [Download PDF] Article: "${article.title}"`);
+      console.log(`📊 [Download PDF] Article status: ${article.status}`);
+      console.log(`📂 [Download PDF] PDF path: ${article.currentPdfUrl}`);
+
+      // 🔥 AUDIT: Record user download
       await this.auditService.recordEditorDownload(
         {
           id: req.user!.id,
           name: req.user!.name || 'User',
           email: req.user!.email || '',
-          organization: 'N/A' // User model doesn't have organization field
+          organization: 'N/A'
         },
         {
           id: articleId,
           title: article.title,
-          category: 'General', // PDF info doesn't have category
-          author: 'Unknown' // PDF info doesn't have author
+          category: article.category || 'General',
+          author: article.authorName
         }
       );
-      
-      console.log(`📄 [Download] Article: "${article.title}"`);
-      console.log(`📂 [Download] PDF path: ${article.currentPdfUrl}`);
 
-      // Add watermark to PDF with clickable link
+      // Add watermark to PDF with role-based URL inclusion
+      console.log(`💧 [Download PDF] Adding watermark for USER role`);
       const watermarkedPdf = await addWatermarkToPdf(
         article.currentPdfUrl,
         {
@@ -485,8 +541,11 @@ export class ArticleController {
           downloadDate: new Date(),
           articleTitle: article.title,
           articleId: articleId,
+          articleSlug: article.slug,
           frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
-        }
+        },
+        'USER',           // User role - will include URL if published
+        article.status    // Article status - URL only for PUBLISHED
       );
 
       // Send watermarked PDF
@@ -496,11 +555,12 @@ export class ArticleController {
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', watermarkedPdf.length.toString());
       
-      console.log(`✅ [Download] Sending watermarked PDF (${watermarkedPdf.length} bytes)`);
+      console.log(`✅ [Download PDF] Sending watermarked PDF (${watermarkedPdf.length} bytes)`);
+      console.log(`🔗 [Download PDF] URL included: ${article.status === 'PUBLISHED'}`);
       
       res.send(watermarkedPdf);
     } catch (error) {
-      console.error('❌ [Download] Failed:', error);
+      console.error('❌ [Download PDF] Failed:', error);
       next(error);
     }
   }
@@ -512,31 +572,33 @@ export class ArticleController {
 
       const userName = req.user?.name || 'User';
       
-      console.log(`📥 [Download] User "${userName}" requesting Word for article ${articleId}`);
+      console.log(`\n📥 [Download Word] User "${userName}" requesting Word for article ${articleId}`);
 
-      // Get article Word info
-      const article = await articleService.getArticleWordUrl(articleId);
+      // Get article Word info with status
+      const article = await articleService.getArticleById(articleId);
       
-      // 🔥 AUDIT: Record editor download
+      console.log(`📄 [Download Word] Article: "${article.title}"`);
+      console.log(`📊 [Download Word] Article status: ${article.status}`);
+      console.log(`📂 [Download Word] Word path: ${article.currentWordUrl}`);
+
+      // 🔥 AUDIT: Record user download
       await this.auditService.recordEditorDownload(
         {
           id: req.user!.id,
           name: req.user!.name || 'User',
           email: req.user!.email || '',
-          organization: 'N/A' // User model doesn't have organization field
+          organization: 'N/A'
         },
         {
           id: articleId,
           title: article.title,
-          category: 'General', // Word info doesn't have category
-          author: 'Unknown' // Word info doesn't have author
+          category: article.category || 'General',
+          author: article.authorName
         }
       );
-      
-      console.log(`📄 [Download] Article: "${article.title}"`);
-      console.log(`📂 [Download] Word path: ${article.currentWordUrl}`);
 
-      // Add watermark to Word document with clickable link
+      // Add watermark to Word document (no URLs in DOCX files)
+      console.log(`💧 [Download Word] Adding watermark for USER role (no URLs in DOCX)`);
       const watermarkedWord = await addSimpleWatermarkToWord(
         article.currentWordUrl!,
         {
@@ -555,11 +617,12 @@ export class ArticleController {
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', watermarkedWord.length.toString());
       
-      console.log(`✅ [Download] Sending watermarked Word file (${watermarkedWord.length} bytes)`);
+      console.log(`✅ [Download Word] Sending watermarked Word file (${watermarkedWord.length} bytes)`);
+      console.log(`🔗 [Download Word] URL included: false (DOCX files never include URLs - editorial use only)`);
       
       res.send(watermarkedWord);
     } catch (error) {
-      console.error('❌ [Download] Failed:', error);
+      console.error('❌ [Download Word] Failed:', error);
       next(error);
     }
   }
@@ -573,7 +636,7 @@ export class ArticleController {
         throw new BadRequestError("Authentication required");
       }
 
-      console.log(`📥 [Download Original DOCX] User ${req.user.id} requesting original DOCX for article ${articleId}`);
+      console.log(`📥 [Download Original DOCX] Admin ${req.user.id} requesting original DOCX for article ${articleId}`);
 
       const originalDocxUrl = await articleService.getOriginalDocxUrl(articleId);
       
@@ -582,14 +645,15 @@ export class ArticleController {
       }
 
       // Get user info for watermarking
-      const userName = req.user.name || 'User';
+      const userName = req.user.name || 'Admin';
       
       // Get article info
       const article = await articleService.getArticleById(articleId);
       
       console.log(`📄 [Download Original DOCX] Processing original DOCX: ${originalDocxUrl}`);
+      console.log(`👤 [Download Original DOCX] User role: ADMIN (no URL in DOCX watermarks)`);
 
-      // Add watermark to original DOCX
+      // Add watermark to original DOCX (ADMIN role - no URLs in DOCX)
       const watermarkedDocx = await articleService.downloadOriginalDocxWithWatermark(
         articleId,
         {
@@ -598,6 +662,7 @@ export class ArticleController {
           articleTitle: article.title,
           articleId: articleId,
           frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+          userRole: 'ADMIN', // Pass role for watermarking logic
         }
       );
 
@@ -609,6 +674,7 @@ export class ArticleController {
       res.setHeader('Content-Length', watermarkedDocx.length.toString());
       
       console.log(`✅ [Download Original DOCX] Sending watermarked original DOCX file (${watermarkedDocx.length} bytes)`);
+      console.log(`🔗 [Download Original DOCX] URL included: false (DOCX files don't include URLs)`);
       
       res.send(watermarkedDocx);
     } catch (error) {
@@ -626,7 +692,7 @@ export class ArticleController {
         throw new BadRequestError("Authentication required");
       }
 
-      console.log(`📥 [Download Editor DOCX] User ${req.user.id} requesting editor's DOCX for article ${articleId}`);
+      console.log(`📥 [Download Editor DOCX] Admin ${req.user.id} requesting editor's DOCX for article ${articleId}`);
 
       const editorDocxUrl = await articleService.getEditorDocxUrl(articleId);
       
@@ -641,8 +707,9 @@ export class ArticleController {
       const article = await articleService.getArticleById(articleId);
       
       console.log(`📄 [Download Editor DOCX] Processing editor's DOCX: ${editorDocxUrl}`);
+      console.log(`👤 [Download Editor DOCX] User role: ADMIN (no URL in DOCX watermarks)`);
 
-      // Add watermark to editor's DOCX
+      // Add watermark to editor's DOCX (ADMIN role - no URLs in DOCX)
       const watermarkedDocx = await articleService.downloadEditorDocxWithWatermark(
         articleId,
         {
@@ -651,6 +718,7 @@ export class ArticleController {
           articleTitle: article.title,
           articleId: articleId,
           frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+          userRole: 'ADMIN', // Pass role for watermarking logic
         }
       );
 
@@ -662,6 +730,7 @@ export class ArticleController {
       res.setHeader('Content-Length', watermarkedDocx.length.toString());
       
       console.log(`✅ [Download Editor DOCX] Sending watermarked editor's DOCX file (${watermarkedDocx.length} bytes)`);
+      console.log(`🔗 [Download Editor DOCX] URL included: false (DOCX files don't include URLs)`);
       
       res.send(watermarkedDocx);
     } catch (error) {
@@ -976,6 +1045,13 @@ export class ArticleController {
       const userName = req.user!.name || 'User';
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
 
+      // Determine user role for watermarking
+      const userRole = userRoles.includes('admin') ? 'ADMIN' : 
+                      userRoles.includes('editor') ? 'EDITOR' : 
+                      userRoles.includes('reviewer') ? 'REVIEWER' : 'USER';
+
+      console.log(`📥 [Diff Download] User "${userName}" (${userRole}) requesting ${downloadFormat} diff for change log ${changeLogId}`);
+
       const result = await articleService.downloadDiff(changeLogId, userId, userRoles, downloadFormat);
 
       // Get article info for watermark
@@ -986,6 +1062,7 @@ export class ArticleController {
             select: {
               id: true,
               title: true,
+              status: true,
             },
           },
         },
@@ -1007,9 +1084,9 @@ export class ArticleController {
           // Write buffer to temp file
           await fs.writeFile(tempFilePath, result.buffer);
           
-          console.log(`💧 [Diff Download] Adding watermark to PDF diff`);
+          console.log(`💧 [Diff Download] Adding watermark to PDF diff for ${userRole} role`);
           
-          // Add logo watermark
+          // Add logo watermark with role-based URL logic
           watermarkedBuffer = await addWatermarkToPdf(
             tempFilePath,
             {
@@ -1018,7 +1095,9 @@ export class ArticleController {
               articleTitle: changeLog?.article.title || 'Article Diff',
               articleId: changeLog?.article.id || '',
               frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
-            }
+            },
+            userRole as 'USER' | 'EDITOR' | 'REVIEWER' | 'ADMIN',
+            changeLog?.article.status || 'DRAFT'
           );
           
           // Clean up temp file
@@ -1044,9 +1123,9 @@ export class ArticleController {
           // Write buffer to temp file
           await fs.writeFile(tempFilePath, result.buffer);
           
-          console.log(`💧 [Diff Download] Adding watermark to Word diff`);
+          console.log(`💧 [Diff Download] Adding watermark to Word diff (no URLs in DOCX)`);
           
-          // Add text watermark
+          // Add text watermark (DOCX files don't include URLs)
           watermarkedBuffer = await addSimpleWatermarkToWord(
             tempFilePath,
             {
@@ -1076,6 +1155,7 @@ export class ArticleController {
       res.setHeader('Content-Length', watermarkedBuffer.length);
 
       console.log(`✅ [Diff Download] Sending watermarked file: ${result.filename} (${watermarkedBuffer.length} bytes)`);
+      console.log(`🔗 [Diff Download] URL included: ${downloadFormat === 'pdf' && userRole === 'USER' && changeLog?.article.status === 'PUBLISHED'}`);
 
       // Send watermarked file buffer
       res.send(watermarkedBuffer);
@@ -1098,6 +1178,13 @@ export class ArticleController {
       const userName = req.user!.name || 'User';
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
 
+      // Determine user role for watermarking
+      const userRole = userRoles.includes('admin') ? 'ADMIN' : 
+                      userRoles.includes('editor') ? 'EDITOR' : 
+                      userRoles.includes('reviewer') ? 'REVIEWER' : 'USER';
+
+      console.log(`📥 [Editor Doc Download] User "${userName}" (${userRole}) requesting ${downloadFormat} editor document for change log ${changeLogId}`);
+
       const result = await articleService.downloadEditorDocument(changeLogId, userId, userRoles, downloadFormat);
 
       // Get article info for watermark
@@ -1108,6 +1195,7 @@ export class ArticleController {
             select: {
               id: true,
               title: true,
+              status: true,
             },
           },
         },
@@ -1117,8 +1205,8 @@ export class ArticleController {
       let watermarkedBuffer: Buffer;
       
       if (downloadFormat === 'pdf') {
-        // Add logo watermark to PDF
-        console.log(`💧 [Editor Doc Download] Adding watermark to PDF`);
+        // Add logo watermark to PDF with role-based URL logic
+        console.log(`💧 [Editor Doc Download] Adding watermark to PDF for ${userRole} role`);
         watermarkedBuffer = await addWatermarkToPdf(
           result.filePath,
           {
@@ -1127,11 +1215,13 @@ export class ArticleController {
             articleTitle: changeLog?.article.title || 'Editor Document',
             articleId: changeLog?.article.id || '',
             frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
-          }
+          },
+          userRole as 'USER' | 'EDITOR' | 'REVIEWER' | 'ADMIN',
+          changeLog?.article.status || 'DRAFT'
         );
       } else {
-        // Add text watermark to Word
-        console.log(`💧 [Editor Doc Download] Adding watermark to Word`);
+        // Add text watermark to Word (no URLs in DOCX)
+        console.log(`💧 [Editor Doc Download] Adding watermark to Word (no URLs in DOCX)`);
         watermarkedBuffer = await addSimpleWatermarkToWord(
           result.filePath,
           {
@@ -1150,6 +1240,7 @@ export class ArticleController {
       res.setHeader('Content-Length', watermarkedBuffer.length);
 
       console.log(`✅ [Editor Doc Download] Sending watermarked file: ${result.filename} (${watermarkedBuffer.length} bytes)`);
+      console.log(`🔗 [Editor Doc Download] URL included: ${downloadFormat === 'pdf' && userRole === 'USER' && changeLog?.article.status === 'PUBLISHED'}`);
 
       // Send watermarked file buffer
       res.send(watermarkedBuffer);
@@ -1363,6 +1454,269 @@ export class ArticleController {
       });
     } catch (error) {
       next(error);
+    }
+  }
+
+  // NEW: Admin assigns reviewer (after editor approval)
+  async assignReviewer(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+      const { reviewerId, reason } = req.body;
+
+      if (!reviewerId) {
+        throw new BadRequestError("Reviewer ID is required");
+      }
+
+      const adminId = req.user!.id;
+
+      const result = await articleService.assignReviewer(articleId, reviewerId, adminId, reason);
+
+      // 🔥 AUDIT: Record reviewer assignment/reassignment
+      if (result.isReassignment && result.oldReviewer) {
+        await this.auditService.recordReviewerReassignment(
+          {
+            id: req.user!.id,
+            name: req.user!.name || 'Admin',
+            email: req.user!.email || '',
+            organization: 'N/A'
+          },
+          {
+            id: result.article.id,
+            title: result.article.title,
+            category: result.article.category || 'General',
+            author: result.article.authorName
+          },
+          {
+            id: result.oldReviewer?.id || 'unknown',
+            name: result.oldReviewer?.name || 'Unknown Reviewer'
+          },
+          {
+            id: result.newReviewer.id,
+            name: result.newReviewer.name
+          }
+        );
+      } else {
+        await this.auditService.recordReviewerAssignment(
+          {
+            id: req.user!.id,
+            name: req.user!.name || 'Admin',
+            email: req.user!.email || '',
+            organization: 'N/A'
+          },
+          {
+            id: result.article.id,
+            title: result.article.title,
+            category: result.article.category || 'General',
+            author: result.article.authorName
+          },
+          {
+            id: result.newReviewer.id,
+            name: result.newReviewer.name
+          }
+        );
+      }
+
+      res.json({
+        message: result.isReassignment 
+          ? `Reviewer reassigned successfully from ${result.oldReviewer?.name} to ${result.newReviewer.name}`
+          : `Reviewer ${result.newReviewer.name} assigned successfully`,
+        article: result.article,
+        isReassignment: result.isReassignment,
+        oldReviewer: result.oldReviewer,
+        newReviewer: result.newReviewer,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // NEW: Reviewer uploads corrected document (DOCX only)
+  async reviewerUploadCorrectedDocument(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+      const reviewerId = req.user!.id;
+
+      if (!req.fileMeta?.url) {
+        throw new BadRequestError("DOCX file is required");
+      }
+
+      // Validate request body
+      const validatedData = uploadCorrectedPdfSchema.parse(req.body);
+
+      const data: UploadCorrectedPdfData = {
+        pdfUrl: req.fileMeta.url, // Actually DOCX for reviewers
+        comments: validatedData.comments,
+      };
+
+      const result = await articleService.reviewerUploadCorrectedDocument(articleId, reviewerId, data);
+
+      // 🔥 AUDIT: Record reviewer upload with editing duration
+      const editingDuration = await this.calculateEditingDuration(articleId, reviewerId);
+      
+      try {
+        const fullArticle = await articleService.getArticleById(articleId);
+        await this.auditService.recordReviewerUpload(
+          {
+            id: req.user!.id,
+            name: req.user!.name || 'Reviewer',
+            email: req.user!.email || '',
+            organization: 'N/A'
+          },
+          {
+            id: articleId,
+            title: fullArticle.title,
+            category: fullArticle.category || 'General',
+            author: fullArticle.authorName
+          },
+          this.parseEditingDuration(editingDuration)
+        );
+      } catch (auditError) {
+        console.error('Failed to record reviewer upload audit event:', auditError);
+        // Continue with response even if audit fails
+      }
+
+      res.json({
+        message: "Document reviewed and uploaded successfully. Pending reviewer approval.",
+        article: result.article,
+        extractedTextLength: result.extractedTextLength,
+        files: result.files,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // NEW: Reviewer approves article (sends to admin for publishing)
+  async reviewerApproveArticle(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+      const reviewerId = req.user!.id;
+
+      const article = await articleService.reviewerApproveArticle(articleId, reviewerId);
+
+      // 🔥 AUDIT: Record reviewer approval (using final decision audit)
+      try {
+        await this.auditService.recordFinalDecision(
+          {
+            id: req.user!.id,
+            name: req.user!.name || 'Reviewer',
+            email: req.user!.email || '',
+            organization: 'N/A'
+          },
+          {
+            id: article.id,
+            title: article.title,
+            category: article.category || 'General',
+            author: article.authorName
+          },
+          'REVIEWER_APPROVED'
+        );
+      } catch (auditError) {
+        console.error('Failed to record reviewer approval audit event:', auditError);
+        // Continue with response even if audit fails
+      }
+
+      res.json({
+        message: "Article approved by reviewer successfully. Admin has been notified and can now publish it.",
+        article,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // NEW: Reviewer downloads editor's document
+  async reviewerDownloadEditorDocument(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+      const reviewerId = req.user!.id;
+
+      // Verify reviewer is assigned to this article
+      const article = await articleService.getArticleById(articleId);
+      if (article.assignedReviewerId !== reviewerId) {
+        throw new ForbiddenError("You are not assigned as reviewer to this article");
+      }
+
+      const userName = req.user?.name || 'Reviewer';
+      
+      console.log(`📥 [Reviewer Download] Reviewer "${userName}" requesting editor's document for article ${articleId}`);
+      console.log(`👤 [Reviewer Download] User role: REVIEWER (no URL in DOCX watermarks)`);
+
+      // Get editor's DOCX
+      const editorDocxUrl = await articleService.getEditorDocxUrl(articleId);
+      
+      if (!editorDocxUrl) {
+        throw new BadRequestError("Editor's document not available for this article");
+      }
+
+      // 🔥 AUDIT: Record reviewer download
+      await this.auditService.recordReviewerDownload(
+        {
+          id: req.user!.id,
+          name: req.user!.name || 'Reviewer',
+          email: req.user!.email || '',
+          organization: 'N/A'
+        },
+        {
+          id: articleId,
+          title: article.title,
+          category: article.category || 'General',
+          author: article.authorName
+        }
+      );
+
+      // Add watermark to editor's DOCX (REVIEWER role - no URLs in DOCX)
+      const watermarkedDocx = await articleService.downloadEditorDocxWithWatermark(
+        articleId,
+        {
+          userName,
+          downloadDate: new Date(),
+          articleTitle: article.title,
+          articleId: articleId,
+          frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+          userRole: 'REVIEWER', // Pass role for watermarking logic
+        }
+      );
+
+      // Send watermarked DOCX file
+      const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}_editor_version.docx`;
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', watermarkedDocx.length.toString());
+      
+      console.log(`✅ [Reviewer Download] Sending watermarked editor's DOCX file (${watermarkedDocx.length} bytes)`);
+      console.log(`🔗 [Reviewer Download] URL included: false (DOCX files don't include URLs)`);
+      
+      res.send(watermarkedDocx);
+    } catch (error) {
+      console.error('❌ [Reviewer Download] Failed:', error);
+      next(error);
+    }
+  }
+
+  // Helper method to parse editing duration string into object
+  private parseEditingDuration(durationString: string): { days: number; hours: number; minutes: number } {
+    const defaultDuration = { days: 0, hours: 0, minutes: 0 };
+    
+    if (!durationString || durationString === "N/A") {
+      return defaultDuration;
+    }
+
+    try {
+      // Parse strings like "2 days, 3 hours, 45 minutes" or "3 hours, 45 minutes" or "45 minutes"
+      const dayMatch = durationString.match(/(\d+)\s+days?/);
+      const hourMatch = durationString.match(/(\d+)\s+hours?/);
+      const minuteMatch = durationString.match(/(\d+)\s+minutes?/);
+
+      return {
+        days: dayMatch ? parseInt(dayMatch[1] || '0') : 0,
+        hours: hourMatch ? parseInt(hourMatch[1] || '0') : 0,
+        minutes: minuteMatch ? parseInt(minuteMatch[1] || '0') : 0,
+      };
+    } catch (error) {
+      console.error('Failed to parse editing duration:', error);
+      return defaultDuration;
     }
   }
 }

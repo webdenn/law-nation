@@ -77,6 +77,68 @@ export const recordFinalDecision = async (
   }
 };
 
+// NEW: Reviewer audit helper functions
+export const recordReviewerAssignment = async (
+  adminProfile: UserProfile,
+  articleInfo: ArticleInfo,
+  reviewerInfo: EditorInfo
+): Promise<void> => {
+  try {
+    await auditService.recordReviewerAssignment(adminProfile, articleInfo, reviewerInfo);
+  } catch (error) {
+    console.error('Failed to record reviewer assignment audit:', error);
+  }
+};
+
+export const recordReviewerReassignment = async (
+  adminProfile: UserProfile,
+  articleInfo: ArticleInfo,
+  previousReviewer: EditorInfo,
+  newReviewer: EditorInfo
+): Promise<void> => {
+  try {
+    await auditService.recordReviewerReassignment(adminProfile, articleInfo, previousReviewer, newReviewer);
+  } catch (error) {
+    console.error('Failed to record reviewer reassignment audit:', error);
+  }
+};
+
+export const recordReviewerDownload = async (
+  reviewerProfile: UserProfile,
+  articleInfo: ArticleInfo
+): Promise<void> => {
+  try {
+    await auditService.recordReviewerDownload(reviewerProfile, articleInfo);
+  } catch (error) {
+    console.error('Failed to record reviewer download audit:', error);
+  }
+};
+
+export const recordReviewerUpload = async (
+  reviewerProfile: UserProfile,
+  articleInfo: ArticleInfo,
+  editingDuration: { days: number; hours: number; minutes: number }
+): Promise<void> => {
+  try {
+    await auditService.recordReviewerUpload(reviewerProfile, articleInfo, editingDuration);
+  } catch (error) {
+    console.error('Failed to record reviewer upload audit:', error);
+  }
+};
+
+export const recordAdminOverride = async (
+  adminProfile: UserProfile,
+  articleInfo: ArticleInfo,
+  overrideType: 'DIRECT_PUBLISH' | 'BYPASS_EDITOR' | 'BYPASS_REVIEWER',
+  reason: string
+): Promise<void> => {
+  try {
+    await auditService.recordAdminOverride(adminProfile, articleInfo, overrideType, reason);
+  } catch (error) {
+    console.error('Failed to record admin override audit:', error);
+  }
+};
+
 /**
  * Helper to calculate editing duration between two dates
  */
@@ -128,6 +190,11 @@ export const getEventTypeDisplayName = (eventType: string): string => {
     'EDITOR_REASSIGN': 'Reassigned to Editor',
     'EDITOR_DOWNLOAD': 'Document Downloaded',
     'EDITOR_UPLOAD': 'Document Uploaded',
+    'REVIEWER_ASSIGN': 'Assigned to Reviewer',
+    'REVIEWER_REASSIGN': 'Reassigned to Reviewer',
+    'REVIEWER_DOWNLOAD': 'Document Downloaded by Reviewer',
+    'REVIEWER_UPLOAD': 'Document Uploaded by Reviewer',
+    'ADMIN_OVERRIDE': 'Admin Override',
     'FINAL_DECISION': 'Final Decision'
   };
   
@@ -145,6 +212,11 @@ export const getEventTypeIcon = (eventType: string): string => {
     'EDITOR_REASSIGN': '🔄',
     'EDITOR_DOWNLOAD': '📥',
     'EDITOR_UPLOAD': '📤',
+    'REVIEWER_ASSIGN': '👨‍🔬',
+    'REVIEWER_REASSIGN': '🔄',
+    'REVIEWER_DOWNLOAD': '📥',
+    'REVIEWER_UPLOAD': '📤',
+    'ADMIN_OVERRIDE': '🔒',
     'FINAL_DECISION': '✅'
   };
   

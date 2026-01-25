@@ -319,6 +319,177 @@ class AdminDashboardService {
       totalDays: publishedAt ? this.daysBetween(submittedAt, publishedAt) : null,
     };
   }
+
+  /**
+   * NEW: Admin override - publish article directly without editor/reviewer
+   */
+  async adminOverridePublish(articleId: string, adminId: string, reason: string): Promise<any> {
+    try {
+      console.log(`🔒 [Admin Override] Publishing article ${articleId} directly by admin ${adminId}`);
+      
+      const article = await prisma.article.findUnique({
+        where: { id: articleId },
+        select: { 
+          id: true, 
+          title: true, 
+          status: true, 
+          authorEmail: true, 
+          authorName: true,
+          assignedEditorId: true,
+          assignedReviewerId: true
+        }
+      });
+
+      if (!article) {
+        throw new NotFoundError('Article not found');
+      }
+
+      // Admin can override in these statuses
+      const allowedStatuses = [
+        'PENDING_ADMIN_REVIEW',
+        'ASSIGNED_TO_EDITOR', 
+        'ASSIGNED_TO_REVIEWER',
+        'EDITOR_EDITING',
+        'REVIEWER_EDITING'
+      ];
+
+      if (!allowedStatuses.includes(article.status)) {
+        throw new BadRequestError(
+          `Cannot override publish in status: ${article.status}. Article may already be published or in final approval.`
+        );
+      }
+
+      // Update article to published status
+      const updatedArticle = await prisma.article.update({
+        where: { id: articleId },
+        data: {
+          status: 'PUBLISHED',
+          approvedAt: new Date(),
+        }
+      });
+
+      // Get admin user details for audit
+      const adminUser = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { name: true, email: true, title: true }
+      });
+
+      // Create audit log for admin override
+      await prisma.auditEvent.create({
+        data: {
+          eventType: 'ADMIN_OVERRIDE',
+          eventDate: new Date().toISOString().split('T')[0] || new Date().getFullYear() + '-01-01',
+          eventTime: new Date().toTimeString().split(' ')[0] || '00:00:00',
+          eventYear: new Date().getFullYear(),
+          userId: adminId,
+          userName: adminUser?.name || 'Unknown Admin',
+          userEmail: adminUser?.email || 'admin@lawnation.com',
+          userOrganization: adminUser?.title || 'LAW NATION',
+          articleId: article.id,
+          articleTitle: article.title,
+          articleCategory: 'OVERRIDE',
+          articleAuthor: article.authorName || 'Unknown',
+          decisionOutcome: 'PUBLISHED',
+          overrideReason: reason
+        }
+      });
+
+      // Send override notification email
+      // Import and send override notification
+      const { workflowOverrideTemplate } = await import("../../templates/email/admin/workflow-override.template.js");
+      const { emailService } = await import("@/services/email/email.service.js");
+      
+      const overrideEmailContent = workflowOverrideTemplate(
+        adminUser?.name || 'Admin',
+        article.title,
+        article.id,
+        reason,
+        process.env.FRONTEND_URL || 'http://localhost:3000'
+      );
+
+      // Send to admin team (you may want to configure admin emails)
+      const adminEmails = process.env.ADMIN_EMAILS?.split(',') || [];
+      for (const adminEmail of adminEmails) {
+        try {
+          // Use the public sendEmail method from emailService
+          await (emailService as any).sendEmail(
+            adminEmail.trim(),
+            `Admin Override - ${article.title}`,
+            overrideEmailContent
+          );
+        } catch (emailError) {
+          console.error(`Failed to send override notification to ${adminEmail}:`, emailError);
+        }
+      }
+
+      console.log(`✅ [Admin Override] Article "${article.title}" published directly by admin`);
+
+      return {
+        message: 'Article published successfully via admin override',
+        article: updatedArticle,
+        overrideReason: reason,
+        bypassedWorkflow: {
+          hadEditor: !!article.assignedEditorId,
+          hadReviewer: !!article.assignedReviewerId
+        }
+      };
+
+    } catch (error: any) {
+      console.error(`❌ [Admin Override] Failed to override publish:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * NEW: Get articles eligible for admin override
+   */
+  async getArticlesEligibleForOverride(): Promise<any[]> {
+    try {
+      console.log(`📋 [Admin Override] Fetching articles eligible for admin override`);
+      
+      const articles = await prisma.article.findMany({
+        where: {
+          status: {
+            in: [
+              'PENDING_ADMIN_REVIEW',
+              'ASSIGNED_TO_EDITOR',
+              'ASSIGNED_TO_REVIEWER',
+              'EDITOR_EDITING',
+              'REVIEWER_IN_PROGRESS'
+            ]
+          }
+        },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          authorName: true,
+          submittedAt: true,
+          assignedEditorId: true,
+          assignedReviewerId: true
+        },
+        orderBy: { submittedAt: 'desc' }
+      });
+
+      const eligibleArticles = articles.map(article => ({
+        id: article.id,
+        title: article.title,
+        status: article.status,
+        authorName: article.authorName,
+        submittedAt: article.submittedAt,
+        assignedEditor: article.assignedEditorId || null,
+        assignedReviewer: article.assignedReviewerId || null,
+        daysWaiting: this.daysBetween(article.submittedAt, new Date()) || 0
+      }));
+
+      console.log(`✅ [Admin Override] Found ${eligibleArticles.length} articles eligible for override`);
+      return eligibleArticles;
+
+    } catch (error: any) {
+      console.error(`❌ [Admin Override] Failed to fetch eligible articles:`, error);
+      throw new BadRequestError('Failed to fetch articles eligible for override');
+    }
+  }
 }
 
 export const adminDashboardService = new AdminDashboardService();

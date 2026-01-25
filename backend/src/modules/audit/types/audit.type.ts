@@ -5,9 +5,14 @@ export type AuditEventType =
   | 'EDITOR_REASSIGN' 
   | 'EDITOR_DOWNLOAD' 
   | 'EDITOR_UPLOAD' 
+  | 'REVIEWER_ASSIGN'
+  | 'REVIEWER_REASSIGN'
+  | 'REVIEWER_DOWNLOAD'
+  | 'REVIEWER_UPLOAD'
+  | 'ADMIN_OVERRIDE'
   | 'FINAL_DECISION';
 
-export type DecisionOutcome = 'PUBLISHED' | 'REJECTED';
+export type DecisionOutcome = 'PUBLISHED' | 'REJECTED' | 'REVIEWER_APPROVED';
 
 export interface UserProfile {
   id: string;

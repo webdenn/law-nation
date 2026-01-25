@@ -19,6 +19,7 @@ import { generateEditorReassignmentNotificationHtml } from "@/templates/email/ed
 import { generateReviewerInvitationHtml } from "@/templates/email/reviewer/invitation.template.js";
 import { generateReviewerTaskAssignedHtml } from "@/templates/email/reviewer/task-assigned.template.js";
 import { generateReviewerReassignmentNotificationHtml } from "@/templates/email/reviewer/reassignment-notification.template.js";
+import { generateArticleUploadNotificationHtml } from "@/templates/email/admin/article-upload-notification.template.js";
 
 /**
  * Email Service
@@ -333,6 +334,32 @@ export class EmailService {
   }
 
   // ==================== ADMIN EMAILS ====================
+
+  /**
+   * Send article upload notification to admin
+   */
+  async sendArticleUploadNotificationToAdmin(
+    adminEmail: string,
+    adminName: string,
+    uploaderName: string,
+    uploaderEmail: string,
+    articleTitle: string,
+    articleId: string,
+    category?: string,
+    organization?: string
+  ): Promise<void> {
+    const { subject, html } = generateArticleUploadNotificationHtml({
+      adminName,
+      uploaderName,
+      uploaderEmail,
+      articleTitle,
+      articleId,
+      ...(category && { category }),
+      ...(organization && { organization }),
+      frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
+    });
+    await this.sendEmail(adminEmail, subject, html);
+  }
 
   /**
    * Send editor approval notification to admin

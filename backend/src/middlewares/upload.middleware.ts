@@ -244,13 +244,18 @@ async function addUploadWatermark(
 
   try {
     if (mimetype === 'application/pdf') {
-      console.log(`📄 [Upload Watermark] Processing PDF...`);
-      return await addWatermarkToPdf(filePath, watermarkData);
+      console.log(`📄 [Upload Watermark] Processing PDF for upload (no URL - internal use)...`);
+      return await addWatermarkToPdf(
+        filePath, 
+        watermarkData,
+        'ADMIN',  // Upload watermarks are for internal/editorial use - no URLs
+        'DRAFT'   // Upload status is always draft
+      );
     } else if (
       mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       mimetype === 'application/msword'
     ) {
-      console.log(`📝 [Upload Watermark] Processing Word document...`);
+      console.log(`📝 [Upload Watermark] Processing Word document (no URLs in DOCX)...`);
       return await addSimpleWatermarkToWord(filePath, watermarkData);
     } else {
       console.warn(`⚠️ [Upload Watermark] Unsupported file type: ${mimetype}`);
@@ -1243,6 +1248,94 @@ export const uploadDocxOnly = (req: Request, res: Response, next: NextFunction) 
       } catch (error) {
         console.error('❌ [Upload] DOCX Supabase upload failed:', error);
         res.status(500).json({ error: "DOCX upload failed" });
+      }
+    });
+  }
+};
+
+// NEW: REVIEWER DOCX ONLY UPLOAD HANDLER (strict DOCX-only for reviewers)
+export const uploadReviewerDocxOnly = (req: Request, res: Response, next: NextFunction) => {
+  // Reviewer-specific file filter - ONLY DOCX allowed
+  const reviewerDocxFilter = (req: Request, file: Express.Multer.File, cb: any) => {
+    if (file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      cb(null, true);
+    } else {
+      cb(new Error("Reviewers can only upload DOCX files. PDF uploads are not allowed for reviewers."), false);
+    }
+  };
+
+  if (isLocal) {
+    const reviewerUpload = multer({
+      storage: multer.diskStorage({
+        destination: (_req, _file, cb) => {
+          cb(null, 'uploads/words/');
+        },
+        filename: (_req, file, cb) => {
+          const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+          cb(null, unique + path.extname(file.originalname));
+        },
+      }),
+      fileFilter: reviewerDocxFilter,
+      limits: { fileSize: MAX_DOCUMENT_SIZE },
+    });
+
+    reviewerUpload.single("document")(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file)
+        return res.status(400).json({ error: "DOCX file required for reviewer upload" });
+
+      try {
+        const tempFilePath = path.join(process.cwd(), 'uploads/words/', req.file.filename);
+
+        console.log(`🔖 [Reviewer Upload] Processing reviewer DOCX: ${tempFilePath}`);
+
+        // For reviewer DOCX files, keep clean for Adobe processing
+        const url = `/uploads/words/${req.file.filename}`;
+
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+
+        console.log(`✅ [Reviewer Upload] DOCX file ready for reviewer processing: ${url}`);
+        next();
+      } catch (error) {
+        console.error('❌ [Reviewer Upload] DOCX processing failed:', error);
+        const url = `/uploads/words/${req.file.filename}`;
+
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+        next();
+      }
+    });
+  } else {
+    const reviewerUpload = multer({
+      storage: multer.memoryStorage(),
+      fileFilter: reviewerDocxFilter,
+      limits: { fileSize: MAX_DOCUMENT_SIZE },
+    });
+
+    reviewerUpload.single("document")(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      const file = req.file as Express.Multer.File | undefined;
+      if (!file) return res.status(400).json({ error: "DOCX file required for reviewer upload" });
+
+      try {
+        console.log(`🔖 [Reviewer Upload] Processing reviewer DOCX for Supabase...`);
+
+        // Upload DOCX to Supabase (watermarking will be handled by Adobe service)
+        const { url, storageKey } = await uploadBufferToSupabase(
+          file.buffer,
+          file.originalname,
+          file.mimetype
+        );
+
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey };
+
+        console.log(`✅ [Reviewer Upload] DOCX uploaded to Supabase: ${url}`);
+        next();
+      } catch (error) {
+        console.error('❌ [Reviewer Upload] DOCX Supabase upload failed:', error);
+        res.status(500).json({ error: "Reviewer DOCX upload failed" });
       }
     });
   }

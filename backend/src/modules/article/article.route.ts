@@ -134,6 +134,13 @@ router.get(
   articleController.getArticleContentBySlug.bind(articleController)
 );
 
+// NEW: Authentication check route for PDF URL access
+router.get(
+  "/:id/auth-check",
+  optionalAuth,  // Check auth but don't require it
+  articleController.checkArticleAccess.bind(articleController)
+);
+
 // Protected routes - Require authentication
 router.use(requireAuth);
 
@@ -216,6 +223,36 @@ router.patch(
   "/:id/extract-text",
   requirePermission("article", "write"),
   articleController.extractDocumentText.bind(articleController)
+);
+
+// NEW: Admin assigns reviewer (after editor approval)
+router.patch(
+  "/:id/assign-reviewer",
+  requirePermission("article", "write"),
+  articleController.assignReviewer.bind(articleController)
+);
+
+// NEW: Reviewer uploads corrected document (DOCX only)
+router.patch(
+  "/:id/reviewer-upload",
+  requirePermission("article", "write"),
+  uploadDocxOnly, // Reviewers can only upload DOCX files
+  articleController.reviewerUploadCorrectedDocument.bind(articleController)
+);
+
+// NEW: Reviewer approves article (sends to admin for publishing)
+router.patch(
+  "/:id/reviewer-approve",
+  requirePermission("article", "write"),
+  articleController.reviewerApproveArticle.bind(articleController)
+);
+
+// NEW: Reviewer downloads editor's document
+router.get(
+  "/:id/download/editor-document-for-reviewer",
+  requireAuth,
+  requirePermission("article", "read"),
+  articleController.reviewerDownloadEditorDocument.bind(articleController)
 );
 
 // List articles with filters

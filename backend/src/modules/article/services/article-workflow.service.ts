@@ -706,7 +706,7 @@ export class ArticleWorkflowService {
     };
   }
 
-  //Editor approves article (submits for publishing)
+  //Editor approves article (NEW WORKFLOW: goes to reviewer if assigned, otherwise to admin)
 
   async editorApproveArticle(articleId: string, editorId: string) {
     const article = await prisma.article.findUnique({
@@ -730,10 +730,13 @@ export class ArticleWorkflowService {
       throw new BadRequestError("Article cannot be approved in current status");
     }
 
+    // NEW WORKFLOW: Check if reviewer is assigned
+    const nextStatus = article.assignedReviewerId ? "ASSIGNED_TO_REVIEWER" : "EDITOR_APPROVED";
+    
     const updatedArticle = await prisma.article.update({
       where: { id: articleId },
       data: {
-        status: "EDITOR_APPROVED",
+        status: nextStatus,
         editorApprovedAt: new Date(),
         reviewedAt: new Date(),
       },
@@ -744,14 +747,296 @@ export class ArticleWorkflowService {
       data: { status: "approved" },
     });
 
+    // NEW WORKFLOW: Send notification based on next step
+    if (article.assignedReviewerId) {
+      // Notify reviewer that editor has approved and article is ready for review
+      const reviewer = await prisma.user.findUnique({
+        where: { id: article.assignedReviewerId }
+      });
+      
+      if (reviewer) {
+        // Import reviewer notification function (will be created)
+        const { sendReviewerAssignmentNotification } = await import("@/utils/email.utils.js");
+        await sendReviewerAssignmentNotification(
+          reviewer.email,
+          reviewer.name,
+          article.title,
+          article.authorName,
+          article.category,
+          article.id
+        );
+        console.log(`📧 [New Workflow] Reviewer ${reviewer.name} notified of editor approval`);
+      }
+    } else {
+      // No reviewer assigned - notify admin as before
+      await notifyAdminOfEditorApproval(
+        articleId,
+        article.title,
+        article.assignedEditor?.name || "Editor"
+      );
+      console.log(`📧 [New Workflow] Admin notified of editor approval (no reviewer assigned)`);
+    }
+
+    console.log(
+      `✅ [Editor Approval] Article ${articleId} approved by editor ${editorId}, next: ${nextStatus}`
+    );
+
+    return updatedArticle;
+  }
+
+  // NEW: Admin assigns reviewer (after editor approval)
+  async assignReviewer(
+    articleId: string,
+    reviewerId: string,
+    adminId: string,
+    reason?: string
+  ) {
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+      include: { assignedReviewer: true },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
+
+    // Can assign reviewer after editor approval or if already assigned to reviewer
+    const allowedStatuses = ["EDITOR_APPROVED", "ASSIGNED_TO_REVIEWER", "REVIEWER_EDITING"];
+    if (!allowedStatuses.includes(article.status)) {
+      throw new BadRequestError(
+        `Cannot assign reviewer in current status: ${article.status}. Must be editor approved first.`
+      );
+    }
+
+    if (article.assignedReviewerId === reviewerId) {
+      throw new BadRequestError("Article is already assigned to this reviewer");
+    }
+
+    const newReviewer = await prisma.user.findUnique({
+      where: { id: reviewerId },
+    });
+    if (!newReviewer) {
+      throw new NotFoundError("Reviewer not found");
+    }
+
+    const isReassignment = !!article.assignedReviewerId;
+    const oldReviewer = article.assignedReviewer;
+
+    console.log(
+      isReassignment
+        ? `🔄 [Reviewer Reassignment] Article ${articleId}: ${oldReviewer?.name} → ${newReviewer.name}`
+        : `✨ [Reviewer Assignment] Article ${articleId}: → ${newReviewer.name}`
+    );
+
+    const updatedArticle = await prisma.article.update({
+      where: { id: articleId },
+      data: {
+        assignedReviewerId: reviewerId,
+        status: "ASSIGNED_TO_REVIEWER",
+      },
+      include: { assignedReviewer: true },
+    });
+
+    // Send notifications
+    const { sendReviewerAssignmentNotification, sendReviewerReassignmentNotification } = await import("@/utils/email.utils.js");
+    
+    if (isReassignment && oldReviewer) {
+      await sendReviewerReassignmentNotification(
+        oldReviewer.email,
+        oldReviewer.name,
+        article.title,
+        article.id
+      );
+    }
+
+    await sendReviewerAssignmentNotification(
+      newReviewer.email,
+      newReviewer.name,
+      article.title,
+      article.authorName,
+      article.category,
+      article.id
+    );
+
+    console.log(`✅ [Reviewer Assignment] Article ${articleId} assigned to reviewer ${reviewerId}`);
+
+    return {
+      article: updatedArticle,
+      isReassignment,
+      oldReviewer: isReassignment
+        ? { id: oldReviewer?.id, name: oldReviewer?.name, email: oldReviewer?.email }
+        : null,
+      newReviewer: {
+        id: newReviewer.id,
+        name: newReviewer.name,
+        email: newReviewer.email,
+      },
+    };
+  }
+
+  // NEW: Reviewer uploads corrected document (DOCX only)
+  async reviewerUploadCorrectedDocument(
+    articleId: string,
+    reviewerId: string,
+    data: UploadCorrectedPdfData
+  ) {
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
+
+    if (article.assignedReviewerId !== reviewerId) {
+      throw new ForbiddenError("You are not assigned as reviewer to this article");
+    }
+
+    const validStatuses = ["ASSIGNED_TO_REVIEWER", "REVIEWER_EDITING"];
+    if (!validStatuses.includes(article.status)) {
+      throw new BadRequestError(
+        `Cannot upload corrections in current status: ${article.status}`
+      );
+    }
+
+    // Validate uploaded file is DOCX (reviewers can only upload DOCX)
+    if (!data.pdfUrl.toLowerCase().endsWith('.docx')) {
+      throw new BadRequestError('Reviewers can only upload DOCX files');
+    }
+
+    try {
+      // Process reviewer's DOCX upload
+      const docxPath = resolveToAbsolutePath(data.pdfUrl);
+      console.log(`📄 [Reviewer Upload] Processing DOCX: ${docxPath}`);
+
+      if (!fileExistsAtPath(data.pdfUrl)) {
+        throw new Error(`DOCX file not found: ${docxPath}`);
+      }
+
+      // Convert DOCX to PDF for preview
+      const pdfPath = docxPath.replace(/\.docx$/i, '_reviewer.pdf');
+      console.log(`🔄 [Adobe] Converting reviewer DOCX to PDF`);
+      await adobeService.convertDocxToPdf(docxPath, pdfPath);
+
+      // Extract text from PDF for content
+      console.log(`🔍 [Adobe] Extracting text from reviewer PDF`);
+      const extractedText = await adobeService.extractTextFromPdf(pdfPath);
+
+      // Create watermarked versions
+      const watermarkData = {
+        userName: 'LAW NATION REVIEWER',
+        downloadDate: new Date(),
+        articleTitle: article.title,
+        articleId: article.id,
+        frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+      };
+
+      // Watermark DOCX
+      const watermarkedDocxPath = docxPath.replace(/\.docx$/i, '_reviewer_watermarked.docx');
+      await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
+
+      // Watermark PDF
+      const watermarkedPdfPath = pdfPath.replace(/\.pdf$/i, '_watermarked.pdf');
+      await adobeService.addWatermarkToPdf(pdfPath, watermarkedPdfPath, watermarkData);
+
+      // Convert paths to relative for database
+      const { convertToWebPath } = await import('@/utils/file-path.utils.js');
+      const relativeWatermarkedDocx = convertToWebPath(watermarkedDocxPath);
+      const relativeWatermarkedPdf = convertToWebPath(watermarkedPdfPath);
+
+      // Update article with reviewer's version
+      const updatedArticle = await prisma.article.update({
+        where: { id: articleId },
+        data: {
+          content: extractedText,
+          contentHtml: extractedText.replace(/\n/g, '<br>'),
+          currentPdfUrl: relativeWatermarkedPdf,
+          currentWordUrl: relativeWatermarkedDocx,
+          status: "REVIEWER_IN_PROGRESS",
+          reviewedAt: new Date(),
+        },
+      });
+
+      // Create change log for reviewer
+      await prisma.articleChangeLog.create({
+        data: {
+          articleId: article.id,
+          versionNumber: await this.getNextVersionNumber(articleId),
+          oldFileUrl: article.currentWordUrl || "",
+          newFileUrl: relativeWatermarkedDocx,
+          fileType: "DOCX",
+          diffData: {
+            type: "reviewer_edit",
+            message: "Document reviewed and edited by reviewer",
+            extractedTextLength: extractedText.length,
+          } as any,
+          editedBy: reviewerId,
+          status: "pending",
+          comments: data.comments || "Document reviewed by reviewer",
+        },
+      });
+
+      console.log(`✅ [Reviewer Upload] Article ${articleId} processed by reviewer ${reviewerId}`);
+
+      return {
+        message: "Document reviewed and processed successfully",
+        article: updatedArticle,
+        extractedTextLength: extractedText.length,
+        files: {
+          watermarkedDocx: relativeWatermarkedDocx,
+          watermarkedPdf: relativeWatermarkedPdf,
+        }
+      };
+
+    } catch (error: any) {
+      console.error(`❌ [Reviewer Upload] Failed to process article ${articleId}:`, error);
+      throw new InternalServerError(`Failed to process reviewer document: ${error.message}`);
+    }
+  }
+
+  // NEW: Reviewer approves article (sends to admin for publishing)
+  async reviewerApproveArticle(articleId: string, reviewerId: string) {
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+      include: { assignedReviewer: true },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
+
+    if (article.assignedReviewerId !== reviewerId) {
+      throw new ForbiddenError("You are not assigned as reviewer to this article");
+    }
+
+    const validStatuses = ["ASSIGNED_TO_REVIEWER", "REVIEWER_EDITING"];
+    if (!validStatuses.includes(article.status)) {
+      throw new BadRequestError("Article cannot be approved in current status");
+    }
+
+    const updatedArticle = await prisma.article.update({
+      where: { id: articleId },
+      data: {
+        status: "REVIEWER_APPROVED",
+        reviewedAt: new Date(),
+      },
+    });
+
+    // Mark reviewer's change logs as approved
+    await prisma.articleChangeLog.updateMany({
+      where: { articleId, status: "pending", editedBy: reviewerId },
+      data: { status: "approved" },
+    });
+
+    // Notify admin that reviewer has approved
     await notifyAdminOfEditorApproval(
       articleId,
       article.title,
-      article.assignedEditor?.name || "Editor"
+      article.assignedReviewer?.name || "Reviewer"
     );
 
     console.log(
-      `✅ [Editor Approval] Article ${articleId} approved by editor ${editorId}`
+      `✅ [Reviewer Approval] Article ${articleId} approved by reviewer ${reviewerId}`
     );
 
     return updatedArticle;
@@ -874,52 +1159,72 @@ export class ArticleWorkflowService {
     return updatedArticle;
   }
 
-  //Admin publishes article (only after editor approval)
+  //Admin publishes article (NEW WORKFLOW: handles editor-only, reviewer, or admin override)
 
   async adminPublishArticle(articleId: string, adminId: string) {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
-      include: { assignedEditor: true },
+      include: { assignedEditor: true, assignedReviewer: true },
     });
 
     if (!article) {
       throw new NotFoundError("Article not found");
     }
 
-    if (article.status !== "EDITOR_APPROVED") {
+    // NEW WORKFLOW: Admin can publish in multiple scenarios
+    const validStatuses = [
+      "EDITOR_APPROVED",        // Editor approved, no reviewer
+      "REVIEWER_APPROVED",      // Reviewer approved after editor
+      "PENDING_ADMIN_REVIEW",   // Admin override - no editor/reviewer assigned
+      "ASSIGNED_TO_EDITOR",     // Admin override - editor assigned but admin publishes directly
+      "ASSIGNED_TO_REVIEWER"    // Admin override - reviewer assigned but admin publishes directly
+    ];
+
+    if (!validStatuses.includes(article.status)) {
       throw new BadRequestError(
-        "Article must be approved by editor before publishing. Current status: " +
-        article.status
+        `Article cannot be published in current status: ${article.status}. Valid statuses: ${validStatuses.join(', ')}`
       );
     }
 
+    // Determine which version to publish based on workflow
+    let publishingMessage = "";
+    if (article.status === "REVIEWER_APPROVED") {
+      publishingMessage = "Publishing reviewer-approved version";
+    } else if (article.status === "EDITOR_APPROVED") {
+      publishingMessage = "Publishing editor-approved version (no reviewer)";
+    } else {
+      publishingMessage = "Admin override: Publishing current version directly";
+    }
+
+    console.log(`📰 [Admin Publish] ${publishingMessage} for article ${articleId}`);
+
     // NEW: Handle document vs article publishing differently
     if (article.contentType === 'DOCUMENT') {
-      return await this.publishDocument(article, adminId);
+      return await this.publishDocument(article, adminId, publishingMessage);
     } else {
-      return await this.publishArticle(article, adminId);
+      return await this.publishArticle(article, adminId, publishingMessage);
     }
   }
 
-  // NEW: Publish document with Adobe text extraction from edited version
-  private async publishDocument(article: any, adminId: string) {
-    console.log(`📄 [Document Publish] Publishing document ${article.id} with Adobe text extraction from edited version`);
+  // NEW: Publish document with Adobe text extraction from final version
+  private async publishDocument(article: any, adminId: string, publishingMessage?: string) {
+    console.log(`📄 [Document Publish] ${publishingMessage || 'Publishing document'} ${article.id}`);
 
     let extractedText = '';
 
-    // Extract text from edited version using Adobe PDF extraction
+    // Extract text from final version using Adobe PDF extraction
     if (article.currentPdfUrl) {
       try {
-        console.log(`🔍 [Adobe Extract] Extracting text from edited PDF version: ${article.currentPdfUrl}`);
+        console.log(`🔍 [Adobe Extract] Extracting text from final PDF version: ${article.currentPdfUrl}`);
         extractedText = await adobeService.extractTextFromPdf(article.currentPdfUrl);
-        console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from edited version`);
+        console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from final version`);
       } catch (error) {
         console.error('❌ [Adobe Extract] Text extraction failed:', error);
         extractedText = 'Text extraction failed. Please contact administrator.';
       }
     } else {
-      console.warn('⚠️ [Document Publish] No edited PDF version available for text extraction');
-      extractedText = 'Document not yet edited. Please contact administrator.';
+      console.warn('⚠️ [Document Publish] No final PDF version available for text extraction');
+      extractedText = 'Document not yet processed. Please contact administrator.';
     }
 
     // Update article with extracted text and published status
@@ -928,17 +1233,18 @@ export class ArticleWorkflowService {
       data: {
         status: "PUBLISHED",
         approvedAt: new Date(),
-        content: extractedText, // Store text from edited version for user display
+        content: extractedText, // Store text from final version for user display
+        finalPdfUrl: article.currentPdfUrl, // Set final published version
       },
     });
 
-    // Mark change logs as published
+    // Mark all change logs as published
     await prisma.articleChangeLog.updateMany({
       where: { articleId: article.id, status: "approved" },
       data: { status: "published" },
     });
 
-    // Complete editor assignment
+    // Complete editor assignment if exists
     if (article.assignedEditorId) {
       await articleHistoryService.markAsCompleted(
         article.id,
@@ -946,26 +1252,28 @@ export class ArticleWorkflowService {
       );
     }
 
-    // Notify uploader
+    // Notify uploader with appropriate message
+    const notificationMessage = publishingMessage || "Document has been professionally processed and published";
     await notifyUploaderOfPublication(
       article.id,
       article.title,
       article.authorEmail,
       article.authorName,
-      "Document has been professionally edited and published - users will see the corrected version"
+      notificationMessage
     );
 
-    console.log(`✅ [Document Publish] Document ${article.id} published successfully with edited version text extraction`);
+    console.log(`✅ [Document Publish] Document ${article.id} published successfully`);
 
     return {
-      message: "Document published successfully with edited version text extraction",
+      message: "Document published successfully",
       article: updatedArticle,
       extractedText: extractedText,
+      publishingMessage,
     };
   }
 
-  // Existing article publishing logic - Enhanced with text extraction
-  private async publishArticle(article: any, adminId: string) {
+  // Enhanced article publishing logic with new workflow support
+  private async publishArticle(article: any, adminId: string, publishingMessage?: string) {
     let finalDiffSummary = "No changes made";
 
     if (article.originalPdfUrl !== article.currentPdfUrl) {
@@ -990,8 +1298,7 @@ export class ArticleWorkflowService {
       );
     }
 
-
-    // NEW: Extract text from current/edited version for user display
+    // Extract text from final version for user display
     let extractedText = '';
 
     // First, check if we already have clean extracted text
@@ -1016,7 +1323,8 @@ export class ArticleWorkflowService {
       data: {
         status: "PUBLISHED",
         approvedAt: new Date(),
-        content: extractedText, // Store extracted text from edited version
+        content: extractedText, // Store extracted text from final version
+        finalPdfUrl: article.currentPdfUrl, // Set final published version
       },
     });
 
@@ -1032,12 +1340,15 @@ export class ArticleWorkflowService {
       );
     }
 
+    // Use custom message if provided, otherwise use diff summary
+    const notificationMessage = publishingMessage || finalDiffSummary;
+    
     await notifyUploaderOfPublication(
       article.id,
       article.title,
       article.authorEmail,
       article.authorName,
-      finalDiffSummary
+      notificationMessage
     );
 
     if (article.secondAuthorEmail && article.secondAuthorName) {
@@ -1046,18 +1357,19 @@ export class ArticleWorkflowService {
         article.title,
         article.secondAuthorEmail,
         article.secondAuthorName,
-        finalDiffSummary
+        notificationMessage
       );
     }
 
     console.log(
-      `✅ [Admin Publish] Article ${article.id} published by admin ${adminId} with text extraction`
+      `✅ [Admin Publish] Article ${article.id} published by admin ${adminId}`
     );
 
     return {
       article: updatedArticle,
       diffSummary: finalDiffSummary,
       extractedText: extractedText,
+      publishingMessage,
     };
   }
 

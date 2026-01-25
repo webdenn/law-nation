@@ -240,6 +240,201 @@ export class AuditService {
   }
 
   /**
+   * NEW: Record reviewer assignment
+   */
+  async recordReviewerAssignment(
+    adminProfile: UserProfile,
+    articleInfo: ArticleInfo,
+    reviewerInfo: EditorInfo
+  ): Promise<void> {
+    try {
+      const now = new Date();
+      const eventDate = now.toISOString().split('T')[0] || now.getFullYear() + '-01-01';
+      const eventTime = now.toTimeString().split(' ')[0] || '00:00:00';
+
+      await prisma.auditEvent.create({
+        data: {
+          eventType: 'REVIEWER_ASSIGN',
+          eventDate,
+          eventTime,
+          eventYear: now.getFullYear(),
+          userId: adminProfile.id,
+          userName: adminProfile.name || 'Unknown Admin',
+          userEmail: adminProfile.email || 'N/A',
+          userOrganization: adminProfile.organization || 'N/A',
+          articleId: articleInfo.id,
+          articleTitle: articleInfo.title,
+          articleCategory: articleInfo.category || 'General',
+          articleAuthor: articleInfo.author || 'Unknown',
+          targetEditorId: reviewerInfo.id,
+          targetEditorName: reviewerInfo.name || 'Unknown Reviewer'
+        }
+      });
+
+      console.log(`👨‍🔬 [Audit] Recorded reviewer assignment: ${adminProfile.name} assigned "${articleInfo.title}" to reviewer ${reviewerInfo.name}`);
+
+    } catch (error: any) {
+      console.error(`❌ [Audit] Failed to record reviewer assignment:`, error);
+    }
+  }
+
+  /**
+   * NEW: Record reviewer reassignment
+   */
+  async recordReviewerReassignment(
+    adminProfile: UserProfile,
+    articleInfo: ArticleInfo,
+    previousReviewer: EditorInfo,
+    newReviewer: EditorInfo
+  ): Promise<void> {
+    try {
+      const now = new Date();
+      const eventDate = now.toISOString().split('T')[0] || now.getFullYear() + '-01-01';
+      const eventTime = now.toTimeString().split(' ')[0] || '00:00:00';
+
+      await prisma.auditEvent.create({
+        data: {
+          eventType: 'REVIEWER_REASSIGN',
+          eventDate,
+          eventTime,
+          eventYear: now.getFullYear(),
+          userId: adminProfile.id,
+          userName: adminProfile.name || 'Unknown Admin',
+          userEmail: adminProfile.email || 'N/A',
+          userOrganization: adminProfile.organization || 'N/A',
+          articleId: articleInfo.id,
+          articleTitle: articleInfo.title,
+          articleCategory: articleInfo.category || 'General',
+          articleAuthor: articleInfo.author || 'Unknown',
+          targetEditorId: newReviewer.id,
+          targetEditorName: newReviewer.name || 'Unknown Reviewer',
+          previousEditorId: previousReviewer.id,
+          previousEditorName: previousReviewer.name || 'Unknown Previous Reviewer'
+        }
+      });
+
+      console.log(`🔄 [Audit] Recorded reviewer reassignment: ${adminProfile.name} reassigned "${articleInfo.title}" from ${previousReviewer.name} to ${newReviewer.name}`);
+
+    } catch (error: any) {
+      console.error(`❌ [Audit] Failed to record reviewer reassignment:`, error);
+    }
+  }
+
+  /**
+   * NEW: Record reviewer document download
+   */
+  async recordReviewerDownload(reviewerProfile: UserProfile, articleInfo: ArticleInfo): Promise<void> {
+    try {
+      const now = new Date();
+      const eventDate = now.toISOString().split('T')[0] || now.getFullYear() + '-01-01';
+      const eventTime = now.toTimeString().split(' ')[0] || '00:00:00';
+
+      await prisma.auditEvent.create({
+        data: {
+          eventType: 'REVIEWER_DOWNLOAD',
+          eventDate,
+          eventTime,
+          eventYear: now.getFullYear(),
+          userId: reviewerProfile.id,
+          userName: reviewerProfile.name || 'Unknown Reviewer',
+          userEmail: reviewerProfile.email || 'N/A',
+          userOrganization: reviewerProfile.organization || 'N/A',
+          articleId: articleInfo.id,
+          articleTitle: articleInfo.title,
+          articleCategory: articleInfo.category || 'General',
+          articleAuthor: articleInfo.author || 'Unknown'
+        }
+      });
+
+      console.log(`📥 [Audit] Recorded reviewer download: ${reviewerProfile.name} downloaded "${articleInfo.title}"`);
+
+    } catch (error: any) {
+      console.error(`❌ [Audit] Failed to record reviewer download:`, error);
+    }
+  }
+
+  /**
+   * NEW: Record reviewer document upload with editing duration
+   */
+  async recordReviewerUpload(
+    reviewerProfile: UserProfile,
+    articleInfo: ArticleInfo,
+    editingDuration: { days: number; hours: number; minutes: number }
+  ): Promise<void> {
+    try {
+      const now = new Date();
+      const eventDate = now.toISOString().split('T')[0] || now.getFullYear() + '-01-01';
+      const eventTime = now.toTimeString().split(' ')[0] || '00:00:00';
+
+      await prisma.auditEvent.create({
+        data: {
+          eventType: 'REVIEWER_UPLOAD',
+          eventDate,
+          eventTime,
+          eventYear: now.getFullYear(),
+          userId: reviewerProfile.id,
+          userName: reviewerProfile.name || 'Unknown Reviewer',
+          userEmail: reviewerProfile.email || 'N/A',
+          userOrganization: reviewerProfile.organization || 'N/A',
+          articleId: articleInfo.id,
+          articleTitle: articleInfo.title,
+          articleCategory: articleInfo.category || 'General',
+          articleAuthor: articleInfo.author || 'Unknown',
+          editingDurationDays: editingDuration.days,
+          editingDurationHours: editingDuration.hours,
+          editingDurationMinutes: editingDuration.minutes
+        }
+      });
+
+      console.log(`📤 [Audit] Recorded reviewer upload: ${reviewerProfile.name} uploaded corrections for "${articleInfo.title}" (${editingDuration.days}d ${editingDuration.hours}h ${editingDuration.minutes}m)`);
+
+    } catch (error: any) {
+      console.error(`❌ [Audit] Failed to record reviewer upload:`, error);
+    }
+  }
+
+  /**
+   * NEW: Record admin override action
+   */
+  async recordAdminOverride(
+    adminProfile: UserProfile,
+    articleInfo: ArticleInfo,
+    overrideType: 'DIRECT_PUBLISH' | 'BYPASS_EDITOR' | 'BYPASS_REVIEWER',
+    reason: string
+  ): Promise<void> {
+    try {
+      const now = new Date();
+      const eventDate = now.toISOString().split('T')[0] || now.getFullYear() + '-01-01';
+      const eventTime = now.toTimeString().split(' ')[0] || '00:00:00';
+
+      await prisma.auditEvent.create({
+        data: {
+          eventType: 'ADMIN_OVERRIDE',
+          eventDate,
+          eventTime,
+          eventYear: now.getFullYear(),
+          userId: adminProfile.id,
+          userName: adminProfile.name || 'Unknown Admin',
+          userEmail: adminProfile.email || 'N/A',
+          userOrganization: adminProfile.organization || 'N/A',
+          articleId: articleInfo.id,
+          articleTitle: articleInfo.title,
+          articleCategory: articleInfo.category || 'General',
+          articleAuthor: articleInfo.author || 'Unknown',
+          decisionOutcome: 'PUBLISHED',
+          overrideReason: reason,
+          overrideType: overrideType
+        }
+      });
+
+      console.log(`🔒 [Audit] Recorded admin override: ${adminProfile.name} performed ${overrideType} for "${articleInfo.title}" - Reason: ${reason}`);
+
+    } catch (error: any) {
+      console.error(`❌ [Audit] Failed to record admin override:`, error);
+    }
+  }
+
+  /**
    * Get complete timeline for an article
    */
   async getArticleTimeline(articleId: string): Promise<AuditTimeline> {
@@ -421,6 +616,93 @@ export class AuditService {
     } catch (error: any) {
       console.error(`❌ [Audit] Failed to get editor activity:`, error);
       throw new InternalServerError('Failed to retrieve editor activity');
+    }
+  }
+
+  /**
+   * Get reviewer's activity history
+   */
+  async getReviewerActivity(reviewerId: string): Promise<EditorActivity> {
+    try {
+      console.log(`📋 [Audit] Fetching activity for reviewer: ${reviewerId}`);
+
+      const reviewerEvents = await prisma.auditEvent.findMany({
+        where: {
+          userId: reviewerId,
+          eventType: {
+            in: ['REVIEWER_DOWNLOAD', 'REVIEWER_UPLOAD']
+          }
+        },
+        orderBy: [
+          { articleId: 'asc' },
+          { eventDate: 'asc' },
+          { eventTime: 'asc' }
+        ]
+      });
+
+      if (reviewerEvents.length === 0) {
+        throw new Error('No activity found for this reviewer');
+      }
+
+      const firstEvent = reviewerEvents[0];
+      if (!firstEvent) {
+        throw new Error('Invalid reviewer events data');
+      }
+
+      const reviewerActivity: EditorActivity = {
+        editorId: reviewerId, // Reusing EditorActivity interface for reviewers
+        editorName: firstEvent.userName,
+        activities: []
+      };
+
+      // Group events by article
+      const articleGroups = new Map<string, any[]>();
+      reviewerEvents.forEach(event => {
+        if (!articleGroups.has(event.articleId)) {
+          articleGroups.set(event.articleId, []);
+        }
+        articleGroups.get(event.articleId)!.push(event);
+      });
+
+      // Process each article's events
+      articleGroups.forEach((events, articleId) => {
+        const downloadEvent = events.find(e => e.eventType === 'REVIEWER_DOWNLOAD');
+        const uploadEvent = events.find(e => e.eventType === 'REVIEWER_UPLOAD');
+
+        // Format editing duration from reviewer upload event
+        let editingDuration: string | undefined;
+        if (uploadEvent && uploadEvent.editingDurationDays !== null) {
+          const days = uploadEvent.editingDurationDays || 0;
+          const hours = uploadEvent.editingDurationHours || 0;
+          const minutes = uploadEvent.editingDurationMinutes || 0;
+          
+          const parts = [];
+          if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`);
+          if (hours > 0) parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
+          if (minutes > 0) parts.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
+          
+          editingDuration = parts.length > 0 ? parts.join(', ') : '0 minutes';
+        }
+
+        reviewerActivity.activities.push({
+          articleId,
+          articleTitle: events[0].articleTitle,
+          downloadDate: downloadEvent?.eventDate,
+          downloadTime: downloadEvent?.eventTime,
+          downloadYear: downloadEvent?.eventYear,
+          uploadDate: uploadEvent?.eventDate,
+          uploadTime: uploadEvent?.eventTime,
+          uploadYear: uploadEvent?.eventYear,
+          editingDuration
+        });
+      });
+
+      console.log(`✅ [Audit] Retrieved ${reviewerActivity.activities.length} activities for reviewer`);
+      return reviewerActivity;
+
+    } catch (error: any) {
+      console.error(`❌ [Audit] Failed to get reviewer activity:`, error);
+      throw new InternalServerError('Failed to retrieve reviewer activity');
     }
   }
 
