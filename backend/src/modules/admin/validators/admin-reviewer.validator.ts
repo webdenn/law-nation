@@ -8,8 +8,9 @@ export const createReviewerSchema = z.object({
       .max(100, "Name must not exceed 100 characters"),
     
     email: z.string()
-      .email("Invalid email format")
-      .max(255, "Email must not exceed 255 characters"),
+      .min(1, "Email is required")
+      .max(255, "Email must not exceed 255 characters")
+      .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email format"),
     
     expertise: z.array(z.string())
       .min(1, "At least one area of expertise is required")
@@ -47,8 +48,9 @@ export const updateReviewerSchema = z.object({
       .optional(),
     
     email: z.string()
-      .email("Invalid email format")
+      .min(1, "Email is required")
       .max(255, "Email must not exceed 255 characters")
+      .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email format")
       .optional(),
     
     expertise: z.array(z.string())
@@ -71,7 +73,7 @@ export const updateReviewerSchema = z.object({
       .optional(),
     
     status: z.enum(['ACTIVE', 'INACTIVE'], {
-      errorMap: () => ({ message: "Status must be either ACTIVE or INACTIVE" })
+      message: "Status must be either ACTIVE or INACTIVE"
     }).optional()
   })
 });

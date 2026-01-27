@@ -2,7 +2,6 @@ import { prisma } from "@/db/db.js";
 import {
   NotFoundError,
   ForbiddenError,
-  BadRequestError,
 } from "@/utils/http-errors.util.js";
 import { extractPdfContent } from "@/utils/pdf-extract.utils.js";
 import {
@@ -431,10 +430,7 @@ export class ArticleQueryService {
             id: true,
             name: true,
             email: true,
-            id: true,
-            name: true,
-            email: true,
-            roles: { select: { role: { select: { name: true } } } } // ✅ Fetch roles correctly via UserRole
+            roles: { select: { role: { select: { name: true } } } } // Fetch roles correctly via UserRole
           },
         },
       },

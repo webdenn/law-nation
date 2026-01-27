@@ -5,7 +5,21 @@ import { ArticleStatus } from "@prisma/client";
 export const timelineQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
-  status: z.nativeEnum(ArticleStatus).optional(),
+  status: z.enum([
+    ArticleStatus.PENDING_ADMIN_REVIEW,
+    ArticleStatus.ASSIGNED_TO_EDITOR,
+    ArticleStatus.EDITOR_EDITING,
+    ArticleStatus.EDITOR_IN_PROGRESS,
+    ArticleStatus.EDITOR_APPROVED,
+    ArticleStatus.ASSIGNED_TO_REVIEWER,
+    ArticleStatus.REVIEWER_EDITING,
+    ArticleStatus.REVIEWER_IN_PROGRESS,
+    ArticleStatus.REVIEWER_APPROVED,
+    ArticleStatus.PENDING_APPROVAL,
+    ArticleStatus.APPROVED,
+    ArticleStatus.REJECTED,
+    ArticleStatus.PUBLISHED
+  ]).optional(),
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
 }).refine(
