@@ -22,6 +22,7 @@
     "@prisma/adapter-pg": "^7.1.0",
     "@prisma/client": "^7.2.0",
     "@supabase/supabase-js": "^2.88.0",
+    "adm-zip": "^0.5.16",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -44,6 +45,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/bcrypt": "^6.0.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",

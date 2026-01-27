@@ -100,8 +100,8 @@ export async function addWatermarkToPdf(
       roleText = 'LAW NATION';
       includeUrl = true;
       articleUrl = options.articleSlug 
-        ? `${options.frontendUrl}/article/${options.articleSlug}`
-        : `${options.frontendUrl}/articles/${options.articleId}`;
+        ? `${options.frontendUrl}/law/article/${options.articleSlug}`
+        : `${options.frontendUrl}/law/articles/${options.articleId}`;
       linkText = `Link: ${articleUrl}`;
       noteText = `(Login required for full article)`;
       

@@ -5,7 +5,7 @@ import { InternalServerError } from "../utils/http-errors.util.js";
 import { resolveToAbsolutePath, fileExistsAtPath } from "@/utils/file-path.utils.js";
 import { cleanWatermarkText, cleanTextForDatabase } from "@/utils/text-cleaning.utils.js";
 import { loadCompanyLogo } from "@/utils/logo-loader.utils.js";
-
+import AdmZip from "adm-zip";
 // Adobe SDK types and classes
 let AdobeSDK: any = null;
 let ServicePrincipalCredentials: any = null;
@@ -457,188 +457,145 @@ export class AdobeService {
    * Extract text from PDF using Adobe ExtractPDF API with validation and repair
    */
   async extractTextFromPdf(pdfPath: string): Promise<string> {
-    this.checkAvailability();
+  this.checkAvailability();
 
-    let processingPath = pdfPath; // Declare at function scope
+  let processingPath = pdfPath; 
 
-    try {
-      console.log(`🔄 [Adobe] Extracting text from PDF using ExtractPDF: ${pdfPath}`);
+  try {
+    console.log(`🔄 [Adobe] Extracting text from PDF using ExtractPDF: ${pdfPath}`);
 
-      // Convert relative path to absolute path using utility
-      const absolutePath = resolveToAbsolutePath(pdfPath);
+    const absolutePath = resolveToAbsolutePath(pdfPath);
 
-      if (!fileExistsAtPath(pdfPath)) {
-        console.error(`❌ [Adobe] Input file missing: ${absolutePath}`);
-        throw new Error(`Input file not found locally: ${absolutePath}`);
-      }
-
-      // Step 1: Validate PDF before processing
-      console.log(`🔍 [Adobe] Validating PDF structure...`);
-      const validation = await this.validatePdfFile(pdfPath);
-
-      if (!validation.isValid) {
-        console.warn(`⚠️ [Adobe] PDF validation failed: ${validation.error}`);
-
-        if (validation.canRepair) {
-          // Attempt to repair the PDF
-          const repairedPath = pdfPath.replace(/\.pdf$/i, '_repaired.pdf');
-          console.log(`🔧 [Adobe] Attempting PDF repair...`);
-
-          const repairSuccess = await this.repairPdfFile(pdfPath, repairedPath);
-
-          if (repairSuccess) {
-            console.log(`✅ [Adobe] PDF repaired successfully, using repaired version`);
-            processingPath = repairedPath;
-          } else {
-            console.warn(`⚠️ [Adobe] PDF repair failed, will try alternative extraction methods`);
-            // Continue with original file but expect Adobe to fail
-          }
-        } else {
-          console.warn(`⚠️ [Adobe] PDF cannot be repaired, will try alternative extraction methods`);
-        }
-      }
-
-      // Step 2: Try Adobe extraction with the validated/repaired PDF
-      const absoluteProcessingPath = resolveToAbsolutePath(processingPath);
-
-      // Create an ExecutionContext using credentials
-      const inputAsset = await this.pdfServices.upload({
-        readStream: fs.createReadStream(absoluteProcessingPath),
-        mimeType: MimeType.PDF
-      });
-
-      // For Adobe SDK v4.1.0, use ExtractPDFParams and ExtractElementType
-      const ExtractPDFParams = AdobeSDK.ExtractPDFParams;
-      const ExtractElementType = AdobeSDK.ExtractElementType;
-
-      console.log(`🔧 [Adobe] ExtractElementType available:`, !!ExtractElementType);
-      console.log(`🔧 [Adobe] ExtractPDFParams available:`, !!ExtractPDFParams);
-
-      // Create parameters with the correct element type
-      let params;
-      if (ExtractPDFParams && ExtractElementType) {
-        if (ExtractElementType.TEXT) {
-          params = new ExtractPDFParams({
-            elementsToExtract: [ExtractElementType.TEXT]
-          });
-          console.log(`🔧 [Adobe] Using ExtractElementType.TEXT`);
-        } else {
-          // List available element types
-          console.log(`🔧 [Adobe] Available element types:`, Object.keys(ExtractElementType));
-          params = new ExtractPDFParams({
-            elementsToExtract: [ExtractElementType.TEXT || 'TEXT']
-          });
-          console.log(`🔧 [Adobe] Using fallback element type`);
-        }
-      } else {
-        throw new InternalServerError('ExtractPDFParams or ExtractElementType not available in Adobe SDK');
-      }
-
-      // Create the job with input asset and parameters
-      const job = new ExtractPDFJob({ inputAsset, params });
-      console.log(`🔧 [Adobe] Created ExtractPDFJob with parameters`);
-
-      // Submit the job and get the job result
-      const pollingURL = await this.pdfServices.submit({ job });
-      const pdfServicesResponse = await this.pdfServices.getJobResult({
-        pollingURL,
-        resultType: ExtractPDFResult
-      });
-
-      // Get content from the resulting asset(s)
-      const resultAsset = pdfServicesResponse.result.resource;
-      const streamAsset = await this.pdfServices.getContent({ asset: resultAsset });
-
-      // Read the JSON result
-      return new Promise((resolve, reject) => {
-        let jsonData = '';
-        streamAsset.readStream.on('data', (chunk: any) => {
-          jsonData += chunk;
-        });
-
-        streamAsset.readStream.on('end', () => {
-          try {
-            // First, try to parse as JSON (structured extraction)
-            const extractedData = JSON.parse(jsonData);
-            const textElements = extractedData.elements || [];
-
-            // Extract text from all text elements
-            const rawExtractedText = textElements
-              .filter((element: any) => element.Text)
-              .map((element: any) => element.Text)
-              .join(' ');
-
-            const extractedText = cleanTextForDatabase(rawExtractedText);
-            console.log(`✅ [Adobe] Text extracted from PDF as JSON and cleaned (${extractedText.length} characters)`);
-
-            // Clean up repaired file if it was created
-            if (processingPath !== pdfPath) {
-              try {
-                const fs = require('fs');
-                fs.unlinkSync(resolveToAbsolutePath(processingPath));
-                console.log(`🧹 [Adobe] Cleaned up repaired PDF file`);
-              } catch { }
-            }
-
-            resolve(extractedText);
-          } catch (parseError) {
-            // If JSON parsing fails, check if we received binary data (ZIP)
-            if (jsonData.startsWith('PK')) {
-              console.warn(`⚠️ [Adobe] Received binary ZIP data instead of JSON text. Treating as extraction failure.`);
-              resolve('PDF file is corrupted (Binary output received)');
-              return;
-            }
-
-            // Treat as raw text only if it's not binary
-            console.log(`ℹ️ [Adobe] Response is raw text, not JSON. Using direct text content.`);
-            const cleanedText = cleanTextForDatabase(jsonData);
-            console.log(`✅ [Adobe] Text extracted from PDF as raw text and cleaned (${cleanedText.length} characters)`);
-
-            // Clean up repaired file if it was created
-            if (processingPath !== pdfPath) {
-              try {
-                const fs = require('fs');
-                fs.unlinkSync(resolveToAbsolutePath(processingPath));
-                console.log(`🧹 [Adobe] Cleaned up repaired PDF file`);
-              } catch { }
-            }
-
-            resolve(cleanedText);
-          }
-        });
-
-        streamAsset.readStream.on('error', reject);
-      });
-
-    } catch (err: any) {
-      console.error('❌ [Adobe] PDF text extraction failed:', err);
-
-      // Clean up repaired file if it was created
-      if (processingPath && processingPath !== pdfPath) {
-        try {
-          const fs = require('fs');
-          fs.unlinkSync(resolveToAbsolutePath(processingPath));
-          console.log(`🧹 [Adobe] Cleaned up repaired PDF file after error`);
-        } catch { }
-      }
-
-      // Check if this is a "BAD_PDF" error from Adobe
-      if (err.message && err.message.includes('BAD_PDF')) {
-        console.warn(`⚠️ [Adobe] BAD_PDF error detected - PDF is fundamentally corrupted`);
-        console.warn(`⚠️ [Adobe] Falling back to alternative text extraction methods...`);
-
-        // Try alternative extraction methods for corrupted PDFs
-        return await this.extractTextFromCorruptedPdf(pdfPath);
-      }
-
-      if (err instanceof SDKError || err instanceof ServiceUsageError || err instanceof ServiceApiError) {
-        throw new InternalServerError(`Adobe PDF text extraction failed: ${err.message}`);
-      }
-      throw new InternalServerError('Adobe PDF text extraction failed');
+    if (!fileExistsAtPath(pdfPath)) {
+      console.error(`❌ [Adobe] Input file missing: ${absolutePath}`);
+      throw new Error(`Input file not found locally: ${absolutePath}`);
     }
-  }
 
-  /**
+    // Step 1: Validate PDF before processing
+    console.log(`🔍 [Adobe] Validating PDF structure...`);
+    const validation = await this.validatePdfFile(pdfPath);
+
+    if (!validation.isValid) {
+      console.warn(`⚠️ [Adobe] PDF validation failed: ${validation.error}`);
+      if (validation.canRepair) {
+        const repairedPath = pdfPath.replace(/\.pdf$/i, '_repaired.pdf');
+        console.log(`🔧 [Adobe] Attempting PDF repair...`);
+        const repairSuccess = await this.repairPdfFile(pdfPath, repairedPath);
+
+        if (repairSuccess) {
+          console.log(`✅ [Adobe] PDF repaired successfully, using repaired version`);
+          processingPath = repairedPath;
+        } else {
+          console.warn(`⚠️ [Adobe] PDF repair failed, continuing with original`);
+        }
+      }
+    }
+
+    // Step 2: Try Adobe extraction
+    const absoluteProcessingPath = resolveToAbsolutePath(processingPath);
+
+    const inputAsset = await this.pdfServices.upload({
+      readStream: fs.createReadStream(absoluteProcessingPath),
+      mimeType: MimeType.PDF
+    });
+
+    const ExtractPDFParams = AdobeSDK.ExtractPDFParams;
+    const ExtractElementType = AdobeSDK.ExtractElementType;
+
+    let params = new ExtractPDFParams({
+      elementsToExtract: [ExtractElementType.TEXT || 'TEXT']
+    });
+
+    const job = new ExtractPDFJob({ inputAsset, params });
+    console.log(`🔧 [Adobe] Created ExtractPDFJob`);
+
+    const pollingURL = await this.pdfServices.submit({ job });
+    const pdfServicesResponse = await this.pdfServices.getJobResult({
+      pollingURL,
+      resultType: ExtractPDFResult
+    });
+
+    const resultAsset = pdfServicesResponse.result.resource;
+    const streamAsset = await this.pdfServices.getContent({ asset: resultAsset });
+
+    // Step 3: Handle the Response (ZIP or JSON)
+    return new Promise((resolve, reject) => {
+      // Use Buffers instead of strings for memory efficiency
+      let chunks: any[] = [];
+      
+      streamAsset.readStream.on('data', (chunk: any) => {
+        chunks.push(chunk);
+      });
+
+      streamAsset.readStream.on('end', async () => {
+        try {
+          const totalBuffer = Buffer.concat(chunks);
+          
+          // Check if response is a ZIP package (Starts with 'PK')
+          if (totalBuffer.length > 0 && totalBuffer[0] === 0x50 && totalBuffer[1] === 0x4B) {
+            console.log("📦 [Adobe] ZIP detected. Extracting structuredData.json...");
+            
+            const zip = new AdmZip(totalBuffer);
+            const mainEntry = zip.getEntry('structuredData.json');
+            
+            if (mainEntry) {
+              const extractedJson = mainEntry.getData().toString('utf8');
+              const parsedData = JSON.parse(extractedJson);
+              
+              const rawText = (parsedData.elements || [])
+                .filter((el: any) => el.Text)
+                .map((el: any) => el.Text)
+                .join(' ');
+
+              console.log(`✅ [Adobe] Text successfully unzipped (${rawText.length} chars)`);
+              this.cleanupRepairedFile(processingPath, pdfPath);
+              return resolve(cleanTextForDatabase(rawText));
+            }
+          }
+
+          // Fallback: Standard JSON processing
+          const jsonData = totalBuffer.toString('utf8');
+          const extractedData = JSON.parse(jsonData);
+          const rawExtractedText = (extractedData.elements || [])
+            .filter((element: any) => element.Text)
+            .map((element: any) => element.Text)
+            .join(' ');
+
+          console.log(`✅ [Adobe] Text extracted from JSON (${rawExtractedText.length} chars)`);
+          this.cleanupRepairedFile(processingPath, pdfPath);
+          resolve(cleanTextForDatabase(rawExtractedText));
+
+        } catch (parseError) {
+          console.error("❌ [Adobe] Parsing failed, falling back to alternative extraction:", parseError);
+          this.cleanupRepairedFile(processingPath, pdfPath);
+          resolve(await this.extractTextFromCorruptedPdf(pdfPath));
+        }
+      });
+
+      streamAsset.readStream.on('error', reject);
+    });
+
+  } catch (err: any) {
+    console.error('❌ [Adobe] PDF text extraction failed:', err);
+    this.cleanupRepairedFile(processingPath, pdfPath);
+
+    if (err.message && err.message.includes('BAD_PDF')) {
+      return await this.extractTextFromCorruptedPdf(pdfPath);
+    }
+
+    throw new InternalServerError(`Adobe PDF text extraction failed: ${err.message}`);
+  }
+}
+
+// Add this helper method to your class to keep the main function clean
+private cleanupRepairedFile(processingPath: string, originalPath: string) {
+  if (processingPath !== originalPath) {
+    try {
+      fs.unlinkSync(resolveToAbsolutePath(processingPath));
+      console.log(`🧹 [Adobe] Cleaned up repaired PDF file`);
+    } catch { }
+  }
+} /**
    * Alternative text extraction for corrupted PDFs that Adobe rejects
    */
   private async extractTextFromCorruptedPdf(pdfPath: string): Promise<string> {
