@@ -1,0 +1,214 @@
+"use client";
+import React from "react";
+import Link from "next/link";
+import AssignEditor from "./AssignEditor";
+import AssignReviewer from "./AssignReviewer";
+// We don't need toast here unless we add interactions that use it directly, 
+// but most interactions are passed down props.
+
+export default function ArticleTable({
+    isLoading,
+    articles,
+    filteredArticles,
+    searchTerm,
+    setSearchTerm,
+    statusFilter,
+    setStatusFilter,
+    showAbstract,
+    setShowAbstract,
+    handlePdfClick,
+    assignArticle,
+    assignReviewer,
+    editors,
+    reviewers,
+    setSelectedArticle,
+    setPdfViewMode,
+    overrideAndPublish,
+    deleteArticle
+}) {
+    return (
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div className="bg-gray-50 p-5 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="font-black text-gray-700 uppercase tracking-tighter text-base md:text-lg">
+                    Monitor & Assign Articles
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                    <input
+                        type="text"
+                        placeholder="Search articles..."
+                        className="p-2 border rounded-lg text-xs outline-none focus:border-red-600 w-full sm:w-auto"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <select
+                        className="p-2 border rounded-lg text-xs font-bold outline-none cursor-pointer w-full sm:w-auto"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                        <option value="All">All Status</option>
+                        <option value="Pending">Pending</option>
+                        <option value="In Review">Under Review</option>
+                        <option value="In Review">Reviewed </option>
+                        <option value="Published">Published</option>
+                    </select>
+                </div>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[900px]">
+                    <thead className="bg-gray-100 text-[10px] uppercase text-gray-400 font-bold">
+                        <tr>
+                            <th className="p-5">PDF Document & Abstract</th>
+                            <th className="p-5">Author & Date</th>
+                            <th className="p-5">Status</th>
+                            <th className="p-5 text-center">Assign Editor</th>
+                            <th className="p-5 text-center">Assign Reviewer</th>
+                            <th className="p-5 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                        {isLoading ? (
+                            <tr>
+                                <td
+                                    colSpan="6"
+                                    className="p-10 text-center font-bold text-gray-500"
+                                >
+                                    Loading articles...
+                                </td>
+                            </tr>
+                        ) : (
+                            filteredArticles.map((art) => (
+                                <tr
+                                    key={art.id}
+                                    className="hover:bg-red-50/30 transition-all"
+                                >
+                                    {/* 1. PDF & Abstract */}
+                                    <td className="p-5">
+                                        <p
+                                            onClick={() => handlePdfClick(art.pdfUrl)}
+                                            className="font-bold text-gray-800 underline cursor-pointer hover:text-red-600"
+                                        >
+                                            {art.title}
+                                        </p>
+                                        <button
+                                            onClick={() => setShowAbstract(art)}
+                                            className="text-[10px] text-red-600 font-bold uppercase mt-1 hover:underline"
+                                        >
+                                            View Abstract
+                                        </button>
+                                    </td>
+                                    {/* 2. Author & Date */}
+                                    <td className="p-5">
+                                        <p className="text-sm text-gray-800 font-bold">
+                                            {art.author}
+                                        </p>
+                                        <p className="text-[10px] text-gray-400">
+                                            {art.date}
+                                        </p>
+                                    </td>
+                                    {/* 3. Status Badge */}
+                                    <td className="p-5">
+                                        <span
+                                            className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${art.status === "Published"
+                                                ? "bg-green-100 text-green-700"
+                                                : art.status === "In Review"
+                                                    ? "bg-blue-100 text-blue-700"
+                                                    : "bg-yellow-100 text-yellow-700"
+                                                }`}
+                                        >
+                                            {art.status}
+                                        </span>
+                                    </td>
+                                    {/* 4. Assign Editor Dropdown */}
+                                    {/* 4. Assign Editor Dropdown */}
+                                    <td className="p-5 text-center">
+                                        <AssignEditor
+                                            article={art}
+                                            editors={editors}
+                                            assignArticle={assignArticle}
+                                        />
+                                    </td>
+                                    {/* 4.5 Assign Reviewer Dropdown */}
+                                    <td className="p-5 text-center">
+                                        <AssignReviewer
+                                            article={art}
+                                            reviewers={reviewers}
+                                            assignReviewer={assignReviewer}
+                                        />
+                                    </td>
+                                    {/* 5. Combined Actions (Publish + Delete) */}
+                                    <td className="p-5 text-right flex justify-end gap-3 items-center">
+                                        <button
+                                            onClick={() => {
+                                                setSelectedArticle(art);
+                                                setPdfViewMode("original");
+                                            }}
+                                            className="w-[80px] bg-blue-600 text-white py-2 rounded text-[10px] font-black hover:bg-blue-800 transition-colors uppercase text-center"
+                                        >
+                                            Review
+                                        </button>
+                                        <button
+                                            onClick={() => overrideAndPublish(art.id)}
+                                            disabled={art.status === "Published"}
+                                            className={`w-[90px] py-2 rounded text-[10px] font-black transition-colors uppercase text-center ${art.status === "Published"
+                                                ? "bg-gray-400 cursor-not-allowed text-gray-200"
+                                                : "bg-black text-white hover:bg-green-600"
+                                                }`}
+                                        >
+                                            {art.status === "Published"
+                                                ? "Published"
+                                                : "Publish"}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                deleteArticle(art.id);
+                                            }}
+                                            className="bg-red-100 text-red-600 p-2 rounded hover:bg-red-600 hover:text-white transition-all shrink-0"
+                                            title="Delete Article"
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                className="h-4 w-4"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862A2 2 0 011.995 18.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                />
+                                            </svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Abstract Modal */}
+            {showAbstract && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white max-w-2xl w-full rounded-2xl p-8 shadow-2xl">
+                        <h3 className="text-xl font-black text-gray-800 border-b pb-4 uppercase italic tracking-tighter">
+                            {showAbstract.title}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-6 leading-relaxed font-medium bg-gray-50 p-4 rounded-xl italic">
+                            "{showAbstract.abstract}"
+                        </p>
+                        <div className="mt-8 flex justify-end">
+                            <button
+                                onClick={() => setShowAbstract(null)}
+                                className="bg-red-600 text-white px-3 py-2 md:px-5 md:py-2 rounded-lg font-bold hover:bg-black transition-all text-[10px] md:text-xs"
+                            >
+                                Close Preview
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

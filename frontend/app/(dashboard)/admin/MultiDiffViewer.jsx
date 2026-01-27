@@ -12,7 +12,7 @@ const InlineDiffRenderer = ({ diffArray, emptyMessage }) => {
     }
 
     return (
-        <div className="bg-white p-4 text-[11px] leading-relaxed font-mono whitespace-pre-wrap h-full overflow-y-auto w-full break-words">
+        <div className="bg-white p-4 text-[11px] leading-relaxed font-mono whitespace-pre-wrap h-full overflow-y-auto w-full wrap-break-word">
             {diffArray.map((part, i) => {
                 if (part.added) {
                     return (
@@ -157,7 +157,7 @@ const MultiDiffViewer = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-gray-100 z-[70] flex flex-col animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-gray-100 z-70 flex flex-col animate-in fade-in duration-200">
             {/* Header */}
             <div className="bg-white h-16 border-b flex items-center justify-between px-6 shadow-sm shrink-0">
                 <div className="flex items-center gap-4">
