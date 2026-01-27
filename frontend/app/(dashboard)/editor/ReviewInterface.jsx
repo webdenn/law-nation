@@ -210,8 +210,8 @@ const ReviewInterface = ({
               <button
                 onClick={() =>
                   handleDownloadFile(
-                    selectedArticle.currentWordUrl || selectedArticle.originalWordUrl,
-                    selectedArticle.title + (selectedArticle.currentWordUrl ? "_edited" : ""),
+                    selectedArticle.originalWordUrl,
+                    selectedArticle.title,
                     "Word"
                   )
                 }

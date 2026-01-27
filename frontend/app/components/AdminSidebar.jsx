@@ -34,6 +34,7 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
             children: [
                 { name: "User Audit", path: "/admin/audit/users" },
                 { name: "Editor Audit", path: "/admin/audit/editors" },
+                { name: "Reviewer Audit", path: "/admin/audit/reviewers" },
             ]
         },
         { name: "Add New Editor", path: "/admin/add-editor" },

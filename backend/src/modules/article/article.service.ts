@@ -251,9 +251,10 @@ export class ArticleService {
   async uploadCorrectedPdf(
     articleId: string,
     editorId: string,
-    data: UploadCorrectedPdfData
+    data: UploadCorrectedPdfData,
+    userRoles: string[] = []
   ) {
-    return articleWorkflowService.uploadCorrectedPdf(articleId, editorId, data);
+    return articleWorkflowService.uploadCorrectedPdf(articleId, editorId, data, userRoles);
   }
   async editorApproveArticle(articleId: string, editorId: string) {
     return articleWorkflowService.editorApproveArticle(articleId, editorId);

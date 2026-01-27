@@ -218,6 +218,7 @@ class AdminDashboardService {
             authorName: true,
             abstract: true,
             assignedEditorId: true,
+            assignedReviewerId: true, // ✅ Added Reviewer ID
             originalPdfUrl: true,
             currentPdfUrl: true,
             originalWordUrl: true, // ✅ Added
@@ -242,6 +243,7 @@ class AdminDashboardService {
         authorName: article.authorName,
         abstract: article.abstract,
         assignedEditorId: article.assignedEditorId,
+        assignedReviewerId: article.assignedReviewerId, // ✅ Added Reviewer ID
         originalPdfUrl: article.originalPdfUrl,
         currentPdfUrl: article.currentPdfUrl,
         originalWordUrl: article.originalWordUrl, // ✅ Added
@@ -326,14 +328,14 @@ class AdminDashboardService {
   async adminOverridePublish(articleId: string, adminId: string, reason: string): Promise<any> {
     try {
       console.log(`🔒 [Admin Override] Publishing article ${articleId} directly by admin ${adminId}`);
-      
+
       const article = await prisma.article.findUnique({
         where: { id: articleId },
-        select: { 
-          id: true, 
-          title: true, 
-          status: true, 
-          authorEmail: true, 
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          authorEmail: true,
           authorName: true,
           assignedEditorId: true,
           assignedReviewerId: true
@@ -347,7 +349,7 @@ class AdminDashboardService {
       // Admin can override in these statuses
       const allowedStatuses = [
         'PENDING_ADMIN_REVIEW',
-        'ASSIGNED_TO_EDITOR', 
+        'ASSIGNED_TO_EDITOR',
         'ASSIGNED_TO_REVIEWER',
         'EDITOR_EDITING',
         'REVIEWER_EDITING'
@@ -398,7 +400,7 @@ class AdminDashboardService {
       // Import and send override notification
       const { workflowOverrideTemplate } = await import("../../templates/email/admin/workflow-override.template.js");
       const { emailService } = await import("@/services/email/email.service.js");
-      
+
       const overrideEmailContent = workflowOverrideTemplate(
         adminUser?.name || 'Admin',
         article.title,
@@ -446,7 +448,7 @@ class AdminDashboardService {
   async getArticlesEligibleForOverride(): Promise<any[]> {
     try {
       console.log(`📋 [Admin Override] Fetching articles eligible for admin override`);
-      
+
       const articles = await prisma.article.findMany({
         where: {
           status: {

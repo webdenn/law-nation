@@ -199,17 +199,17 @@ const ReviewInterface = ({
                     )}
                 </button>
 
-                {/* 4. USER ORIGINAL DOCUMENT */}
+                {/* 4. PREVIOUS VERSION (EDITOR) */}
                 <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h3 className="font-bold text-gray-800 mb-4">User Original Document</h3>
+                    <h3 className="font-bold text-gray-800 mb-4">Previous Version (Editor)</h3>
                     <div className="flex flex-col gap-3">
-                        {/* Prefer current edited Word file, fallback to original */}
-                        {(selectedArticle.currentWordUrl || selectedArticle.originalWordUrl) ? (
+                        {/* Prefer Editor's Corrected Word file */}
+                        {(selectedArticle.editorCorrectedDocxUrl || selectedArticle.editorDocumentUrl || selectedArticle.originalWordUrl) ? (
                             <button
                                 onClick={() =>
                                     handleDownloadFile(
-                                        selectedArticle.currentWordUrl || selectedArticle.originalWordUrl,
-                                        selectedArticle.title + (selectedArticle.currentWordUrl ? "_edited" : ""),
+                                        selectedArticle.editorCorrectedDocxUrl || selectedArticle.editorDocumentUrl || selectedArticle.originalWordUrl,
+                                        selectedArticle.title + "_editor_version",
                                         "Word"
                                     )
                                 }
