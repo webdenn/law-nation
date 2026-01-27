@@ -219,11 +219,26 @@ export default function ReviewerDashboard() {
                 const reversedLogs = [...logs].reverse();
 
                 const editorLog = reversedLogs.find(log =>
-                    (log.role?.toLowerCase() === "editor") && (log.pdfUrl || log.documentUrl)
+                    (log.role?.toLowerCase() === "editor") && (log.pdfUrl || log.documentUrl || log.newFileUrl)
                 );
 
                 if (editorLog) {
-                    editorPdf = editorLog.pdfUrl || editorLog.documentUrl;
+                    editorPdf = editorLog.pdfUrl || editorLog.documentUrl || (editorLog.fileType === 'PDF' ? editorLog.newFileUrl : null);
+                    // Try to find the word file. In some logs it might be separate, or we infer it.
+                    // Based on workflow service: newFileUrl IS the docx if fileType is DOCX.
+                    // Or check old logs structure.
+                    // Let's look for a log with DOCX file type or extension.
+                }
+
+                // Robust search for Editor's DOCX
+                const editorDocxLog = reversedLogs.find(log =>
+                    (log.role?.toLowerCase() === "editor") &&
+                    (log.newFileUrl?.endsWith('.docx') || log.editorDocumentUrl)
+                );
+
+                let editorDocx = null;
+                if (editorDocxLog) {
+                    editorDocx = editorDocxLog.editorDocumentUrl || editorDocxLog.newFileUrl;
                 }
 
                 // Check if Reviewer has uploaded anything
@@ -232,6 +247,10 @@ export default function ReviewerDashboard() {
 
                 setLastEditorPdf(editorPdf);
                 setHasReviewerUploaded(reviewerUploaded);
+                // Also save editorDocx in state to pass down (we can piggyback on selectedArticle or new state)
+                if (editorDocx) {
+                    setSelectedArticle(prev => ({ ...prev, editorCorrectedDocxUrl: editorDocx }));
+                }
 
                 if (
                     data.article?.editorDocumentUrl &&
@@ -267,6 +286,8 @@ export default function ReviewerDashboard() {
             return toast.error("Only DOCX/DOC files are supported for reviewer uploads.");
         }
 
+        const toastId = toast.loading("Uploading Correction & Generating Diff...");
+
         try {
             setIsUploading(true);
             // ✅ CHANGED: reviewerToken
@@ -297,7 +318,13 @@ export default function ReviewerDashboard() {
             const data = await res.json();
 
             if (res.ok) {
-                toast.success("New version uploaded & Diff generated!");
+                toast.update(toastId, {
+                    render: "New version uploaded & Diff generated successfully!",
+                    type: "success",
+                    isLoading: false,
+                    autoClose: 3000
+                });
+
                 setUploadedFile(null);
                 setTrackFile(null);
                 setUploadComment("");
@@ -311,11 +338,21 @@ export default function ReviewerDashboard() {
                     setPdfTimestamp(Date.now());
                 }
             } else {
-                toast.error(data.error || data.message || "Upload failed");
+                toast.update(toastId, {
+                    render: data.error || data.message || "Upload failed",
+                    type: "error",
+                    isLoading: false,
+                    autoClose: 5000
+                });
             }
         } catch (err) {
             console.error("Upload Error:", err);
-            toast.error("Server Error: Could not connect to backend");
+            toast.update(toastId, {
+                render: "Server Error: Could not connect to backend",
+                type: "error",
+                isLoading: false,
+                autoClose: 5000
+            });
         } finally {
             setIsUploading(false);
         }

@@ -187,7 +187,8 @@ export class ArticleWorkflowService {
   async uploadCorrectedDocxImproved(
     articleId: string,
     editorId: string,
-    data: UploadCorrectedPdfData
+    data: UploadCorrectedPdfData,
+    userRoles: string[] = []
   ) {
     console.log(`🚀 [Improved Workflow] Starting improved editor upload for article ${articleId}`);
 
@@ -199,7 +200,8 @@ export class ArticleWorkflowService {
       throw new NotFoundError("Article not found");
     }
 
-    if (article.assignedEditorId !== editorId) {
+    const isAdmin = userRoles.includes("admin") || userRoles.includes("ADMIN");
+    if (article.assignedEditorId !== editorId && !isAdmin) {
       throw new ForbiddenError("You are not assigned to this article");
     }
 
@@ -283,8 +285,8 @@ export class ArticleWorkflowService {
           currentPdfUrl: relativeWatermarkedPdf, // Watermarked PDF for downloads
           currentWordUrl: relativeWatermarkedDocx, // Watermarked DOCX for downloads
 
-          // Update status
-          status: "EDITOR_APPROVED",
+          // Update status - KEEP as EDITOR_EDITING so editor must explicitly approve
+          status: "EDITOR_EDITING",
         },
       });
 
@@ -458,7 +460,8 @@ export class ArticleWorkflowService {
   async uploadCorrectedPdf(
     articleId: string,
     editorId: string,
-    data: UploadCorrectedPdfData
+    data: UploadCorrectedPdfData,
+    userRoles: string[] = []
   ) {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
@@ -468,7 +471,9 @@ export class ArticleWorkflowService {
       throw new NotFoundError("Article not found");
     }
 
-    if (article.assignedEditorId !== editorId) {
+    const isAdmin = userRoles.includes("admin") || userRoles.includes("ADMIN");
+
+    if (article.assignedEditorId !== editorId && !isAdmin) {
       throw new ForbiddenError("You are not assigned to this article");
     }
 
@@ -480,16 +485,25 @@ export class ArticleWorkflowService {
       "PENDING_ADMIN_REVIEW" // Allow editing before assignment
     ];
 
+    // Allow admins to edit published articles AND reviewer approved articles
     if (!validStatuses.includes(article.status)) {
-      throw new BadRequestError(
-        `Article status '${article.status}' does not allow corrections. Valid statuses: ${validStatuses.join(', ')}`
-      );
+      if (isAdmin && (
+        article.status === 'PUBLISHED' ||
+        article.status.startsWith('REVIEWER_') ||
+        article.status === 'ASSIGNED_TO_REVIEWER'
+      )) {
+        // Allowed for admin on published or reviewer statuses
+      } else {
+        throw new BadRequestError(
+          `Article status '${article.status}' does not allow corrections. Valid statuses: ${validStatuses.join(', ')}`
+        );
+      }
     }
 
     // NEW: Use improved workflow for DOCX uploads
     if (data.pdfUrl.toLowerCase().endsWith('.docx')) {
       console.log(`🚀 [Upload] Using improved workflow for DOCX upload`);
-      return await this.uploadCorrectedDocxImproved(articleId, editorId, data);
+      return await this.uploadCorrectedDocxImproved(articleId, editorId, data, userRoles);
     }
 
     // Existing logic for PDF uploads and other cases
@@ -552,7 +566,7 @@ export class ArticleWorkflowService {
       data: {
         currentPdfUrl: `/${relativePdfPath}`,
         currentWordUrl: `/${relativeDocxPath}`,
-        status: "EDITOR_APPROVED",
+        status: "EDITOR_EDITING",
       },
       include: { assignedEditor: true }, // Include editor info usually needed
     });
@@ -921,7 +935,17 @@ export class ArticleWorkflowService {
 
       // Extract text from PDF for content
       console.log(`🔍 [Adobe] Extracting text from reviewer PDF`);
-      const extractedText = await adobeService.extractTextFromPdf(pdfPath);
+      let extractedText = await adobeService.extractTextFromPdf(pdfPath);
+
+      // If PDF extraction failed (returned fallback message), try Mammoth on DOCX
+      if (extractedText.includes("Text could not be extracted")) {
+        console.warn(`⚠️ [workflow] PDF extraction failed, falling back to Mammoth for DOCX...`);
+        try {
+          extractedText = await adobeService.extractTextFromDocxUsingMammoth(docxPath);
+        } catch (mammothError) {
+          console.error("❌ [workflow] Mammoth fallback failed:", mammothError);
+        }
+      }
 
       // Create watermarked versions
       const watermarkData = {
@@ -1078,13 +1102,22 @@ export class ArticleWorkflowService {
         );
       }
     } else {
-      if (
-        article.status !== "PENDING_ADMIN_REVIEW" &&
-        article.status !== "ASSIGNED_TO_EDITOR" &&
-        article.status !== "PENDING_APPROVAL"
-      ) {
+      // Admin can publish from almost any status if they choose to
+      const validAdminStatuses = [
+        "PENDING_ADMIN_REVIEW",
+        "ASSIGNED_TO_EDITOR",
+        "PENDING_APPROVAL",
+        "EDITOR_EDITING",      // ✅ Allow publishing while editor is working
+        "EDITOR_APPROVED",     // ✅ Allow publishing after editor approves
+        "ASSIGNED_TO_REVIEWER",// ✅ Allow publishing while assigned to reviewer
+        "REVIEWER_IN_PROGRESS",// ✅ Allow publishing while reviewer is working
+        "REVIEWER_EDITING",    // ✅ Allow publishing while reviewer is editing
+        "REVIEWER_APPROVED"    // ✅ Allow publishing after reviewer approves
+      ];
+
+      if (!validAdminStatuses.includes(article.status)) {
         throw new BadRequestError(
-          "Article cannot be approved in current status"
+          `Article status '${article.status}' does not allow direct publishing. Valid statuses: ${validAdminStatuses.join(', ')}`
         );
       }
     }
@@ -1178,7 +1211,10 @@ export class ArticleWorkflowService {
       "REVIEWER_APPROVED",      // Reviewer approved after editor
       "PENDING_ADMIN_REVIEW",   // Admin override - no editor/reviewer assigned
       "ASSIGNED_TO_EDITOR",     // Admin override - editor assigned but admin publishes directly
-      "ASSIGNED_TO_REVIEWER"    // Admin override - reviewer assigned but admin publishes directly
+      "ASSIGNED_TO_REVIEWER",   // Admin override - reviewer assigned but admin publishes directly
+      "EDITOR_EDITING",         // ✅ Allow override while editor is working
+      "REVIEWER_IN_PROGRESS",   // ✅ Allow override while reviewer is working
+      "REVIEWER_EDITING"        // ✅ Allow override while reviewer is editing
     ];
 
     if (!validStatuses.includes(article.status)) {
@@ -1221,7 +1257,28 @@ export class ArticleWorkflowService {
         console.log(`✅ [Adobe Extract] Extracted ${extractedText.length} characters from final version`);
       } catch (error) {
         console.error('❌ [Adobe Extract] Text extraction failed:', error);
-        extractedText = 'Text extraction failed. Please contact administrator.';
+
+        // Fallback: Try Mammoth extraction from DOCX if available
+        if (article.currentWordUrl) {
+          try {
+            console.log(`🔄 [Fallback] Attempting Mammoth extraction from DOCX: ${article.currentWordUrl}`);
+            const resolveToAbsolutePath = (await import("@/utils/file-path.utils.js")).resolveToAbsolutePath;
+            const docxPath = resolveToAbsolutePath(article.currentWordUrl);
+
+            const mammothText = await adobeService.extractTextFromDocxUsingMammoth(docxPath);
+            if (mammothText && mammothText.length > 0) {
+              extractedText = mammothText;
+              console.log(`✅ [Fallback] Mammoth extraction successful (${mammothText.length} characters)`);
+            } else {
+              extractedText = 'Text extraction failed. Please contact administrator.';
+            }
+          } catch (mammothError) {
+            console.error('❌ [Fallback] Mammoth extraction also failed:', mammothError);
+            extractedText = 'Text extraction failed. Please contact administrator.';
+          }
+        } else {
+          extractedText = 'Text extraction failed. Please contact administrator.';
+        }
       }
     } else {
       console.warn('⚠️ [Document Publish] No final PDF version available for text extraction');
@@ -1307,7 +1364,7 @@ export class ArticleWorkflowService {
       // Check if the content looks clean (not corrupted binary data)
       const hasCorruptedData = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|PKx|��|AEstructuredData/.test(article.content);
 
-      if (!hasCorruptedData) {
+      if (!hasCorruptedData && !article.content.includes("PDF file is corrupted") && !article.content.includes("Text could not be extracted")) {
         console.log(`✅ [Article Publish] Using existing clean content (${article.content.length} characters)`);
         extractedText = article.content;
       } else {
@@ -1317,6 +1374,21 @@ export class ArticleWorkflowService {
     } else {
       console.log(`ℹ️ [Article Publish] No existing content, extracting text...`);
       extractedText = await this.extractTextForPublishing(article);
+
+      // If PDF extraction failed (returned fallback message), check if we have a DOCX to fallback to
+      if (extractedText.includes("Text could not be extracted") && article.currentWordUrl) {
+        console.warn(`⚠️ [Article Publish] PDF extraction failed during publish, falling back to Mammoth for DOCX...`);
+        try {
+          const docxPath = resolveToAbsolutePath(article.currentWordUrl);
+          const mammothText = await adobeService.extractTextFromDocxUsingMammoth(docxPath);
+          if (mammothText && mammothText.length > 0) {
+            console.log(`✅ [Article Publish] Mammoth fallback successful (${mammothText.length} chars)`);
+            extractedText = mammothText;
+          }
+        } catch (mammothError) {
+          console.error("❌ [Article Publish] Mammoth fallback failed:", mammothError);
+        }
+      }
     }
 
     const updatedArticle = await prisma.article.update({

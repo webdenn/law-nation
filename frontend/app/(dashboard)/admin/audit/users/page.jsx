@@ -55,7 +55,7 @@ export default function UserAuditPage() {
                 `"${event.userEmail}"`,
                 `"${event.userOrganization || ''}"`,
                 `"${event.articleTitle}"`,
-                event.eventDate,
+                `\t${new Date(event.eventDate).toLocaleDateString('en-GB')}`,
                 event.eventTime,
                 event.decisionOutcome || 'PENDING'
             ];

@@ -8,6 +8,7 @@ import { diffWords } from 'diff';
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import AdminSidebar from "../../components/AdminSidebar";
+import MultiDiffViewer from "./MultiDiffViewer"; // ✅ NEW IMPORT
 
 const DiffViewer = ({ diffData }) => {
   if (!diffData || !diffData.summary)
@@ -114,6 +115,8 @@ export default function AdminDashboard() {
     email: "",
   });
   const [isAuthorized, setIsAuthorized] = useState(false);
+  // ✅ STATE FOR MULTI-DIFF (Moved to top)
+  const [showMultiDiff, setShowMultiDiff] = useState(false);
 
   // ✅ 2. ROUTE PROTECTION (Restored)
   useEffect(() => {
@@ -178,18 +181,36 @@ export default function AdminDashboard() {
 
         let editorPdf = null;
         let reviewerPdf = null;
+        let adminPdf = null;
+        let editorDocx = null;
+        let reviewerDocx = null;
+        let adminDocx = null;
 
         // Iterate through all logs to find the latest for each role
         logs.forEach(log => {
-          const role = log.role?.toLowerCase() || (log.editedBy?.role || "").toLowerCase(); // Check role helper from backend or user object
-          // NOTE: admin dashboard might not have 'role' directly on log if not joined properly, but I added it in backend `getArticleChangeHistory`.
-          // Let's rely on my previous backend change which added `role` to the log object.
+          const role = log.role?.toLowerCase() || (log.editedBy?.role || "").toLowerCase();
+          const isNotOriginal = (url) => url && !url.includes(data.article.originalPdfUrl) && url !== data.article.originalPdfUrl;
 
           if (role === 'editor' && (log.pdfUrl || log.newFileUrl)) {
-            editorPdf = log.pdfUrl || log.newFileUrl;
+            const url = log.pdfUrl || log.newFileUrl;
+            if (isNotOriginal(url)) {
+              if (url.endsWith('.docx') || url.endsWith('.doc')) editorDocx = url;
+              editorPdf = url;
+            }
           }
           if (role === 'reviewer' && (log.pdfUrl || log.newFileUrl)) {
-            reviewerPdf = log.pdfUrl || log.newFileUrl;
+            const url = log.pdfUrl || log.newFileUrl;
+            if (isNotOriginal(url)) {
+              if (url.endsWith('.docx') || url.endsWith('.doc')) reviewerDocx = url;
+              reviewerPdf = url;
+            }
+          }
+          if (role === 'admin' && (log.pdfUrl || log.newFileUrl)) {
+            const url = log.pdfUrl || log.newFileUrl;
+            if (isNotOriginal(url)) {
+              if (url.endsWith('.docx') || url.endsWith('.doc')) adminDocx = url;
+              adminPdf = url;
+            }
           }
         });
 
@@ -210,7 +231,7 @@ export default function AdminDashboard() {
           else if (clean.includes('_reviewer_watermarked.pdf')) {
             // Already correct format, just return as-is
             return clean;
-          } 
+          }
           // Handle editor PDFs (they have "clean" in the name)
           else if (clean.endsWith('_watermarked.docx')) {
             // Editor files have "clean" in the name
@@ -219,7 +240,7 @@ export default function AdminDashboard() {
             if (clean.includes('/uploads/words/')) {
               clean = clean.replace('/uploads/words/', '/uploads/pdfs/');
             }
-          } 
+          }
           // Handle other DOCX files
           else if (clean.endsWith('.docx')) {
             clean = clean.replace(/\.docx$/i, '.pdf');
@@ -237,17 +258,55 @@ export default function AdminDashboard() {
           console.log('🔍 [URL Debug] Original reviewer PDF:', reviewerPdf);
         }
 
+        // Other DOCX fallback logic
+        const deriveDocx = (pdfUrl) => {
+          if (!pdfUrl) return null;
+
+          let docxUrl = pdfUrl;
+
+          // 1. Convert extension
+          if (docxUrl.endsWith('.pdf')) {
+            docxUrl = docxUrl.replace('.pdf', '.docx');
+          }
+
+          // 2. Fix Directory (/uploads/pdfs/ -> /uploads/words/)
+          // ❌ REMOVED: Admin/Editor DOCX files are actually stored in /uploads/pdfs/ alongside the PDF.
+          // The previous logic incorrectly forced them to look in /uploads/words/ which caused 404s.
+          // if (docxUrl.includes('/uploads/pdfs/')) {
+          //   docxUrl = docxUrl.replace('/uploads/pdfs/', '/uploads/words/');
+          // }
+
+          // 3. Fix Filename discrepancy (Editor version)
+          // Pattern: filename_clean_watermarked.pdf -> filename_watermarked.docx
+          if (docxUrl.includes('_clean_watermarked.docx')) {
+            docxUrl = docxUrl.replace('_clean_watermarked.docx', '_watermarked.docx');
+          }
+
+          return docxUrl;
+        };
+
+        // If explicitly found DOCX is null, try to derive from PDF
+        if (!editorDocx && editorPdf) editorDocx = deriveDocx(editorPdf);
+        if (!reviewerDocx && reviewerPdf) reviewerDocx = deriveDocx(reviewerPdf);
+        if (!adminDocx && adminPdf) adminDocx = deriveDocx(adminPdf);
+
+        // Clean PDFs for viewing
         if (editorPdf) editorPdf = cleanUrl(editorPdf);
         if (reviewerPdf) {
           reviewerPdf = cleanUrl(reviewerPdf);
           console.log('🔍 [URL Debug] Cleaned reviewer PDF:', reviewerPdf);
         }
+        if (adminPdf) adminPdf = cleanUrl(adminPdf);
 
         setSelectedArticle((prev) => ({
           ...prev,
-          editorDocumentUrl: data.article.editorDocumentUrl, // Keeps existing logic
-          latestEditorPdfUrl: editorPdf, // ✅ NEW
-          latestReviewerPdfUrl: reviewerPdf, // ✅ NEW
+          editorDocumentUrl: data.article.editorDocumentUrl,
+          latestEditorPdfUrl: editorPdf,
+          latestEditorDocxUrl: editorDocx,
+          latestReviewerPdfUrl: reviewerPdf,
+          latestReviewerDocxUrl: reviewerDocx,
+          latestAdminPdfUrl: adminPdf,
+          latestAdminDocxUrl: adminDocx,
         }));
       }
     } catch (err) {
@@ -388,16 +447,17 @@ export default function AdminDashboard() {
     // 2. Baki modes ke liye path set karo
     let path = "";
     if (pdfViewMode === "original") path = selectedArticle.originalPdfUrl;
-    else if (pdfViewMode === "current") path = selectedArticle.currentPdfUrl;
-    else if (pdfViewMode === "editor") path = selectedArticle.latestEditorPdfUrl || selectedArticle.editorDocumentUrl; // ✅ NEW MODE
-    else if (pdfViewMode === "reviewer") path = selectedArticle.latestReviewerPdfUrl; // ✅ NEW MODE
+    else if (pdfViewMode === "admin") path = selectedArticle.latestAdminPdfUrl; // ✅ UPDATED: Admin specific
+    else if (pdfViewMode === "current") path = selectedArticle.currentPdfUrl; // Fallback for general latest
+    else if (pdfViewMode === "editor") path = selectedArticle.latestEditorPdfUrl || selectedArticle.editorDocumentUrl;
+    else if (pdfViewMode === "reviewer") path = selectedArticle.latestReviewerPdfUrl;
     else if (pdfViewMode === "track") path = selectedArticle.editorDocumentUrl;
 
     if (!path) return null;
 
     const cleanPath = path.startsWith("http")
       ? path
-      : `${NEXT_PUBLIC_BASE_URL}/${path.replace(/^\//, "")}`;
+      : `${NEXT_PUBLIC_BASE_URL}/${path.replace(/\\/g, "/").replace(/^\//, "")}`;
 
     // Add timestamp to prevent PDF caching
     return `${cleanPath}?cb=${Date.now()}`;
@@ -435,7 +495,14 @@ export default function AdminDashboard() {
       const token = localStorage.getItem("adminToken");
 
       if (!selectedArticle?.originalPdfUrl) throw new Error("Original PDF missing");
-      if (!selectedArticle?.currentPdfUrl) throw new Error("Current PDF missing");
+
+      // Determine which PDF to compare against based on current view mode
+      let targetPdfUrl = selectedArticle.currentPdfUrl; // Default to latest
+      if (pdfViewMode === "editor") targetPdfUrl = selectedArticle.latestEditorPdfUrl || selectedArticle.editorDocumentUrl;
+      if (pdfViewMode === "reviewer") targetPdfUrl = selectedArticle.latestReviewerPdfUrl;
+      if (pdfViewMode === "admin") targetPdfUrl = selectedArticle.latestAdminPdfUrl;
+
+      if (!targetPdfUrl) throw new Error("Target PDF for comparison missing");
 
       // 1. Fetch Original PDF
       const originalRes = await fetch(
@@ -445,9 +512,9 @@ export default function AdminDashboard() {
       const originalBlob = await originalRes.blob();
       const originalFile = new File([originalBlob], "original.pdf", { type: "application/pdf" });
 
-      // 2. Fetch Current (Edited) PDF
+      // 2. Fetch Current (Edited/Target) PDF
       const editedRes = await fetch(
-        selectedArticle.currentPdfUrl.startsWith("http") ? selectedArticle.currentPdfUrl : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.currentPdfUrl}`,
+        targetPdfUrl.startsWith("http") ? targetPdfUrl : `${NEXT_PUBLIC_BASE_URL}${targetPdfUrl}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const editedBlob = await editedRes.blob();
@@ -460,11 +527,8 @@ export default function AdminDashboard() {
       // Ye Array return karta hai
       const differences = compareTexts(originalText.fullText, editedText.fullText);
 
-      // ❌ DELETE THIS LINE (Ye string bana raha tha jo error de raha hai)
-      // const formattedDiff = formatDifferences(differences); 
-
-      // 4. Generate Diff PDF
-      // ✅ FIX: 'differences' (Array) pass karein, 'formattedDiff' (String) nahi
+      // ✅ FIX: Use 'differences' directly (Array) as generateComparisonPDF expects {added, removed, value} objects 
+      // which are present in the raw diff. 'formatDifferences' might be returning something unexpected.
       const pdfBytes = await generateComparisonPDF(differences);
 
       const blob = new Blob([pdfBytes], { type: "application/pdf" });
@@ -716,6 +780,65 @@ export default function AdminDashboard() {
     }
   };
   const [isPublishing, setIsPublishing] = useState(false); // ✅ NEW State
+
+  // ✅ ADMIN UPLOAD LOGIC
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [uploadComment, setUploadComment] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleAdminUpload = async () => {
+    if (!uploadedFile) return toast.error("Please select a DOCX file.");
+
+    const allowed = [".docx", ".doc"];
+    const ext = uploadedFile.name.substring(uploadedFile.name.lastIndexOf(".")).toLowerCase();
+    if (!allowed.includes(ext) && uploadedFile.type !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      return toast.error("Only DOCX files are allowed.");
+    }
+
+    try {
+      setIsUploading(true);
+      const token = localStorage.getItem("adminToken");
+      const formData = new FormData();
+      formData.append("document", uploadedFile);
+      if (uploadComment) formData.append("comments", uploadComment);
+
+      const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id}/upload-corrected`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("Admin upload successful!");
+        setUploadedFile(null);
+        setUploadComment("");
+        setVisualDiffBlobUrl(null); // Clear old diff
+
+        // Update local state to show new file
+        // We need to fetch history or just update selectedArticle if backend returns updated article
+        if (data.article) {
+          // Re-fetch history to ensure we get the proper log entry
+          await fetchChangeHistory(selectedArticle.id);
+
+          setSelectedArticle(prev => ({
+            ...prev,
+            ...data.article,
+            currentPdfUrl: data.article.currentPdfUrl,
+            currentWordUrl: data.article.currentWordUrl
+          }));
+          setPdfViewMode("admin"); // Switch to view result
+        }
+      } else {
+        toast.error(data.message || "Upload failed");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Upload error");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const overrideAndPublish = async (id) => {
     try {
@@ -1164,7 +1287,7 @@ export default function AdminDashboard() {
                           <div className="flex flex-col items-center">
                             {art.assignedReviewer && (
                               <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full mb-1 border border-blue-200 uppercase tracking-wide">
-                                ✅ Assigned
+                                Assigned to {reviewers.find(r => r.id === art.assignedReviewer || r._id === art.assignedReviewer)?.name || "User"}
                               </span>
                             )}
                             <select
@@ -1252,7 +1375,7 @@ export default function AdminDashboard() {
             <div className="mt-8 flex justify-end">
               <button
                 onClick={() => setShowAbstract(null)}
-                className="bg-red-600 text-white px-8 py-2 rounded-lg font-black uppercase text-xs"
+                className="bg-red-600 text-white px-3 py-2 md:px-5 md:py-2 rounded-lg font-bold hover:bg-black transition-all text-[10px] md:text-xs"
               >
                 Close Preview
               </button>
@@ -1260,102 +1383,266 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+      {/* ✅ MULTI-DIFF VIEWER OVERLAY */}
+      {showMultiDiff && selectedArticle && (
+        <MultiDiffViewer
+          selectedArticle={selectedArticle}
+          changeHistory={changeHistory}
+          onClose={() => setShowMultiDiff(false)}
+          adminToken={localStorage.getItem("adminToken")}
+          NEXT_PUBLIC_BASE_URL={NEXT_PUBLIC_BASE_URL}
+        />
+      )}
       {selectedArticle && (
-        <div className="fixed inset-0 bg-white z-[60] flex flex-col overflow-hidden animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-white z-[60] flex flex-col overflow-hidden animate-in fade-in duration-300 font-sans">
           {/* HEADER */}
-          <header className="bg-red-700 text-white p-4 flex justify-between items-center shadow-xl">
+          <header className="bg-red-700 text-white p-4 flex justify-between items-center shadow-md">
             <div className="flex items-center gap-4">
-              <h3 className="font-black italic text-lg uppercase">
+              <h3 className="font-black italic text-lg uppercase tracking-wider">
                 Admin Review Mode
               </h3>
-              <span className="bg-white/20 px-3 py-1 rounded-full text-xs">
+              <span className="bg-white/20 px-3 py-1 rounded text-xs font-medium">
                 {selectedArticle.title}
               </span>
             </div>
             <button
               onClick={() => setSelectedArticle(null)}
-              className="bg-black hover:bg-gray-800 px-6 py-2 rounded-lg text-xs font-black transition-all"
+              className="bg-black hover:bg-gray-800 px-6 py-2 rounded text-xs font-bold uppercase transition-all"
             >
-              CLOSE REVIEW
+              Close Review
             </button>
           </header>
 
-          <div className="flex flex-1 overflow-hidden p-4 gap-6 bg-gray-100">
-            {/* LEFT SIDE: PDF VIEWER */}
-            <div className="flex-1 bg-white rounded-2xl shadow-2xl relative overflow-hidden flex flex-col border border-gray-200">
-              <div className="p-4 border-b bg-gray-50 flex gap-4">
-                <button
-                  onClick={() => setPdfViewMode("original")}
-                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${pdfViewMode === "original"
-                    ? "bg-red-600 text-white shadow-lg"
-                    : "bg-white text-gray-400 border"
-                    }`}
-                >
-                  1. ORIGINAL SUBMISSION
-                </button>
-                <button
-                  onClick={() => setPdfViewMode("editor")} // ✅ Changed to "editor" mode to explicitly show Editor's PDF
-                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${pdfViewMode === "editor"
-                    ? "bg-blue-600 text-white shadow-lg"
-                    : "bg-white text-gray-400 border"
-                    }`}
-                >
-                  2. EDITOR EDITED VERSION
-                </button>
+          <div className="flex flex-col lg:flex-row flex-1 overflow-hidden bg-gray-100">
 
-                {/* ✅ 3. REVIEWER PDF TAB */}
-                <button
-                  onClick={() => setPdfViewMode("reviewer")}
-                  disabled={!selectedArticle.latestReviewerPdfUrl}
-                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${pdfViewMode === "reviewer"
-                    ? "bg-purple-600 text-white shadow-lg"
-                    : !selectedArticle.latestReviewerPdfUrl ? "bg-gray-100 text-gray-300 cursor-not-allowed border" : "bg-white text-gray-400 border"
-                    }`}
-                >
-                  3. REVIEWER EDITED VERSION
-                </button>
+            {/* 🔴 1. SIDEBAR (Simple Text Tabs) */}
+            <div className="w-full lg:w-64 bg-white border-r lg:border-r border-b lg:border-b-0 border-gray-200 flex flex-col shrink-0 h-auto lg:h-full max-h-[200px] lg:max-h-full">
+              {/* Document Options Menu */}
+              <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                <p className="text-[10px] font-bold text-red-800 uppercase tracking-widest mb-3 ml-2">
+                  Document Versions
+                </p>
 
-                {/* ✅ VISUAL DIFF BUTTON (Track File Removed) */}
-                <button
-                  onClick={handleViewVisualDiff}
-                  disabled={isGeneratingDiff}
-                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${pdfViewMode === "visual-diff"
-                    ? "bg-green-600 text-white shadow-lg"
-                    : "bg-white text-gray-400 border"
-                    }`}
-                >
-                  {isGeneratingDiff ? "GENERATING..." : "4. VIEW VISUAL DIFF"}
-                </button>
-              </div>
-
-              {/* ✅ IFRAME LOGIC with Loading State */}
-              {getPdfUrlToView() ? (
-                <iframe
-                  key={getPdfUrlToView()} // Key ensures refresh on URL change
-                  src={getPdfUrlToView()}
-                  className="flex-1 w-full"
-                  title="Admin Viewer"
-                />
-              ) : (
-                <div className="flex-1 flex items-center justify-center bg-gray-100 text-gray-500">
-                  <p>
-                    {isGeneratingDiff
-                      ? "Analyzing documents & generating diff..."
-                      : "PDF URL not found or generation failed."}
-                  </p>
+                {/* 1. Original Submission */}
+                <div className={`w-full flex items-center rounded-lg transition-all ${pdfViewMode === "original"
+                  ? "bg-red-50 ring-1 ring-red-200"
+                  : "hover:bg-red-50"
+                  }`}>
+                  <button
+                    onClick={() => setPdfViewMode("original")}
+                    className={`flex-1 text-left px-4 py-3 text-xs font-bold flex items-center gap-3 ${pdfViewMode === "original"
+                      ? "text-red-700"
+                      : "text-gray-500 hover:text-red-700"
+                      }`}
+                  >
+                    Original Submission
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const url = selectedArticle.originalWordUrl || selectedArticle.originalPdfUrl;
+                      const type = selectedArticle.originalWordUrl ? "Word" : "PDF";
+                      handleDownloadFile(url, `Original_${selectedArticle.title}`, type);
+                    }}
+                    className="p-3 text-gray-400 hover:text-red-700 transition"
+                    title="Download Original"
+                  >
+                    <DownloadIcon />
+                  </button>
                 </div>
-              )}
+
+                {/* 2. Admin Version */}
+                <div className={`w-full flex items-center rounded-lg transition-all ${pdfViewMode === "admin"
+                  ? "bg-red-50 ring-1 ring-red-200"
+                  : !selectedArticle.latestAdminPdfUrl ? "" : "hover:bg-red-50"
+                  }`}>
+                  <button
+                    onClick={() => setPdfViewMode("admin")}
+                    disabled={!selectedArticle.latestAdminPdfUrl}
+                    className={`flex-1 text-left px-4 py-3 text-xs font-bold flex items-center gap-3 ${pdfViewMode === "admin"
+                      ? "text-red-700"
+                      : !selectedArticle.latestAdminPdfUrl ? "text-gray-300 cursor-not-allowed" : "text-gray-500 hover:text-red-700"
+                      }`}
+                  >
+                    Admin Edited (Latest)
+                  </button>
+                  {selectedArticle.latestAdminPdfUrl && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadFile(selectedArticle.latestAdminPdfUrl, `Admin_Edited_${selectedArticle.title}`, "PDF");
+                      }}
+                      className="p-3 text-gray-400 hover:text-red-700 transition"
+                      title="Download Admin Version"
+                    >
+                      <DownloadIcon />
+                    </button>
+                  )}
+                </div>
+
+                {/* 3. Editor Version */}
+                <div className={`w-full flex items-center rounded-lg transition-all ${pdfViewMode === "editor"
+                  ? "bg-blue-50 ring-1 ring-blue-200"
+                  : !selectedArticle.latestEditorPdfUrl ? "" : "hover:bg-blue-50"
+                  }`}>
+                  <button
+                    onClick={() => setPdfViewMode("editor")}
+                    disabled={!selectedArticle.latestEditorPdfUrl}
+                    className={`flex-1 text-left px-4 py-3 text-xs font-bold flex items-center gap-3 ${pdfViewMode === "editor"
+                      ? "text-blue-700"
+                      : !selectedArticle.latestEditorPdfUrl ? "text-gray-300 cursor-not-allowed" : "text-gray-500 hover:text-blue-700"
+                      }`}
+                  >
+                    Editor Version
+                  </button>
+                  {selectedArticle.latestEditorPdfUrl && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadFile(selectedArticle.latestEditorPdfUrl, `Editor_Version_${selectedArticle.title}`, "PDF");
+                      }}
+                      className="p-3 text-gray-400 hover:text-blue-700 transition"
+                      title="Download Editor Version"
+                    >
+                      <DownloadIcon />
+                    </button>
+                  )}
+                </div>
+
+                {/* 4. Reviewer Version */}
+                <div className={`w-full flex items-center rounded-lg transition-all ${pdfViewMode === "reviewer"
+                  ? "bg-purple-50 ring-1 ring-purple-200"
+                  : !selectedArticle.latestReviewerPdfUrl ? "" : "hover:bg-purple-50"
+                  }`}>
+                  <button
+                    onClick={() => setPdfViewMode("reviewer")}
+                    disabled={!selectedArticle.latestReviewerPdfUrl}
+                    className={`flex-1 text-left px-4 py-3 text-xs font-bold flex items-center gap-3 ${pdfViewMode === "reviewer"
+                      ? "text-purple-700"
+                      : !selectedArticle.latestReviewerPdfUrl
+                        ? "text-gray-300 cursor-not-allowed"
+                        : "text-gray-500 hover:text-purple-700"
+                      }`}
+                  >
+                    Reviewer Version
+                  </button>
+                  {selectedArticle.latestReviewerPdfUrl && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadFile(selectedArticle.latestReviewerPdfUrl, `Reviewer_Version_${selectedArticle.title}`, "PDF");
+                      }}
+                      className="p-3 text-gray-400 hover:text-purple-700 transition"
+                      title="Download Reviewer Version"
+                    >
+                      <DownloadIcon />
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  disabled={isGeneratingDiff}
+                  onClick={() => handleViewVisualDiff()}
+                  className={`w-full text-left px-4 py-3 rounded-lg text-xs font-bold transition-all flex items-center gap-3 ${pdfViewMode === "visual-diff"
+                    ? "bg-red-50 text-red-700 shadow-sm ring-1 ring-red-200"
+                    : "text-gray-500 hover:bg-red-50 hover:text-red-700"
+                    }`}
+                >
+                  {isGeneratingDiff ? "Generating..." : "View Track File"}
+                </button>
+
+                <div className="border-t border-gray-200 my-2 pt-2"></div>
+
+                <button
+                  onClick={() => setShowMultiDiff(true)}
+                  className="w-full text-left px-4 py-3 rounded-lg text-xs font-bold transition-all flex items-center gap-3 text-white bg-black hover:bg-gray-800 shadow-md"
+                >
+                  Open Multi-Diff Viewer
+                </button>
+              </nav>
             </div>
 
-            {/* RIGHT SIDE: EDITOR'S LOGS & ACTIONS */}
-            <div className="w-[450px] overflow-y-auto space-y-4">
-              {/* ✅ SOURCE FILES SECTION */}
-              <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
-                <h4 className="font-black text-gray-800 border-b pb-3 mb-6 flex items-center gap-2 text-sm">
-                  <span>📄</span> SOURCE FILES
-                </h4>
-                <div className="space-y-3">
-                  {/* Original DOCX */}
+            {/* ⚪ 2. MAIN VIEWER */}
+            <div className="flex-1 flex flex-col relative bg-gray-200 p-4 overflow-hidden">
+              <div className="flex-1 bg-white shadow-lg rounded-lg overflow-hidden relative">
+                {getPdfUrlToView() ? (
+                  <iframe
+                    key={getPdfUrlToView()}
+                    src={getPdfUrlToView()}
+                    className="w-full h-full border-none"
+                    title="Viewer"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center flex-col text-gray-400 gap-2">
+                    <p className="text-sm font-medium">
+                      {isGeneratingDiff ? "Processing Visual Diff..." : "Select a document version to view"}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 🔵 3. ACTION PANEL */}
+            <div className="w-full lg:w-[350px] bg-white border-l lg:border-l border-t lg:border-t-0 border-gray-200 flex flex-col shrink-0 overflow-y-auto h-auto lg:h-full">
+              <div className="p-6 space-y-8">
+
+                {/* Upload Section */}
+                <div>
+                  <h3 className="text-sm font-bold text-gray-800 uppercase mb-3">
+                    Upload Admin Edit
+                  </h3>
+                  <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-red-400 hover:bg-red-50/50 transition-colors bg-gray-50 text-center cursor-pointer relative group">
+                    <input
+                      type="file"
+                      accept=".docx"
+                      onChange={(e) => setUploadedFile(e.target.files[0])}
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    />
+                    <p className="text-xs font-bold text-gray-500 uppercase group-hover:text-red-600">
+                      {uploadedFile ? uploadedFile.name : "Select Corrected DOCX"}
+                    </p>
+                  </div>
+                  <textarea
+                    className="w-full mt-3 p-3 border rounded-lg text-xs outline-none focus:border-red-600 resize-none bg-gray-50"
+                    rows="2"
+                    placeholder="Add comments (optional)..."
+                    value={uploadComment}
+                    onChange={(e) => setUploadComment(e.target.value)}
+                  />
+                  <button
+                    onClick={handleAdminUpload}
+                    disabled={isUploading || !uploadedFile}
+                    className={`w-full mt-3 py-3 rounded text-xs font-bold uppercase transition-all ${isUploading || !uploadedFile
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 text-white"
+                      }`}
+                  >
+                    {isUploading ? "Processing Diff..." : "Upload & Generate Diff"}
+                  </button>
+                </div>
+
+                {/* Publish Section */}
+                <div className="pt-6 border-t border-gray-100">
+                  <h3 className="text-sm font-bold text-gray-800 uppercase mb-3">
+                    Final Decision
+                  </h3>
+                  <button
+                    onClick={() => overrideAndPublish(selectedArticle.id)}
+                    disabled={isPublishing || selectedArticle.status === "Published"}
+                    className={`w-full py-4 text-white rounded font-black shadow-md transition-all uppercase tracking-tight ${isPublishing || selectedArticle.status === "Published"
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-green-600 hover:bg-green-700"
+                      }`}
+                  >
+                    {isPublishing ? "Publishing..." : selectedArticle.status === "Published" ? "Already Published" : "Direct Publish"}
+                  </button>
+                </div>
+
+                {/* Downloads Section */}
+                <div className="pt-6 border-t border-gray-100 space-y-2">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">
+                    Downloads
+                  </h3>
                   <button
                     onClick={() =>
                       handleDownloadFile(
@@ -1364,12 +1651,10 @@ export default function AdminDashboard() {
                         "Word"
                       )
                     }
-                    className="w-full py-3 bg-blue-50 text-blue-700 font-bold rounded-xl hover:bg-blue-100 border border-blue-200 transition flex items-center justify-center gap-2"
+                    className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-blue-700 border border-gray-200 rounded text-xs font-bold transition"
                   >
-                    <DownloadIcon /> Download Original DOCX
+                    Original Submission (DOCX)
                   </button>
-
-                  {/* Final DOCX */}
                   <button
                     onClick={() =>
                       handleDownloadFile(
@@ -1379,44 +1664,57 @@ export default function AdminDashboard() {
                       )
                     }
                     disabled={!selectedArticle.currentWordUrl}
-                    className={`w-full py-3 font-bold rounded-xl transition flex items-center justify-center gap-2 ${selectedArticle.currentWordUrl
-                      ? "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
-                      : "bg-gray-100 text-gray-400 cursor-not-allowed text-xs"
+                    className={`w-full py-2 border rounded text-xs font-bold transition ${selectedArticle.currentWordUrl
+                      ? "bg-gray-50 hover:bg-gray-100 text-green-700 border-gray-200"
+                      : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                       }`}
                   >
-                    <DownloadIcon /> {selectedArticle.currentWordUrl ? "Download Final DOCX" : "Final DOCX Not Ready"}
+                    Final Version (DOCX)
                   </button>
-                </div>
-              </div>
 
-              <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
+                  <div className="border-t border-gray-100 my-2 pt-2"></div>
+                  <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">
+                    Review Versions (DOCX)
+                  </h3>
 
-                <button
-                  onClick={() => overrideAndPublish(selectedArticle.id)}
-                  disabled={isPublishing}
-                  className={`w-full mt-10 text-white py-4 rounded-xl font-black shadow-lg transition-all uppercase tracking-tighter ${isPublishing
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-green-600 hover:bg-green-700 hover:shadow-green-200"
-                    }`}
-                >
-                  {isPublishing ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      PUBLISHING...
-                    </span>
-                  ) : (
-                    "Final Approve & Publish"
+                  {/* Admin Edited - Always Visible, Disabled if missing */}
+                  <button
+                    onClick={() => handleDownloadFile(selectedArticle.latestAdminDocxUrl, `Admin_Edited_${selectedArticle.title}`, "Word")}
+                    disabled={!selectedArticle.latestAdminDocxUrl}
+                    className={`w-full py-2 border rounded text-xs font-bold transition ${selectedArticle.latestAdminDocxUrl
+                      ? "bg-gray-50 hover:bg-gray-100 text-red-700 border-gray-200"
+                      : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                      }`}
+                  >
+                    Admin Edited (DOCX)
+                  </button>
+
+                  {selectedArticle.latestEditorDocxUrl && (
+                    <button
+                      onClick={() => handleDownloadFile(selectedArticle.latestEditorDocxUrl, `Editor_Version_${selectedArticle.title}`, "Word")}
+                      className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-blue-700 border border-gray-200 rounded text-xs font-bold transition"
+                    >
+                      Editor Version (DOCX)
+                    </button>
                   )}
-                </button>
+                  {selectedArticle.latestReviewerDocxUrl && (
+                    <button
+                      onClick={() => handleDownloadFile(selectedArticle.latestReviewerDocxUrl, `Reviewer_Version_${selectedArticle.title}`, "Word")}
+                      className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-purple-700 border border-gray-200 rounded text-xs font-bold transition"
+                    >
+                      Reviewer Version (DOCX)
+                    </button>
+                  )}
+                </div>
+
               </div>
             </div>
+
           </div>
-        </div>
-      )}
+        </div >
+      )
+      }
       <ToastContainer position="top-right" autoClose={3000} theme="colored" />
-    </div>
+    </div >
   );
 }

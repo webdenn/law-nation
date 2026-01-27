@@ -304,6 +304,8 @@ export default function EditorDashboard() {
       return toast.error("Only DOCX/DOC files are supported for editor uploads.");
     }
 
+    const toastId = toast.loading("Uploading Correction & Generating Diff...");
+
     try {
       setIsUploading(true);
       const token = localStorage.getItem("editorToken");
@@ -332,7 +334,13 @@ export default function EditorDashboard() {
       const data = await res.json();
 
       if (res.ok) {
-        toast.success("New version uploaded & Diff generated!");
+        toast.update(toastId, {
+          render: "New version uploaded & Diff generated successfully!",
+          type: "success",
+          isLoading: false,
+          autoClose: 3000
+        });
+
         setUploadedFile(null);
         setTrackFile(null);
         setUploadComment("");
@@ -346,11 +354,21 @@ export default function EditorDashboard() {
           setPdfTimestamp(Date.now()); // ✅ Refresh PDF
         }
       } else {
-        toast.error(data.error || data.message || "Upload failed");
+        toast.update(toastId, {
+          render: data.error || data.message || "Upload failed",
+          type: "error",
+          isLoading: false,
+          autoClose: 5000
+        });
       }
     } catch (err) {
       console.error("Upload Error:", err);
-      toast.error("Server Error: Could not connect to backend");
+      toast.update(toastId, {
+        render: "Server Error: Could not connect to backend",
+        type: "error",
+        isLoading: false,
+        autoClose: 5000
+      });
     } finally {
       setIsUploading(false);
     }

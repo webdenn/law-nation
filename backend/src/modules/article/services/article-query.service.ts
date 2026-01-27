@@ -431,6 +431,10 @@ export class ArticleQueryService {
             id: true,
             name: true,
             email: true,
+            id: true,
+            name: true,
+            email: true,
+            roles: { select: { role: { select: { name: true } } } } // ✅ Fetch roles correctly via UserRole
           },
         },
       },
@@ -537,10 +541,18 @@ export class ArticleQueryService {
             }
           }
 
-          // Default fallback
           return log.newFileUrl.replace(/\.docx$/i, '.pdf');
         })(),
-        role: (log.diffData as any)?.type === 'reviewer_edit' ? 'Reviewer' : 'Editor',
+        role: (() => {
+          if ((log.diffData as any)?.type === 'reviewer_edit') return 'Reviewer';
+
+
+          // Check user roles
+          // Roles structure is User -> UserRole[] -> Role
+          const roles = (log.editor as any).roles?.map((ur: any) => ur.role?.name) || [];
+          if (roles.includes('admin') || roles.includes('ADMIN')) return 'admin'; // Lowercase to match frontend check
+          return 'Editor';
+        })(),
       })),
       totalVersions: changeLogs.length + 1,
       accessLevel: isAdmin ? "admin" : "editor",
