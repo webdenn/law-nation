@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import AssignEditor from "./AssignEditor";
 import AssignReviewer from "./AssignReviewer";
@@ -26,6 +26,19 @@ export default function ArticleTable({
     overrideAndPublish,
     deleteArticle
 }) {
+    const [publishingId, setPublishingId] = useState(null);
+
+    const handlePublish = async (id) => {
+        setPublishingId(id);
+        try {
+            await overrideAndPublish(id);
+        } catch (error) {
+            console.error("Publishing error:", error);
+        } finally {
+            setPublishingId(null);
+        }
+    };
+
     return (
         <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
             <div className="bg-gray-50 p-5 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -147,16 +160,20 @@ export default function ArticleTable({
                                             Review
                                         </button>
                                         <button
-                                            onClick={() => overrideAndPublish(art.id)}
-                                            disabled={art.status === "Published"}
+                                            onClick={() => handlePublish(art.id)}
+                                            disabled={art.status === "Published" || publishingId === art.id}
                                             className={`w-[90px] py-2 rounded text-[10px] font-black transition-colors uppercase text-center ${art.status === "Published"
                                                 ? "bg-gray-400 cursor-not-allowed text-gray-200"
-                                                : "bg-black text-white hover:bg-green-600"
+                                                : publishingId === art.id
+                                                    ? "bg-gray-800 text-white cursor-wait"
+                                                    : "bg-black text-white hover:bg-green-600"
                                                 }`}
                                         >
                                             {art.status === "Published"
                                                 ? "Published"
-                                                : "Publish"}
+                                                : publishingId === art.id
+                                                    ? "Wait..."
+                                                    : "Publish"}
                                         </button>
                                         <button
                                             onClick={() => {
@@ -263,14 +280,16 @@ export default function ArticleTable({
                                         Review
                                     </button>
                                     <button
-                                        onClick={() => overrideAndPublish(art.id)}
-                                        disabled={art.status === "Published"}
+                                        onClick={() => handlePublish(art.id)}
+                                        disabled={art.status === "Published" || publishingId === art.id}
                                         className={`flex-1 sm:flex-none py-2 px-4 rounded text-xs font-bold transition shadow-sm uppercase ${art.status === "Published"
                                             ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                            : "bg-black text-white hover:bg-gray-900"
+                                            : publishingId === art.id
+                                                ? "bg-gray-800 text-white cursor-wait"
+                                                : "bg-black text-white hover:bg-gray-900"
                                             }`}
                                     >
-                                        {art.status === "Published" ? "Published" : "Publish"}
+                                        {art.status === "Published" ? "Published" : publishingId === art.id ? "Wait..." : "Publish"}
                                     </button>
                                 </div>
                                 <button
