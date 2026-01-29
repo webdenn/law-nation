@@ -1,9 +1,11 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { Download, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Download, CheckCircle, XCircle, Clock, ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function UserAuditPage() {
+    const router = useRouter();
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -46,14 +48,13 @@ export default function UserAuditPage() {
     const downloadCSV = () => {
         if (events.length === 0) return;
 
-        const headers = ["User Name", "User Email", "Organization", "Article Title", "Upload Date", "Upload Time", "Status"];
+        const headers = ["User Name", "User Email", "Article Title", "Upload Date", "Upload Time", "Status"];
         const csvRows = [headers.join(",")];
 
         events.forEach(event => {
             const row = [
                 `"${event.userName}"`,
-                `"${event.userEmail}"`,
-                `"${event.userOrganization || ''}"`,
+                `"${(event.userEmail && event.userEmail !== 'N/A') ? event.userEmail : '-'}"`,
                 `"${event.articleTitle}"`,
                 `\t${new Date(event.eventDate).toLocaleDateString('en-GB')}`,
                 event.eventTime,
@@ -74,9 +75,17 @@ export default function UserAuditPage() {
     return (
         <div className="p-8">
             <div className="flex justify-between items-end mb-6 border-b-4 border-red-600 pb-2">
-                <h1 className="text-3xl font-black italic tracking-tighter text-gray-900 uppercase">
-                    User Upload History
-                </h1>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => router.back()}
+                        className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 transition"
+                    >
+                        <ArrowLeft size={24} />
+                    </button>
+                    <h1 className="text-3xl font-black italic tracking-tighter text-gray-900 uppercase">
+                        User Upload History
+                    </h1>
+                </div>
                 <button
                     onClick={downloadCSV}
                     disabled={loading || events.length === 0}
@@ -102,7 +111,6 @@ export default function UserAuditPage() {
                                 <thead>
                                     <tr className="bg-gray-50 border-b border-gray-200 text-gray-700 uppercase text-xs tracking-wider">
                                         <th className="p-4 font-bold">User</th>
-                                        <th className="p-4 font-bold">Organization</th>
                                         <th className="p-4 font-bold">Article Title</th>
                                         <th className="p-4 font-bold">Upload Date/Time</th>
                                         <th className="p-4 font-bold">Status</th>
@@ -113,9 +121,8 @@ export default function UserAuditPage() {
                                         <tr key={event.id} className="hover:bg-gray-50 transition-colors group">
                                             <td className="p-4 font-medium text-gray-900">
                                                 {event.userName}
-                                                <div className="text-xs text-gray-400 font-normal">{event.userEmail}</div>
+                                                <div className="text-xs text-gray-400 font-normal">{(event.userEmail && event.userEmail !== 'N/A') ? event.userEmail : '-'}</div>
                                             </td>
-                                            <td className="p-4 text-gray-600">{event.userOrganization || "N/A"}</td>
                                             <td className="p-4 font-bold text-gray-800">{event.articleTitle}</td>
                                             <td className="p-4 text-gray-500">
                                                 <div>{new Date(event.eventDate).toLocaleDateString()}</div>

@@ -1,9 +1,11 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { Copy, ArrowRight, Download, Upload, CheckCircle, XCircle, UserPlus, FileText } from "lucide-react";
+import { Copy, ArrowRight, Download, Upload, CheckCircle, XCircle, UserPlus, FileText, ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function EditorAuditPage() {
+    const router = useRouter();
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -57,7 +59,7 @@ export default function EditorAuditPage() {
             let details = "";
             if (event.eventType === 'EDITOR_ASSIGN') details = `Assigned to ${event.targetEditorName}`;
             else if (event.eventType === 'EDITOR_REASSIGN') details = `Reassigned to ${event.targetEditorName}`;
-            else if (event.eventType === 'EDITOR_UPLOAD') details = `Editing Duration: ${event.editingDuration || 'N/A'}`;
+            else if (event.eventType === 'EDITOR_UPLOAD') details = `Editing Duration: ${event.editingDuration || '-'}`;
             else if (event.eventType === 'FINAL_DECISION') details = `Decision: ${event.decisionOutcome}`;
 
             const row = [
@@ -83,9 +85,17 @@ export default function EditorAuditPage() {
     return (
         <div className="p-8">
             <div className="flex justify-between items-end mb-6 border-b-4 border-red-600 pb-2">
-                <h1 className="text-3xl font-black italic tracking-tighter text-gray-900 uppercase">
-                    Editor & Admin Activity Log
-                </h1>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => router.back()}
+                        className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 transition"
+                    >
+                        <ArrowLeft size={24} />
+                    </button>
+                    <h1 className="text-3xl font-black italic tracking-tighter text-gray-900 uppercase">
+                        Editor & Admin Activity Log
+                    </h1>
+                </div>
                 <button
                     onClick={downloadCSV}
                     disabled={loading || events.length === 0}
@@ -112,7 +122,7 @@ export default function EditorAuditPage() {
                                     <tr className="bg-gray-50 border-b border-gray-200 text-gray-700 uppercase text-xs tracking-wider">
                                         <th className="p-4 font-bold">Date/Time</th>
                                         <th className="p-4 font-bold">Activity Type</th>
-                                        <th className="p-4 font-bold">Performed By (Admin/Editor)</th>
+                                        <th className="p-4 font-bold">Performed By (Admin/User/Editor/Reviewer)</th>
                                         <th className="p-4 font-bold">Article Involved</th>
                                         <th className="p-4 font-bold">Details</th>
                                     </tr>
@@ -137,20 +147,24 @@ export default function EditorAuditPage() {
                                                 {event.articleTitle}
                                             </td>
                                             <td className="p-4 text-gray-600 text-xs">
-                                                {event.eventType === 'EDITOR_ASSIGN' && (
-                                                    <span>Assigned to <strong>{event.targetEditorName}</strong></span>
-                                                )}
-                                                {event.eventType === 'EDITOR_REASSIGN' && (
-                                                    <span>Reassigned from <strong>{event.previousEditorName}</strong> to <strong>{event.targetEditorName}</strong></span>
-                                                )}
-                                                {event.eventType === 'EDITOR_UPLOAD' && (
-                                                    <span>Editing Duration: {event.editingDuration || 'N/A'}</span>
-                                                )}
-                                                {event.eventType === 'FINAL_DECISION' && (
-                                                    <span className={`font-bold ${event.decisionOutcome === 'PUBLISHED' ? 'text-green-600' : 'text-red-600'}`}>
-                                                        Decision: {event.decisionOutcome}
-                                                    </span>
-                                                )}
+                                                {(() => {
+                                                    switch (event.eventType) {
+                                                        case 'EDITOR_ASSIGN':
+                                                            return <span>Assigned to <strong>{event.targetEditorName}</strong></span>;
+                                                        case 'EDITOR_REASSIGN':
+                                                            return <span>Reassigned from <strong>{event.previousEditorName}</strong> to <strong>{event.targetEditorName}</strong></span>;
+                                                        case 'EDITOR_UPLOAD':
+                                                            return <span>Editing Duration: {(event.editingDuration && event.editingDuration !== 'N/A') ? event.editingDuration : '-'}</span>;
+                                                        case 'FINAL_DECISION':
+                                                            return (
+                                                                <span className={`font-bold ${event.decisionOutcome === 'PUBLISHED' ? 'text-green-600' : 'text-red-600'}`}>
+                                                                    Decision: {event.decisionOutcome}
+                                                                </span>
+                                                            );
+                                                        default:
+                                                            return <span>-</span>;
+                                                    }
+                                                })()}
                                             </td>
                                         </tr>
                                     ))}
