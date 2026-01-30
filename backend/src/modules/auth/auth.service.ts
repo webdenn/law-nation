@@ -12,7 +12,8 @@ import {
   UnauthorizedError,
   BadRequestError,
 } from "@/utils/http-errors.util.js";
-import { sendOtpEmail } from "@/utils/email.utils.js";
+import { sendOtpEmail, sendPasswordResetEmail } from "@/utils/email.utils.js";
+import { randomUUID } from "crypto";
 
 const SALT = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
 
@@ -26,6 +27,9 @@ export const AuthService = {
   sendVerificationOtp,
   verifyOtp,
   setupPassword,
+  requestPasswordReset,
+  validateResetToken,
+  resetPassword,
 };
 
 export default AuthService;
@@ -430,4 +434,212 @@ async function setupPassword(token: string, password: string) {
       roles: user.roles.map((r) => r.role.name),
     },
   };
+}
+
+/**
+ * Request password reset - sends reset email to user
+ * Works for all user types: Admin, Editor, Reviewer, User
+ */
+async function requestPasswordReset(email: string) {
+  try {
+    // Find user by email (all user types)
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isActive: true,
+      },
+    });
+
+    // Always return success message (don't reveal if email exists)
+    const successMessage = "If this email exists in our system, you will receive password reset instructions.";
+
+    // If user doesn't exist, still return success (security best practice)
+    if (!user) {
+      console.log(`🔒 [Password Reset] Email not found: ${email}`);
+      return {
+        success: true,
+        message: successMessage,
+      };
+    }
+
+    // Check if user account is active
+    if (!user.isActive) {
+      console.log(`🔒 [Password Reset] Inactive account: ${email}`);
+      return {
+        success: true,
+        message: successMessage,
+      };
+    }
+
+    // Generate secure reset token
+    const resetToken = randomUUID();
+
+    // Set expiration to 30 minutes from now
+    const ttl = new Date();
+    ttl.setMinutes(ttl.getMinutes() + 30);
+
+    // Delete any existing password reset tokens for this email
+    await prisma.emailVerification.deleteMany({
+      where: {
+        email,
+        resourceType: "PASSWORD_RESET",
+        isVerified: false,
+      },
+    });
+
+    // Create new password reset record
+    await prisma.emailVerification.create({
+      data: {
+        resourceId: user.id,
+        resourceType: "PASSWORD_RESET",
+        email: user.email,
+        token: resetToken,
+        ttl,
+        metadata: {
+          userId: user.id,
+          requestedAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    // Send password reset email
+    await sendPasswordResetEmail(user.email, user.name, resetToken);
+
+    console.log(`✅ [Password Reset] Reset email sent to: ${email}`);
+
+    return {
+      success: true,
+      message: successMessage,
+    };
+
+  } catch (error) {
+    console.error(`❌ [Password Reset] Failed to process request:`, error);
+    
+    // Return generic success message even on error (don't reveal system issues)
+    return {
+      success: true,
+      message: "If this email exists in our system, you will receive password reset instructions.",
+    };
+  }
+}
+
+/**
+ * Validate password reset token
+ * Checks if token is valid, not expired, and not already used
+ */
+async function validateResetToken(token: string) {
+  try {
+    // Find verification record
+    const verification = await prisma.emailVerification.findUnique({
+      where: { token },
+    });
+
+    if (!verification) {
+      throw new BadRequestError("Invalid or expired reset token");
+    }
+
+    // Check if this is a password reset token
+    if (verification.resourceType !== "PASSWORD_RESET") {
+      throw new BadRequestError("Invalid reset token type");
+    }
+
+    // Check if already used
+    if (verification.isVerified) {
+      throw new BadRequestError("This reset link has already been used");
+    }
+
+    // Check if expired
+    if (new Date() > verification.ttl) {
+      throw new BadRequestError("Reset link has expired. Please request a new one");
+    }
+
+    // Get user info
+    const user = await prisma.user.findUnique({
+      where: { id: verification.resourceId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isActive: true,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestError("User account not found");
+    }
+
+    if (!user.isActive) {
+      throw new BadRequestError("User account is inactive");
+    }
+
+    console.log(`✅ [Password Reset] Valid token for user: ${user.email}`);
+
+    return {
+      success: true,
+      message: "Reset token is valid",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
+    };
+
+  } catch (error) {
+    console.error(`❌ [Password Reset] Token validation failed:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Reset user password using valid token
+ * Updates password and invalidates the token
+ */
+async function resetPassword(token: string, newPassword: string) {
+  try {
+    // Validate token first (this will throw if invalid)
+    const tokenValidation = await validateResetToken(token);
+    const userId = tokenValidation.user.id;
+
+    // Hash new password
+    const passwordHash = await bcrypt.hash(newPassword, SALT);
+
+    // Update user password
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    // Mark token as used
+    await prisma.emailVerification.update({
+      where: { token },
+      data: {
+        isVerified: true,
+        verifiedAt: new Date(),
+      },
+    });
+
+    // Revoke all existing refresh tokens for this user (force re-login everywhere)
+    await prisma.refreshToken.updateMany({
+      where: { userId },
+      data: { revoked: true },
+    });
+
+    console.log(`✅ [Password Reset] Password updated for user: ${tokenValidation.user.email}`);
+
+    return {
+      success: true,
+      message: "Password reset successful. Please log in with your new password.",
+      user: {
+        id: tokenValidation.user.id,
+        email: tokenValidation.user.email,
+      },
+    };
+
+  } catch (error) {
+    console.error(`❌ [Password Reset] Password reset failed:`, error);
+    throw error;
+  }
 }

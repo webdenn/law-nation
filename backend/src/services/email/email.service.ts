@@ -4,6 +4,7 @@ import { EmailAdapterFactory } from "@/adapters/email/email.adapter.factory.js";
 import type { IEmailAdapter } from "@/adapters/email/interfaces/email-adapter.interface.js";
 import { generateOtpEmailHtml } from "@/templates/email/auth/otp.template.js";
 import { generateWelcomeEmailHtml } from "@/templates/email/auth/welcome.template.js";
+import { generatePasswordResetHtml } from "@/templates/email/auth/password-reset.template.js";
 import { generateArticleSubmissionHtml } from "@/templates/email/article/submission.template.js";
 import { generateArticleVerificationHtml } from "@/templates/email/article/verification.template.js";
 import { generateArticleVerificationCodeHtml } from "@/templates/email/article/verification-code.template.js";
@@ -20,6 +21,7 @@ import { generateReviewerInvitationHtml } from "@/templates/email/reviewer/invit
 import { generateReviewerTaskAssignedHtml } from "@/templates/email/reviewer/task-assigned.template.js";
 import { generateReviewerReassignmentNotificationHtml } from "@/templates/email/reviewer/reassignment-notification.template.js";
 import { generateArticleUploadNotificationHtml } from "@/templates/email/admin/article-upload-notification.template.js";
+import { generateAccessRemovalNotificationHtml } from "@/templates/email/admin/access-removal-notification.template.js";
 
 /**
  * Email Service
@@ -84,6 +86,23 @@ export class EmailService {
     const { subject, html } = generateWelcomeEmailHtml({
       userName,
       frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
+    });
+    await this.sendEmail(userEmail, subject, html);
+  }
+
+  /**
+   * Send password reset email
+   */
+  async sendPasswordResetEmail(
+    userEmail: string, 
+    userName: string, 
+    resetToken: string
+  ): Promise<void> {
+    const { subject, html } = generatePasswordResetHtml({
+      userName,
+      resetToken,
+      frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
+      expiryMinutes: 30, // Token expires in 30 minutes
     });
     await this.sendEmail(userEmail, subject, html);
   }
@@ -398,6 +417,41 @@ export class EmailService {
     });
     
     await this.sendEmail(editorEmail, subject, html);
+  }
+
+  /**
+   * Send access removal notification
+   */
+  async sendAccessRemovalNotification(
+    userEmail: string,
+    userName: string,
+    userType: 'EDITOR' | 'REVIEWER',
+    adminName: string,
+    reason?: string
+  ): Promise<void> {
+    console.log(`📧 [EmailService] Sending access removal notification to: ${userEmail}`);
+    
+    const templateData = {
+      userName,
+      userType,
+      removalDate: new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      adminName,
+      supportEmail: process.env.SUPPORT_EMAIL || 'support@law-nation.com',
+    } as any;
+
+    if (reason) {
+      templateData.reason = reason;
+    }
+    
+    const { subject, html } = generateAccessRemovalNotificationHtml(templateData);
+    
+    await this.sendEmail(userEmail, subject, html);
   }
 }
 

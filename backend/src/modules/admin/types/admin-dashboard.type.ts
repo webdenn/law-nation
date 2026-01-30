@@ -5,6 +5,12 @@ export interface DashboardSummary {
   underReview: number;
   approved: number;
   rejected: number;
+  visibility: {
+    totalPublished: number;
+    visibleToUsers: number;
+    hiddenFromUsers: number;
+    visibilityPercentage: number;
+  };
 }
 
 export interface TimeMetrics {

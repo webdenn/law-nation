@@ -1,4 +1,5 @@
-import type { Request, Response } from "express";
+import type { Response } from "express";
+import type { AuthRequest } from "../../../types/auth-request.js";
 import { AdminReviewerService } from "../services/admin-reviewer.service.js";
 import type { CreateReviewerData, UpdateReviewerData } from "../types/admin-reviewer.type.js";
 
@@ -10,7 +11,7 @@ export class AdminReviewerController {
    * GET /api/admin/reviewers
    * Get all reviewers
    */
-  async getAllReviewers(req: Request, res: Response): Promise<void> {
+  async getAllReviewers(req: AuthRequest, res: Response): Promise<void> {
     try {
       console.log(`📋 [Admin Reviewer Controller] GET /api/admin/reviewers`);
       
@@ -35,7 +36,7 @@ export class AdminReviewerController {
    * GET /api/admin/reviewers/:id
    * Get reviewer by ID
    */
-  async getReviewerById(req: Request, res: Response): Promise<void> {
+  async getReviewerById(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
       
@@ -70,7 +71,7 @@ export class AdminReviewerController {
    * POST /api/admin/reviewers
    * Create new reviewer
    */
-  async createReviewer(req: Request, res: Response): Promise<void> {
+  async createReviewer(req: AuthRequest, res: Response): Promise<void> {
     try {
       console.log(`➕ [Admin Reviewer Controller] POST /api/admin/reviewers`);
       
@@ -113,7 +114,7 @@ export class AdminReviewerController {
    * PUT /api/admin/reviewers/:id
    * Update reviewer
    */
-  async updateReviewer(req: Request, res: Response): Promise<void> {
+  async updateReviewer(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
       
@@ -158,7 +159,7 @@ export class AdminReviewerController {
    * DELETE /api/admin/reviewers/:id
    * Delete reviewer (soft delete)
    */
-  async deleteReviewer(req: Request, res: Response): Promise<void> {
+  async deleteReviewer(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
       
@@ -192,7 +193,7 @@ export class AdminReviewerController {
    * GET /api/admin/reviewers/:id/stats
    * Get reviewer statistics
    */
-  async getReviewerStats(req: Request, res: Response): Promise<void> {
+  async getReviewerStats(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
       
@@ -227,7 +228,7 @@ export class AdminReviewerController {
    * POST /api/admin/reviewers/:id/assign
    * Assign article to reviewer
    */
-  async assignArticleToReviewer(req: Request, res: Response): Promise<void> {
+  async assignArticleToReviewer(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
       const { articleId } = req.body;
@@ -250,7 +251,15 @@ export class AdminReviewerController {
         return;
       }
 
-      await adminReviewerService.assignArticleToReviewer(articleId, id);
+      if (!req.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: 'Admin authentication required'
+        });
+        return;
+      }
+
+      await adminReviewerService.assignArticleToReviewer(articleId, id, req.user.id);
       
       res.status(200).json({
         success: true,
@@ -270,7 +279,7 @@ export class AdminReviewerController {
    * GET /api/admin/reviewers/:id/workload
    * Get reviewer's current workload
    */
-  async getReviewerWorkload(req: Request, res: Response): Promise<void> {
+  async getReviewerWorkload(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
       

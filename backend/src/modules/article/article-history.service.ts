@@ -143,6 +143,40 @@ export class ArticleHistoryService {
   }
 
   /**
+   * NEW: Log editor unassignment (when access is removed)
+   */
+  async logUnassignment(data: {
+    articleId: string;
+    editorId: string;
+    reason?: string;
+  }) {
+    console.log(`📝 [History] Logging unassignment: Article ${data.articleId}, Editor ${data.editorId}`);
+
+    const activeAssignment = await prisma.articleEditorHistory.findFirst({
+      where: {
+        articleId: data.articleId,
+        editorId: data.editorId,
+        status: "active",
+      },
+      orderBy: {
+        assignedAt: "desc",
+      },
+    });
+
+    if (activeAssignment) {
+      await prisma.articleEditorHistory.update({
+        where: { id: activeAssignment.id },
+        data: {
+          status: "unassigned",
+          unassignedAt: new Date(),
+          reason: data.reason || "Editor access removed",
+        },
+      });
+      console.log(`✅ [History] Assignment marked as unassigned: ${activeAssignment.id}`);
+    }
+  }
+
+  /**
    * Get complete editor history for an article
    */
   async getArticleEditorHistory(articleId: string) {

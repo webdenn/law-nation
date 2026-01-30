@@ -13,6 +13,7 @@ model User {
   email                     String                  @unique
   phone                     String?
   passwordHash              String
+  passwordSetupDate         DateTime?               // When user first set up password
   isActive                  Boolean                 @default(true)
   
   // NEW FIELDS FOR EDITORS/REVIEWERS
@@ -41,6 +42,9 @@ model User {
   
   // NEW RELATIONS FOR REVIEWERS
   reviewedArticles          Article[]               @relation("AssignedReviewer")
+  
+  // ADMIN PDF UPLOADS
+  uploadedPdfs              AdminPdf[]              @relation("AdminPdfUploader")
 }
 
 /// ---------- roles ----------
@@ -168,6 +172,11 @@ model Article {
   editedDocxUrl      String?                 // Editor's edited DOCX
   finalPdfUrl        String?                 // Final PDF with watermark
   extractedText      String?                 // Text extracted for website
+  
+  // Article visibility control
+  isVisible          Boolean                 @default(true)  // Controls visibility on user side
+  hiddenAt           DateTime?               // When article was hidden
+  hiddenBy           String?                 // Admin ID who hid the article
   
   assignedEditor     User?                   @relation("AssignedEditor", fields: [assignedEditorId], references: [id])
   
@@ -343,6 +352,37 @@ model SystemSettings {
   value           Json     // Stores structured data
   updatedAt       DateTime @updatedAt
   updatedBy       String?
+}
+
+/// ---------- Admin PDF Management ----------
+model AdminPdf {
+  id                String   @id @default(cuid())
+  title             String
+  shortDescription  String?
+  issue             String   // Month of upload (e.g., "January", "February")
+  volume            String   // Year of upload (e.g., "2026")
+  originalPdfUrl    String   // Clean PDF for admin access
+  watermarkedPdfUrl String   // Watermarked PDF for user preview
+  fileSize          BigInt   // File size in bytes
+  uploadedBy        String   // Admin user ID
+  uploadedAt        DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  isVisible         Boolean  @default(true) // Controls visibility on user side
+  
+  uploader          User     @relation("AdminPdfUploader", fields: [uploadedBy], references: [id])
+
+  @@index([uploadedBy])
+  @@index([isVisible])
+  @@index([volume, issue])
+  @@index([uploadedAt])
+}
+
+/// ---------- About Us Content Management ----------
+model AboutUs {
+  id        String   @id @default(cuid())
+  content   String   // Rich text content (HTML supported)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// ---------- Audit Events ----------

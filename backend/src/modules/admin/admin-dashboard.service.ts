@@ -23,6 +23,7 @@ class AdminDashboardService {
         underReview,
         approved,
         rejected,
+        visibilityStats,
       ] = await Promise.all([
         prisma.article.count(),
         prisma.article.count({ where: { status: 'PUBLISHED' } }),
@@ -30,6 +31,7 @@ class AdminDashboardService {
         prisma.article.count({ where: { status: 'ASSIGNED_TO_EDITOR' } }),
         prisma.article.count({ where: { status: 'APPROVED' } }),
         prisma.article.count({ where: { status: 'REJECTED' } }),
+        this.getVisibilityStats(),
       ]);
 
       return {
@@ -39,10 +41,45 @@ class AdminDashboardService {
         underReview,
         approved,
         rejected,
+        visibility: visibilityStats,
       };
     } catch (error) {
       console.error('Error fetching dashboard summary:', error);
       throw new BadRequestError('Failed to fetch dashboard summary');
+    }
+  }
+
+  /**
+   * Get article visibility statistics
+   */
+  async getVisibilityStats() {
+    try {
+      const [visibleCount, hiddenCount] = await Promise.all([
+        prisma.article.count({
+          where: {
+            status: 'PUBLISHED',
+            isVisible: true,
+          },
+        }),
+        prisma.article.count({
+          where: {
+            status: 'PUBLISHED',
+            isVisible: false,
+          },
+        }),
+      ]);
+
+      return {
+        totalPublished: visibleCount + hiddenCount,
+        visibleToUsers: visibleCount,
+        hiddenFromUsers: hiddenCount,
+        visibilityPercentage: visibleCount + hiddenCount > 0 
+          ? Math.round((visibleCount / (visibleCount + hiddenCount)) * 100) 
+          : 100,
+      };
+    } catch (error) {
+      console.error('Error fetching visibility stats:', error);
+      throw new BadRequestError('Failed to fetch visibility statistics');
     }
   }
 

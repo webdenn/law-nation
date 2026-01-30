@@ -23,6 +23,14 @@ export async function sendAuthNotification(userEmail: string, userName: string) 
   return emailService.sendWelcomeEmail(userEmail, userName);
 }
 
+export async function sendPasswordResetEmail(
+  userEmail: string, 
+  userName: string, 
+  resetToken: string
+) {
+  return emailService.sendPasswordResetEmail(userEmail, userName, resetToken);
+}
+
 // ==================== ARTICLE EMAILS ====================
 // All functions now delegate to EmailService
 
@@ -198,4 +206,17 @@ export async function sendEditorReassignmentNotification(
   articleId: string
 ) {
   return emailService.sendEditorReassignmentNotification(editorEmail, editorName, articleTitle, articleId);
+}
+
+// ==================== ACCESS MANAGEMENT EMAILS ====================
+// All functions now delegate to EmailService
+
+export async function sendAccessRemovalNotification(
+  userEmail: string,
+  userName: string,
+  userType: 'EDITOR' | 'REVIEWER',
+  adminName: string,
+  reason?: string
+) {
+  return emailService.sendAccessRemovalNotification(userEmail, userName, userType, adminName, reason);
 }

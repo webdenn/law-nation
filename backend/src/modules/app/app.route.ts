@@ -11,6 +11,8 @@ import AuditRouter from "@/modules/audit/audit.route.js";
 import NotificationRouter from "@/modules/notification/notification.route.js";
 import BannerRouter from "@/modules/banners/banner.routes.js";
 import SettingsRouter from "@/modules/settings/settings.routes.js";
+import AdminPdfPublicRouter from "@/modules/admin/admin-pdf-public.route.js";
+import AboutRouter from "@/modules/about/about.route.js";
 
 // /src/modules/app/app.route.ts
 
@@ -28,6 +30,10 @@ AppRouter.use("/audit", AuditRouter);
 AppRouter.use("/notifications", NotificationRouter);
 AppRouter.use("/banners", BannerRouter);
 AppRouter.use("/settings", SettingsRouter);
+
+// Public routes (no authentication required)
+AppRouter.use("/public/admin-pdfs", AdminPdfPublicRouter);
+AppRouter.use("/about", AboutRouter);
 
 // Health check
 AppRouter.get("/health", (_req, res) => {
