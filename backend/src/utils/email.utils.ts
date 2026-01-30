@@ -23,6 +23,14 @@ export async function sendAuthNotification(userEmail: string, userName: string) 
   return emailService.sendWelcomeEmail(userEmail, userName);
 }
 
+export async function sendPasswordResetEmail(
+  userEmail: string, 
+  userName: string, 
+  resetToken: string
+) {
+  return emailService.sendPasswordResetEmail(userEmail, userName, resetToken);
+}
+
 // ==================== ARTICLE EMAILS ====================
 // All functions now delegate to EmailService
 

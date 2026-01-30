@@ -4,6 +4,7 @@ import { EmailAdapterFactory } from "@/adapters/email/email.adapter.factory.js";
 import type { IEmailAdapter } from "@/adapters/email/interfaces/email-adapter.interface.js";
 import { generateOtpEmailHtml } from "@/templates/email/auth/otp.template.js";
 import { generateWelcomeEmailHtml } from "@/templates/email/auth/welcome.template.js";
+import { generatePasswordResetHtml } from "@/templates/email/auth/password-reset.template.js";
 import { generateArticleSubmissionHtml } from "@/templates/email/article/submission.template.js";
 import { generateArticleVerificationHtml } from "@/templates/email/article/verification.template.js";
 import { generateArticleVerificationCodeHtml } from "@/templates/email/article/verification-code.template.js";
@@ -84,6 +85,23 @@ export class EmailService {
     const { subject, html } = generateWelcomeEmailHtml({
       userName,
       frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
+    });
+    await this.sendEmail(userEmail, subject, html);
+  }
+
+  /**
+   * Send password reset email
+   */
+  async sendPasswordResetEmail(
+    userEmail: string, 
+    userName: string, 
+    resetToken: string
+  ): Promise<void> {
+    const { subject, html } = generatePasswordResetHtml({
+      userName,
+      resetToken,
+      frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
+      expiryMinutes: 30, // Token expires in 30 minutes
     });
     await this.sendEmail(userEmail, subject, html);
   }

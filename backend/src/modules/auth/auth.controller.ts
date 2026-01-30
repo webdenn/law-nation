@@ -12,6 +12,11 @@ import {
   verifyOtpSchema,
   setupPasswordSchema,
 } from "./validators/auth.validator.js";
+import {
+  forgotPasswordSchema,
+  validateResetTokenSchema,
+  resetPasswordSchema,
+} from "./validators/password-reset.validator.js";
 import { UnauthorizedError } from "@/utils/http-errors.util.js";
 
 export async function signupHandler(
@@ -175,6 +180,64 @@ export async function setupPasswordHandler(
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: z.treeifyError(err) });
+    }
+    next(err);
+  }
+}
+
+// Password reset handlers
+export async function forgotPasswordHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = forgotPasswordSchema.parse(req);
+    const result = await AuthService.requestPasswordReset(data.body.email);
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const errorMessage = err.issues[0]?.message || "Validation failed";
+      return res.status(400).json({ error: errorMessage });
+    }
+    next(err);
+  }
+}
+
+export async function validateResetTokenHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = validateResetTokenSchema.parse(req);
+    const result = await AuthService.validateResetToken(data.params.token);
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const errorMessage = err.issues[0]?.message || "Invalid token format";
+      return res.status(400).json({ error: errorMessage });
+    }
+    next(err);
+  }
+}
+
+export async function resetPasswordHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = resetPasswordSchema.parse(req);
+    const result = await AuthService.resetPassword(
+      data.body.token,
+      data.body.newPassword
+    );
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const errorMessage = err.issues[0]?.message || "Validation failed";
+      return res.status(400).json({ error: errorMessage });
     }
     next(err);
   }
