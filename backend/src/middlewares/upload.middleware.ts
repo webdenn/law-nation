@@ -13,11 +13,22 @@ declare global {
     interface Request {
       fileUrl?: string;
       fileUrls?: Array<{ url: string; storageKey?: string }>;
-      fileMeta?: { url: string; storageKey?: string } | null;
+      fileMeta?: { 
+        url: string; 
+        storageKey?: string;
+        watermarkedUrl?: string; // NEW: For admin PDFs
+        fileSize?: number; // NEW: File size in bytes
+      } | null;
       isDocumentUpload?: boolean; // NEW: Flag for document processing
     }
   }
 }
+
+// No size limit for admin uploads
+const UNLIMITED_SIZE = Number.MAX_SAFE_INTEGER; // Effectively unlimited
+
+// Admin PDF directory
+const ADMIN_PDF_DIR = 'uploads/admin-pdfs/';
 
 const isLocal = process.env.NODE_ENV === "local";
 
@@ -74,6 +85,15 @@ const docxOnlyFileFilter = (req: Request, file: Express.Multer.File, cb: any) =>
   }
 };
 
+// Admin PDF upload filter - PDF only, no size restrictions
+const adminPdfFileFilter = (req: Request, file: Express.Multer.File, cb: any) => {
+  if (file.mimetype === "application/pdf") {
+    cb(null, true);
+  } else {
+    cb(new Error("Only PDF files are allowed for admin uploads"), false);
+  }
+};
+
 // ---------- IMAGE VALIDATION ----------
 const allowedImageMimes = [
   "image/jpeg",
@@ -104,6 +124,7 @@ if (isLocal) {
   const imageDir = "uploads/images/";
   const tempImageDir = "uploads/temp/images/";
   const visualDiffDir = "uploads/visual-diffs/";
+  const adminPdfDir = "uploads/admin-pdfs/"; // NEW: Admin PDF directory
 
   if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
   if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
@@ -111,6 +132,7 @@ if (isLocal) {
   if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
   if (!fs.existsSync(tempImageDir)) fs.mkdirSync(tempImageDir, { recursive: true });
   if (!fs.existsSync(visualDiffDir)) fs.mkdirSync(visualDiffDir, { recursive: true });
+  if (!fs.existsSync(adminPdfDir)) fs.mkdirSync(adminPdfDir, { recursive: true }); // NEW
 }
 
 // ---------- DOCUMENT UPLOAD CONFIG (PDF or Word for users) ----------
@@ -188,6 +210,35 @@ const supabaseMemoryDocxOnly = multer({
   storage: multer.memoryStorage(),
   fileFilter: docxOnlyFileFilter,
   limits: { fileSize: MAX_DOCUMENT_SIZE },
+});
+
+// ---------- ADMIN PDF UPLOAD CONFIG (unlimited size) ----------
+const localAdminPdfStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    // Create admin PDF directory if it doesn't exist
+    if (!fs.existsSync(ADMIN_PDF_DIR)) {
+      fs.mkdirSync(ADMIN_PDF_DIR, { recursive: true });
+    }
+    cb(null, ADMIN_PDF_DIR);
+  },
+  filename: (_req, file, cb) => {
+    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, unique + path.extname(file.originalname));
+  },
+});
+
+// Multer config for admin PDFs (no size limit)
+const localUploadAdminPdf = multer({
+  storage: localAdminPdfStorage,
+  fileFilter: adminPdfFileFilter,
+  limits: { fileSize: UNLIMITED_SIZE }, // No size limit
+});
+
+// Supabase memory storage for admin PDFs (no size limit)
+const supabaseMemoryAdminPdf = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: adminPdfFileFilter,
+  limits: { fileSize: UNLIMITED_SIZE }, // No size limit
 });
 
 // ---------- IMAGE STORAGE CONFIG ----------
@@ -1371,4 +1422,128 @@ export const uploadBannerImage = (req: Request, res: Response, next: NextFunctio
             }
         });
     }
+};
+
+// ✅ NEW: Admin PDF Upload Handler (unlimited size)
+export const uploadAdminPdf = (req: Request, res: Response, next: NextFunction) => {
+  if (isLocal) {
+    localUploadAdminPdf.single("pdf")(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file) return res.status(400).json({ error: "PDF file required" });
+
+      try {
+        const filePath = path.join(process.cwd(), ADMIN_PDF_DIR, req.file.filename);
+        
+        console.log(`🔖 [Admin Upload] Processing admin PDF: ${filePath} (${req.file.size} bytes)`);
+
+        // Import admin watermark utility
+        const { addAdminPdfWatermark } = await import('../utils/admin-pdf-watermark.utils.js');
+        
+        // Create both original and watermarked versions
+        const { originalBuffer, watermarkedBuffer } = await addAdminPdfWatermark(filePath, {
+          title: req.body.title || 'Admin Upload',
+          issue: req.body.issue || new Date().toLocaleString('default', { month: 'long' }),
+          volume: req.body.volume || new Date().getFullYear().toString(),
+          adminName: (req as any).user?.name || 'LAW NATION ADMIN'
+        });
+
+        // Save watermarked version
+        const watermarkedFilename = req.file.filename.replace('.pdf', '_watermarked.pdf');
+        const watermarkedPath = path.join(process.cwd(), ADMIN_PDF_DIR, watermarkedFilename);
+        fs.writeFileSync(watermarkedPath, watermarkedBuffer);
+
+        console.log(`✅ [Admin Upload] Admin PDF processed successfully`);
+        console.log(`📁 [Admin Upload] Original: ${req.file.filename}`);
+        console.log(`🔒 [Admin Upload] Watermarked: ${watermarkedFilename}`);
+
+        // Store both URLs and file info
+        req.fileUrl = `/${ADMIN_PDF_DIR}${req.file.filename}`; // Original
+        req.fileMeta = { 
+          url: `/${ADMIN_PDF_DIR}${req.file.filename}`, // Original for admin
+          watermarkedUrl: `/${ADMIN_PDF_DIR}${watermarkedFilename}`, // Watermarked for users
+          storageKey: req.file.filename,
+          fileSize: req.file.size
+        };
+        
+        next();
+      } catch (error) {
+        console.error('❌ [Admin Upload] Processing failed:', error);
+        // Continue with original file if watermark fails
+        const url = `/${ADMIN_PDF_DIR}${req.file.filename}`;
+        req.fileUrl = url;
+        req.fileMeta = { 
+          url, 
+          storageKey: req.file.filename,
+          fileSize: req.file.size
+        };
+        next();
+      }
+    });
+  } else {
+    supabaseMemoryAdminPdf.single("pdf")(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      const file = req.file as Express.Multer.File | undefined;
+      if (!file) return res.status(400).json({ error: "PDF file required" });
+
+      try {
+        console.log(`🔖 [Admin Upload] Processing admin PDF for Supabase (size: ${file.size} bytes)...`);
+
+        // Save to temp file for watermarking
+        const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        const tempFilePath = path.join(tempDir, `admin-temp-${Date.now()}.pdf`);
+        fs.writeFileSync(tempFilePath, file.buffer);
+
+        // Import admin watermark utility
+        const { addAdminPdfWatermark } = await import('../utils/admin-pdf-watermark.utils.js');
+        
+        // Create both original and watermarked versions
+        const { originalBuffer, watermarkedBuffer } = await addAdminPdfWatermark(tempFilePath, {
+          title: req.body.title || 'Admin Upload',
+          issue: req.body.issue || new Date().toLocaleString('default', { month: 'long' }),
+          volume: req.body.volume || new Date().getFullYear().toString(),
+          adminName: (req as any).user?.name || 'LAW NATION ADMIN'
+        });
+
+        // Delete temp file
+        fs.unlinkSync(tempFilePath);
+
+        console.log(`✅ [Admin Upload] Watermark added, uploading to Supabase...`);
+
+        // Upload both original and watermarked versions
+        const { url: originalUrl, storageKey } = await uploadBufferToSupabase(
+          originalBuffer,
+          file.originalname,
+          file.mimetype,
+          'pdf'
+        );
+
+        const watermarkedFilename = file.originalname.replace('.pdf', '_watermarked.pdf');
+        const { url: watermarkedUrl } = await uploadBufferToSupabase(
+          watermarkedBuffer,
+          watermarkedFilename,
+          file.mimetype,
+          'pdf'
+        );
+
+        console.log(`✅ [Admin Upload] Admin PDF uploaded to Supabase successfully`);
+
+        req.fileUrl = originalUrl;
+        req.fileMeta = { 
+          url: originalUrl, // Original for admin
+          watermarkedUrl, // Watermarked for users
+          storageKey,
+          fileSize: file.size
+        };
+        
+        next();
+      } catch (error) {
+        console.error('❌ [Admin Upload] Upload failed:', error);
+        res.status(500).json({ error: "Admin PDF upload failed" });
+      }
+    });
+  }
 };
