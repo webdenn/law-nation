@@ -169,7 +169,7 @@ function SetupForm() {
 export default function SetupPasswordPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <ToastContainer position="top-center" autoClose={3000} theme="colored" />
+      {/* ToastContainer removed to avoid duplicates (handled in layout) */}
       <Suspense fallback={<div className="text-gray-500 font-bold text-sm">Loading Interface...</div>}>
         <SetupForm />
       </Suspense>

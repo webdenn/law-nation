@@ -217,7 +217,7 @@ export default function ArticlePage({ params }) {
 
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast.success("Download complete!");
+      // Removed success toast as it appears before user actually saves/cancels the file UI
     } catch (err) {
       console.error(err);
       toast.error("Failed to download file. Please try again.");

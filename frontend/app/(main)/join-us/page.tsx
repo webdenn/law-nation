@@ -149,7 +149,7 @@ export default function JoinUsPage() {
   return (
     <div className="h-screen flex overflow-hidden">
       {/* Toast Container */}
-      <ToastContainer />
+      {/* ToastContainer removed to avoid duplicates (handled in layout) */}
 
       {/* Left Side - Visual Section */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-red-800 relative overflow-hidden">

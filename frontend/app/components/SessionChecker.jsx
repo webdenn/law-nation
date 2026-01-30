@@ -15,25 +15,33 @@ export default function SessionChecker() {
         const checkSession = () => {
             const token = localStorage.getItem("token");
 
-            if (!token) return;
+            if (!token) {
+                // Optional: consistent state sync if token manually cleared
+                // dispatch(logout()); 
+                return;
+            }
 
             try {
-                // Decode payload safely
-                const payloadBase64 = token.split(".")[1];
-                if (!payloadBase64) return;
+                // Decode payload safely (Handle Base64Url)
+                const payloadPart = token.split(".")[1];
+                if (!payloadPart) return;
 
-                const decodedJson = JSON.parse(atob(payloadBase64));
+                const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+                const decodedJson = JSON.parse(atob(base64));
                 const currentTime = Date.now() / 1000;
 
                 // Check if expired
                 if (decodedJson.exp < currentTime) {
                     console.warn("Session expired. Logging out...");
                     dispatch(logout());
-                    router.push("/login");
-                    toast.error("Session expired. Please login again.");
+
+                    // Prevent toast loop: Only show if not already on login page
+                    if (window.location.pathname !== "/login") {
+                        toast.error("Session expired. Please login again.");
+                        router.push("/login");
+                    }
                 }
             } catch (error) {
-                // If token is malformed, log out
                 console.error("Invalid token format", error);
                 dispatch(logout());
             }
@@ -45,7 +53,18 @@ export default function SessionChecker() {
         // Check every 1 minute (60000ms)
         const interval = setInterval(checkSession, 60000);
 
-        return () => clearInterval(interval);
+        // Sync across tabs: If token removed elsewhere, logout here
+        const handleStorageChange = (e) => {
+            if (e.key === "token" && !e.newValue) {
+                dispatch(logout());
+            }
+        };
+        window.addEventListener("storage", handleStorageChange);
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener("storage", handleStorageChange);
+        };
     }, [dispatch, router]);
 
     return null; // This component renders nothing

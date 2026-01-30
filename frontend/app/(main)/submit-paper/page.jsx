@@ -379,7 +379,7 @@ export default function SubmitPaperPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-4 sm:py-6 lg:py-8">
-      <ToastContainer position="top-center" autoClose={4000} />
+      {/* ToastContainer removed to avoid duplicates (handled in layout) */}
 
       {/* 👇 SUCCESS POPUP MODAL START 👇 */}
       {showSuccessModal && (
@@ -538,11 +538,10 @@ export default function SubmitPaperPage() {
                   setFormData((prev) => ({ ...prev, declarationAccepted: true }));
                   setShowTermsModal(false);
                 }}
-                className={`px-6 py-2.5 rounded-lg font-bold shadow-md transition-all duration-300 flex items-center gap-2 ${
-                  termsScrolled
+                className={`px-6 py-2.5 rounded-lg font-bold shadow-md transition-all duration-300 flex items-center gap-2 ${termsScrolled
                     ? "bg-gradient-to-r from-red-600 to-red-700 text-white transform hover:-translate-y-0.5 hover:shadow-lg cursor-pointer"
                     : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
+                  }`}
               >
                 {termsScrolled ? (
                   <>
