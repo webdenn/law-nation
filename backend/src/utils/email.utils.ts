@@ -207,3 +207,16 @@ export async function sendEditorReassignmentNotification(
 ) {
   return emailService.sendEditorReassignmentNotification(editorEmail, editorName, articleTitle, articleId);
 }
+
+// ==================== ACCESS MANAGEMENT EMAILS ====================
+// All functions now delegate to EmailService
+
+export async function sendAccessRemovalNotification(
+  userEmail: string,
+  userName: string,
+  userType: 'EDITOR' | 'REVIEWER',
+  adminName: string,
+  reason?: string
+) {
+  return emailService.sendAccessRemovalNotification(userEmail, userName, userType, adminName, reason);
+}

@@ -21,6 +21,7 @@ import { generateReviewerInvitationHtml } from "@/templates/email/reviewer/invit
 import { generateReviewerTaskAssignedHtml } from "@/templates/email/reviewer/task-assigned.template.js";
 import { generateReviewerReassignmentNotificationHtml } from "@/templates/email/reviewer/reassignment-notification.template.js";
 import { generateArticleUploadNotificationHtml } from "@/templates/email/admin/article-upload-notification.template.js";
+import { generateAccessRemovalNotificationHtml } from "@/templates/email/admin/access-removal-notification.template.js";
 
 /**
  * Email Service
@@ -416,6 +417,41 @@ export class EmailService {
     });
     
     await this.sendEmail(editorEmail, subject, html);
+  }
+
+  /**
+   * Send access removal notification
+   */
+  async sendAccessRemovalNotification(
+    userEmail: string,
+    userName: string,
+    userType: 'EDITOR' | 'REVIEWER',
+    adminName: string,
+    reason?: string
+  ): Promise<void> {
+    console.log(`📧 [EmailService] Sending access removal notification to: ${userEmail}`);
+    
+    const templateData = {
+      userName,
+      userType,
+      removalDate: new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      adminName,
+      supportEmail: process.env.SUPPORT_EMAIL || 'support@law-nation.com',
+    } as any;
+
+    if (reason) {
+      templateData.reason = reason;
+    }
+    
+    const { subject, html } = generateAccessRemovalNotificationHtml(templateData);
+    
+    await this.sendEmail(userEmail, subject, html);
   }
 }
 

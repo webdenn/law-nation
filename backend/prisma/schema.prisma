@@ -13,6 +13,7 @@ model User {
   email                     String                  @unique
   phone                     String?
   passwordHash              String
+  passwordSetupDate         DateTime?               // When user first set up password
   isActive                  Boolean                 @default(true)
   
   // NEW FIELDS FOR EDITORS/REVIEWERS

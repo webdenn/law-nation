@@ -43,6 +43,9 @@ export async function requireAuth(
   });
 
   if (!user) throw new UnauthorizedError("User not found");
+  
+  // Check if user account is active
+  if (!user.isActive) throw new UnauthorizedError("Account access has been removed");
 
   // Flatten permissions from all roles
   const permissionSet = new Set<string>();
@@ -115,6 +118,14 @@ export async function optionalAuth(
     });
 
     if (user) {
+      // Check if user account is active
+      if (!user.isActive) {
+        // User account is inactive - continue as guest
+        delete req.user;
+        req.permissions = new Set<string>();
+        return next();
+      }
+
       // Flatten permissions from all roles
       const permissionSet = new Set<string>();
       for (const userRole of user.roles) {

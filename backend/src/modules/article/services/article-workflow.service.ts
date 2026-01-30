@@ -1461,6 +1461,93 @@ export class ArticleWorkflowService {
 
     return { message: "Article deleted successfully" };
   }
+
+  // NEW: Handle article reassignments when editor/reviewer access is removed
+  async handleAccessRemovalReassignments(
+    userId: string,
+    userType: 'EDITOR' | 'REVIEWER'
+  ): Promise<{ reassignedCount: number; articleIds: string[] }> {
+    console.log(`🔄 [Access Removal] Handling article reassignments for ${userType}: ${userId}`);
+
+    if (userType === 'EDITOR') {
+      // Find articles assigned to this editor that are in progress
+      const assignedArticles = await prisma.article.findMany({
+        where: {
+          assignedEditorId: userId,
+          status: {
+            in: ['ASSIGNED_TO_EDITOR', 'EDITOR_IN_PROGRESS', 'EDITOR_EDITING']
+          }
+        },
+        select: { id: true, title: true }
+      });
+
+      if (assignedArticles.length > 0) {
+        // Unassign articles - admin will need to reassign manually
+        await prisma.article.updateMany({
+          where: {
+            assignedEditorId: userId,
+            status: {
+              in: ['ASSIGNED_TO_EDITOR', 'EDITOR_IN_PROGRESS', 'EDITOR_EDITING']
+            }
+          },
+          data: {
+            assignedEditorId: null,
+            status: 'PENDING_ADMIN_REVIEW'
+          }
+        });
+
+        // Log the reassignments in article history
+        for (const article of assignedArticles) {
+          await articleHistoryService.logUnassignment({
+            articleId: article.id,
+            editorId: userId,
+            reason: 'Editor access removed by admin'
+          });
+        }
+
+        console.log(`✅ [Access Removal] Unassigned ${assignedArticles.length} articles from editor`);
+        return {
+          reassignedCount: assignedArticles.length,
+          articleIds: assignedArticles.map(a => a.id)
+        };
+      }
+    } else if (userType === 'REVIEWER') {
+      // Find articles assigned to this reviewer that are in progress
+      const assignedReviews = await prisma.article.findMany({
+        where: {
+          assignedReviewerId: userId,
+          status: {
+            in: ['ASSIGNED_TO_REVIEWER', 'REVIEWER_IN_PROGRESS', 'REVIEWER_EDITING']
+          }
+        },
+        select: { id: true, title: true }
+      });
+
+      if (assignedReviews.length > 0) {
+        // Unassign reviews - revert to editor approved state
+        await prisma.article.updateMany({
+          where: {
+            assignedReviewerId: userId,
+            status: {
+              in: ['ASSIGNED_TO_REVIEWER', 'REVIEWER_IN_PROGRESS', 'REVIEWER_EDITING']
+            }
+          },
+          data: {
+            assignedReviewerId: null,
+            status: 'EDITOR_APPROVED' // Back to editor approved state
+          }
+        });
+
+        console.log(`✅ [Access Removal] Unassigned ${assignedReviews.length} reviews from reviewer`);
+        return {
+          reassignedCount: assignedReviews.length,
+          articleIds: assignedReviews.map(a => a.id)
+        };
+      }
+    }
+
+    return { reassignedCount: 0, articleIds: [] };
+  }
 }
 
 export const articleWorkflowService = new ArticleWorkflowService();

@@ -829,4 +829,45 @@ export class AuditService {
       throw new InternalServerError('Failed to get audit events count');
     }
   }
+
+  /**
+   * NEW: Record access removal by admin
+   */
+  async recordAccessRemoval(
+    adminProfile: UserProfile,
+    removedUser: { id: string; name: string; email: string; userType: 'EDITOR' | 'REVIEWER' },
+    reason?: string
+  ): Promise<void> {
+    try {
+      const now = new Date();
+      const eventDate = now.toISOString().split('T')[0] || now.getFullYear() + '-01-01';
+      const eventTime = now.toTimeString().split(' ')[0] || '00:00:00';
+
+      await prisma.auditEvent.create({
+        data: {
+          eventType: 'ACCESS_REMOVAL',
+          eventDate,
+          eventTime,
+          eventYear: now.getFullYear(),
+          userId: adminProfile.id,
+          userName: adminProfile.name || 'Unknown Admin',
+          userEmail: adminProfile.email || 'N/A',
+          userOrganization: adminProfile.organization || 'Law-Nation',
+          articleId: 'N/A', // Not article-specific
+          articleTitle: `${removedUser.userType} Access Removal`,
+          articleCategory: 'Access Management',
+          articleAuthor: removedUser.name,
+          targetEditorId: removedUser.id,
+          targetEditorName: removedUser.name,
+          overrideReason: reason || 'Access removed by admin',
+          overrideType: `REMOVE_${removedUser.userType}_ACCESS`
+        }
+      });
+
+      console.log(`🚫 [Audit] Recorded access removal: ${adminProfile.name} removed ${removedUser.userType.toLowerCase()} access for ${removedUser.name}`);
+
+    } catch (error: any) {
+      console.error(`❌ [Audit] Failed to record access removal:`, error);
+    }
+  }
 }

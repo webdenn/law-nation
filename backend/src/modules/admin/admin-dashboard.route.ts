@@ -5,6 +5,7 @@ import { adminDashboardController } from "./admin-dashboard.controller.js";
 import { AdminArticleVisibilityController } from "./controllers/admin-article-visibility.controller.js";
 import { validateRequest } from "./middlewares/validation.middleware.js";
 import { toggleVisibilitySchema, getHiddenArticlesSchema } from "./validators/admin-article-visibility.validator.js";
+import accessManagementRoutes from "./admin-access-management.route.js";
 
 const router = Router();
 const visibilityController = new AdminArticleVisibilityController();
@@ -55,5 +56,8 @@ router.get(
   validateRequest(getHiddenArticlesSchema),
   visibilityController.getHiddenArticles
 );
+
+// Access management routes
+router.use("/access-management", accessManagementRoutes);
 
 export default router;
