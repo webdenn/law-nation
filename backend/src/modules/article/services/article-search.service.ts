@@ -117,6 +117,7 @@ export class ArticleSearchService {
         ) as relevance
       FROM "Article"
       WHERE status = 'PUBLISHED'
+        AND "isVisible" = true
         AND to_tsvector('english', 
           coalesce(title, '') || ' ' || 
           coalesce(abstract, '') || ' ' || 
@@ -140,6 +141,7 @@ export class ArticleSearchService {
       SELECT COUNT(*) as total
       FROM "Article"
       WHERE status = 'PUBLISHED'
+        AND "isVisible" = true
         AND to_tsvector('english', 
           coalesce(title, '') || ' ' || 
           coalesce(abstract, '') || ' ' || 

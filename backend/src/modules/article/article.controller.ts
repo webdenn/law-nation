@@ -296,13 +296,12 @@ export class ArticleController {
 
   async getPublishedArticles(req: AuthRequest, res: Response, next: NextFunction) {
     try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const category = req.query.category as string;
 
-      const filters: ArticleListFilters = {
-        ...req.query,
-        status: "PUBLISHED"
-      };
-
-      const result = await articleService.listArticles(filters);
+      // Use visibility-filtered method for users
+      const result = await articleService.getPublishedArticles(page, limit, category);
 
       res.json(result);
     } catch (error) {

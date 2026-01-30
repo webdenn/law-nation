@@ -65,6 +65,7 @@ export class ArticleQueryService {
       where: {
         id: articleId,
         status: "PUBLISHED",
+        isVisible: true, // Only show visible articles to users
       },
       include: {
         assignedEditor: {
@@ -90,6 +91,7 @@ export class ArticleQueryService {
       where: {
         slug: slug,
         status: "PUBLISHED",
+        isVisible: true, // Only show visible articles to users
       },
       include: {
         assignedEditor: {
@@ -113,6 +115,7 @@ export class ArticleQueryService {
       where: {
         id: articleId,
         status: "PUBLISHED",
+        isVisible: true, // Only show visible articles to users
       },
       select: {
         id: true,
@@ -139,6 +142,7 @@ export class ArticleQueryService {
       where: {
         id: articleId,
         status: "PUBLISHED",
+        isVisible: true, // Only show visible articles to users
       },
       select: {
         id: true,
@@ -552,6 +556,103 @@ export class ArticleQueryService {
       })),
       totalVersions: changeLogs.length + 1,
       accessLevel: isAdmin ? "admin" : "editor",
+    };
+  }
+
+  // Get published articles for users (with visibility filter)
+  async getPublishedArticles(page = 1, limit = 20, category?: string) {
+    const where: any = {
+      status: "PUBLISHED",
+      isVisible: true, // Only show visible articles to users
+    };
+    
+    if (category) {
+      where.category = category;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [articles, total] = await Promise.all([
+      prisma.article.findMany({
+        where,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          category: true,
+          abstract: true,
+          authorName: true,
+          authorOrganization: true,
+          keywords: true,
+          thumbnailUrl: true,
+          submittedAt: true,
+          approvedAt: true,
+        },
+        orderBy: { approvedAt: "desc" },
+      }),
+      prisma.article.count({ where }),
+    ]);
+
+    return {
+      articles,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  // Get published articles for admin (no visibility filter)
+  async getPublishedArticlesForAdmin(page = 1, limit = 20, category?: string) {
+    const where: any = {
+      status: "PUBLISHED",
+      // No isVisible filter - admin sees all published articles
+    };
+    
+    if (category) {
+      where.category = category;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [articles, total] = await Promise.all([
+      prisma.article.findMany({
+        where,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          category: true,
+          abstract: true,
+          authorName: true,
+          authorOrganization: true,
+          keywords: true,
+          thumbnailUrl: true,
+          submittedAt: true,
+          approvedAt: true,
+          isVisible: true, // Include visibility status for admin
+          hiddenAt: true,
+          hiddenBy: true,
+        },
+        orderBy: { approvedAt: "desc" },
+      }),
+      prisma.article.count({ where }),
+    ]);
+
+    return {
+      articles,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 

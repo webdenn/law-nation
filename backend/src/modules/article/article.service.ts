@@ -392,6 +392,16 @@ export class ArticleService {
   async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
     return articleQueryService.getArticleContent(articleId, isAuthenticated);
   }
+
+  // NEW: Get published articles with visibility filtering (for users)
+  async getPublishedArticles(page = 1, limit = 20, category?: string) {
+    return articleQueryService.getPublishedArticles(page, limit, category);
+  }
+
+  // NEW: Get published articles without visibility filtering (for admin)
+  async getPublishedArticlesForAdmin(page = 1, limit = 20, category?: string) {
+    return articleQueryService.getPublishedArticlesForAdmin(page, limit, category);
+  }
   async getArticleHistory(articleId: string) {
     return articleQueryService.getArticleHistory(articleId);
   }

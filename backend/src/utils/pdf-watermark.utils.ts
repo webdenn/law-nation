@@ -174,8 +174,9 @@ export async function addWatermarkToPdf(
       });
       
       // Add clickable link ONLY for users with published articles on FIRST page
-      if (index === 0 && includeUrl) {
-        console.log('[Watermark] Adding clickable link to first page');
+      if (includeUrl) {
+         console.log(`[Watermark] Adding clickable link to page ${index + 1}`);
+
         
         // Clickable link text
         page.drawText(linkText, {
@@ -227,9 +228,10 @@ export async function addWatermarkToPdf(
         }
         
         page.node.set(PDFName.of('Annots'), pdfDoc.context.obj(annotsArray));
-        console.log('✅ [Watermark] Clickable link annotation added');
-      } else if (index === 0) {
-        console.log('❌ [Watermark] No clickable link added (editorial user or unpublished article)');
+        console.log(`✅ [Watermark] Clickable link added to page ${index + 1}`);
+
+      } else{
+        console.log(`❌ [Watermark] No clickable link added to page ${index + 1} (editorial user or unpublished article)`);
       }
     });
     

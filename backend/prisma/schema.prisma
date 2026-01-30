@@ -169,6 +169,11 @@ model Article {
   finalPdfUrl        String?                 // Final PDF with watermark
   extractedText      String?                 // Text extracted for website
   
+  // Article visibility control
+  isVisible          Boolean                 @default(true)  // Controls visibility on user side
+  hiddenAt           DateTime?               // When article was hidden
+  hiddenBy           String?                 // Admin ID who hid the article
+  
   assignedEditor     User?                   @relation("AssignedEditor", fields: [assignedEditorId], references: [id])
   
   // NEW REVIEWER RELATION
