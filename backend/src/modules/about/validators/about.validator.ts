@@ -2,29 +2,35 @@ import { z } from 'zod';
 
 // Content validation schema
 export const aboutContentSchema = z.object({
-  content: z
-    .string()
-    .min(1, 'Content is required')
-    .max(50000, 'Content must be less than 50,000 characters')
-    .trim()
+  body: z.object({
+    content: z
+      .string()
+      .min(1, 'Content is required')
+      .max(50000, 'Content must be less than 50,000 characters')
+      .trim()
+  })
 });
 
-// Admin update schema (same as content schema for now)
+// Admin update schema
 export const adminAboutUpdateSchema = z.object({
-  content: z
-    .string()
-    .min(1, 'Content is required')
-    .max(50000, 'Content must be less than 50,000 characters')
-    .trim()
+  body: z.object({
+    content: z
+      .string()
+      .min(1, 'Content is required')
+      .max(50000, 'Content must be less than 50,000 characters')
+      .trim()
+  })
 });
 
-// Preview schema (for preview functionality)
+// Preview schema
 export const aboutPreviewSchema = z.object({
-  content: z
-    .string()
-    .min(1, 'Content is required')
-    .max(50000, 'Content must be less than 50,000 characters')
-    .trim()
+  body: z.object({
+    content: z
+      .string()
+      .min(1, 'Content is required')
+      .max(50000, 'Content must be less than 50,000 characters')
+      .trim()
+  })
 });
 
 // Export types for use in controllers

@@ -16,8 +16,8 @@ const router = Router();
 // Apply authentication to all admin PDF routes
 router.use(requireAuth);
 
-// Apply admin permission requirement to all routes
-router.use(requirePermission('admin', 'manage'));
+// Apply base admin permission
+router.use(requirePermission('admin', 'read'));
 
 /**
  * @route   GET /api/admin/pdfs/stats
@@ -43,10 +43,11 @@ router.get(
 /**
  * @route   POST /api/admin/pdfs
  * @desc    Upload new admin PDF
- * @access  Admin only
+ * @access  Admin only (write)
  */
 router.post(
   '/',
+  requirePermission('admin', 'write'),
   uploadAdminPdf, // Handle file upload with unlimited size
   validateRequest(adminPdfUploadSchema),
   AdminPdfController.uploadPdf
@@ -77,10 +78,11 @@ router.get(
 /**
  * @route   PUT /api/admin/pdfs/:id
  * @desc    Update admin PDF metadata
- * @access  Admin only
+ * @access  Admin only (write)
  */
 router.put(
   '/:id',
+  requirePermission('admin', 'write'),
   validateRequest(adminPdfIdSchema),
   validateRequest(adminPdfUpdateSchema),
   AdminPdfController.updatePdf
@@ -89,10 +91,11 @@ router.put(
 /**
  * @route   PATCH /api/admin/pdfs/:id/visibility
  * @desc    Toggle admin PDF visibility
- * @access  Admin only
+ * @access  Admin only (write)
  */
 router.patch(
   '/:id/visibility',
+  requirePermission('admin', 'write'),
   validateRequest(adminPdfIdSchema),
   AdminPdfController.toggleVisibility
 );
@@ -100,10 +103,11 @@ router.patch(
 /**
  * @route   DELETE /api/admin/pdfs/:id
  * @desc    Delete admin PDF
- * @access  Admin only
+ * @access  Admin only (write)
  */
 router.delete(
   '/:id',
+  requirePermission('admin', 'write'),
   validateRequest(adminPdfIdSchema),
   AdminPdfController.deletePdf
 );

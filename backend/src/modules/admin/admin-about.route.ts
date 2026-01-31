@@ -11,7 +11,7 @@ const router = Router();
 router.use(requireAuth);
 
 // Apply admin permission requirement to all routes
-router.use(requirePermission('admin', 'manage'));
+router.use(requirePermission('admin', 'write'));
 
 /**
  * @route   GET /api/admin/about

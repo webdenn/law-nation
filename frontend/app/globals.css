@@ -1,25 +1,54 @@
 @import "tailwindcss";
+
 @font-face {
     font-family: "Roboto";
-    src: url('/public/fonts/Roboto/Roboto-Regular.ttf');
-}
-.navbar-font{
-    font-family: "Roboto"!important;
+    src: url('/fonts/Roboto/static/Roboto-Regular.ttf');
 }
 
-body,html{
-    font-family: "Roboto"!important;
+.navbar-font {
+    font-family: "Roboto" !important;
 }
 
-.article-font{
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif!important;
+body,
+html {
+    font-family: "Roboto" !important;
+}
+
+.article-font {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
 }
 
 /* Hide horizontal scrollbar for custom carousels */
-.scrollbar-hidden{
+.scrollbar-hidden {
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
-.scrollbar-hidden::-webkit-scrollbar{
+
+.scrollbar-hidden::-webkit-scrollbar {
     display: none;
+}
+
+/* About Us Page Custom Utilities (Tailwind-based) */
+.about-hero-title {
+    @apply text-5xl md:text-6xl font-bold mb-10 text-black leading-[1.1];
+}
+
+.about-hero-lead {
+    @apply text-xl md:text-2xl text-gray-500 leading-relaxed border-l border-red-700 pl-8 mb-20 max-w-3xl;
+}
+
+.about-section-grid {
+    @apply grid md:grid-cols-2 gap-20;
+}
+
+.about-section-title {
+    @apply text-xs font-semibold uppercase tracking-[0.25em] text-red-700 mb-4;
+}
+
+.about-section-text {
+    @apply text-gray-600 leading-relaxed text-lg font-light;
+}
+
+.text-red {
+    @apply text-red-700;
 }

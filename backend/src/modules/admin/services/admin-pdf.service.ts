@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/db/db.js';
 import fs from 'fs';
 import path from 'path';
 import type {
@@ -10,7 +10,7 @@ import type {
   AdminPdfStatsResponse
 } from '../types/admin-pdf.type.js';
 
-const prisma = new PrismaClient();
+
 
 export class AdminPdfService {
   /**
@@ -19,10 +19,10 @@ export class AdminPdfService {
   private formatFileSize(bytes: bigint): string {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     if (bytes === 0n) return '0 Bytes';
-    
+
     const i = Math.floor(Math.log(Number(bytes)) / Math.log(1024));
     const size = Number(bytes) / Math.pow(1024, i);
-    
+
     return `${size.toFixed(2)} ${sizes[i]}`;
   }
 

@@ -9,11 +9,11 @@ interface PasswordResetTemplateData {
 
 export function generatePasswordResetHtml(data: PasswordResetTemplateData) {
   const { userName, resetToken, frontendUrl, expiryMinutes = 30 } = data;
-  
-  const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
-  
+
+  const resetUrl = `${frontendUrl}/law/reset-password?token=${resetToken}`;
+
   const subject = "Reset Your Law Nation Password";
-  
+
   const content = `
     <div style="text-align: center; padding: 40px 20px;">
       <h1 style="color: #1a365d; margin-bottom: 30px; font-size: 28px;">

@@ -1,9 +1,8 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { Linkedin, Twitter, Mail, Award, Globe } from "lucide-react";
+import { Award } from "lucide-react";
 
 interface Member {
     id: number;
@@ -15,11 +14,10 @@ interface Member {
 }
 
 const TeamCard = ({ member }: { member: Member }) => (
-    <div className="group bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:border-red-100 transition-all duration-300 flex flex-col items-center text-center">
+    <div className="group bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:border-red-100 transition-all duration-300 flex flex-col items-center text-center h-full">
         <div className="relative w-32 h-32 mb-6">
             <div className="absolute inset-0 bg-red-600 rounded-full opacity-0 group-hover:opacity-10 transition-opacity duration-300 scale-110"></div>
             <div className="w-full h-full rounded-full overflow-hidden border-4 border-slate-50 shadow-inner bg-slate-200 flex items-center justify-center">
-                {/* Fallback for Image if not exists */}
                 <span className="text-3xl font-black text-slate-300">{member.name.charAt(0)}</span>
             </div>
         </div>
@@ -31,27 +29,14 @@ const TeamCard = ({ member }: { member: Member }) => (
             {member.role}
         </p>
 
-        <p className="text-sm text-slate-500 leading-relaxed mb-6 line-clamp-3">
+        <p className="text-sm text-slate-500 leading-relaxed line-clamp-4">
             {member.bio}
         </p>
-
-        <div className="mt-auto w-full pt-4 border-t border-slate-50 flex justify-center gap-4">
-            <button className="text-slate-400 hover:text-[#0077b5] transition-colors hover:scale-110 transform">
-                <Linkedin size={18} />
-            </button>
-            <button className="text-slate-400 hover:text-black transition-colors hover:scale-110 transform">
-                <Twitter size={18} />
-            </button>
-            <button className="text-slate-400 hover:text-red-600 transition-colors hover:scale-110 transform">
-                <Mail size={18} />
-            </button>
-        </div>
     </div>
 );
 
 export default function OurTeamPage() {
     const [teamMembers, setTeamMembers] = React.useState<Member[]>([]);
-    const [reviewers, setReviewers] = React.useState<Member[]>([]);
     const [loading, setLoading] = React.useState(true);
     const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000";
 
@@ -65,7 +50,6 @@ export default function OurTeamPage() {
             const data = await res.json();
             if (data.success && data.settings) {
                 setTeamMembers(Array.isArray(data.settings.teamMembers) ? data.settings.teamMembers : []);
-                setReviewers(Array.isArray(data.settings.reviewers) ? data.settings.reviewers : []);
             }
         } catch (error) {
             console.error("Failed to load team:", error);
@@ -106,21 +90,6 @@ export default function OurTeamPage() {
                     </div>
                 )}
             </section>
-
-            {/* Reviewers Section */}
-            {!loading && reviewers.length > 0 && (
-                <section className="max-w-7xl mx-auto px-6 mb-24">
-                    <div className="text-center mb-12">
-                        <h2 className="text-3xl font-bold text-slate-900 mb-3">Our Reviewers</h2>
-                        <div className="w-16 h-1 bg-red-600 mx-auto rounded-full"></div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {reviewers.map((member) => (
-                            <TeamCard key={member.id} member={member} />
-                        ))}
-                    </div>
-                </section>
-            )}
 
             {/* Call to Action: Join Us */}
             <section className="max-w-5xl mx-auto px-6 mt-32">

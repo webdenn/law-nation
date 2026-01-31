@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import TermsModal from "../../components/TermsModal";
 
 // ✅ 1. ICONS (Yahi define kar diye taaki import ki tension na ho)
 const DownloadIcon = () => (
@@ -85,6 +86,9 @@ const ReviewInterface = ({
   isGeneratingDiff,
   isApproving, // ✅ NEW: Loading state for approval
 }) => {
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [declarationAccepted, setDeclarationAccepted] = useState(false);
+
   if (!selectedArticle) return null;
 
   return (
@@ -164,11 +168,34 @@ const ReviewInterface = ({
               onChange={(e) => setUploadComment(e.target.value)}
             />
 
+            {/* T&C Checkbox */}
+            <div className="flex items-start gap-2 py-2">
+              <input
+                type="checkbox"
+                id="terms-acceptance"
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                checked={declarationAccepted}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setShowTermsModal(true);
+                  } else {
+                    setDeclarationAccepted(false);
+                  }
+                }}
+              />
+              <label
+                htmlFor="terms-acceptance"
+                className="text-xs text-gray-600 leading-tight cursor-pointer hover:text-gray-800"
+              >
+                I agree to the <span className="text-blue-600 font-semibold underline">Terms and Conditions</span>
+              </label>
+            </div>
+
             {/* Upload Button */}
             <button
               onClick={handleUploadCorrection}
-              disabled={!uploadedFile || isUploading}
-              className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-2 ${!uploadedFile || isUploading
+              disabled={!uploadedFile || isUploading || !declarationAccepted}
+              className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${!uploadedFile || isUploading || !declarationAccepted
                 ? "bg-gray-300 cursor-not-allowed"
                 : "bg-blue-600 hover:bg-blue-700 active:scale-95"
                 }`}
@@ -177,6 +204,13 @@ const ReviewInterface = ({
             </button>
           </div>
         </div>
+
+        {/* T&C Modal */}
+        <TermsModal
+          isOpen={showTermsModal}
+          onClose={() => setShowTermsModal(false)}
+          onAccept={() => setDeclarationAccepted(true)}
+        />
 
         {/* 2. APPROVE BUTTON */}
         <button
@@ -199,7 +233,7 @@ const ReviewInterface = ({
           )}
         </button>
 
-      
+
 
         {/* 4. USER ORIGINAL DOCUMENT */}
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">

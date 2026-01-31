@@ -1,25 +1,36 @@
 import { prisma } from "@/db/db.js";
-import type { 
-  Reviewer, 
-  ReviewerStats, 
-  ReviewerWorkload, 
-  CreateReviewerData, 
-  UpdateReviewerData 
+import type {
+  Reviewer,
+  ReviewerStats,
+  ReviewerWorkload,
+  CreateReviewerData,
+  UpdateReviewerData
 } from "../types/admin-reviewer.type.js";
 import { NotFoundError, InternalServerError } from "@/utils/http-errors.util.js";
 
 export class AdminReviewerService {
-  
+
   /**
    * Get all reviewers with their basic information
    */
   async getAllReviewers(): Promise<Reviewer[]> {
     try {
       console.log(`📋 [Admin Reviewer] Fetching all reviewers`);
-      
+
       const users = await prisma.user.findMany({
         where: {
-          userType: 'REVIEWER'
+          OR: [
+            { userType: { in: ['REVIEWER', 'ADMIN'] } },
+            {
+              roles: {
+                some: {
+                  role: {
+                    name: { in: ['admin', 'reviewer', 'ADMIN', 'REVIEWER', 'Admin', 'Reviewer', 'Super Admin', 'Administrator'] }
+                  }
+                }
+              }
+            }
+          ]
         },
         include: {
           _count: {
@@ -64,7 +75,7 @@ export class AdminReviewerService {
   async getReviewerById(reviewerId: string): Promise<Reviewer> {
     try {
       console.log(`🔍 [Admin Reviewer] Fetching reviewer: ${reviewerId}`);
-      
+
       const user = await prisma.user.findUnique({
         where: {
           id: reviewerId,
@@ -117,7 +128,7 @@ export class AdminReviewerService {
   async createReviewer(data: CreateReviewerData): Promise<Reviewer> {
     try {
       console.log(`➕ [Admin Reviewer] Creating new reviewer: ${data.name}`);
-      
+
       // Check if email already exists
       const existingUser = await prisma.user.findUnique({
         where: { email: data.email }
@@ -172,7 +183,7 @@ export class AdminReviewerService {
   async updateReviewer(reviewerId: string, data: UpdateReviewerData): Promise<Reviewer> {
     try {
       console.log(`📝 [Admin Reviewer] Updating reviewer: ${reviewerId}`);
-      
+
       const user = await prisma.user.update({
         where: {
           id: reviewerId,
@@ -227,7 +238,7 @@ export class AdminReviewerService {
   async deleteReviewer(reviewerId: string): Promise<void> {
     try {
       console.log(`🗑️ [Admin Reviewer] Deleting reviewer: ${reviewerId}`);
-      
+
       await prisma.user.update({
         where: {
           id: reviewerId,
@@ -252,7 +263,7 @@ export class AdminReviewerService {
   async getReviewerStats(reviewerId: string): Promise<ReviewerStats> {
     try {
       console.log(`📊 [Admin Reviewer] Fetching stats for reviewer: ${reviewerId}`);
-      
+
       const articles = await prisma.article.findMany({
         where: {
           assignedReviewerId: reviewerId
@@ -265,24 +276,24 @@ export class AdminReviewerService {
       });
 
       const totalAssigned = articles.length;
-      const totalCompleted = articles.filter(a => 
+      const totalCompleted = articles.filter(a =>
         ['REVIEWER_APPROVED', 'PUBLISHED'].includes(a.status)
       ).length;
-      const inProgress = articles.filter(a => 
+      const inProgress = articles.filter(a =>
         ['ASSIGNED_TO_REVIEWER', 'REVIEWER_IN_PROGRESS'].includes(a.status)
       ).length;
 
       // Calculate average review time (simplified)
-      const completedReviews = articles.filter(a => 
+      const completedReviews = articles.filter(a =>
         ['REVIEWER_APPROVED', 'PUBLISHED'].includes(a.status)
       );
-      const averageReviewTime = completedReviews.length > 0 
+      const averageReviewTime = completedReviews.length > 0
         ? completedReviews.reduce((sum, article) => {
-            const days = Math.ceil(
-              (article.updatedAt.getTime() - article.createdAt.getTime()) / (1000 * 60 * 60 * 24)
-            );
-            return sum + days;
-          }, 0) / completedReviews.length
+          const days = Math.ceil(
+            (article.updatedAt.getTime() - article.createdAt.getTime()) / (1000 * 60 * 60 * 24)
+          );
+          return sum + days;
+        }, 0) / completedReviews.length
         : 0;
 
       // Simple quality score based on completion rate
@@ -311,7 +322,7 @@ export class AdminReviewerService {
   async assignArticleToReviewer(articleId: string, reviewerId: string, adminId: string): Promise<void> {
     try {
       console.log(`📝 [Admin Reviewer] Assigning article ${articleId} to reviewer ${reviewerId} after editor approval`);
-      
+
       // Verify article is in correct state for reviewer assignment
       const article = await prisma.article.findUnique({
         where: { id: articleId },
@@ -350,7 +361,7 @@ export class AdminReviewerService {
   async getAvailableReviewersForAssignment(): Promise<Reviewer[]> {
     try {
       console.log(`📋 [Admin Reviewer] Fetching available reviewers for assignment`);
-      
+
       const users = await prisma.user.findMany({
         where: {
           userType: 'REVIEWER',
@@ -408,7 +419,7 @@ export class AdminReviewerService {
   async getReviewerWorkload(reviewerId: string): Promise<ReviewerWorkload> {
     try {
       console.log(`📋 [Admin Reviewer] Fetching workload for reviewer: ${reviewerId}`);
-      
+
       const reviewer = await prisma.user.findUnique({
         where: { id: reviewerId },
         select: { name: true }

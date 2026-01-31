@@ -73,8 +73,8 @@ class AdminDashboardService {
         totalPublished: visibleCount + hiddenCount,
         visibleToUsers: visibleCount,
         hiddenFromUsers: hiddenCount,
-        visibilityPercentage: visibleCount + hiddenCount > 0 
-          ? Math.round((visibleCount / (visibleCount + hiddenCount)) * 100) 
+        visibilityPercentage: visibleCount + hiddenCount > 0
+          ? Math.round((visibleCount / (visibleCount + hiddenCount)) * 100)
           : 100,
       };
     } catch (error) {
@@ -265,6 +265,7 @@ class AdminDashboardService {
             approvedAt: true,
             createdAt: true,
             updatedAt: true,
+            isVisible: true, // ✅ Added visibility status
           },
           orderBy: { submittedAt: 'desc' },
           skip,
@@ -292,6 +293,7 @@ class AdminDashboardService {
           approvedAt: article.approvedAt,
           publishedAt: article.status === 'PUBLISHED' ? article.updatedAt : null,
         },
+        isVisible: article.isVisible, // ✅ Added visibility status
         durations: this.calculateDurations(article),
       }));
 

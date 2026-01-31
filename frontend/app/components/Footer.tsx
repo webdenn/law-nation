@@ -2,6 +2,8 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
+import logoImg from "../assets/logo.jpg";
 import {
   Mail,
   Phone,
@@ -10,7 +12,6 @@ import {
   Twitter,
   Instagram,
   Facebook,
-  Scale, // Briefcase ki jagah Scale use kiya (Law icon)
   BookOpen
 } from "lucide-react";
 
@@ -50,9 +51,16 @@ export default function Footer() {
 
           {/* Brand and Mission - 5 columns wide */}
           <div className="lg:col-span-5 space-y-6">
-            <Link href="/" className="flex items-center gap-2 text-red-700 font-bold text-2xl">
-              <Scale size={28} />
-              <span>LAW<span className="text-slate-900">NATION</span></span>
+            <Link href="/" className="flex items-center gap-2">
+              <div className="relative h-12 w-48">
+                <Image
+                  src={logoImg}
+                  alt="Law Nation"
+                  fill
+                  className="object-contain object-left"
+                  priority
+                />
+              </div>
             </Link>
             <h1>LAWNATION – LAW NATION PRIME TIMES JOURNAL</h1>
 

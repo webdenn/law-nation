@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/db/db.js';
 import type { AboutContentInput } from '../validators/about.validator.js';
 
-const prisma = new PrismaClient();
+
 
 export class AboutService {
   /**
