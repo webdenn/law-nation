@@ -22,7 +22,7 @@ const ArrowLeftIcon = () => (
 export default function AllArticlesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
   // --- States ---
@@ -32,16 +32,16 @@ export default function AllArticlesPage() {
 
   // --- Initial Load & URL Sync ---
   // --- Initial Load & URL Sync ---
-  useEffect(() => {
+  useEffect(() => {
     // 1. URL parameter mat padho, bas blank search set kar do
-    setSearchTerm("");
-    
+    setSearchTerm("");
+
     // 2. Saare articles fetch karo (bina filter ke)
-    fetchArticles("");
+    fetchArticles("");
 
     // 3. URL ko saaf kar do (agar wahan ?q=something likha hai to hata do)
     router.replace('/articles');
-  }, []); // Empty dependency array -> Sirf page load par chalega
+  }, []); // Empty dependency array -> Sirf page load par chalega
 
   // --- Fetch Function ---
   const fetchArticles = async (query = "") => {
@@ -54,7 +54,7 @@ export default function AllArticlesPage() {
       if (query.trim()) {
         const params = new URLSearchParams();
         // Backend ko 'q' bhejo, wo title/author/keyword sab search karega
-        params.append("q", query.trim()); 
+        params.append("q", query.trim());
         url = `${NEXT_PUBLIC_BASE_URL}/api/articles/search?${params.toString()}`;
       } else {
         // Warna saare published articles load karo
@@ -63,7 +63,7 @@ export default function AllArticlesPage() {
 
       const res = await fetch(url);
       const data = await res.json();
-      
+
       const list = data.results || data.articles || [];
       setArticles(list);
 
@@ -78,7 +78,7 @@ export default function AllArticlesPage() {
   // --- Handle Search Submit (Updated) ---
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    
+
     // ✅ Change: Fetch function manually call karo
     fetchArticles(searchTerm);
 
@@ -97,13 +97,13 @@ export default function AllArticlesPage() {
       {/* --- Header Section --- */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          
+
           {/* Back Button - Fixed Route */}
           <div className="mb-4">
-            <button 
+            <button
               // ✅ FIXED: Seedha root ('/') par bhejega. 
               // Agar tumhara home '/home' par hai to yahan '/home' likhna.
-              onClick={() => window.location.href = '/law/home'} 
+              onClick={() => window.location.href = '/law/home'}
               className="inline-flex items-center text-gray-500 hover:text-red-700 font-medium transition-colors"
             >
               <ArrowLeftIcon /> Back to Home
@@ -111,7 +111,7 @@ export default function AllArticlesPage() {
           </div>
 
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            
+
             {/* Title */}
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Research Library</h1>
@@ -120,7 +120,7 @@ export default function AllArticlesPage() {
 
             {/* Single Search Bar */}
             <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-              
+
               <div className="relative w-full sm:w-80">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <SearchIcon />
@@ -134,7 +134,7 @@ export default function AllArticlesPage() {
                 />
               </div>
 
-              <button 
+              <button
                 type="submit"
                 className="bg-red-700 hover:bg-red-800 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors text-sm shrink-0"
               >
@@ -148,7 +148,7 @@ export default function AllArticlesPage() {
 
       {/* --- Content Grid --- */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        
+
         {loading ? (
           // Skeleton Loader
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -167,8 +167,8 @@ export default function AllArticlesPage() {
           // Article Cards
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {articles.map((item) => (
-              <Link 
-                href={`/article/${item.slug || item._id}`} 
+              <Link
+                href={`/article/${item.slug || item._id}`}
                 key={item._id || item.id}
                 className="group flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden "
               >
@@ -179,6 +179,7 @@ export default function AllArticlesPage() {
                       src={item.thumbnailUrl.startsWith("http") ? item.thumbnailUrl : `${NEXT_PUBLIC_BASE_URL}${item.thumbnailUrl}`}
                       alt={item.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      loading="lazy"
                       onError={(e) => e.target.style.display = 'none'}
                     />
                   ) : (
@@ -186,7 +187,7 @@ export default function AllArticlesPage() {
                       <span className="text-sm font-medium">No Image</span>
                     </div>
                   )}
-                  
+
                   {/* Category Badge */}
                   {item.category && (
                     <span className="absolute top-4 left-4 bg-white/95 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-red-700 shadow-sm">
@@ -195,13 +196,7 @@ export default function AllArticlesPage() {
                   )}
                 </div>
 
-                <div className="flex flex-col flex-grow p-6">
-                  {/* Date */}
-                  <div className="text-xs text-gray-500 mb-3 font-medium">
-                    {new Date(item.submittedAt || Date.now()).toLocaleDateString("en-US", {
-                      year: 'numeric', month: 'short', day: 'numeric'
-                    })}
-                  </div>
+                <div className="flex flex-col grow p-6">
 
                   {/* Title */}
                   <h3 className="text-xl font-bold text-gray-900 mb-3 leading-snug  line-clamp-2">
@@ -235,13 +230,13 @@ export default function AllArticlesPage() {
           // Empty State
           <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-dashed border-gray-300">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-               <SearchIcon />
+              <SearchIcon />
             </div>
             <h3 className="text-lg font-bold text-gray-900">No articles found</h3>
             <p className="text-gray-500 mt-2 text-center max-w-sm">
               We couldn&apos;t find any articles matching &quot;{searchTerm}&quot;.
             </p>
-            <button 
+            <button
               onClick={() => {
                 setSearchTerm("");
                 router.push("/articles");

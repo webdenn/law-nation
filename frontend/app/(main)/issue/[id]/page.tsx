@@ -125,10 +125,17 @@ export default function IssueViewerPage() {
 
     if (isLoading) {
         return (
-            <div className="flex grow items-center justify-center min-h-[60vh]">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-gray-500 font-medium font-sans italic tracking-widest text-[10px] uppercase">Verifying Digital Archive Access...</p>
+            <div className="bg-white min-h-screen">
+                <div className="container mx-auto px-4 py-12 md:px-8 max-w-5xl animate-pulse">
+                    <div className="h-6 bg-gray-100 rounded w-24 mb-6" />
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="h-4 bg-gray-100 rounded w-16" />
+                        <div className="h-px w-8 bg-gray-100" />
+                        <div className="h-4 bg-gray-100 rounded w-32" />
+                    </div>
+                    <div className="h-12 bg-gray-100 rounded w-3/4 mb-8" />
+                    <div className="h-12 bg-gray-50 rounded w-full mb-10" />
+                    <div className="h-[600px] bg-gray-100 rounded-3xl w-full" />
                 </div>
             </div>
         );

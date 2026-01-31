@@ -382,9 +382,19 @@ export default function HomePage() {
 
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {isLoading ? (
-              <p className="text-black col-span-full text-center font-medium">
-                {isSearching ? "Searching articles..." : "Loading articles..."}
-              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 col-span-full w-full">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="bg-white rounded-lg p-8 h-96 animate-pulse border border-gray-200">
+                    <div className="h-48 bg-gray-100 rounded-md mb-6" />
+                    <div className="space-y-4">
+                      <div className="h-6 bg-gray-100 rounded w-3/4" />
+                      <div className="h-4 bg-gray-100 rounded w-full" />
+                      <div className="h-4 bg-gray-100 rounded w-full" />
+                      <div className="h-4 bg-gray-100 rounded w-2/3" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : publishedArticles.length > 0 ? (
               publishedArticles.map((item) => (
                 <article
@@ -403,6 +413,7 @@ export default function HomePage() {
                           }
                           alt={item.title}
                           className="w-full h-full object-cover"
+                          loading="lazy"
                           onError={(e) => {
                             // Agar image load fail ho jaye, toh parent div ko hi gayab kar do
                             e.target.parentElement.style.display = "none";
@@ -413,19 +424,19 @@ export default function HomePage() {
 
                   <div className="space-y-4">
                     {/* Title - Black, breaks long words, moves to next line */}
-                    <h3 className="text-xl font-bold text-black leading-snug break-words overflow-wrap-anywhere">
+                    <h3 className="text-xl font-bold text-black leading-snug wrap-break-word overflow-wrap-anywhere">
                       {item.title}
                     </h3>
 
                     {/* Abstract - Gray for better readability */}
-                    <p className="text-[15px] text-gray-600 leading-relaxed line-clamp-4 break-words">
+                    <p className="text-[15px] text-gray-600 leading-relaxed line-clamp-4 wrap-break-word">
                       {item.abstract ||
                         "Description text goes here. Long words like SSSSSSSSSSSSSSSSSSS will now break automatically."}
                     </p>
                   </div>
 
                   {/* Bottom Section: Author (Left) and Read More (Right) */}
-                  <div className="mt-auto pt-6 flex items-center justify-between border-t border-gray-100 mt-6">
+                  <div className="mt-auto pt-6 flex items-center justify-between border-t border-gray-100">
                     <span className="text-sm font-semibold text-black truncate max-w-[140px]">
                       {item.authorName || "Anonymous"}
                     </span>

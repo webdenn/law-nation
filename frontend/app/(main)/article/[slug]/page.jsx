@@ -109,9 +109,7 @@ const RecentArticlesWidget = ({ currentSlug }) => {
           <h4 className="text-sm font-bold text-gray-900 leading-snug group-hover:text-red-700 transition-colors line-clamp-2 mb-1">
             {art.title}
           </h4>
-          <p className="text-xs text-gray-500">
-            {new Date(art.submittedAt || art.createdAt).toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' })}
-          </p>
+
         </div>
       ))}
     </div>
@@ -364,7 +362,7 @@ export default function ArticlePage({ params }) {
     );
 
   return (
-    <article className="min-h-screen bg-white font-sans text-gray-900 bg-gray-50/30">
+    <article className="min-h-screen font-sans text-gray-900 bg-gray-50/30">
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <button
           onClick={() => router.back()}
@@ -382,17 +380,10 @@ export default function ArticlePage({ params }) {
                 <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold tracking-wider uppercase">
                   {article.category || "General"}
                 </span>
-                <span className="text-gray-300">•</span>
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {new Date(article.submittedAt).toLocaleDateString("en-US", {
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </span>
+
               </div>
 
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-[1.1] mb-8 text-gray-900 break-words font-serif">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-[1.1] mb-8 text-gray-900 wrap-break-word font-serif">
                 {article.title}
               </h1>
 
@@ -406,6 +397,7 @@ export default function ArticlePage({ params }) {
                     }
                     alt={article.title}
                     className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                 </div>
               )}
@@ -444,7 +436,7 @@ export default function ArticlePage({ params }) {
             )}
 
             <div
-              className={`prose prose-lg prose-slate max-w-none prose-headings:font-bold prose-headings:font-sans prose-p:font-serif prose-a:text-red-700 hover:prose-a:text-red-800 prose-img:rounded-xl break-words overflow-hidden ${(!token || isLimited) ? "relative" : ""
+              className={`prose prose-lg prose-slate max-w-none prose-headings:font-bold prose-headings:font-sans prose-p:font-serif prose-a:text-red-700 hover:prose-a:text-red-800 prose-img:rounded-xl wrap-break-word overflow-hidden ${(!token || isLimited) ? "relative" : ""
                 }`}
             >
               {token ? (
@@ -468,7 +460,7 @@ export default function ArticlePage({ params }) {
               )}
 
               {!token && (
-                <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-white via-white/95 to-transparent flex items-end justify-center pb-8 z-10">
+                <div className="absolute inset-x-0 bottom-0 h-48 bg-linear-to-t from-white via-white/95 to-transparent flex items-end justify-center pb-8 z-10">
                   <div className="text-center w-full px-4">
                     <Link
                       href={`/login?redirect=${pathname}`}
