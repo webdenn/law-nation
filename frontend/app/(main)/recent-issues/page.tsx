@@ -101,7 +101,7 @@ export default function RecentIssuesPage() {
                                         </div>
 
                                         <Link href={`/issue/${issue.id}`} className="block">
-                                            <h2 className="text-3xl md:text-4xl font-black text-gray-900 leading-[1.1] tracking-tight mb-5">
+                                            <h2 className="text-3xl md:text-4xl font-black text-blue-600 underline leading-[1.1] tracking-tight mb-5 hover:text-blue-800 transition-colors">
                                                 {issue.title}
                                             </h2>
                                         </Link>

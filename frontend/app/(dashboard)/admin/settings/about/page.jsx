@@ -160,7 +160,7 @@ export default function AboutSettingsPage() {
                                     className="w-full border border-gray-300 rounded-md p-4 text-2xl font-bold outline-none focus:border-red-700 transition bg-white"
                                     value={heading}
                                     onChange={(e) => setHeading(e.target.value)}
-                                    placeholder='The future of <span class="text-red-700">...</span>'
+                                    placeholder=''
                                 />
                                 <p className="text-[10px] text-gray-400 italic">Supports HTML for coloring specific words.</p>
                             </div>

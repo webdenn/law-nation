@@ -73,7 +73,7 @@ export default function ArticleTable({
                     <thead className="bg-gray-100 text-[10px] uppercase text-gray-400 font-bold">
                         <tr>
                             <th className="p-5">PDF Document & Abstract</th>
-                            <th className="p-5">Author & Date</th>
+                            <th className="p-5">Author</th>
                             <th className="p-5">Status</th>
                             <th className="p-5 text-center">Assign Editor</th>
                             <th className="p-5 text-center">Assign Reviewer</th>
@@ -115,9 +115,6 @@ export default function ArticleTable({
                                     <td className="p-5">
                                         <p className="text-sm text-gray-800 font-bold">
                                             {art.author}
-                                        </p>
-                                        <p className="text-[10px] text-gray-400">
-                                            {art.date}
                                         </p>
                                     </td>
                                     {/* 3. Status Badge */}
@@ -219,8 +216,6 @@ export default function ArticleTable({
                                     </p>
                                     <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                                         <span className="font-bold text-gray-700">{art.author}</span>
-                                        <span>•</span>
-                                        <span>{art.date}</span>
                                     </div>
                                 </div>
                                 <span

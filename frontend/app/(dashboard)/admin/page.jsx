@@ -461,7 +461,7 @@ export default function AdminDashboard() {
             assignedTo: item.assignedEditor?.id || item.assignedEditorId || "",
             assignedReviewer: item.assignedReviewer?.id || item.assignedReviewerId || "", // ✅ Added Reviewer Mapping
             // ✅ Is line ko dhundo aur replace karo:
-            date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "Just Now",
+            date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "",
             abstract: item.abstract,
             originalPdfUrl: item.originalPdfUrl,
             currentPdfUrl: item.currentPdfUrl,
@@ -804,11 +804,7 @@ export default function AdminDashboard() {
             </h2>
           </div>
           <div className="flex items-center gap-2 md:gap-6">
-            <Link href="/admin/add-editor">
-              <button className="bg-red-600 text-white px-3 py-2 md:px-5 md:py-2 rounded-lg font-bold hover:bg-black transition-all text-[10px] md:text-xs">
-                + CREATE EDITOR
-              </button>
-            </Link>
+
             <div className="flex items-center gap-3 pl-3 md:pl-6 border-l border-gray-200">
               <div className="text-right hidden md:block">
                 <p className="text-sm font-bold text-gray-800">
