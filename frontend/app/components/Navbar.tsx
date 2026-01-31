@@ -11,7 +11,7 @@
 //   const pathname = usePathname()
 //   const router = useRouter()
 //   const dispatch = useDispatch()
-  
+
 //   // TypeScript: Explicitly defining boolean type
 //   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false)
 //   const [scrolled, setScrolled] = useState<boolean>(false)
@@ -33,7 +33,7 @@
 //     if (typeof window !== 'undefined') {
 //       const token = localStorage.getItem("authToken");
 //       const userName = localStorage.getItem("userName");
-      
+
 //       if (token && !user) {
 //         dispatch(setCredentials({ 
 //           user: { name: userName || "User", email: "" }, 
@@ -47,7 +47,7 @@
 //     dispatch(logoutAction());
 //     localStorage.removeItem("authToken");
 //     localStorage.removeItem("userName");
-    
+
 //     toast.info("Logged out successfully");
 //     setIsMobileMenuOpen(false); 
 //     router.push("/login");
@@ -77,7 +77,7 @@
 //       >
 //         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 //           <div className="flex items-center justify-between">
-            
+
 //             {/* Logo */}
 //             <div className="flex-shrink-0">
 //               <Link href="/" className="flex items-center gap-2">
@@ -193,7 +193,7 @@
 //                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
 //             </button>
 //           </div>
-          
+
 //           <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
 //             {navItems.map(item => {
 //               const isActive = pathname === item.link;
@@ -259,19 +259,19 @@ import Image from "next/image" // ✅ Next.js Image Component
 import { usePathname, useRouter } from "next/navigation"
 import { toast } from 'react-toastify'
 import { useSelector, useDispatch } from "react-redux"
-import { Menu, X, LogOut, User } from 'lucide-react' 
+import { Menu, X, LogOut, User } from 'lucide-react'
 
 import { setCredentials, logout as logoutAction } from "../lib/store/authSlice"
 
 // ✅ CORRECT IMPORT PATH (Aapke Screenshot ke hisab se)
 // ".." se components folder ke bahar aaye -> phir "assets" folder me gaye -> phir "logo.jpg" uthaya
-import logoImg from "../assets/logo.jpg" 
+import logoImg from "../assets/logo.jpg"
 
 export default function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
   const dispatch = useDispatch()
-  
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
@@ -292,11 +292,11 @@ export default function Navbar() {
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem("authToken");
       const userName = localStorage.getItem("userName");
-      
+
       if (token && !user) {
-        dispatch(setCredentials({ 
-          user: { name: userName || "User", email: "" }, 
-          token: token 
+        dispatch(setCredentials({
+          user: { name: userName || "User", email: "" },
+          token: token
         }));
       }
     }
@@ -306,20 +306,20 @@ export default function Navbar() {
     dispatch(logoutAction());
     localStorage.removeItem("authToken");
     localStorage.removeItem("userName");
-    
+
     toast.info("Logged out successfully");
-    setIsMobileMenuOpen(false); 
+    setIsMobileMenuOpen(false);
     router.push("/login");
   }
 
   const navItems = [
     { name: "Home", link: "/home" },
     { name: "Submit a Paper", link: "/submit-paper" },
-    { name: "Recent Issues ", link: "/research-paper" },
+    { name: "Recent Issues ", link: "/recent-issues" },
     { name: " Law Nation Prime Talks ", link: "/ Law-Nation-Prime-Talks" },
     { name: "About Us", link: "/about" },
-    
-    
+
+
   ]
 
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen)
@@ -329,23 +329,22 @@ export default function Navbar() {
 
   return (
     <>
-      <nav 
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${
-          scrolled 
-            ? "bg-white/90 backdrop-blur-md shadow-sm border-gray-200 py-2" 
+      <nav
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${scrolled
+            ? "bg-white/90 backdrop-blur-md shadow-sm border-gray-200 py-2"
             : "bg-white border-transparent py-4"
-        }`}
+          }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
-            
+
             {/* ✅ LOGO SECTION (Ab Path Sahi Hai) */}
             <div className="flex-shrink-0">
               <Link href="/" className="flex items-center gap-2">
-                <div className="relative h-12 w-40"> 
-                  <Image 
+                <div className="relative h-12 w-40">
+                  <Image
                     src={logoImg}  // ✅ Imported variable use kiya
-                    alt="Law Nation" 
+                    alt="Law Nation"
                     fill
                     className="object-contain object-left"
                     priority
@@ -362,11 +361,10 @@ export default function Navbar() {
                   <Link
                     key={item.name}
                     href={item.link}
-                    className={`relative text-sm font-medium transition-colors duration-200 py-2 ${
-                      isActive 
-                        ? "text-red-600" 
+                    className={`relative text-sm font-medium transition-colors duration-200 py-2 ${isActive
+                        ? "text-red-600"
                         : "text-gray-600 hover:text-red-600"
-                    }`}
+                      }`}
                   >
                     {item.name}
                     {isActive && (
@@ -397,12 +395,12 @@ export default function Navbar() {
                       <div className="px-4 py-3 border-b border-gray-50 bg-gray-50/50">
                         <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
                       </div>
-                      <button 
-                        onClick={handleLogout} 
+                      <button
+                        onClick={handleLogout}
                         className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 font-medium flex items-center gap-2 transition-colors"
                       >
-                          <LogOut size={16} />
-                          Sign out
+                        <LogOut size={16} />
+                        Sign out
                       </button>
                     </div>
                   </div>
@@ -421,8 +419,8 @@ export default function Navbar() {
 
             {/* Mobile Toggle Button */}
             <div className="lg:hidden flex items-center">
-              <button 
-                onClick={toggleMobileMenu} 
+              <button
+                onClick={toggleMobileMenu}
                 className="p-2 rounded-md text-gray-600 hover:text-red-600 hover:bg-gray-50 focus:outline-none transition-colors"
               >
                 {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -437,8 +435,8 @@ export default function Navbar() {
 
       {/* Mobile Menu Overlay & Sidebar */}
       {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-gray-900/20 backdrop-blur-sm z-40 lg:hidden" 
+        <div
+          className="fixed inset-0 bg-gray-900/20 backdrop-blur-sm z-40 lg:hidden"
           onClick={toggleMobileMenu}
         />
       )}
@@ -448,23 +446,22 @@ export default function Navbar() {
           <div className="flex items-center justify-between p-5 border-b border-gray-100">
             <span className="font-bold text-lg text-gray-800">Menu</span>
             <button onClick={toggleMobileMenu} className="text-gray-400 hover:text-red-600 transition-colors">
-               <X size={24} />
+              <X size={24} />
             </button>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
             {navItems.map(item => {
               const isActive = pathname === item.link;
               return (
-                <Link 
-                  key={item.name} 
-                  href={item.link} 
+                <Link
+                  key={item.name}
+                  href={item.link}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={`block px-4 py-3 rounded-lg text-base font-medium transition-all ${
-                    isActive 
-                      ? "bg-red-50 text-red-600 shadow-sm" 
+                  className={`block px-4 py-3 rounded-lg text-base font-medium transition-all ${isActive
+                      ? "bg-red-50 text-red-600 shadow-sm"
                       : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
+                    }`}
                 >
                   {item.name}
                 </Link>
@@ -476,16 +473,16 @@ export default function Navbar() {
             {user && user.name ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-3 px-2">
-                   <div className="h-10 w-10 rounded-full bg-red-600 text-white flex items-center justify-center font-bold uppercase shadow-sm">
-                      {user.name.charAt(0)}
-                   </div>
-                   <div className="overflow-hidden">
-                      <p className="font-medium text-gray-900 truncate">{user.name}</p>
-                      <p className="text-xs text-gray-500">Member</p>
-                   </div>
+                  <div className="h-10 w-10 rounded-full bg-red-600 text-white flex items-center justify-center font-bold uppercase shadow-sm">
+                    {user.name.charAt(0)}
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="font-medium text-gray-900 truncate">{user.name}</p>
+                    <p className="text-xs text-gray-500">Member</p>
+                  </div>
                 </div>
-                <button 
-                  onClick={handleLogout} 
+                <button
+                  onClick={handleLogout}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white text-red-600 border border-gray-200 rounded-lg font-medium shadow-sm hover:bg-red-50 hover:border-red-100 transition-all"
                 >
                   <LogOut size={18} />

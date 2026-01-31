@@ -468,6 +468,7 @@ export default function AdminDashboard() {
             originalWordUrl: item.originalWordUrl, // ✅ Added for Download Original
             currentWordUrl: item.currentWordUrl,   // ✅ Added for Download Final
             pdfUrl: item.currentPdfUrl || item.originalPdfUrl,
+            isVisible: item.isVisible !== undefined ? item.isVisible : true, // ✅ Map visibility status
           }));
           setArticles(formatted);
         }
@@ -719,27 +720,33 @@ export default function AdminDashboard() {
     return matchesSearch && matchesStatus;
   });
 
-  const deleteArticle = async (id) => {
+  const toggleVisibility = async (id, currentVisibility) => {
     try {
       const token = localStorage.getItem("adminToken");
-      // Backend API calling
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/articles/${id}`, {
-        method: "DELETE", // Backend route.ts mein delete method hai
+      const newVisibility = !currentVisibility;
+
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/articles/${id}/visibility`, {
+        method: "PATCH",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({ isVisible: newVisibility }),
       });
+
+      const data = await response.json();
+
       if (response.ok) {
-        // Frontend state se article hatayein
-        setArticles((prev) => prev.filter((art) => art.id !== id));
-        toast.success("Article deleted successfully!"); //
+        setArticles((prev) =>
+          prev.map((art) => (art.id === id ? { ...art, isVisible: newVisibility } : art))
+        );
+        toast.success(newVisibility ? "Article is now visible" : "Article hidden from users");
       } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || "Failed to delete article");
+        toast.error(data.message || "Failed to update visibility");
       }
     } catch (error) {
-      console.error("Error deleting:", error);
-      toast.error("Server error while deleting");
+      console.error("Error toggling visibility:", error);
+      toast.error("Server error while updating visibility");
     }
   };
 
@@ -848,7 +855,7 @@ export default function AdminDashboard() {
             setSelectedArticle={setSelectedArticle}
             setPdfViewMode={setPdfViewMode}
             overrideAndPublish={overrideAndPublish}
-            deleteArticle={deleteArticle}
+            toggleVisibility={toggleVisibility}
           />
         </div>
       </main>

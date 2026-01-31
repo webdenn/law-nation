@@ -35,7 +35,7 @@ export default function Login() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     // 1. Check Captcha
     if (!captchaToken) {
       toast.error("Please verify you are not a robot!");
@@ -212,6 +212,15 @@ export default function Login() {
                 </div>
               </div>
 
+              <div className="flex justify-end mb-4">
+                <Link
+                  href="/forgot-password"
+                  className="text-sm font-medium text-red-600 hover:text-red-700 hover:underline"
+                >
+                  Forgot Password?
+                </Link>
+              </div>
+
               <div className="mb-4">
                 <ReCAPTCHA
                   // || "" add karna hai taki undefined na jaye
@@ -223,9 +232,8 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className={`w-full px-6 py-2.5 bg-red-600 text-white rounded-lg font-semibold text-sm shadow-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-all duration-200 transform hover:scale-[1.02] ${
-                  isLoading ? "opacity-70 cursor-not-allowed" : ""
-                }`}
+                className={`w-full px-6 py-2.5 bg-red-600 text-white rounded-lg font-semibold text-sm shadow-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-all duration-200 transform hover:scale-[1.02] ${isLoading ? "opacity-70 cursor-not-allowed" : ""
+                  }`}
               >
                 {isLoading ? "Signing In..." : "Sign In"}
               </button>

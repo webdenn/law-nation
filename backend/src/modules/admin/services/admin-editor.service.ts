@@ -1,25 +1,36 @@
 import { prisma } from "@/db/db.js";
-import type { 
-  Editor, 
-  EditorStats, 
-  EditorWorkload, 
-  CreateEditorData, 
-  UpdateEditorData 
+import type {
+  Editor,
+  EditorStats,
+  EditorWorkload,
+  CreateEditorData,
+  UpdateEditorData
 } from "../types/admin-editor.type.js";
 import { NotFoundError, InternalServerError } from "@/utils/http-errors.util.js";
 
 export class AdminEditorService {
-  
+
   /**
    * Get all editors with their basic information
    */
   async getAllEditors(): Promise<Editor[]> {
     try {
       console.log(`📋 [Admin Editor] Fetching all editors`);
-      
+
       const users = await prisma.user.findMany({
         where: {
-          userType: 'EDITOR'
+          OR: [
+            { userType: { in: ['EDITOR', 'ADMIN'] } },
+            {
+              roles: {
+                some: {
+                  role: {
+                    name: { in: ['admin', 'editor', 'ADMIN', 'EDITOR', 'Admin', 'Editor', 'Super Admin', 'Administrator'] }
+                  }
+                }
+              }
+            }
+          ]
         },
         include: {
           _count: {
@@ -65,7 +76,7 @@ export class AdminEditorService {
   async getEditorById(editorId: string): Promise<Editor> {
     try {
       console.log(`🔍 [Admin Editor] Fetching editor: ${editorId}`);
-      
+
       const user = await prisma.user.findUnique({
         where: {
           id: editorId,
@@ -118,7 +129,7 @@ export class AdminEditorService {
   async createEditor(data: CreateEditorData): Promise<Editor> {
     try {
       console.log(`➕ [Admin Editor] Creating new editor: ${data.name}`);
-      
+
       // Check if email already exists
       const existingUser = await prisma.user.findUnique({
         where: { email: data.email }
@@ -174,7 +185,7 @@ export class AdminEditorService {
   async updateEditor(editorId: string, data: UpdateEditorData): Promise<Editor> {
     try {
       console.log(`📝 [Admin Editor] Updating editor: ${editorId}`);
-      
+
       const user = await prisma.user.update({
         where: {
           id: editorId,
@@ -230,7 +241,7 @@ export class AdminEditorService {
   async deleteEditor(editorId: string): Promise<void> {
     try {
       console.log(`🗑️ [Admin Editor] Deleting editor: ${editorId}`);
-      
+
       await prisma.user.update({
         where: {
           id: editorId,
@@ -255,7 +266,7 @@ export class AdminEditorService {
   async getEditorStats(editorId: string): Promise<EditorStats> {
     try {
       console.log(`📊 [Admin Editor] Fetching stats for editor: ${editorId}`);
-      
+
       const articles = await prisma.article.findMany({
         where: {
           assignedEditorId: editorId
@@ -268,24 +279,24 @@ export class AdminEditorService {
       });
 
       const totalAssigned = articles.length;
-      const totalCompleted = articles.filter(a => 
+      const totalCompleted = articles.filter(a =>
         ['EDITOR_APPROVED', 'PUBLISHED'].includes(a.status)
       ).length;
-      const inProgress = articles.filter(a => 
+      const inProgress = articles.filter(a =>
         ['ASSIGNED_TO_EDITOR', 'EDITOR_IN_PROGRESS'].includes(a.status)
       ).length;
 
       // Calculate average completion time (simplified)
-      const completedArticles = articles.filter(a => 
+      const completedArticles = articles.filter(a =>
         ['EDITOR_APPROVED', 'PUBLISHED'].includes(a.status)
       );
-      const averageCompletionTime = completedArticles.length > 0 
+      const averageCompletionTime = completedArticles.length > 0
         ? completedArticles.reduce((sum, article) => {
-            const days = Math.ceil(
-              (article.updatedAt.getTime() - article.createdAt.getTime()) / (1000 * 60 * 60 * 24)
-            );
-            return sum + days;
-          }, 0) / completedArticles.length
+          const days = Math.ceil(
+            (article.updatedAt.getTime() - article.createdAt.getTime()) / (1000 * 60 * 60 * 24)
+          );
+          return sum + days;
+        }, 0) / completedArticles.length
         : 0;
 
       const successRate = totalAssigned > 0 ? (totalCompleted / totalAssigned) * 100 : 0;
@@ -313,7 +324,7 @@ export class AdminEditorService {
   async assignArticleToEditor(articleId: string, editorId: string): Promise<void> {
     try {
       console.log(`📝 [Admin Editor] Assigning article ${articleId} to editor ${editorId}`);
-      
+
       await prisma.article.update({
         where: { id: articleId },
         data: {
@@ -336,7 +347,7 @@ export class AdminEditorService {
   async getEditorWorkload(editorId: string): Promise<EditorWorkload> {
     try {
       console.log(`📋 [Admin Editor] Fetching workload for editor: ${editorId}`);
-      
+
       const editor = await prisma.user.findUnique({
         where: { id: editorId },
         select: { name: true }

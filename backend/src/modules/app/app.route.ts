@@ -13,6 +13,9 @@ import BannerRouter from "@/modules/banners/banner.routes.js";
 import SettingsRouter from "@/modules/settings/settings.routes.js";
 import AdminPdfPublicRouter from "@/modules/admin/admin-pdf-public.route.js";
 import AboutRouter from "@/modules/about/about.route.js";
+import AdminArticleVisibilityRouter from "@/modules/admin/admin-article-visibility.route.js";
+import AdminAccessManagementRouter from "@/modules/admin/admin-access-management.route.js";
+import AdminPdfRouter from "@/modules/admin/admin-pdf.route.js";
 
 // /src/modules/app/app.route.ts
 
@@ -26,10 +29,15 @@ AppRouter.use("/articles", ArticleRouter);
 AppRouter.use("/admin/dashboard", AdminDashboardRouter);
 AppRouter.use("/admin/editors", AdminEditorRouter);
 AppRouter.use("/admin/reviewers", AdminReviewerRouter);
+AppRouter.use("/admin/articles", AdminArticleVisibilityRouter);
+AppRouter.use("/admin/access-management", AdminAccessManagementRouter);
 AppRouter.use("/audit", AuditRouter);
 AppRouter.use("/notifications", NotificationRouter);
 AppRouter.use("/banners", BannerRouter);
 AppRouter.use("/settings", SettingsRouter);
+
+// Admin PDF Management (Protected)
+AppRouter.use("/admin/pdfs", AdminPdfRouter);
 
 // Public routes (no authentication required)
 AppRouter.use("/public/admin-pdfs", AdminPdfPublicRouter);

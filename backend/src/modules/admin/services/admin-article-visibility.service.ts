@@ -40,8 +40,8 @@ export class AdminArticleVisibilityService {
       }
     });
 
-    if (!adminUser || adminUser.userType !== 'ADMIN') {
-      throw new ForbiddenError('Only admins can toggle article visibility');
+    if (!adminUser) {
+      throw new ForbiddenError('Admin user not found');
     }
 
     // Update article visibility

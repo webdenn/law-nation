@@ -3,6 +3,8 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
+import Image from "next/image";
+import logoImg from "../assets/logo.jpg";
 
 export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
     const router = useRouter();
@@ -39,32 +41,50 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
         },
         { name: "Add New Editor", path: "/admin/add-editor" },
         { name: "Add New Reviewer", path: "/admin/add-reviewer" },
+        { name: "Editors & Reviewers", path: "/admin/staff" }, // New Item
+        { name: "Concern", path: "/admin/concern" },
+        { name: "Upload Issue", path: "/admin/upload-issue" }, // New Item
         { name: "Banner Management", path: "/admin/banners" },
-        { name: "Site Settings", path: "/admin/settings" },
+        {
+            name: "Site Settings",
+            path: "#",
+            children: [
+                { name: "Footer Content", path: "/admin/settings" },
+                { name: "About Us", path: "/admin/settings/about" },
+            ]
+        },
         // { name: "Live Database", path: "/admin/live-database" },
     ];
 
     return (
         <aside
-            className={`fixed md:sticky top-0 h-screen w-72 bg-red-700 text-white flex flex-col shadow-2xl z-50 transition-transform duration-300 ease-in-out
+            className={`fixed md:sticky top-0 min-h-screen w-72 bg-red-700 text-white flex flex-col shadow-2xl z-50 transition-transform duration-300 ease-in-out
         ${isMobileMenuOpen
                     ? "translate-x-0"
                     : "-translate-x-full md:translate-x-0"
                 }`}
         >
-            <div className="p-8 border-b border-red-800 flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-black italic tracking-tighter">
-                        LAW NATION
-                    </h1>
-                    <span className="text-[10px] bg-white text-red-700 px-2 py-0.5 rounded-full font-bold uppercase mt-2 inline-block">
-                        Admin Panel
-                    </span>
+            <div className="p-8 border-b border-red-800 flex flex-col items-center relative">
+                <div className="mb-4 flex justify-center w-full">
+                    <div className="bg-white p-1.5 rounded-lg shadow-md inline-block">
+                        <Image
+                            src={logoImg}
+                            alt="Law Nation"
+                            width={140}
+                            height={40}
+                            className="h-auto w-auto max-w-[140px] object-contain rounded-sm"
+                            priority
+                        />
+                    </div>
                 </div>
-                {/* Close Button Mobile */}
+                <span className="text-[9px] bg-red-900/50 text-white/90 px-4 py-0.5 rounded-full font-black uppercase tracking-[0.2em] border border-red-800/50 shadow-sm">
+                    Admin Management
+                </span>
+
+                {/* Close Button Mobile - Absolute Positioning */}
                 <button
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="md:hidden text-white"
+                    className="md:hidden text-white absolute top-6 right-6"
                 >
                     <svg
                         xmlns="http://www.w3.org/2000/svg"

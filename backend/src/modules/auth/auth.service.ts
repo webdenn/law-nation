@@ -128,6 +128,11 @@ async function login(
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) throw new UnauthorizedError("invalid credentials");
 
+  // Check if account is active
+  if (!user.isActive) {
+    throw new UnauthorizedError("Account access has been removed. Please contact administrator.");
+  }
+
   // Check if admin access is required (for admin/editor/reviewer login)
   if (requireAdminAccess) {
     const hasManagementAccess = user.roles.some(
@@ -517,7 +522,7 @@ async function requestPasswordReset(email: string) {
 
   } catch (error) {
     console.error(`❌ [Password Reset] Failed to process request:`, error);
-    
+
     // Return generic success message even on error (don't reveal system issues)
     return {
       success: true,

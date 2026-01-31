@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
+import Image from "next/image";
+import logoImg from "../../assets/logo.jpg";
 import ReviewInterface from "./ReviewInterface";
 import { compareTexts, getChangeStats, formatDifferences } from "../../utilis/diffutilis";
 
@@ -530,19 +532,27 @@ export default function ReviewerDashboard() {
                         : "-translate-x-full md:translate-x-0"
                     }`}
             >
-                <div className="p-8 border-b border-red-800 flex justify-between items-center">
-                    <div>
-                        <h1 className="text-2xl font-black italic tracking-tighter">
-                            LAW NATION
-                        </h1>
-                        <span className="text-[10px] bg-white text-red-700 px-2 py-0.5 rounded-full font-bold uppercase">
-                            {/* ✅ CHANGED TITLE */}
-                            {selectedArticle ? "Review Mode" : "Reviewer Panel"}
-                        </span>
+                <div className="p-8 border-b border-red-800 flex flex-col items-center relative">
+                    <div className="mb-4 flex justify-center w-full">
+                        <div className="bg-white p-1.5 rounded-lg shadow-md inline-block">
+                            <Image
+                                src={logoImg}
+                                alt="Law Nation"
+                                width={140}
+                                height={40}
+                                className="h-auto w-auto max-w-[140px] object-contain rounded-sm"
+                                priority
+                            />
+                        </div>
                     </div>
+                    <span className="text-[9px] bg-red-900/50 text-white/90 px-4 py-0.5 rounded-full font-black uppercase tracking-[0.2em] border border-red-800/50 shadow-sm">
+                        {selectedArticle ? "Review Mode" : "Reviewer Panel"}
+                    </span>
+
+                    {/* Close Button Mobile - Absolute Positioning */}
                     <button
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="md:hidden text-white"
+                        className="md:hidden text-white absolute top-6 right-6"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -656,22 +666,24 @@ export default function ReviewerDashboard() {
                     )}
                 </nav>
 
-                {!selectedArticle && (
-                    <div className="p-4 border-t border-red-800">
-                        <button
-                            onClick={handleLogout}
-                            className="w-full p-2 text-sm bg-red-900 rounded font-medium uppercase"
-                        >
-                            Logout
-                        </button>
-                    </div>
-                )}
-            </aside>
+                {
+                    !selectedArticle && (
+                        <div className="p-4 border-t border-red-800">
+                            <button
+                                onClick={handleLogout}
+                                className="w-full p-2 text-sm bg-red-900 rounded font-medium uppercase"
+                            >
+                                Logout
+                            </button>
+                        </div>
+                    )
+                }
+            </aside >
 
             {/* MAIN CONTENT AREA */}
-            <main className="flex-1 h-screen overflow-y-auto bg-white flex flex-col">
+            < main className="flex-1 h-screen overflow-y-auto bg-white flex flex-col" >
                 {/* HEADER */}
-                <header className="bg-white h-20 border-b flex items-center justify-between px-4 md:px-10 sticky top-0 z-20 shadow-sm shrink-0">
+                < header className="bg-white h-20 border-b flex items-center justify-between px-4 md:px-10 sticky top-0 z-20 shadow-sm shrink-0" >
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => setIsMobileMenuOpen(true)}
@@ -696,10 +708,10 @@ export default function ReviewerDashboard() {
                             {profile.name.charAt(0)}
                         </div>
                     </div>
-                </header>
+                </header >
 
                 {/* CONTENT SWITCHER */}
-                <div className="p-4 md:p-10 pb-20 flex-1">
+                < div className="p-4 md:p-10 pb-20 flex-1" >
                     {!selectedArticle && activeTab === "tasks" && (
                         <>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-8">
@@ -768,31 +780,34 @@ export default function ReviewerDashboard() {
                                 </div>
                             </div>
                         </>
-                    )}
+                    )
+                    }
 
-                    {selectedArticle && (
-                        <ReviewInterface
-                            selectedArticle={selectedArticle}
-                            pdfViewMode={pdfViewMode}
-                            getPdfUrlToView={getPdfUrlToView}
-                            uploadedFile={uploadedFile}
-                            setUploadedFile={setUploadedFile}
-                            uploadComment={uploadComment}
-                            setUploadComment={setUploadComment}
-                            isUploading={isUploading}
-                            handleUploadCorrection={handleUploadCorrection}
-                            handleApprove={handleReviewerApprove} // ✅ Passed Handler
-                            changeHistory={changeHistory}
-                            handleViewVisualDiff={handleViewVisualDiff}
-                            handleDownloadDiffReport={handleDownloadDiffReport}
-                            handleDownloadFile={handleDownloadFile}
-                            currentDiffData={currentDiffData}
-                            isGeneratingDiff={isGeneratingDiff}
-                            isApproving={isApproving}
-                        />
-                    )}
-                </div>
-            </main>
-        </div>
+                    {
+                        selectedArticle && (
+                            <ReviewInterface
+                                selectedArticle={selectedArticle}
+                                pdfViewMode={pdfViewMode}
+                                getPdfUrlToView={getPdfUrlToView}
+                                uploadedFile={uploadedFile}
+                                setUploadedFile={setUploadedFile}
+                                uploadComment={uploadComment}
+                                setUploadComment={setUploadComment}
+                                isUploading={isUploading}
+                                handleUploadCorrection={handleUploadCorrection}
+                                handleApprove={handleReviewerApprove} // ✅ Passed Handler
+                                changeHistory={changeHistory}
+                                handleViewVisualDiff={handleViewVisualDiff}
+                                handleDownloadDiffReport={handleDownloadDiffReport}
+                                handleDownloadFile={handleDownloadFile}
+                                currentDiffData={currentDiffData}
+                                isGeneratingDiff={isGeneratingDiff}
+                                isApproving={isApproving}
+                            />
+                        )
+                    }
+                </div >
+            </main >
+        </div >
     );
 }
