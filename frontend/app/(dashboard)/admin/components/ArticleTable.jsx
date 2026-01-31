@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import AssignEditor from "./AssignEditor";
 import AssignReviewer from "./AssignReviewer";
@@ -26,6 +26,19 @@ export default function ArticleTable({
     overrideAndPublish,
     deleteArticle
 }) {
+    const [publishingId, setPublishingId] = useState(null);
+
+    const handlePublish = async (id) => {
+        setPublishingId(id);
+        try {
+            await overrideAndPublish(id);
+        } catch (error) {
+            console.error("Publishing error:", error);
+        } finally {
+            setPublishingId(null);
+        }
+    };
+
     return (
         <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
             <div className="bg-gray-50 p-5 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -53,7 +66,8 @@ export default function ArticleTable({
                     </select>
                 </div>
             </div>
-            <div className="overflow-x-auto">
+            {/* Desktop Table View */}
+            <div className="hidden lg:block overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[900px]">
                     <thead className="bg-gray-100 text-[10px] uppercase text-gray-400 font-bold">
                         <tr>
@@ -119,7 +133,6 @@ export default function ArticleTable({
                                         </span>
                                     </td>
                                     {/* 4. Assign Editor Dropdown */}
-                                    {/* 4. Assign Editor Dropdown */}
                                     <td className="p-5 text-center">
                                         <AssignEditor
                                             article={art}
@@ -147,16 +160,20 @@ export default function ArticleTable({
                                             Review
                                         </button>
                                         <button
-                                            onClick={() => overrideAndPublish(art.id)}
-                                            disabled={art.status === "Published"}
+                                            onClick={() => handlePublish(art.id)}
+                                            disabled={art.status === "Published" || publishingId === art.id}
                                             className={`w-[90px] py-2 rounded text-[10px] font-black transition-colors uppercase text-center ${art.status === "Published"
                                                 ? "bg-gray-400 cursor-not-allowed text-gray-200"
-                                                : "bg-black text-white hover:bg-green-600"
+                                                : publishingId === art.id
+                                                    ? "bg-gray-800 text-white cursor-wait"
+                                                    : "bg-black text-white hover:bg-green-600"
                                                 }`}
                                         >
                                             {art.status === "Published"
                                                 ? "Published"
-                                                : "Publish"}
+                                                : publishingId === art.id
+                                                    ? "Wait..."
+                                                    : "Publish"}
                                         </button>
                                         <button
                                             onClick={() => {
@@ -186,6 +203,108 @@ export default function ArticleTable({
                         )}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="lg:hidden flex flex-col divide-y divide-gray-100">
+                {isLoading ? (
+                    <div className="p-8 text-center text-gray-500 font-bold">Loading articles...</div>
+                ) : (
+                    filteredArticles.map((art) => (
+                        <div key={art.id} className="p-4 bg-white flex flex-col gap-4">
+                            {/* Header: Title & Status */}
+                            <div className="flex justify-between items-start gap-3">
+                                <div className="flex-1">
+                                    <p
+                                        onClick={() => handlePdfClick(art.pdfUrl)}
+                                        className="font-bold text-gray-900 text-lg leading-snug cursor-pointer hover:text-red-600 hover:underline mb-1"
+                                    >
+                                        {art.title}
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                        <span className="font-bold text-gray-700">{art.author}</span>
+                                        <span>•</span>
+                                        <span>{art.date}</span>
+                                    </div>
+                                </div>
+                                <span
+                                    className={`shrink-0 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wide ${art.status === "Published"
+                                        ? "bg-green-100 text-green-700"
+                                        : art.status === "In Review"
+                                            ? "bg-blue-100 text-blue-700"
+                                            : "bg-yellow-100 text-yellow-700"
+                                        }`}
+                                >
+                                    {art.status}
+                                </span>
+                            </div>
+
+                            {/* Abstract Button */}
+                            <button
+                                onClick={() => setShowAbstract(art)}
+                                className="text-xs text-red-600 font-bold uppercase hover:underline self-start"
+                            >
+                                View Abstract
+                            </button>
+
+                            {/* Assignments */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                <div>
+                                    <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Editor</p>
+                                    <AssignEditor
+                                        article={art}
+                                        editors={editors}
+                                        assignArticle={assignArticle}
+                                    />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Reviewer</p>
+                                    <AssignReviewer
+                                        article={art}
+                                        reviewers={reviewers}
+                                        assignReviewer={assignReviewer}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                                <div className="flex gap-2 w-full sm:w-auto">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedArticle(art);
+                                            setPdfViewMode("original");
+                                        }}
+                                        className="flex-1 sm:flex-none bg-blue-600 text-white py-2 px-4 rounded text-xs font-bold hover:bg-blue-700 transition shadow-sm uppercase"
+                                    >
+                                        Review
+                                    </button>
+                                    <button
+                                        onClick={() => handlePublish(art.id)}
+                                        disabled={art.status === "Published" || publishingId === art.id}
+                                        className={`flex-1 sm:flex-none py-2 px-4 rounded text-xs font-bold transition shadow-sm uppercase ${art.status === "Published"
+                                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                            : publishingId === art.id
+                                                ? "bg-gray-800 text-white cursor-wait"
+                                                : "bg-black text-white hover:bg-gray-900"
+                                            }`}
+                                    >
+                                        {art.status === "Published" ? "Published" : publishingId === art.id ? "Wait..." : "Publish"}
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={() => deleteArticle(art.id)}
+                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                                    title="Delete Article"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862A2 2 0 011.995 18.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
 
             {/* Abstract Modal */}

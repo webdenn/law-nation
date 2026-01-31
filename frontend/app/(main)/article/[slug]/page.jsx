@@ -68,6 +68,56 @@ const LockIcon = () => (
   </svg>
 );
 
+// --- RECENT ARTICLES WIDGET ---
+const RecentArticlesWidget = ({ currentSlug }) => {
+  const [recents, setRecents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
+
+  useEffect(() => {
+    const fetchRecents = async () => {
+      try {
+        // Fetch published articles (using the same endpoint as Home)
+        const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/articles/published`);
+        if (res.ok) {
+          const data = await res.json();
+          const list = data.results || data.articles || [];
+          // Filter out current article and take top 5
+          const filtered = list.filter(a => a.slug !== currentSlug && a.id !== currentSlug).slice(0, 5);
+          setRecents(filtered);
+        }
+      } catch (e) {
+        console.error("Failed to load recents", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRecents();
+  }, [currentSlug, NEXT_PUBLIC_BASE_URL]);
+
+  if (loading) return <div className="animate-pulse space-y-4">
+    {[1, 2, 3].map(i => <div key={i} className="h-16 bg-gray-100 rounded-lg"></div>)}
+  </div>;
+
+  if (recents.length === 0) return <p className="text-sm text-gray-400">No other articles yet.</p>;
+
+  return (
+    <div className="flex flex-col gap-5">
+      {recents.map((art) => (
+        <div key={art.id} className="group cursor-pointer" onClick={() => router.push(`/article/${art.slug || art.id}`)}>
+          <h4 className="text-sm font-bold text-gray-900 leading-snug group-hover:text-red-700 transition-colors line-clamp-2 mb-1">
+            {art.title}
+          </h4>
+          <p className="text-xs text-gray-500">
+            {new Date(art.submittedAt || art.createdAt).toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' })}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export default function ArticlePage({ params }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -167,7 +217,7 @@ export default function ArticlePage({ params }) {
 
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast.success("Download complete!");
+      // Removed success toast as it appears before user actually saves/cancels the file UI
     } catch (err) {
       console.error(err);
       toast.error("Failed to download file. Please try again.");
@@ -188,7 +238,85 @@ export default function ArticlePage({ params }) {
     );
 
 
-  // Calculate guest content
+  // Helper: Render text with Medium-style formatting (typography + lists)
+  const renderMediumContent = (text) => {
+    if (!text) return null;
+
+    // Pre-process: Ensure lists are on new lines if they're stuck in the middle of text
+    // 1. Numbered lists (e.g., "text. 1. Item") -> "text.\n1. Item"
+    // We look for a period/colon/newline, space, digit, dot, space.
+    let formattedText = text
+      .replace(/([.:?!])\s+(\d+\.\s+)/g, "$1\n$2")  // Fix stuck numbered lists
+      .replace(/([.:?!])\s+([•*-]\s+)/g, "$1\n$2"); // Fix stuck bullets
+
+    // Also handle cases where a list starts a paragraph without a preceding punctuation match if needed,
+    // but the above covers the "inline" case. 
+    // Additional cleanup for common patterns:
+    formattedText = formattedText.replace(/(\n|^)(\d+\.)([^\s])/g, "$1$2 $3"); // Ensure space after dot in "1.Text"
+
+    const lines = formattedText.split('\n');
+    const elements = [];
+    let currentList = null;
+
+    const renderList = (list, key) => {
+      const Tag = list.type;
+      const listClass = list.type === 'ul' ? 'list-disc' : 'list-decimal';
+      return (
+        <Tag key={key} className={`mb-6 pl-5 space-y-2 ${listClass} ml-2 text-[20px] text-[#292929] leading-[32px]`}>
+          {list.items.map((item, i) => (
+            <li key={i} className="pl-1" dangerouslySetInnerHTML={{ __html: item }} />
+          ))}
+        </Tag>
+      );
+    };
+
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        if (currentList) {
+          elements.push(renderList(currentList, `list-${index}`));
+          currentList = null;
+        }
+        return;
+      }
+
+      // Check for list items
+      const isBullet = /^[-*•]\s/.test(trimmed);
+      const isNumber = /^\d+\.\s/.test(trimmed);
+
+      if (isBullet || isNumber) {
+        const listType = isBullet ? 'ul' : 'ol';
+        // If switching list types or just starting
+        if (!currentList || currentList.type !== listType) {
+          if (currentList) elements.push(renderList(currentList, `list-${index}-prev`));
+          currentList = { type: listType, items: [] };
+        }
+        // Remove the marker for display
+        const itemContent = trimmed.replace(/^([-*•]|\d+\.)\s/, '');
+        currentList.items.push(itemContent);
+      } else {
+        // Close list if open
+        if (currentList) {
+          elements.push(renderList(currentList, `list-${index}`));
+          currentList = null;
+        }
+        // Regular paragraph (Medium style)
+        elements.push(
+          <p key={`p-${index}`} className="mb-8 text-[20px] text-[#292929] leading-[32px] tracking-tight text-justify">
+            {trimmed}
+          </p>
+        );
+      }
+    });
+
+    if (currentList) {
+      elements.push(renderList(currentList, `list-end`));
+    }
+
+    return elements;
+  };
+
+  // Calculate guest content preserving structure
   const guestContent = (() => {
     if (token || !article) return "";
 
@@ -202,10 +330,22 @@ export default function ArticlePage({ params }) {
 
     if (!textContent) return "";
 
-    const words = textContent.trim().split(/\s+/);
-    return words.length > 250
-      ? words.slice(0, 250).join(" ") + "..."
-      : textContent;
+    // Preserve structure: Take lines until word count > 250
+    const lines = textContent.split('\n');
+    let accumulatedText = "";
+    let wordCount = 0;
+
+    for (const line of lines) {
+      const words = line.trim().split(/\s+/).length;
+      if (line.trim() === "") continue; // Skip empty lines for count, but logic below handles formatting
+
+      wordCount += words;
+      accumulatedText += line + "\n";
+
+      if (wordCount > 250) break;
+    }
+
+    return accumulatedText;
   })();
 
   if (error || !article)
@@ -224,136 +364,170 @@ export default function ArticlePage({ params }) {
     );
 
   return (
-    <article className="min-h-screen bg-white font-sans text-gray-900">
-      <div className="max-w-3xl mx-auto py-16 px-6 sm:px-8">
+    <article className="min-h-screen bg-white font-sans text-gray-900 bg-gray-50/30">
+      <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <button
           onClick={() => router.back()}
-          className="inline-flex items-center text-sm text-gray-500 hover:text-black mb-8 transition-colors"
+          className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-red-700 mb-8 transition-colors group"
         >
-          <ArrowLeftIcon /> Back
+          <ArrowLeftIcon />
+          <span className="group-hover:translate-x-1 transition-transform">Back to Library</span>
         </button>
 
-        <header className="mb-10">
-          <div className="flex items-center gap-3 mb-6">
-            <span className="text-xs font-semibold tracking-wider uppercase text-blue-600">
-              {article.category || "General"}
-            </span>
-            <span className="text-gray-300">•</span>
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-              {new Date(article.submittedAt).toLocaleDateString("en-US", {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </span>
-          </div>
-
-          {article.thumbnailUrl && (
-            <div className="w-full h-[300px] sm:h-[400px] mb-8 rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
-              <img
-                src={
-                  article.thumbnailUrl.startsWith("http")
-                    ? article.thumbnailUrl
-                    : `${NEXT_PUBLIC_BASE_URL}${article.thumbnailUrl}`
-                }
-                alt={article.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          )}
-
-          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight leading-[1.1] mb-8 text-gray-900 break-words">
-            {article.title}
-          </h1>
-
-          <div className="flex items-center justify-between border-b border-gray-100 pb-8">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-600">
-                {article.authorName?.charAt(0) || "A"}
+        <div className="flex flex-col lg:flex-row gap-12">
+          {/* MAIN CONTENT (Left) */}
+          <main className="lg:w-[70%]">
+            <header className="mb-10">
+              <div className="flex items-center gap-3 mb-6">
+                <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold tracking-wider uppercase">
+                  {article.category || "General"}
+                </span>
+                <span className="text-gray-300">•</span>
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {new Date(article.submittedAt).toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </span>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  {article.authorName}
-                </p>
-                <p className="text-xs text-gray-500">Author</p>
+
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-[1.1] mb-8 text-gray-900 break-words font-serif">
+                {article.title}
+              </h1>
+
+              {article.thumbnailUrl && (
+                <div className="w-full h-[300px] sm:h-[450px] mb-10 rounded-2xl overflow-hidden shadow-sm bg-gray-100">
+                  <img
+                    src={
+                      article.thumbnailUrl.startsWith("http")
+                        ? article.thumbnailUrl
+                        : `${NEXT_PUBLIC_BASE_URL}${article.thumbnailUrl}`
+                    }
+                    alt={article.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-between border-b border-gray-100 pb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-lg font-bold text-red-700 border border-red-100">
+                    {article.authorName?.charAt(0) || "A"}
+                  </div>
+                  <div>
+                    <p className="text-base font-bold text-gray-900">
+                      {article.authorName}
+                    </p>
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Author</p>
+                  </div>
+                </div>
+
+                {!isLimited && article.currentPdfUrl && (
+                  <button
+                    onClick={() => handleDownload("pdf")}
+                    className="hidden sm:flex items-center text-sm font-bold text-gray-700 hover:text-red-700 border border-gray-200 rounded-lg px-5 py-2.5 hover:border-red-200 hover:bg-red-50 transition-all cursor-pointer"
+                  >
+                    <DownloadIcon /> Download PDF
+                  </button>
+                )}
               </div>
+            </header>
+
+            {token && article.abstract && (
+              <div className="p-8 bg-gray-50 rounded-2xl border border-gray-100 mb-12">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Abstract</h3>
+                <div className="text-lg md:text-xl text-gray-700 leading-relaxed font-serif italic">
+                  {article.abstract}
+                </div>
+              </div>
+            )}
+
+            <div
+              className={`prose prose-lg prose-slate max-w-none prose-headings:font-bold prose-headings:font-sans prose-p:font-serif prose-a:text-red-700 hover:prose-a:text-red-800 prose-img:rounded-xl break-words overflow-hidden ${(!token || isLimited) ? "relative" : ""
+                }`}
+            >
+              {token ? (
+                // ✅ Logged In: Show Full Content (HTML or Text)
+                article.contentHtml ? (
+                  <div dangerouslySetInnerHTML={{ __html: article.contentHtml }} />
+                ) : article.content ? (
+                  <div className="font-serif max-w-2xl mx-auto">
+                    {renderMediumContent(article.content)}
+                  </div>
+                ) : (
+                  <div className="p-10 bg-gray-50 rounded-xl text-center text-gray-500 text-sm italic">
+                    Content unavailable for this article.
+                  </div>
+                )
+              ) : (
+                // 🔒 Guest: Show Structured Preview
+                <div className="font-serif max-w-2xl mx-auto opacity-70 blur-[0.3px] select-none">
+                  {renderMediumContent(guestContent)}
+                </div>
+              )}
+
+              {!token && (
+                <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-white via-white/95 to-transparent flex items-end justify-center pb-8 z-10">
+                  <div className="text-center w-full px-4">
+                    <Link
+                      href={`/login?redirect=${pathname}`}
+                      className="inline-flex items-center justify-center bg-red-600 text-white font-bold px-8 py-3.5 rounded-full hover:bg-red-700 transition-all shadow-lg hover:shadow-red-200 transform hover:-translate-y-0.5 group"
+                    >
+                      <LockIcon />
+                      <span className="ml-2 text-sm uppercase tracking-wider">Login to Read Full Article</span>
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
 
             {!isLimited && article.currentPdfUrl && (
-              <button
-                onClick={() => handleDownload("pdf")}
-                className="hidden sm:flex items-center text-sm font-medium text-gray-600 hover:text-black border border-gray-200 rounded-full px-4 py-2 hover:border-gray-400 transition-all cursor-pointer"
-              >
-                <DownloadIcon /> PDF
-              </button>
-            )}
-          </div>
-        </header>
-
-        {token && article.abstract && (
-          <div className="text-xl text-gray-600 leading-relaxed mb-10 not-italic font-normal break-words">
-            {article.abstract}
-          </div>
-        )}
-
-        <div
-          className={`prose prose-lg prose-slate max-w-none prose-headings:font-bold prose-a:text-blue-600 hover:prose-a:text-blue-500 prose-img:rounded-xl break-words overflow-hidden ${(!token || isLimited) ? "relative" : ""
-            }`}
-        >
-          {token ? (
-            // ✅ Logged In: Show Full Content (HTML or Text)
-            article.contentHtml ? (
-              <div dangerouslySetInnerHTML={{ __html: article.contentHtml }} />
-            ) : article.content ? (
-              <div className="whitespace-pre-wrap">{article.content}</div>
-            ) : (
-              <div className="p-6 bg-gray-50 rounded-lg text-center text-gray-500 text-sm">
-                Content unavailable.
-              </div>
-            )
-          ) : (
-            // 🔒 Guest: Show Truncated Plain Text Preview
-            <div className="whitespace-pre-wrap text-lg text-gray-700 leading-relaxed">
-              {guestContent}
-            </div>
-          )}
-
-          {!token && (
-            <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white via-white/80 to-transparent flex items-end justify-center pb-0">
-              <div className="w-full text-center bg-white/50 backdrop-blur-sm pt-4 pb-2">
-                <Link
-                  href={`/login?redirect=${pathname}`}
-                  className="inline-flex items-center justify-center bg-gradient-to-r from-red-700 to-red-600 text-white font-semibold px-8 py-3 rounded-full hover:from-red-800 hover:to-red-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              <div className="mt-16 pt-8 border-t border-gray-100 sm:hidden">
+                <a
+                  href={getPdfUrl(article.currentPdfUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center w-full bg-gray-900 text-white text-sm font-bold px-6 py-4 rounded-xl active:scale-95 transition-transform"
                 >
-                  <LockIcon />
-                  <span className="ml-2">Login to Read Full Article</span>
+                  <DownloadIcon /> Download Full PDF
+                </a>
+              </div>
+            )}
+          </main>
+
+          {/* SIDEBAR (Right) */}
+          <aside className="lg:w-[30%] space-y-8">
+            <div className="sticky top-24">
+              {/* Recent Articles Widget */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-6 flex items-center gap-2">
+                  <span className="w-1 h-6 bg-red-600 rounded-full"></span>
+                  Recent Articles
+                </h3>
+                <div className="space-y-6">
+                  <RecentArticlesWidget currentSlug={slug} />
+                </div>
+                <div className="mt-8 pt-6 border-t border-gray-50 text-center">
+                  <Link href="/articles" className="text-xs font-bold text-red-600 hover:text-red-700 uppercase tracking-widest hover:underline">
+                    View All Articles
+                  </Link>
+                </div>
+              </div>
+
+              {/* Newsletter / Call to Action (Optional Future use) */}
+              <div className="mt-8 bg-red-50 rounded-2xl p-6 border border-red-100 hidden md:block">
+                <h4 className="font-bold text-red-900 mb-2">Submit your work</h4>
+                <p className="text-sm text-red-700 mb-4 leading-relaxed">
+                  Contributing to Law Nation Prime Times Journal allows you to reach a global audience.
+                </p>
+                <Link href="/submit-paper" className="text-xs font-bold bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition block text-center">
+                  Submit Manuscript
                 </Link>
               </div>
             </div>
-          )}
+          </aside>
         </div>
-
-        {!isLimited && article.currentPdfUrl && (
-          <div className="mt-16 pt-8 border-t border-gray-100 sm:hidden">
-            <a
-              href={getPdfUrl(article.currentPdfUrl)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center w-full bg-black text-white text-sm font-medium px-6 py-4 rounded-lg active:scale-95 transition-transform"
-            >
-              <DownloadIcon /> Download Full PDF
-            </a>
-          </div>
-        )}
-
-        {article.currentWordUrl && (
-          <button
-            onClick={() => handleDownload("word")}
-            className="flex sm:hidden items-center justify-center w-full bg-blue-600 text-white text-sm font-medium px-6 py-4 rounded-lg"
-          >
-            <WordIcon /> Download Word
-          </button>
-        )}
       </div>
     </article>
   );
