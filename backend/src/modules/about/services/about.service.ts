@@ -1,7 +1,4 @@
 import { prisma } from '@/db/db.js';
-import type { AboutContentInput } from '../validators/about.validator.js';
-
-
 
 export class AboutService {
   /**
@@ -33,7 +30,7 @@ export class AboutService {
   /**
    * Update about us content (creates new record if none exists)
    */
-  async updateAboutContent(data: AboutContentInput): Promise<{ id: string; content: string; updatedAt: string }> {
+  async updateAboutContent(content: string): Promise<{ id: string; content: string; updatedAt: string }> {
     try {
       // Check if any record exists
       const existingRecord = await prisma.aboutUs.findFirst();
@@ -45,7 +42,7 @@ export class AboutService {
         aboutUs = await prisma.aboutUs.update({
           where: { id: existingRecord.id },
           data: {
-            content: data.content,
+            content: content,
             updatedAt: new Date()
           }
         });
@@ -53,7 +50,7 @@ export class AboutService {
         // Create new record
         aboutUs = await prisma.aboutUs.create({
           data: {
-            content: data.content
+            content: content
           }
         });
       }
