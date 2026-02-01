@@ -13,12 +13,12 @@ export class SettingsService {
             where: { key },
             update: {
                 value,
-                updatedBy,
+                updatedBy: updatedBy ?? null,
             },
             create: {
                 key,
                 value,
-                updatedBy,
+                updatedBy: updatedBy ?? null,
             },
         });
     }

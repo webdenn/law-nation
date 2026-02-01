@@ -1,1 +1,0 @@
-{"version":3,"file":"reassignment-notification.template.d.ts","sourceRoot":"","sources":["../../../../src/templates/email/editor/reassignment-notification.template.ts"],"names":[],"mappings":"AAEA,wBAAgB,0CAA0C,CAAC,IAAI,EAAE;IAC/D,UAAU,EAAE,MAAM,CAAC;IACnB,YAAY,EAAE,MAAM,CAAC;IACrB,SAAS,EAAE,MAAM,CAAC;CACnB,GAAG;IAAE,OAAO,EAAE,MAAM,CAAC;IAAC,IAAI,EAAE,MAAM,CAAA;CAAE,CA0CpC"}

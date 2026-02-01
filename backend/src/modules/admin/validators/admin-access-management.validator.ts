@@ -4,7 +4,7 @@ export const removeAccessSchema = z.object({
   body: z.object({
     userId: z.string().min(1, "User ID is required"),
     userType: z.enum(['EDITOR', 'REVIEWER'], {
-      errorMap: () => ({ message: "User type must be either EDITOR or REVIEWER" })
+      message: "User type must be either EDITOR or REVIEWER"
     }),
     reason: z.string().optional()
   })

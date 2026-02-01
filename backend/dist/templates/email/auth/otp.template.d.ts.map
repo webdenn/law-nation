@@ -1,1 +1,0 @@
-{"version":3,"file":"otp.template.d.ts","sourceRoot":"","sources":["../../../../src/templates/email/auth/otp.template.ts"],"names":[],"mappings":"AAEA,wBAAgB,oBAAoB,CAAC,IAAI,EAAE;IACzC,GAAG,EAAE,MAAM,CAAC;CACb,GAAG;IAAE,OAAO,EAAE,MAAM,CAAC;IAAC,IAAI,EAAE,MAAM,CAAA;CAAE,CAoCpC"}
