@@ -13,7 +13,8 @@ import AppRouter from "./app.route.js";
 const app: express.Application = express();
 
 // app.use(helmet());
-app.use(cors({ origin: true, credentials: true }));
+// app.use(cors({ origin: true, credentials: true }));
+app.use(cors({ origin: "*" }));
 app.use(cookieParser());
 app.use(express.json());
 app.use(morgan("dev"));
