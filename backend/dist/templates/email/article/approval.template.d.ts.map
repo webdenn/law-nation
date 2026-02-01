@@ -1,1 +1,0 @@
-{"version":3,"file":"approval.template.d.ts","sourceRoot":"","sources":["../../../../src/templates/email/article/approval.template.ts"],"names":[],"mappings":"AAEA,wBAAgB,2BAA2B,CAAC,IAAI,EAAE;IAChD,UAAU,EAAE,MAAM,CAAC;IACnB,YAAY,EAAE,MAAM,CAAC;IACrB,SAAS,EAAE,MAAM,CAAC;CACnB,GAAG;IAAE,OAAO,EAAE,MAAM,CAAC;IAAC,IAAI,EAAE,MAAM,CAAA;CAAE,CAsBpC"}

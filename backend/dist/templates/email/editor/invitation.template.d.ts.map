@@ -1,1 +1,0 @@
-{"version":3,"file":"invitation.template.d.ts","sourceRoot":"","sources":["../../../../src/templates/email/editor/invitation.template.ts"],"names":[],"mappings":"AAEA,wBAAgB,4BAA4B,CAAC,IAAI,EAAE;IACjD,UAAU,EAAE,MAAM,CAAC;IACnB,KAAK,EAAE,MAAM,CAAC;IACd,WAAW,EAAE,MAAM,CAAC;CACrB,GAAG;IAAE,OAAO,EAAE,MAAM,CAAC;IAAC,IAAI,EAAE,MAAM,CAAA;CAAE,CA6DpC"}
