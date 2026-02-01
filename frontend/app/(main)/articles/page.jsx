@@ -264,9 +264,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-// --- Build Error Fix: Force Dynamic Rendering for Search Params ---
-export const dynamic = "force-dynamic";
-
 // --- Icons Components ---
 const SearchIcon = () => (
   <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -280,7 +277,8 @@ const ArrowLeftIcon = () => (
   </svg>
 );
 
-export default function AllArticlesPage() {
+// --- PART 1: The Logic Component (Internal) ---
+function ArticlesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
@@ -289,15 +287,15 @@ export default function AllArticlesPage() {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Input state ko URL params se initialize karein (Refesh par data bacha rahega)
+  // Initialize from URL
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
 
   // --- Effect: Handle Fetching based on URL ---
   useEffect(() => {
     const query = searchParams.get("q") || "";
-    setSearchTerm(query); // Sync input box with URL
+    setSearchTerm(query);
     fetchArticles(query);
-  }, [searchParams]); // Jab bhi URL badlega, ye chalega
+  }, [searchParams]);
 
   // --- Fetch Function ---
   const fetchArticles = async (query = "") => {
@@ -312,7 +310,7 @@ export default function AllArticlesPage() {
         url = `${NEXT_PUBLIC_BASE_URL}/api/articles/published`;
       }
 
-      const res = await fetch(url, { cache: "no-store" }); // Ensure fresh data
+      const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch");
       
       const data = await res.json();
@@ -329,7 +327,6 @@ export default function AllArticlesPage() {
   // --- Handle Search Submit ---
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    // Hum seedha URL update karenge, useEffect apne aap fetch trigger karega
     if (searchTerm.trim()) {
       router.push(`/articles?q=${searchTerm.trim()}`);
     } else {
@@ -345,7 +342,7 @@ export default function AllArticlesPage() {
       <div className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           
-          {/* Back Button (Optimized with Link) */}
+          {/* Back Button */}
           <div className="mb-4">
             <Link 
               href="/law/home" 
@@ -376,7 +373,7 @@ export default function AllArticlesPage() {
                   placeholder="Search title, author, or keywords..."
                   className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none text-sm shadow-sm"
                 />
-                {/* Clear Button inside Input */}
+                {/* Clear Button */}
                 {searchTerm && (
                   <button
                     type="button"
@@ -426,7 +423,6 @@ export default function AllArticlesPage() {
                 key={item._id || item.id}
                 className="group flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow duration-300"
               >
-                {/* Thumbnail */}
                 <div className="relative h-52 overflow-hidden bg-gray-100">
                   {item.thumbnailUrl ? (
                     <img
@@ -436,7 +432,7 @@ export default function AllArticlesPage() {
                       loading="lazy"
                       onError={(e) => {
                           e.target.onerror = null; 
-                          e.target.style.display = 'none'; // Better: set a fallback image src here
+                          e.target.style.display = 'none'; 
                       }}
                     />
                   ) : (
@@ -445,7 +441,6 @@ export default function AllArticlesPage() {
                     </div>
                   )}
 
-                  {/* Category Badge */}
                   {item.category && (
                     <span className="absolute top-4 left-4 bg-white/95 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-red-700 shadow-sm border border-gray-100">
                       {item.category}
@@ -454,17 +449,12 @@ export default function AllArticlesPage() {
                 </div>
 
                 <div className="flex flex-col grow p-6">
-                  {/* Title */}
                   <h3 className="text-xl font-bold text-gray-900 mb-3 leading-snug line-clamp-2 group-hover:text-red-700 transition-colors">
                     {item.title}
                   </h3>
-
-                  {/* Abstract */}
                   <p className="text-gray-600 text-sm leading-relaxed mb-6 line-clamp-3">
                     {item.abstract || "No description available for this article."}
                   </p>
-
-                  {/* Footer */}
                   <div className="mt-auto pt-5 border-t border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-bold uppercase">
@@ -483,7 +473,6 @@ export default function AllArticlesPage() {
             ))}
           </div>
         ) : (
-          // Empty State
           <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-dashed border-gray-300">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
               <SearchIcon />
@@ -505,5 +494,15 @@ export default function AllArticlesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// --- PART 2: The Main Page Wrapper (The Fix) ---
+export default function AllArticlesPage() {
+  return (
+    // This Suspense boundary is what fixes the Build Error
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading Library...</div>}>
+      <ArticlesContent />
+    </Suspense>
   );
 }
