@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 import { AboutService } from '../../about/services/about.service.js';
 import type { AuthRequest } from '../../../types/auth-request.js';
 import { UnauthorizedError } from '../../../utils/http-errors.util.js';
@@ -56,7 +56,7 @@ export class AdminAboutController {
 
       const { content } = req.body;
 
-      const updatedContent = await aboutService.updateAboutContent({ content });
+      const updatedContent = await aboutService.updateAboutContent(content);
 
       res.json({
         success: true,
