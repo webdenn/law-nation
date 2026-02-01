@@ -1,0 +1,1 @@
+{"version":3,"file":"verification-code.template.d.ts","sourceRoot":"","sources":["../../../../src/templates/email/article/verification-code.template.ts"],"names":[],"mappings":"AAEA,wBAAgB,mCAAmC,CAAC,IAAI,EAAE;IACxD,UAAU,EAAE,MAAM,CAAC;IACnB,IAAI,EAAE,MAAM,CAAC;CACd,GAAG;IAAE,OAAO,EAAE,MAAM,CAAC;IAAC,IAAI,EAAE,MAAM,CAAA;CAAE,CAkCpC"}

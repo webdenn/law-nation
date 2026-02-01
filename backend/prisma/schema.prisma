@@ -6,50 +6,76 @@ datasource db {
   provider = "postgresql"
 }
 
-/// ==============================
-/// RBAC MODULE
-/// ==============================
-
 /// ---------- core user model ----------
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  phone        String?
-  passwordHash String
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  version      Int      @default(1)
-
-  // RBAC relations
-  roles       UserRole[]
-  refreshTokens          RefreshToken[]
-  auditLogs  AuditLog[]
+  id                        String                  @id @default(cuid())
+  name                      String
+  email                     String                  @unique
+  phone                     String?
+  passwordHash              String
+  passwordSetupDate         DateTime?               // When user first set up password
+  isActive                  Boolean                 @default(true)
+  
+  // NEW FIELDS FOR EDITORS/REVIEWERS
+  userType                  UserType                @default(USER) // ADMIN, EDITOR, REVIEWER, USER
+  title                     String?                 // "B.Com (Hons.), FCA"
+  designation               String?                 // "Chartered Accountant"
+  specialization            String[]                @default([]) // Editor specializations
+  expertise                 String[]                @default([]) // Reviewer expertise areas
+  qualification             String?                 // Educational background
+  experience                Int?                    // Years of experience
+  bio                       String?                 // Professional background
+  
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+  version                   Int                     @default(1)
+  
+  // EXISTING RELATIONS
+  assignedArticles          Article[]               @relation("AssignedEditor")
+  auditLogs                 AuditLog[]
+  refreshTokens             RefreshToken[]
+  roles                     UserRole[]
+  changeLogs                ArticleChangeLog[]
+  notifications             Notification[]
+  editorHistory             ArticleEditorHistory[]  @relation("EditorHistory")
+  assignedEditorHistory     ArticleEditorHistory[]  @relation("AssignedByHistory")
+  
+  // NEW RELATIONS FOR REVIEWERS
+  reviewedArticles          Article[]               @relation("AssignedReviewer")
+  
+  // ADMIN PDF UPLOADS
+  uploadedPdfs              AdminPdf[]              @relation("AdminPdfUploader")
 }
 
 /// ---------- roles ----------
 model Role {
-  id          String   @id @default(cuid())
-  name        String   @unique
+  id          String           @id @default(cuid())
+  name        String           @unique
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  users       UserRole[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
   permissions RolePermission[]
+  users       UserRole[]
+}
+
+/// ---------- banner management ----------
+model Banner {
+  id        String   @id @default(cuid())
+  title     String?
+  imageUrl  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
 }
 
 /// ---------- permissions ----------
 model Permission {
-  id          String   @id @default(cuid())
-  key         String   @unique
+  id          String           @id @default(cuid())
+  key         String           @unique
   description String?
-  module      String? // optional grouping (e.g. "leads", "inventory", "auth")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  roles RolePermission[]
+  module      String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  roles       RolePermission[]
 }
 
 /// ---------- user <-> role ----------
@@ -57,9 +83,8 @@ model UserRole {
   userId     String
   roleId     String
   assignedAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
   @@index([roleId])
@@ -69,10 +94,9 @@ model UserRole {
 model RolePermission {
   roleId       String
   permissionId String
-  assignedAt   DateTime @default(now())
-
-  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  assignedAt   DateTime   @default(now())
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
   @@index([permissionId])
@@ -82,14 +106,13 @@ model RolePermission {
 model AuditLog {
   id         String   @id @default(cuid())
   userId     String?
-  roleName   String? // snapshot of role at time of action
-  action     String  // e.g. "ROLE_ASSIGNED", "LOGIN", "PERMISSION_REVOKED"
-  resource   String  // e.g. "user", "role", "permission"
+  roleName   String?
+  action     String
+  resource   String
   resourceId String?
   payload    Json?
   createdAt  DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id])
+  user       User?    @relation(fields: [userId], references: [id])
 }
 
 model RefreshToken {
@@ -99,6 +122,298 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
   revoked   Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id])
+}
 
-  user User @relation(fields: [userId], references: [id])
+model Article {
+  id                 String                  @id @default(cuid())
+  authorName         String
+  authorEmail        String
+  authorPhone        String?
+  authorOrganization String?
+  secondAuthorName         String?
+  secondAuthorEmail        String?
+  secondAuthorPhone        String?
+  secondAuthorOrganization String?
+  title              String
+  slug               String                  @unique
+  category           String
+  abstract           String
+  keywords           String?
+  coAuthors          String?
+  remarksToEditor    String?
+  originalPdfUrl     String
+  currentPdfUrl      String
+  status             ArticleStatus           @default(PENDING_ADMIN_REVIEW)
+  assignedEditorId   String?
+  
+  // NEW REVIEWER RELATION
+  assignedReviewerId String?
+  
+  editorApprovedAt   DateTime?
+  submittedAt        DateTime                @default(now())
+  reviewedAt         DateTime?
+  approvedAt         DateTime?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  content            String?
+  contentHtml        String?
+  imageUrls          String[]
+  thumbnailUrl       String?
+  currentWordUrl     String?
+  originalFileType   String                  @default("pdf")
+  originalWordUrl    String?
+  
+  // NEW: Document-specific fields
+  contentType        ContentType             @default(ARTICLE)
+  documentType       DocumentType?           // Only for documents
+  documentStatus     DocumentStatus?         // Document processing status
+  docxUrl            String?                 // Converted DOCX for editing
+  editedDocxUrl      String?                 // Editor's edited DOCX
+  finalPdfUrl        String?                 // Final PDF with watermark
+  extractedText      String?                 // Text extracted for website
+  
+  // Article visibility control
+  isVisible          Boolean                 @default(true)  // Controls visibility on user side
+  hiddenAt           DateTime?               // When article was hidden
+  hiddenBy           String?                 // Admin ID who hid the article
+  
+  assignedEditor     User?                   @relation("AssignedEditor", fields: [assignedEditorId], references: [id])
+  
+  // NEW REVIEWER RELATION
+  assignedReviewer   User?                   @relation("AssignedReviewer", fields: [assignedReviewerId], references: [id])
+  
+  revisions          ArticleRevision[]
+  changeLogs         ArticleChangeLog[]
+  notifications      Notification[]
+  editorHistory      ArticleEditorHistory[]
+
+  @@index([status])
+  @@index([assignedEditorId])
+  @@index([assignedReviewerId])
+  @@index([authorEmail])
+  @@index([secondAuthorEmail])
+  @@index([slug])
+  @@index([contentType])
+}
+
+model ArticleRevision {
+  id         String   @id @default(cuid())
+  articleId  String
+  pdfUrl     String
+  uploadedBy String?
+  comments   String?
+  createdAt  DateTime @default(now())
+  wordUrl    String?
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+}
+
+model EmailVerification {
+  id               String    @id @default(cuid())
+  resourceId       String
+  resourceType     String
+  email            String
+  token            String    @unique
+  verificationCode String?
+  isVerified       Boolean   @default(false)
+  verifiedAt       DateTime?
+  ttl              DateTime
+  metadata         Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([token])
+  @@index([verificationCode])
+  @@index([email])
+  @@index([ttl])
+  @@index([isVerified])
+}
+
+/// ---------- Article Change Log (Diff Tracking) ----------
+model ArticleChangeLog {
+  id                  String   @id @default(cuid())
+  articleId           String
+  versionNumber       Int
+  oldFileUrl          String
+  newFileUrl          String
+  fileType            String   // "PDF" or "WORD"
+  diffData            Json     // {added: [], removed: [], modified: []}
+  visualDiffUrl       String?  // Path to visual diff PDF with markup
+  visualDiffStatus    String   @default("PENDING") // "PENDING", "GENERATING", "READY", "FAILED"
+  editedBy            String
+  editedAt            DateTime @default(now())
+  status              String   @default("pending") // "pending", "approved", "published"
+  comments            String?
+  editorDocumentUrl   String?  // Editor's additional uploaded document
+  editorDocumentType  String?  // Original type: "PDF" or "WORD"
+  article             Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  editor              User     @relation(fields: [editedBy], references: [id])
+
+  @@index([articleId])
+  @@index([editedBy])
+  @@index([status])
+  @@index([visualDiffStatus])
+}
+
+/// ---------- Notifications ----------
+model Notification {
+  id         String    @id @default(cuid())
+  userId     String
+  articleId  String?
+  type       String    // "ARTICLE_APPROVED_BY_EDITOR", "ARTICLE_PUBLISHED", etc.
+  title      String
+  message    String
+  isRead     Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  readAt     DateTime?
+  metadata   Json?     // Additional data like articleTitle, editorName, etc.
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article    Article?  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([articleId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+/// ---------- Article Editor History (Audit Trail) ----------
+model ArticleEditorHistory {
+  id           String    @id @default(cuid())
+  articleId    String
+  editorId     String
+  assignedAt   DateTime  @default(now())
+  unassignedAt DateTime?
+  assignedBy   String    // Admin ID who made the assignment
+  reason       String?   // Optional reason for assignment/reassignment
+  status       String    @default("active") // "active", "reassigned", "completed"
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  article      Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  editor       User      @relation("EditorHistory", fields: [editorId], references: [id])
+  assignedByUser User    @relation("AssignedByHistory", fields: [assignedBy], references: [id])
+
+  @@index([articleId])
+  @@index([editorId])
+  @@index([assignedBy])
+  @@index([status])
+  @@index([assignedAt])
+}
+
+/// ---------- User Type Enum ----------
+enum UserType {
+  ADMIN
+  EDITOR
+  REVIEWER
+  USER
+}
+
+enum ArticleStatus {
+  PENDING_ADMIN_REVIEW
+  ASSIGNED_TO_EDITOR
+  EDITOR_EDITING
+  EDITOR_IN_PROGRESS
+  EDITOR_APPROVED
+  ASSIGNED_TO_REVIEWER
+  REVIEWER_EDITING
+  REVIEWER_IN_PROGRESS
+  REVIEWER_APPROVED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PUBLISHED
+}
+
+/// ---------- Content Type Enums ----------
+enum ContentType {
+  ARTICLE
+  DOCUMENT
+}
+
+enum DocumentType {
+  PDF
+  DOCX
+}
+
+enum DocumentStatus {
+  UPLOADED          // User uploaded PDF
+  PROCESSING        // Converting/watermarking
+  READY_FOR_EDIT    // Available for editor
+  EDITED            // Editor uploaded edited DOCX
+  PUBLISHED         // Admin published, text extracted
+}
+
+/// ---------- System/Site Settings ----------
+model SystemSettings {
+  id              String   @id @default(cuid())
+  key             String   @unique // e.g. "footer_content"
+  value           Json     // Stores structured data
+  updatedAt       DateTime @updatedAt
+  updatedBy       String?
+}
+
+/// ---------- Admin PDF Management ----------
+model AdminPdf {
+  id                String   @id @default(cuid())
+  title             String
+  shortDescription  String?
+  issue             String   // Month of upload (e.g., "January", "February")
+  volume            String   // Year of upload (e.g., "2026")
+  originalPdfUrl    String   // Clean PDF for admin access
+  watermarkedPdfUrl String   // Watermarked PDF for user preview
+  fileSize          BigInt   // File size in bytes
+  uploadedBy        String   // Admin user ID
+  uploadedAt        DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  isVisible         Boolean  @default(true) // Controls visibility on user side
+  
+  uploader          User     @relation("AdminPdfUploader", fields: [uploadedBy], references: [id])
+
+  @@index([uploadedBy])
+  @@index([isVisible])
+  @@index([volume, issue])
+  @@index([uploadedAt])
+}
+
+/// ---------- About Us Content Management ----------
+model AboutUs {
+  id        String   @id @default(cuid())
+  content   String   // Rich text content (HTML supported)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// ---------- Audit Events ----------
+model AuditEvent {
+  id                    String   @id @default(cuid())
+  eventType             String   // USER_UPLOAD, EDITOR_ASSIGN, etc.
+  eventDate             String   // "2026-01-21"
+  eventTime             String   // "09:30:15"
+  eventYear             Int      // 2026
+  userId                String
+  userName              String
+  userEmail             String
+  userOrganization      String
+  articleId             String
+  articleTitle          String
+  articleCategory       String
+  articleAuthor         String
+  targetEditorId        String?
+  targetEditorName      String?
+  previousEditorId      String?
+  previousEditorName    String?
+  decisionOutcome       String?  // PUBLISHED, REJECTED
+  editingDuration       String?  // "2 days, 5 hours, 15 minutes"
+  editingDurationDays   Int?     // For reviewer workflow
+  editingDurationHours  Int?     // For reviewer workflow  
+  editingDurationMinutes Int?    // For reviewer workflow
+  overrideReason        String?  // For admin override actions
+  overrideType          String?  // DIRECT_PUBLISH, BYPASS_EDITOR, etc.
+  createdAt             DateTime @default(now())
+
+  @@index([articleId, eventDate, eventTime])
+  @@index([userId, eventDate, eventTime])
+  @@index([eventType, eventDate, eventTime])
 }

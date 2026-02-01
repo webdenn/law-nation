@@ -2,14 +2,44 @@ import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 import { AuthService } from "./auth.service.js";
 import { type AuthRequest } from "@/types/auth-request.js";
+import { sendAuthNotification } from "@/utils/email.utils.js";
 import {
   loginSchema,
+  signupSchema,
   refreshSchema,
   logoutSchema,
+  sendOtpSchema,
+  verifyOtpSchema,
+  setupPasswordSchema,
 } from "./validators/auth.validator.js";
+import {
+  forgotPasswordSchema,
+  validateResetTokenSchema,
+  resetPasswordSchema,
+} from "./validators/password-reset.validator.js";
 import { UnauthorizedError } from "@/utils/http-errors.util.js";
 
-// /src/controllers/auth.controller.ts
+export async function signupHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = signupSchema.parse(req.body);
+    const result = await AuthService.signup(data);
+    sendAuthNotification(data.email, data.name);
+    return res.status(201).json(result);
+  } catch (err: any) {
+    if (err instanceof z.ZodError) {
+      // Use the first validation error message to be user-friendly
+      const errorMessage = err.issues[0]?.message || "Validation failed";
+      return res.status(400).json({ error: errorMessage });
+    }
+    next(err);
+  }
+}
+
+// --- LOGIN HANDLER (Signin) ---
 export async function loginHandler(
   req: Request,
   res: Response,
@@ -17,16 +47,38 @@ export async function loginHandler(
 ) {
   try {
     const data = loginSchema.parse(req.body);
-    const result = await AuthService.login(data.email, data.password, res);
+    const result = await AuthService.login(data.email, data.password, res, false);
     return res.json(result);
-  } catch (err) {
+  } catch (err: any) {
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ error: z.treeifyError(err) });
+      const errorMessage = err.issues[0]?.message || "Validation failed";
+      return res.status(400).json({ error: errorMessage });
     }
     next(err);
   }
 }
 
+export async function adminLoginHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = loginSchema.parse(req.body);
+    // Pass true to require admin/editor access
+    const result = await AuthService.login(data.email, data.password, res, true);
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: z.treeifyError(err) });
+    }
+
+
+    next(err);
+  }
+}
+
+// --- REFRESH HANDLER ---
 export async function refreshHandler(
   req: Request,
   res: Response,
@@ -45,6 +97,7 @@ export async function refreshHandler(
   }
 }
 
+// --- LOGOUT HANDLER ---
 export async function logoutHandler(
   req: Request,
   res: Response,
@@ -63,6 +116,7 @@ export async function logoutHandler(
   }
 }
 
+// --- ME HANDLER (Current User) ---
 export async function meHandler(
   req: AuthRequest,
   res: Response,
@@ -74,6 +128,117 @@ export async function meHandler(
     const result = await AuthService.getCurrentUser(req.user.id);
     return res.json(result);
   } catch (err) {
+    next(err);
+  }
+}
+
+// OTP handlers
+export async function sendOtpHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = sendOtpSchema.parse(req.body);
+    const result = await AuthService.sendVerificationOtp(data.email);
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: z.treeifyError(err) });
+    }
+    next(err);
+  }
+}
+
+export async function verifyOtpHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = verifyOtpSchema.parse(req.body);
+    const result = await AuthService.verifyOtp(data.email, data.otp);
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: z.treeifyError(err) });
+    }
+    next(err);
+  }
+}
+
+// Setup password handler (for editor invitation)
+export async function setupPasswordHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = setupPasswordSchema.parse(req.body);
+    const result = await AuthService.setupPassword(data.token, data.password);
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: z.treeifyError(err) });
+    }
+    next(err);
+  }
+}
+
+// Password reset handlers
+export async function forgotPasswordHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = forgotPasswordSchema.parse(req);
+    const result = await AuthService.requestPasswordReset(data.body.email);
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const errorMessage = err.issues[0]?.message || "Validation failed";
+      return res.status(400).json({ error: errorMessage });
+    }
+    next(err);
+  }
+}
+
+export async function validateResetTokenHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = validateResetTokenSchema.parse(req);
+    const result = await AuthService.validateResetToken(data.params.token);
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const errorMessage = err.issues[0]?.message || "Invalid token format";
+      return res.status(400).json({ error: errorMessage });
+    }
+    next(err);
+  }
+}
+
+export async function resetPasswordHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = resetPasswordSchema.parse(req);
+    const result = await AuthService.resetPassword(
+      data.body.token,
+      data.body.newPassword
+    );
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const errorMessage = err.issues[0]?.message || "Validation failed";
+      return res.status(400).json({ error: errorMessage });
+    }
     next(err);
   }
 }

@@ -1,0 +1,51 @@
+import { wrapInRedLayout } from "../shared/layout.template.js";
+
+export function reviewerAssignmentTemplate(
+  adminName: string,
+  reviewerName: string,
+  articleTitle: string,
+  articleId: string,
+  frontendUrl: string
+): string {
+  const subject = `Reviewer Assigned - ${articleTitle}`;
+  
+  const content = `
+    <div style="margin-bottom: 30px;">
+      <h2 style="color: #2c3e50; margin-bottom: 20px;">Reviewer Assignment Notification</h2>
+      
+      <p style="font-size: 16px; line-height: 1.6; margin-bottom: 15px;">
+        Dear Admin,
+      </p>
+      
+      <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+        A reviewer has been assigned to review an article after editor approval.
+      </p>
+      
+      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="color: #2c3e50; margin-bottom: 15px;">Assignment Details</h3>
+        <p style="margin: 8px 0;"><strong>Article:</strong> ${articleTitle}</p>
+        <p style="margin: 8px 0;"><strong>Assigned Reviewer:</strong> ${reviewerName}</p>
+        <p style="margin: 8px 0;"><strong>Status:</strong> Assigned to Reviewer</p>
+      </div>
+      
+      <div style="background-color: #e8f4fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 0; color: #1e40af;">
+          <strong>Next Steps:</strong> The reviewer will now review the editor's work and may make additional corrections before final approval.
+        </p>
+      </div>
+      
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${frontendUrl}/admin/articles/${articleId}" 
+           style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 500;">
+          View Article Details
+        </a>
+      </div>
+      
+      <p style="font-size: 14px; color: #6b7280; margin-top: 30px;">
+        This is an automated notification from the LAW NATION editorial system.
+      </p>
+    </div>
+  `;
+
+  return wrapInRedLayout(content);
+}

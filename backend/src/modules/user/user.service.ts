@@ -3,6 +3,8 @@ import type { CreateUserData } from "./types/create-user-data.type.js";
 import { prisma } from "@/db/db.js";
 import type { AuthUser } from "@/types/auth-request.js";
 import { NotFoundError, BadRequestError } from "@/utils/http-errors.util.js";
+import { VerificationService } from "@/utils/verification.utils.js";
+import { sendEditorInvitationEmail, sendReviewerInvitationEmail } from "@/utils/email.utils.js";
 
 const SALT = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
 
@@ -10,6 +12,10 @@ export const UserService = {
   createUser,
   listUsers,
   findUserById,
+  inviteEditor,
+  listEditors,
+  inviteReviewer,
+  listReviewers,
 };
 
 export default UserService;
@@ -96,5 +102,265 @@ async function findUserById(id: string, currentUser?: AuthUser) {
       email: user.email,
       roles: user.roles.map((r) => r.role),
     },
+  };
+}
+
+/**
+ * List all users who have the 'editor' role
+ */
+async function listEditors() {
+  const editors = await prisma.user.findMany({
+    where: {
+      roles: {
+        some: {
+          role: {
+            name: "editor",
+          },
+        },
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return editors;
+}
+
+/**
+ * List all users who have the 'reviewer' role
+ */
+async function listReviewers() {
+  const reviewers = await prisma.user.findMany({
+    where: {
+      roles: {
+        some: {
+          role: {
+            name: "reviewer",
+          },
+        },
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return reviewers;
+}
+
+/**
+ * Invite an editor - sends invitation email with password setup link
+ */
+async function inviteEditor(
+  data: { name: string; email: string },
+  currentUser?: AuthUser
+) {
+  const { name, email } = data;
+
+  console.log(`👤 [Invite Editor] Starting invitation process for: ${email}`);
+
+  // Check if user already exists
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (existingUser) {
+    console.log(`❌ [Invite Editor] User already exists: ${email}`);
+    throw new BadRequestError("User with this email already exists");
+  }
+
+  // Check if there's already a pending invitation
+  const existingInvitation = await prisma.emailVerification.findFirst({
+    where: {
+      email,
+      resourceType: "EDITOR_INVITE",
+      isVerified: false,
+    },
+  });
+
+  if (existingInvitation && new Date() < existingInvitation.ttl) {
+    console.log(
+      `⚠️ [Invite Editor] Pending invitation already exists for: ${email}`
+    );
+    throw new BadRequestError(
+      "An invitation has already been sent to this email. Please wait for it to expire or ask the editor to check their inbox."
+    );
+  }
+
+  // Get editor role
+  const editorRole = await prisma.role.findUnique({
+    where: { name: "editor" },
+  });
+
+  if (!editorRole) {
+    console.log(`❌ [Invite Editor] Editor role not found in database`);
+    throw new NotFoundError("Editor role not found. Please run database seed.");
+  }
+
+  console.log(`✅ [Invite Editor] Editor role found: ${editorRole.id}`);
+
+  // Create verification record with 48-hour TTL
+  console.log(`🔐 [Invite Editor] Creating verification token for: ${email}`);
+  const { token, expiresAt } =
+    await VerificationService.createVerificationRecord(
+      email,
+      "EDITOR_INVITE",
+      {
+        name,
+        email,
+        roleId: editorRole.id,
+      },
+      48 // 48 hours
+    );
+
+  console.log(
+    `✅ [Invite Editor] Verification token created: ${token.substring(
+      0,
+      10
+    )}...`
+  );
+  console.log(`⏰ [Invite Editor] Token expires at: ${expiresAt}`);
+
+  // Send invitation email
+  console.log(
+    `📧 [Invite Editor] Attempting to send invitation email to: ${email}`
+  );
+  console.log(
+    `🔗 [Invite Editor] Frontend URL: ${
+      process.env.FRONTEND_URL || "http://localhost:3000"
+    }`
+  );
+
+  try {
+    await sendEditorInvitationEmail(email, name, token);
+    console.log(
+      `✅ [Invite Editor] Invitation email sent successfully to: ${email}`
+    );
+  } catch (error) {
+    console.error(
+      `❌ [Invite Editor] Failed to send invitation email to: ${email}`
+    );
+    console.error(`❌ [Invite Editor] Error details:`, error);
+    throw error;
+  }
+
+  return {
+    success: true,
+    message: `Invitation sent to ${email}. The editor has 48 hours to set up their password.`,
+    expiresAt,
+  };
+}
+
+/**
+ * Invite a reviewer - sends invitation email with password setup link
+ */
+async function inviteReviewer(
+  data: { name: string; email: string },
+  currentUser?: AuthUser
+) {
+  const { name, email } = data;
+
+  console.log(`👤 [Invite Reviewer] Starting invitation process for: ${email}`);
+
+  // Check if user already exists
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (existingUser) {
+    console.log(`❌ [Invite Reviewer] User already exists: ${email}`);
+    throw new BadRequestError("User with this email already exists");
+  }
+
+  // Check if there's already a pending invitation
+  const existingInvitation = await prisma.emailVerification.findFirst({
+    where: {
+      email,
+      resourceType: "REVIEWER_INVITE",
+      isVerified: false,
+    },
+  });
+
+  if (existingInvitation && new Date() < existingInvitation.ttl) {
+    console.log(
+      `⚠️ [Invite Reviewer] Pending invitation already exists for: ${email}`
+    );
+    throw new BadRequestError(
+      "An invitation has already been sent to this email. Please wait for it to expire or ask the reviewer to check their inbox."
+    );
+  }
+
+  // Get reviewer role
+  const reviewerRole = await prisma.role.findUnique({
+    where: { name: "reviewer" },
+  });
+
+  if (!reviewerRole) {
+    console.log(`❌ [Invite Reviewer] Reviewer role not found in database`);
+    throw new NotFoundError("Reviewer role not found. Please run database seed.");
+  }
+
+  console.log(`✅ [Invite Reviewer] Reviewer role found: ${reviewerRole.id}`);
+
+  // Create verification record with 48-hour TTL
+  console.log(`🔐 [Invite Reviewer] Creating verification token for: ${email}`);
+  const { token, expiresAt } =
+    await VerificationService.createVerificationRecord(
+      email,
+      "REVIEWER_INVITE",
+      {
+        name,
+        email,
+        roleId: reviewerRole.id,
+      },
+      48 // 48 hours
+    );
+
+  console.log(
+    `✅ [Invite Reviewer] Verification token created: ${token.substring(
+      0,
+      10
+    )}...`
+  );
+  console.log(`⏰ [Invite Reviewer] Token expires at: ${expiresAt}`);
+
+  // Send invitation email
+  console.log(
+    `📧 [Invite Reviewer] Attempting to send invitation email to: ${email}`
+  );
+  console.log(
+    `🔗 [Invite Reviewer] Frontend URL: ${
+      process.env.FRONTEND_URL || "http://localhost:3000"
+    }`
+  );
+
+  try {
+    await sendReviewerInvitationEmail(email, name, token);
+    console.log(
+      `✅ [Invite Reviewer] Invitation email sent successfully to: ${email}`
+    );
+  } catch (error) {
+    console.error(
+      `❌ [Invite Reviewer] Failed to send invitation email to: ${email}`
+    );
+    console.error(`❌ [Invite Reviewer] Error details:`, error);
+    throw error;
+  }
+
+  return {
+    success: true,
+    message: `Invitation sent to ${email}. The reviewer has 48 hours to set up their password.`,
+    expiresAt,
   };
 }

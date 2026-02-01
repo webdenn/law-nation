@@ -1,0 +1,71 @@
+import { Router } from "express";
+import { requireAuth } from "@/middlewares/auth.middleware.js";
+import { requirePermission } from "@/middlewares/require-premission.middleware.js";
+import { adminDashboardController } from "./admin-dashboard.controller.js";
+import { AdminArticleVisibilityController } from "./controllers/admin-article-visibility.controller.js";
+import { validateRequest } from "./middlewares/validation.middleware.js";
+import { toggleVisibilitySchema, getHiddenArticlesSchema } from "./validators/admin-article-visibility.validator.js";
+import accessManagementRoutes from "./admin-access-management.route.js";
+import adminPdfRoutes from "./admin-pdf.route.js";
+import adminAboutRoutes from "./admin-about.route.js";
+
+const router = Router();
+const visibilityController = new AdminArticleVisibilityController();
+
+// All admin dashboard routes require authentication and admin permission
+router.use(requireAuth);
+router.use(requirePermission("admin", "read"));
+
+// Get overall summary
+router.get(
+  "/summary",
+  adminDashboardController.getSummary.bind(adminDashboardController)
+);
+
+// Get time metrics
+router.get(
+  "/time-metrics",
+  adminDashboardController.getTimeMetrics.bind(adminDashboardController)
+);
+
+// Get status distribution
+router.get(
+  "/status-distribution",
+  adminDashboardController.getStatusDistribution.bind(adminDashboardController)
+);
+
+// Get articles timeline
+router.get(
+  "/articles-timeline",
+  adminDashboardController.getArticlesTimeline.bind(adminDashboardController)
+);
+
+// Article visibility management routes
+router.patch(
+  "/articles/:id/visibility",
+  requirePermission("article", "update"),
+  validateRequest(toggleVisibilitySchema),
+  visibilityController.toggleVisibility
+);
+
+router.get(
+  "/articles/visibility/stats",
+  visibilityController.getVisibilityStats
+);
+
+router.get(
+  "/articles/hidden",
+  validateRequest(getHiddenArticlesSchema),
+  visibilityController.getHiddenArticles
+);
+
+// Access management routes
+router.use("/access-management", accessManagementRoutes);
+
+// Admin PDF management routes
+router.use("/pdfs", adminPdfRoutes);
+
+// Admin About Us management routes
+router.use("/about", adminAboutRoutes);
+
+export default router;

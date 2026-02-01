@@ -3,3 +3,16 @@ node_modules
 .env
 
 /src/generated/prisma
+
+# Uploaded files - don't commit user uploads
+uploads/
+uploads/**/*
+
+# Keep uploads directory structure but ignore contents
+!uploads/.gitkeep
+!uploads/temp/.gitkeep
+!uploads/pdfs/.gitkeep
+!uploads/words/.gitkeep
+!uploads/images/.gitkeep
+!uploads/editor-docs/.gitkeep
+!uploads/visual-diffs/.gitkeep
