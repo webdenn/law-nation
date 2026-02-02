@@ -32,20 +32,21 @@ export class ArticleQueryService {
 
     const skip = (page - 1) * limit;
 
-    const [articles, total] = await Promise.all([
-      prisma.article.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          assignedEditor: {
-            select: { id: true, name: true, email: true },
-          },
+   // Fetch data first to free up connection
+    const articles = await prisma.article.findMany({
+      where,
+      skip,
+      take: limit,
+      include: {
+        assignedEditor: {
+          select: { id: true, name: true, email: true },
         },
-        orderBy: { submittedAt: "desc" },
-      }),
-      prisma.article.count({ where }),
-    ]);
+      },
+      orderBy: { submittedAt: "desc" },
+    });
+
+    // Fetch count separately
+    const total = await prisma.article.count({ where });
 
     return {
       articles,
@@ -572,28 +573,29 @@ export class ArticleQueryService {
 
     const skip = (page - 1) * limit;
 
-    const [articles, total] = await Promise.all([
-      prisma.article.findMany({
-        where,
-        skip,
-        take: limit,
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          category: true,
-          abstract: true,
-          authorName: true,
-          authorOrganization: true,
-          keywords: true,
-          thumbnailUrl: true,
-          submittedAt: true,
-          approvedAt: true,
-        },
-        orderBy: { approvedAt: "desc" },
-      }),
-      prisma.article.count({ where }),
-    ]);
+   // Fetch data first
+    const articles = await prisma.article.findMany({
+      where,
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        category: true,
+        abstract: true,
+        authorName: true,
+        authorOrganization: true,
+        keywords: true,
+        thumbnailUrl: true,
+        submittedAt: true,
+        approvedAt: true,
+      },
+      orderBy: { approvedAt: "desc" },
+    });
+
+    // Fetch count separately
+    const total = await prisma.article.count({ where });
 
     return {
       articles,
@@ -619,31 +621,32 @@ export class ArticleQueryService {
 
     const skip = (page - 1) * limit;
 
-    const [articles, total] = await Promise.all([
-      prisma.article.findMany({
-        where,
-        skip,
-        take: limit,
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          category: true,
-          abstract: true,
-          authorName: true,
-          authorOrganization: true,
-          keywords: true,
-          thumbnailUrl: true,
-          submittedAt: true,
-          approvedAt: true,
-          isVisible: true, // Include visibility status for admin
-          hiddenAt: true,
-          hiddenBy: true,
-        },
-        orderBy: { approvedAt: "desc" },
-      }),
-      prisma.article.count({ where }),
-    ]);
+    // Fetch data first
+    const articles = await prisma.article.findMany({
+      where,
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        category: true,
+        abstract: true,
+        authorName: true,
+        authorOrganization: true,
+        keywords: true,
+        thumbnailUrl: true,
+        submittedAt: true,
+        approvedAt: true,
+        isVisible: true,
+        hiddenAt: true,
+        hiddenBy: true,
+      },
+      orderBy: { approvedAt: "desc" },
+    });
+
+    // Fetch count separately
+    const total = await prisma.article.count({ where });
 
     return {
       articles,
