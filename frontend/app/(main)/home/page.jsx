@@ -71,10 +71,10 @@ export default function HomePage() {
           params.append("category", currentFilters.category);
         }
 
-        url = `${NEXT_PUBLIC_BASE_URL}/api/articles/search?${params.toString()}`;
+        url = `${NEXT_PUBLIC_BASE_URL}/articles/search?${params.toString()}`;
       } else {
         // Normal Load (No Search)
-        url = `${NEXT_PUBLIC_BASE_URL}/api/articles/published`;
+        url = `${NEXT_PUBLIC_BASE_URL}/articles/published`;
       }
 
       console.log("Fetching URL:", url);
@@ -101,7 +101,7 @@ export default function HomePage() {
   // Fetch Banners Logic
   const fetchBanners = async () => {
     try {
-      const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/banners`);
+      const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/banners`);
       if (res.ok) {
         const data = await res.json();
         if (data.banners) {

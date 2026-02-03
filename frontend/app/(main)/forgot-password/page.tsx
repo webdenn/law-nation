@@ -22,7 +22,7 @@ export default function ForgotPassword() {
         setIsLoading(true);
 
         try {
-            const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/auth/forgot-password`, {
+            const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/auth/forgot-password`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, recaptchaToken: captchaToken }),

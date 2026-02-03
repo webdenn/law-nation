@@ -50,7 +50,7 @@
 //         recaptchaToken: captchaToken // 🔥 YAHAN ADD KARNA HAI
 //       };
 
-//       const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/auth/login`, {
+//       const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/auth/login`, {
 //         method: "POST",
 //         headers: { "Content-Type": "application/json" },
 //         body: JSON.stringify(payload), // Ab payload bhejo, sirf formData nahi
@@ -306,7 +306,7 @@ function LoginContent() {
         recaptchaToken: captchaToken 
       };
 
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/auth/login`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

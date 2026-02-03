@@ -54,7 +54,7 @@ export default function JoinUsPage() {
     setIsLoading(true)
     try {
       // Backend Send OTP Endpoint (Port 4000)
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/auth/send-otp`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/auth/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
@@ -92,7 +92,7 @@ export default function JoinUsPage() {
     setIsLoading(true)
     try {
       // 1. Verify OTP Call
-      const verifyResponse = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/auth/verify-otp`, {
+      const verifyResponse = await fetch(`${NEXT_PUBLIC_BASE_URL}/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email, otp: otp }),
@@ -116,7 +116,7 @@ export default function JoinUsPage() {
         recaptchaToken: captchaToken // Backend ko ye token chahiye
       }
 
-      const signupResponse = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/auth/signup`, {
+      const signupResponse = await fetch(`${NEXT_PUBLIC_BASE_URL}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

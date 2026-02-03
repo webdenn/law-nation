@@ -27,7 +27,11 @@ export default function Footer() {
   React.useEffect(() => {
     const fetchFooterSettings = async () => {
       try {
+<<<<<<< Updated upstream
         const res = await fetch(`${nextPublicApiUrl}/settings/footer`);
+=======
+        const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/settings/footer`);
+>>>>>>> Stashed changes
         const data = await res.json();
         if (data.success && data.settings) {
           setFooterContent({
