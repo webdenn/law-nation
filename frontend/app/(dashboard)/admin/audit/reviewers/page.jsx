@@ -18,8 +18,8 @@ export default function ReviewerAuditPage() {
     const fetchAuditEvents = async () => {
         try {
             const token = localStorage.getItem("adminToken");
-            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000";
-            const res = await fetch(`${baseUrl}/api/audit/events?type=REVIEWER`, {
+            const nextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL;
+            const res = await fetch(`${nextPublicApiUrl}/audit/events?type=REVIEWER`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             const data = await res.json();

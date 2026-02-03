@@ -17,7 +17,7 @@ import {
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
-  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000";
+  const nextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL;
 
   const [footerContent, setFooterContent] = React.useState({
     aboutText: "Bridging the gap between legal scholarship and global practice. We provide open-access research, peer-reviewed journals, and a platform for legal innovation. Connecting scholars, practitioners, and students to the future of law.",
@@ -27,7 +27,7 @@ export default function Footer() {
   React.useEffect(() => {
     const fetchFooterSettings = async () => {
       try {
-        const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/settings/footer`);
+        const res = await fetch(`${nextPublicApiUrl}/settings/footer`);
         const data = await res.json();
         if (data.success && data.settings) {
           setFooterContent({
