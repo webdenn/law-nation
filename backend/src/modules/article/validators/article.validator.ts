@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ArticleStatus } from "@prisma/client";
+import { ArticleStatus } from "@/db/db.js";
 
 export const articleSubmissionSchema = z.object({
   // Primary author (required)

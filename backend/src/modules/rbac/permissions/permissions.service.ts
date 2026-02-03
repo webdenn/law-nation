@@ -1,5 +1,4 @@
 import { prisma } from "@/db/db.js";
-import type { Prisma } from "@prisma/client";
 
 // src/modules/rbac/permissions/permission.service.ts
 

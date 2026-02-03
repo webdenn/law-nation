@@ -2,11 +2,11 @@ import { createRequire } from "module";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 
-// 1. Load CommonJS module
-const require = createRequire(import.meta.url);
+// RENAME 'require' to 'cjsRequire' to avoid conflict with global Node types
+const cjsRequire = createRequire(import.meta.url);
 
-// 2. Extract BOTH 'PrismaClient' AND 'Prisma' (the namespace)
-const { PrismaClient, Prisma } = require("@prisma/client");
+// Use the renamed variable
+const { PrismaClient, Prisma, ArticleStatus } = cjsRequire("@prisma/client");
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -19,5 +19,5 @@ const adapter = new PrismaPg(pool);
 
 export const prisma = new PrismaClient({ adapter });
 
-// 3. EXPORT 'Prisma' so other files can import it from here!
-export { Prisma };
+// Export the Runtime Values (Enums like ArticleStatus, runtime helpers)
+export { Prisma, ArticleStatus };

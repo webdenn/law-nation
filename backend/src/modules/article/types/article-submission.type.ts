@@ -1,4 +1,4 @@
-import type { ArticleStatus } from "@prisma/client";
+import type { ArticleStatus } from "@/db/db.js";
 
 export interface ArticleSubmissionData {
   authorName: string;
@@ -26,7 +26,7 @@ export interface ArticleVerificationMetadata extends ArticleSubmissionData {
 }
 
 export interface ArticleListFilters {
-  status?: ArticleStatus;
+  status?: typeof ArticleStatus;
   category?: string;
   authorEmail?: string;
   assignedEditorId?: string;
