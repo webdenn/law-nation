@@ -65,7 +65,7 @@ export default function AdminUploadIssuePage() {
         if (shortDescription) formData.append("shortDescription", shortDescription);
 
         try {
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/pdfs`, {
+            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/pdfs`, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}` },
                 body: formData

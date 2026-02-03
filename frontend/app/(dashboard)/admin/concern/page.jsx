@@ -29,7 +29,7 @@ export default function ConcernPage() {
         try {
             setIsLoading(true);
             const token = localStorage.getItem("adminToken");
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/articles/hidden`, {
+            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/articles/hidden`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -52,7 +52,7 @@ export default function ConcernPage() {
         try {
             const token = localStorage.getItem("adminToken");
             // We want to SHOW the article, so isVisible = true
-            const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/articles/${id}/visibility`, {
+            const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/articles/${id}/visibility`, {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",

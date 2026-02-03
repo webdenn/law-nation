@@ -58,7 +58,7 @@ export default function OurPeopleSettingsPage() {
             const token = localStorage.getItem("adminToken");
             // Note: We're still sending reviewers as an empty array or the existing one depending on the backend expectation.
             // Usually, if we want to remove them, we should send the updated state.
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/settings/our-people`, {
+            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/settings/our-people`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",

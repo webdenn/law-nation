@@ -55,10 +55,10 @@
 //         const params = new URLSearchParams();
 //         // Backend ko 'q' bhejo, wo title/author/keyword sab search karega
 //         params.append("q", query.trim());
-//         url = `${NEXT_PUBLIC_BASE_URL}/api/articles/search?${params.toString()}`;
+//         url = `${NEXT_PUBLIC_BASE_URL}/articles/search?${params.toString()}`;
 //       } else {
 //         // Warna saare published articles load karo
-//         url = `${NEXT_PUBLIC_BASE_URL}/api/articles/published`;
+//         url = `${NEXT_PUBLIC_BASE_URL}/articles/published`;
 //       }
 
 //       const res = await fetch(url);
@@ -305,9 +305,9 @@ function ArticlesContent() {
       if (query.trim()) {
         const params = new URLSearchParams();
         params.append("q", query.trim());
-        url = `${NEXT_PUBLIC_BASE_URL}/api/articles/search?${params.toString()}`;
+        url = `${NEXT_PUBLIC_BASE_URL}/articles/search?${params.toString()}`;
       } else {
-        url = `${NEXT_PUBLIC_BASE_URL}/api/articles/published`;
+        url = `${NEXT_PUBLIC_BASE_URL}/articles/published`;
       }
 
       const res = await fetch(url, { cache: "no-store" });

@@ -79,7 +79,7 @@ const RecentArticlesWidget = ({ currentSlug }) => {
     const fetchRecents = async () => {
       try {
         // Fetch published articles (using the same endpoint as Home)
-        const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/articles/published`);
+        const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/articles/published`);
         if (res.ok) {
           const data = await res.json();
           const list = data.results || data.articles || [];
@@ -153,7 +153,7 @@ export default function ArticlePage({ params }) {
 
         // ✅ API URL Fix: Backend dev ke mutabiq '/content' hata diya
         const res = await fetch(
-          `${NEXT_PUBLIC_BASE_URL}/api/articles/slug/${slug}/content`,
+          `${NEXT_PUBLIC_BASE_URL}/articles/slug/${slug}/content`,
           {
             method: "GET",
             headers: headers,
@@ -194,7 +194,7 @@ export default function ArticlePage({ params }) {
 
       // ✅ Database ID use karein kyunki slug se download nahi hota
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${article.id || article._id}/${endpoint}`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${article.id || article._id}/${endpoint}`,
         {
           method: "GET",
           headers: {

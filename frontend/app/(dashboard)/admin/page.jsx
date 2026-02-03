@@ -84,7 +84,7 @@ export default function AdminDashboard() {
       const token = localStorage.getItem("adminToken");
       const cb = Date.now(); // Unique timestamp
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/change-history?cb=${cb}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -405,12 +405,12 @@ export default function AdminDashboard() {
 
         const [summaryRes, metricsRes, statusRes, timelineRes, editorsRes, reviewersRes] =
           await Promise.all([
-            fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/summary?cb=${cb}`, { headers }),
-            fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/time-metrics?cb=${cb}`, { headers }),
-            fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/status-distribution?cb=${cb}`, { headers }),
-            fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/articles-timeline?limit=50&cb=${cb}`, { headers }),
-            fetch(`${NEXT_PUBLIC_BASE_URL}/api/users/editors?cb=${cb}`, { headers }),
-            fetch(`${NEXT_PUBLIC_BASE_URL}/api/users/reviewers?cb=${cb}`, { headers }), // ✅ Fetch Reviewers
+            fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/summary?cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/time-metrics?cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/status-distribution?cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/articles-timeline?limit=50&cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/users/editors?cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/users/reviewers?cb=${cb}`, { headers }), // ✅ Fetch Reviewers
           ]);
 
         // 1. Summary Data
@@ -523,7 +523,7 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem("adminToken");
       const response = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/assign-editor`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/assign-editor`,
         {
           method: "PATCH",
           headers: {
@@ -567,7 +567,7 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem("adminToken");
       const response = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/assign-reviewer`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/assign-reviewer`,
         {
           method: "PATCH",
           headers: {
@@ -625,7 +625,7 @@ export default function AdminDashboard() {
       formData.append("document", uploadedFile);
       if (uploadComment) formData.append("comments", uploadComment);
 
-      const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id}/upload-corrected`, {
+      const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/articles/${selectedArticle.id}/upload-corrected`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}` },
         body: formData
@@ -675,7 +675,7 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${id}/admin-publish`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${id}/admin-publish`,
         {
           method: "PATCH",
           headers: {
@@ -725,7 +725,7 @@ export default function AdminDashboard() {
       const token = localStorage.getItem("adminToken");
       const newVisibility = !currentVisibility;
 
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/articles/${id}/visibility`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/articles/${id}/visibility`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

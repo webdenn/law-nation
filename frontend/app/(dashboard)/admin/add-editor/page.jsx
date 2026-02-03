@@ -32,7 +32,7 @@ export default function AddEditorPage() {
     }
 
     try {
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/users/invite-editor`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/users/invite-editor`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

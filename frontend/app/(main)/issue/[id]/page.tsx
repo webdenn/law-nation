@@ -48,7 +48,7 @@ export default function IssueViewerPage() {
 
     const fetchPdfDetails = async (issueId: string) => {
         try {
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/public/admin-pdfs/${issueId}`);
+            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/public/admin-pdfs/${issueId}`);
             const data = await res.json();
 
             if (res.ok) {
@@ -102,7 +102,7 @@ export default function IssueViewerPage() {
         const adminToken = localStorage.getItem("adminToken");
         try {
             toast.info("Publishing updates...");
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/pdfs/${id}`, {
+            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/pdfs/${id}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
