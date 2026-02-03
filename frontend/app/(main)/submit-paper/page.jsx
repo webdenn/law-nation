@@ -286,14 +286,8 @@ export default function SubmitPaperPage() {
       data.append("recaptchaToken", captchaToken);
 
       const token = localStorage.getItem("authToken");
-<<<<<<< Updated upstream
       const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL;
       const response = await fetch(`${NEXT_PUBLIC_API_URL}/articles/submit-with-images`, {
-=======
-      const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
-
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/articles/submit-with-images`, {
->>>>>>> Stashed changes
         method: "POST",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -347,12 +341,7 @@ export default function SubmitPaperPage() {
     setIsLoading(true);
 
     try {
-<<<<<<< Updated upstream
       const API_URL = process.env.NEXT_PUBLIC_API_URL;
-=======
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/articles";
->>>>>>> Stashed changes
 
       const res = await fetch(`${API_URL}/articles/verify-code`, {
         method: "POST",

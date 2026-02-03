@@ -28,11 +28,7 @@ export default function BannerManagementPage() {
 
     const fetchBanners = async () => {
         try {
-<<<<<<< Updated upstream
             const res = await fetch(`${nextPublicApiUrl}/banners`);
-=======
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/banners`);
->>>>>>> Stashed changes
             if (res.ok) {
                 const data = await res.json();
                 setBanners(data.banners || []);
@@ -62,11 +58,7 @@ export default function BannerManagementPage() {
 
         try {
             const token = localStorage.getItem("adminToken");
-<<<<<<< Updated upstream
             const res = await fetch(`${nextPublicApiUrl}/banners`, {
-=======
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/banners`, {
->>>>>>> Stashed changes
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -96,11 +88,7 @@ export default function BannerManagementPage() {
 
         try {
             const token = localStorage.getItem("adminToken");
-<<<<<<< Updated upstream
             const res = await fetch(`${nextPublicApiUrl}/banners/${id}`, {
-=======
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/banners/${id}`, {
->>>>>>> Stashed changes
                 method: "DELETE",
                 headers: {
                     Authorization: `Bearer ${token}`,

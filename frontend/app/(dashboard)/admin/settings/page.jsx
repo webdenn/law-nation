@@ -26,11 +26,7 @@ export default function FooterSettingsPage() {
 
     const fetchSettings = async () => {
         try {
-<<<<<<< Updated upstream
             const res = await fetch(`${nextPublicApiUrl}/settings/footer`);
-=======
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/settings/footer`);
->>>>>>> Stashed changes
             const data = await res.json();
             if (data.success && data.settings) {
                 setAboutText(data.settings.aboutText || "");
@@ -49,11 +45,7 @@ export default function FooterSettingsPage() {
         setSaving(true);
         try {
             const token = localStorage.getItem("adminToken");
-<<<<<<< Updated upstream
             const res = await fetch(`${nextPublicApiUrl}/settings/footer`, {
-=======
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/settings/footer`, {
->>>>>>> Stashed changes
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",

@@ -39,11 +39,7 @@ export default function OurPeopleSettingsPage() {
 
     const fetchSettings = async () => {
         try {
-<<<<<<< Updated upstream
             const res = await fetch(`${nextPublicApiUrl}/settings/our-people`);
-=======
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/settings/our-people`);
->>>>>>> Stashed changes
             const data = await res.json();
             if (data.success && data.settings) {
                 setTeamMembers(Array.isArray(data.settings.teamMembers) ? data.settings.teamMembers : []);
@@ -101,19 +97,11 @@ export default function OurPeopleSettingsPage() {
         try {
             const token = localStorage.getItem("adminToken");
             // First fetch current to get reviewers
-<<<<<<< Updated upstream
             const getRes = await fetch(`${nextPublicApiUrl}/settings/our-people`);
             const getData = await getRes.json();
             const currentReviewers = getData.success && getData.settings ? getData.settings.reviewers : [];
 
             const res = await fetch(`${nextPublicApiUrl}/settings/our-people`, {
-=======
-            const getRes = await fetch(`${NEXT_PUBLIC_BASE_URL}/settings/our-people`);
-            const getData = await getRes.json();
-            const currentReviewers = getData.success && getData.settings ? getData.settings.reviewers : [];
-
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/settings/our-people`, {
->>>>>>> Stashed changes
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",

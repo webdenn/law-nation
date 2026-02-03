@@ -13,11 +13,7 @@ export default function AboutPage() {
   useEffect(() => {
     const fetchAbout = async () => {
       try {
-<<<<<<< Updated upstream
         const res = await fetch(`${nextPublicApiUrl}/about`);
-=======
-        const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/about`);
->>>>>>> Stashed changes
         const result = await res.json();
         if (result.success && result.data && result.data.content) {
           const parser = new DOMParser();
