@@ -345,7 +345,7 @@ export default function SubmitPaperPage() {
       const API_URL =
         process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/articles";
 
-      const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/verify-code`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/verify-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
