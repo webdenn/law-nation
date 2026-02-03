@@ -1,7 +1,13 @@
-// /src/db/db.ts
-import { PrismaClient } from "@prisma/client";
+import { createRequire } from "module";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
+
+// --- THE FIX START ---
+// We create a 'require' function to load the CommonJS Prisma Client
+// This bypasses the "Named export 'PrismaClient' not found" error
+const require = createRequire(import.meta.url);
+const { PrismaClient } = require("@prisma/client");
+// --- THE FIX END ---
 
 const connectionString = process.env.DATABASE_URL;
 
