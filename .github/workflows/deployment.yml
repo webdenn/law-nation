@@ -1,7 +1,8 @@
-name: Deploy Law-Nation Fullstack
+name: Deploy to AWS
+
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
 
 jobs:
   deploy:
@@ -10,60 +11,72 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # --- 1. Frontend Build (Standalone) ---
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
+
+      # --- BUILD FRONTEND ---
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
       - name: Build Frontend
         working-directory: ./frontend
+        run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: /api
+          # These env vars are needed at build time for Next.js
           NEXT_PUBLIC_BASE_URL: /api
-        run: |
-          npm ci
-          npm run build
-          # Prepare standalone assets
-          cp -r public .next/standalone/public
-          mkdir -p .next/standalone/.next/static
-          cp -r .next/static/* .next/standalone/.next/static/
-          cd .next/standalone && tar -czf ../../../frontend-release.tar.gz .
+          NEXT_PUBLIC_API_URL: /api
+          NEXT_PUBLIC_RECAPTCHA_SITE_KEY: 6LcC-14sAAAAAC_Q30dcv0nnNhPFnGA-D2bxppVC
 
-      # --- 2. Backend Build (TypeScript Compilation) ---
-      - name: Build Backend
+      # --- PREPARE BACKEND ---
+      - name: Install Backend Dependencies
         working-directory: ./backend
-        run: |
-          npm ci
-          npm run build  # This must run 'tsc' to create a 'dist' or 'build' folder
-          # Package the compiled JS and production node_modules
-          # Assuming your compiled files are in 'dist'
-          tar -czf ../backend-release.tar.gz dist package.json package-lock.json
+        run: npm ci --omit=dev
 
-      # --- 3. Deployment to EC2 ---
+      # --- DEPLOY TO SERVER ---
+# ... previous steps ...
+
       - name: Deploy to EC2
-        run: |
-          # Configure SSH
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts
+        uses: easingthemes/ssh-deploy@main
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_KEY }}
+          REMOTE_HOST: ${{ secrets.EC2_HOST }}
+          REMOTE_USER: ${{ secrets.EC2_USER }}
+          TARGET: "/var/www/law-nation/"
+          SOURCE: "./"
+          # Exclude node_modules from the upload. We will install them on the server.
+          # This makes the upload much faster.
+          EXCLUDE: "/.git/, /frontend/node_modules/, /backend/node_modules/"
 
-          # Upload Artifacts
-          scp frontend-release.tar.gz backend-release.tar.gz ubuntu@${{ vars.SERVER_HOST }}:/home/ubuntu/
+      - name: Post Deploy Steps
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            # --- FRONTEND STEPS (As discussed before) ---
+            APP_ROOT="/var/www/law-nation/frontend"
+            STANDALONE_DIR="$APP_ROOT/.next/standalone/frontend"
+            sudo chown -R ubuntu:ubuntu /var/www/law-nation
+            
+            mkdir -p $STANDALONE_DIR/public
+            cp -r $APP_ROOT/public/* $STANDALONE_DIR/public/
+            mkdir -p $STANDALONE_DIR/.next/static
+            cp -r $APP_ROOT/.next/static/* $STANDALONE_DIR/.next/static/
 
-          ssh ubuntu@${{ vars.SERVER_HOST }} '
-            # --- Setup Backend ---
-            sudo systemctl stop backend.service || true
-            sudo rm -rf /home/ubuntu/law-nation/backend/*
-            sudo tar -xzf /home/ubuntu/backend-release.tar.gz -C /home/ubuntu/law-nation/backend/
-            cd /home/ubuntu/law-nation/backend/ && npm ci --production
+            # --- BACKEND STEPS (The important part for you) ---
+            echo "Installing Backend Dependencies..."
+            cd /var/www/law-nation/backend
             
-            # --- Setup Frontend ---
-            sudo systemctl stop law-nation.service || true
-            sudo rm -rf /var/www/law-nation/law-nation/*
-            sudo tar -xzf /home/ubuntu/frontend-release.tar.gz -C /var/www/law-nation/law-nation/
-            
-            # --- Permissions & Restart ---
-            sudo chown -R ubuntu:ubuntu /var/www/law-nation/law-nation/
-            sudo systemctl daemon-reload
-            sudo systemctl start backend.service
-            sudo systemctl start law-nation.service
-            
-            rm /home/ubuntu/frontend-release.tar.gz /home/ubuntu/backend-release.tar.gz
-          '
+            # This installs only production dependencies (ignoring devTools like nodemon/eslint)
+            # This keeps your server clean and fast.
+            npm ci --omit=dev
+
+            # --- RESTART SERVICES ---
+            sudo systemctl restart law-backend
+            sudo systemctl restart law-frontend
