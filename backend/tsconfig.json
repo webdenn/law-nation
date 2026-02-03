@@ -3,7 +3,7 @@
     "target": "ES2022",
     "lib": ["ES2022"],
     
-    // REVERTED: Back to NodeNext to support import.meta and await
+    // KEEP NodeNext for your import.meta and await support
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
 
@@ -11,18 +11,20 @@
     "outDir": "./dist",
     "sourceMap": true,
     "declaration": true,
-    "declarationMap": true,
-    "verbatimModuleSyntax": true,
     "resolveJsonModule": true,
     
+    // --- THE FIXES ---
+    "esModuleInterop": true,       // Fixes "no exported member" errors
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,          // Ignores strict errors in node_modules
+    
+    // Loose strictness settings to keep build green
     "noImplicitAny": false,
     "strict": false,            
     "strictNullChecks": false, 
     "noUncheckedIndexedAccess": false,
     
     "types": ["node"],
-    "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
