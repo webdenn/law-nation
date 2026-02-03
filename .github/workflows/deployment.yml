@@ -78,5 +78,5 @@ jobs:
             npm ci --omit=dev
 
             # --- RESTART SERVICES ---
-            sudo systemctl restart law-backend
-            sudo systemctl restart law-frontend
+            sudo systemctl restart backend.service
+            sudo systemctl restart law-nation
