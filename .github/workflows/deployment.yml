@@ -30,6 +30,7 @@ jobs:
           NEXT_PUBLIC_BASE_URL: /api
           NEXT_PUBLIC_API_URL: /api
           NEXT_PUBLIC_RECAPTCHA_SITE_KEY: 6LcC-14sAAAAAC_Q30dcv0nnNhPFnGA-D2bxppVC
+          DATABASE_URL: postgresql://postgres.anxggunphccvysvvignw:Aman%40%40123%40123@aws-1-ap-south-1.pooler.supabase.com:6543/postgres
 
       # --- BUILD BACKEND (On GitHub - NEW STEP) ---
       - name: Install Backend Dependencies
