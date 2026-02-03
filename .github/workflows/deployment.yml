@@ -67,7 +67,11 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            # 1. Fix Permissions
+            # --- 1. CRITICAL FIX: ADD NODE TO PATH ---
+            # Manually add the NVM node binary path so 'npm' and 'npx' work
+            export PATH=/home/ubuntu/.nvm/versions/node/v22.22.0/bin:$PATH
+
+            # 2. Fix Permissions
             sudo chown -R ubuntu:ubuntu /var/www/law-nation
 
             # --- FRONTEND STEPS ---
@@ -83,28 +87,24 @@ jobs:
             echo "Setting up Backend..."
             cd /var/www/law-nation/backend
             
-            # 2. Install Dependencies (Production only)
-            # We use --ignore-scripts to prevent any automatic postinstall scripts 
-            # from running and failing (since env vars aren't ready yet).
+            # 3. Install Dependencies
+            echo "Installing dependencies..."
             npm ci --omit=dev --ignore-scripts
 
-            # 3. SETUP ENV & GENERATE PRISMA
+            # 4. SETUP ENV & GENERATE PRISMA
             echo "Copying environment file..."
-            # Copy the system env file to a local .env file so Prisma finds it automatically
             cp /home/ubuntu/production/app.env .env
 
             echo "Generating Prisma Client..."
-            # We use npx --yes to bypass "Do you want to install..." prompts
             npx --yes prisma generate
 
-            # 4. VERIFICATION (Optional but helpful debug)
+            # 5. VERIFICATION
             if [ -d "node_modules/.prisma" ]; then
                 echo "✅ Prisma Client generated successfully."
             else
                 echo "❌ Prisma Client generation FAILED."
                 exit 1
             fi
-
             # --- RESTART SERVICES ---
             sudo systemctl restart backend.service
             sudo systemctl restart law-nation
