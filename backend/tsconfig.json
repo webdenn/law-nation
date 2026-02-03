@@ -4,26 +4,19 @@
     "lib": [
       "ES2022"
     ],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    // CHANGED: Use CommonJS for maximum compatibility
+    "module": "commonjs",
+    "moduleResolution": "node",
     "rootDir": "./src",
     "outDir": "./dist",
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
-    "verbatimModuleSyntax": true,
     "resolveJsonModule": true,
     "noImplicitAny": false,
     "strict": false,
     "strictNullChecks": false,
-    "noUncheckedIndexedAccess": false,
-    "exactOptionalPropertyTypes": false,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "types": [
-      "node"
-    ],
-    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true, // ENSURE THIS IS TRUE
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
