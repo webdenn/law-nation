@@ -71,24 +71,28 @@ jobs:
             # 1. Fix Permissions
             sudo chown -R ubuntu:ubuntu /var/www/law-nation
 
-            # --- FRONTEND FINISHING ---
+            # --- FRONTEND STEPS ---
             APP_ROOT="/var/www/law-nation/frontend"
             STANDALONE_DIR="$APP_ROOT/.next/standalone/frontend"
             
-            # Copy public/static to standalone (files were transferred by rsync)
+            # Copy public/static assets
             mkdir -p $STANDALONE_DIR/public
             cp -r $APP_ROOT/public/* $STANDALONE_DIR/public/ || true
             mkdir -p $STANDALONE_DIR/.next/static
             cp -r $APP_ROOT/.next/static/* $STANDALONE_DIR/.next/static/ || true
 
-            # --- BACKEND FINISHING ---
+            # --- BACKEND STEPS ---
             echo "Setting up Backend..."
             cd /var/www/law-nation/backend
             
-            # LIGHTWEIGHT INSTALL
-            # We only install 'dependencies' (express, etc). 
-            # We SKIP 'devDependencies' (typescript, types) because build is already done!
+            # 1. Install Production Dependencies
             npm ci --omit=dev
+
+            # 2. GENERATE PRISMA CLIENT (The Missing Step!)
+            # We source the environment variables so Prisma can see DATABASE_URL
+            echo "Generating Prisma Client..."
+            export $(cat /home/ubuntu/production/app.env | xargs) && npx --yes prisma generate
+
             # --- RESTART SERVICES ---
             sudo systemctl restart backend.service
             sudo systemctl restart law-nation
