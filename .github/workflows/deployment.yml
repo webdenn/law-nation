@@ -1,4 +1,4 @@
-name: Deploy Law-Nation Fullstack
+name: Deploy Law-Nation
 on:
   push:
     branches: [ "main" ]
