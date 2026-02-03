@@ -18,7 +18,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: '**/package-lock.json'
 
-      # --- BUILD FRONTEND (On GitHub) ---
+      # --- 1. BUILD FRONTEND (Standard) ---
       - name: Install Frontend Dependencies
         working-directory: ./frontend
         run: npm ci
@@ -31,24 +31,30 @@ jobs:
           NEXT_PUBLIC_API_URL: /api
           NEXT_PUBLIC_RECAPTCHA_SITE_KEY: 6LcC-14sAAAAAC_Q30dcv0nnNhPFnGA-D2bxppVC
 
-      # --- BUILD BACKEND (On GitHub - NEW STEP) ---
+      # --- 2. BUILD BACKEND (The Heavy Lifting) ---
       - name: Install Backend Dependencies
         working-directory: ./backend
         run: npm ci
 
-      - name: Build Backend
+      - name: Build Backend & Generate Prisma
         working-directory: ./backend
+        # We use dummy env vars just to satisfy the build process
         env:
-          DATABASE_URL: dummy
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
           JWT_SECRET: "dummy"
-          DIRECT_URL: dummy
+          DIRECT_URL: "dummy"
         run: |
+          # Generate Prisma Client (Creates files inside node_modules)
           npx prisma generate
+          
+          # Compile TypeScript to JavaScript (dist folder)
           npm run build
-        # This creates the 'dist' (or 'build') folder inside ./backend
-        # We do NOT prune dependencies here because we aren't transferring node_modules
+          
+          # CRITICAL: Remove devDependencies (TypeScript, etc) to shrink size
+          # This leaves only what is needed to run the app
+          npm prune --production
 
-# --- DEPLOY TO SERVER ---
+      # --- 3. TRANSFER FILES ---
       - name: Deploy to EC2
         uses: easingthemes/ssh-deploy@main
         env:
@@ -57,9 +63,11 @@ jobs:
           REMOTE_USER: ${{ secrets.EC2_USER }}
           TARGET: "/var/www/law-nation/"
           SOURCE: "./"
-          # We exclude src/ but ensure prisma/ folder transfers so we have the schema
-          EXCLUDE: "/.git/, /frontend/node_modules/, /backend/node_modules/, /backend/src/"
+          # NOTE: We do NOT exclude backend/node_modules anymore!
+          # We transfer the pre-built, pruned modules.
+          EXCLUDE: "/.git/, /frontend/node_modules/, /backend/src/"
 
+      # --- 4. RESTART SERVER (Zero CPU usage) ---
       - name: Post Deploy Steps
         uses: appleboy/ssh-action@master
         with:
@@ -67,14 +75,10 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            # --- 1. CRITICAL FIX: ADD NODE TO PATH ---
-            # Manually add the NVM node binary path so 'npm' and 'npx' work
-            export PATH=/home/ubuntu/.nvm/versions/node/v22.22.0/bin:$PATH
-
-            # 2. Fix Permissions
+            # Fix Permissions
             sudo chown -R ubuntu:ubuntu /var/www/law-nation
 
-            # --- FRONTEND STEPS ---
+            # --- FRONTEND SETUP ---
             APP_ROOT="/var/www/law-nation/frontend"
             STANDALONE_DIR="$APP_ROOT/.next/standalone/frontend"
             
@@ -83,28 +87,15 @@ jobs:
             mkdir -p $STANDALONE_DIR/.next/static
             cp -r $APP_ROOT/.next/static/* $STANDALONE_DIR/.next/static/ || true
 
-            # --- BACKEND STEPS ---
-            echo "Setting up Backend..."
+            # --- BACKEND SETUP ---
             cd /var/www/law-nation/backend
             
-            # 3. Install Dependencies
-            echo "Installing dependencies..."
-            npm ci --omit=dev --ignore-scripts
-
-            # 4. SETUP ENV & GENERATE PRISMA
+            # COPY ENV FILE (Crucial for runtime)
+            # We don't run npm install or prisma generate here anymore!
             echo "Copying environment file..."
             cp /home/ubuntu/production/app.env .env
 
-            echo "Generating Prisma Client..."
-            npx --yes prisma generate
-
-            # 5. VERIFICATION
-            if [ -d "node_modules/.prisma" ]; then
-                echo "✅ Prisma Client generated successfully."
-            else
-                echo "❌ Prisma Client generation FAILED."
-                exit 1
-            fi
             # --- RESTART SERVICES ---
+            echo "Restarting services..."
             sudo systemctl restart backend.service
-            sudo systemctl restart law-nation
+            sudo systemctl restart law-nation.service
