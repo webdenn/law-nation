@@ -48,7 +48,7 @@ jobs:
         # This creates the 'dist' (or 'build') folder inside ./backend
         # We do NOT prune dependencies here because we aren't transferring node_modules
 
-      # --- DEPLOY TO SERVER ---
+# --- DEPLOY TO SERVER ---
       - name: Deploy to EC2
         uses: easingthemes/ssh-deploy@main
         env:
@@ -57,8 +57,7 @@ jobs:
           REMOTE_USER: ${{ secrets.EC2_USER }}
           TARGET: "/var/www/law-nation/"
           SOURCE: "./"
-          # 1. We EXCLUDE node_modules (too big, OS-specific)
-          # 2. We INCLUDE 'dist' (it is not excluded, so it will transfer!)
+          # We exclude src/ but ensure prisma/ folder transfers so we have the schema
           EXCLUDE: "/.git/, /frontend/node_modules/, /backend/node_modules/, /backend/src/"
 
       - name: Post Deploy Steps
@@ -75,7 +74,6 @@ jobs:
             APP_ROOT="/var/www/law-nation/frontend"
             STANDALONE_DIR="$APP_ROOT/.next/standalone/frontend"
             
-            # Copy public/static assets
             mkdir -p $STANDALONE_DIR/public
             cp -r $APP_ROOT/public/* $STANDALONE_DIR/public/ || true
             mkdir -p $STANDALONE_DIR/.next/static
@@ -85,13 +83,27 @@ jobs:
             echo "Setting up Backend..."
             cd /var/www/law-nation/backend
             
-            # 1. Install Production Dependencies
-            npm ci --omit=dev
+            # 2. Install Dependencies (Production only)
+            # We use --ignore-scripts to prevent any automatic postinstall scripts 
+            # from running and failing (since env vars aren't ready yet).
+            npm ci --omit=dev --ignore-scripts
 
-            # 2. GENERATE PRISMA CLIENT (The Missing Step!)
-            # We source the environment variables so Prisma can see DATABASE_URL
+            # 3. SETUP ENV & GENERATE PRISMA
+            echo "Copying environment file..."
+            # Copy the system env file to a local .env file so Prisma finds it automatically
+            cp /home/ubuntu/production/app.env .env
+
             echo "Generating Prisma Client..."
-            export $(cat /home/ubuntu/production/app.env | xargs) && npx --yes prisma generate
+            # We use npx --yes to bypass "Do you want to install..." prompts
+            npx --yes prisma generate
+
+            # 4. VERIFICATION (Optional but helpful debug)
+            if [ -d "node_modules/.prisma" ]; then
+                echo "✅ Prisma Client generated successfully."
+            else
+                echo "❌ Prisma Client generation FAILED."
+                exit 1
+            fi
 
             # --- RESTART SERVICES ---
             sudo systemctl restart backend.service
