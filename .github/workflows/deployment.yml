@@ -38,7 +38,9 @@ jobs:
 
       - name: Build Backend
         working-directory: ./backend
-        run: npm run build
+        run: |
+          npx prisma generate
+          npm run build
         # This creates the 'dist' (or 'build') folder inside ./backend
         # We do NOT prune dependencies here because we aren't transferring node_modules
 
