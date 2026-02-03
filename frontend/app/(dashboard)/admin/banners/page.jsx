@@ -7,7 +7,8 @@ import AdminSidebar from "../../../components/AdminSidebar";
 
 export default function BannerManagementPage() {
     const router = useRouter();
-    const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000";
+    const nextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const nextPublicBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
     const [banners, setBanners] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -27,7 +28,7 @@ export default function BannerManagementPage() {
 
     const fetchBanners = async () => {
         try {
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/banners`);
+            const res = await fetch(`${nextPublicApiUrl}/banners`);
             if (res.ok) {
                 const data = await res.json();
                 setBanners(data.banners || []);
@@ -57,7 +58,7 @@ export default function BannerManagementPage() {
 
         try {
             const token = localStorage.getItem("adminToken");
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/banners`, {
+            const res = await fetch(`${nextPublicApiUrl}/banners`, {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -87,7 +88,7 @@ export default function BannerManagementPage() {
 
         try {
             const token = localStorage.getItem("adminToken");
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/banners/${id}`, {
+            const res = await fetch(`${nextPublicApiUrl}/banners/${id}`, {
                 method: "DELETE",
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -177,7 +178,7 @@ export default function BannerManagementPage() {
                                 <div key={banner.id} className="group relative bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition">
                                     <div className="aspect-video bg-gray-100 relative">
                                         <img
-                                            src={banner.imageUrl.startsWith("http") ? banner.imageUrl : `${NEXT_PUBLIC_BASE_URL}${banner.imageUrl}`}
+                                            src={banner.imageUrl.startsWith("http") ? banner.imageUrl : `${nextPublicBaseUrl}${banner.imageUrl}`}
                                             alt={banner.title}
                                             className="w-full h-full object-cover"
                                         />

@@ -8,12 +8,12 @@ export default function AboutPage() {
     mission: 'We are committed to significantly improving the lives of people by inducing motivation to legal knowledge, making it accessible to everyone and demystifying the law to make it a meaningful part of everyday life such that the real function of law which is to bring fundamental rights to everyone becomes a reality.'
   });
   const [loading, setLoading] = useState(true);
-  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000";
+  const nextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
     const fetchAbout = async () => {
       try {
-        const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/about`);
+        const res = await fetch(`${nextPublicApiUrl}/about`);
         const result = await res.json();
         if (result.success && result.data && result.data.content) {
           const parser = new DOMParser();
@@ -57,7 +57,7 @@ export default function AboutPage() {
         />
 
         {/* Dynamic Lead Text */}
-        <p className="text-xl md:text-2xl text-gray-500 leading-relaxed border-l-[1px] border-red-700 pl-8 mb-20 max-w-3xl about-lead-text">
+        <p className="text-xl md:text-2xl text-gray-500 leading-relaxed border-l border-red-700 pl-8 mb-20 max-w-3xl about-lead-text">
           {data.lead}
         </p>
 

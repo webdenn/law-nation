@@ -7,7 +7,7 @@ import AdminSidebar from "../../../../components/AdminSidebar";
 
 export default function AboutSettingsPage() {
     const router = useRouter();
-    const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000";
+    const nextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL;
 
     const [heading, setHeading] = useState("");
     const [lead, setLead] = useState("");
@@ -29,7 +29,7 @@ export default function AboutSettingsPage() {
     const fetchAboutContent = async () => {
         try {
             const token = localStorage.getItem("adminToken");
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/about`, {
+            const res = await fetch(`${nextPublicApiUrl}/admin/dashboard/about`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -70,7 +70,7 @@ export default function AboutSettingsPage() {
 
         try {
             const token = localStorage.getItem("adminToken");
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/about`, {
+            const res = await fetch(`${nextPublicApiUrl}/admin/dashboard/about`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
