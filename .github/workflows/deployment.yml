@@ -1,0 +1,69 @@
+name: Deploy Law-Nation Fullstack
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # --- 1. Frontend Build (Standalone) ---
+      - name: Build Frontend
+        working-directory: ./frontend
+        env:
+          NEXT_PUBLIC_API_URL: /api
+          NEXT_PUBLIC_BASE_URL: /api
+        run: |
+          npm ci
+          npm run build
+          # Prepare standalone assets
+          cp -r public .next/standalone/public
+          mkdir -p .next/standalone/.next/static
+          cp -r .next/static/* .next/standalone/.next/static/
+          cd .next/standalone && tar -czf ../../../frontend-release.tar.gz .
+
+      # --- 2. Backend Build (TypeScript Compilation) ---
+      - name: Build Backend
+        working-directory: ./backend
+        run: |
+          npm ci
+          npm run build  # This must run 'tsc' to create a 'dist' or 'build' folder
+          # Package the compiled JS and production node_modules
+          # Assuming your compiled files are in 'dist'
+          tar -czf ../backend-release.tar.gz dist package.json package-lock.json
+
+      # --- 3. Deployment to EC2 ---
+      - name: Deploy to EC2
+        run: |
+          # Configure SSH
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+          # Upload Artifacts
+          scp frontend-release.tar.gz backend-release.tar.gz ubuntu@${{ vars.SERVER_HOST }}:/home/ubuntu/
+
+          ssh ubuntu@${{ vars.SERVER_HOST }} '
+            # --- Setup Backend ---
+            sudo systemctl stop backend.service || true
+            sudo rm -rf /home/ubuntu/law-nation/backend/*
+            sudo tar -xzf /home/ubuntu/backend-release.tar.gz -C /home/ubuntu/law-nation/backend/
+            cd /home/ubuntu/law-nation/backend/ && npm ci --production
+            
+            # --- Setup Frontend ---
+            sudo systemctl stop law-nation.service || true
+            sudo rm -rf /var/www/law-nation/law-nation/*
+            sudo tar -xzf /home/ubuntu/frontend-release.tar.gz -C /var/www/law-nation/law-nation/
+            
+            # --- Permissions & Restart ---
+            sudo chown -R ubuntu:ubuntu /var/www/law-nation/law-nation/
+            sudo systemctl daemon-reload
+            sudo systemctl start backend.service
+            sudo systemctl start law-nation.service
+            
+            rm /home/ubuntu/frontend-release.tar.gz /home/ubuntu/backend-release.tar.gz
+          '
