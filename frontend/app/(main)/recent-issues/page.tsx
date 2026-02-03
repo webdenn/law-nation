@@ -29,7 +29,7 @@ export default function RecentIssuesPage() {
 
     const fetchIssues = async () => {
         try {
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/public/admin-pdfs`);
+            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/public/admin-pdfs`);
             const data = await res.json();
             if (res.ok) {
                 // The backend returns { success: true, data: { pdfs: [...], total: ... } }

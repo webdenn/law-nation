@@ -36,7 +36,7 @@ export default function StaffPage() {
         const token = localStorage.getItem("adminToken");
         try {
             if (activeTab === "editors") {
-                const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/access-management/editors`, {
+                const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/access-management/editors`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (res.ok) {
@@ -47,7 +47,7 @@ export default function StaffPage() {
                     toast.error("Failed to fetch editors");
                 }
             } else {
-                const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/access-management/reviewers`, {
+                const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/access-management/reviewers`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (res.ok) {
@@ -79,7 +79,7 @@ export default function StaffPage() {
         const token = localStorage.getItem("adminToken");
 
         try {
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/access-management/remove-access`, {
+            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/access-management/remove-access`, {
                 method: "DELETE",
                 headers: {
                     "Content-Type": "application/json",

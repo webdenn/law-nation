@@ -29,7 +29,11 @@ export default function AboutSettingsPage() {
     const fetchAboutContent = async () => {
         try {
             const token = localStorage.getItem("adminToken");
+<<<<<<< Updated upstream
             const res = await fetch(`${nextPublicApiUrl}/admin/dashboard/about`, {
+=======
+            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/about`, {
+>>>>>>> Stashed changes
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -70,7 +74,11 @@ export default function AboutSettingsPage() {
 
         try {
             const token = localStorage.getItem("adminToken");
+<<<<<<< Updated upstream
             const res = await fetch(`${nextPublicApiUrl}/admin/dashboard/about`, {
+=======
+            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/about`, {
+>>>>>>> Stashed changes
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",

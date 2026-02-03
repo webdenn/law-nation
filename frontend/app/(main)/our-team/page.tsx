@@ -46,7 +46,11 @@ export default function OurTeamPage() {
 
     const fetchTeam = async () => {
         try {
+<<<<<<< Updated upstream
             const res = await fetch(`${nextPublicApiUrl}/settings/our-people`);
+=======
+            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/settings/our-people`);
+>>>>>>> Stashed changes
             const data = await res.json();
             if (data.success && data.settings) {
                 setTeamMembers(Array.isArray(data.settings.teamMembers) ? data.settings.teamMembers : []);

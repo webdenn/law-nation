@@ -80,7 +80,7 @@ const [captchaToken, setCaptchaToken] = useState(null);
           recaptchaToken: captchaToken // 🔥 Backend ye dhoond raha hai
       }
 
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/auth/admin-login`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/auth/admin-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload), // formData ki jagah payload bheja

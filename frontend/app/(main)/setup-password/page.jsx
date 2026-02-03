@@ -60,7 +60,7 @@ function SetupForm() {
 
     try {
       // 2. Backend API Call
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/auth/setup-password`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/auth/setup-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, password })
