@@ -19,7 +19,7 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(morgan("dev"));
 
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads"), {
+app.use("/api/uploads", express.static(path.join(process.cwd(), "uploads"), {
   setHeaders: (res) => {
     // Disable caching for all uploaded files to prevent PDF cross-contamination
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
