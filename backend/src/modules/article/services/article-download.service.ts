@@ -107,10 +107,13 @@ export class ArticleDownloadService {
       // Adobe service now returns relative path, convert to absolute for file reading
       const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath) 
         ? watermarkedPath 
-        : path.join(process.cwd(), watermarkedPath.replace(/^\//, ''));
+        : path.join(process.cwd(), watermarkedPath.startsWith('/') 
+            ? watermarkedPath.substring(1) 
+            : watermarkedPath);
       
-      // Read the watermarked file as buffer
+      // Validate the file exists before trying to read it
       const fs = await import('fs/promises');
+      await fs.access(absoluteWatermarkedPath); // Check if file exists
       const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
       
       // Clean up temp file
@@ -216,10 +219,13 @@ export class ArticleDownloadService {
       // Adobe service now returns relative path, convert to absolute for file reading
       const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath) 
         ? watermarkedPath 
-        : path.join(process.cwd(), watermarkedPath.replace(/^\//, ''));
+        : path.join(process.cwd(), watermarkedPath.startsWith('/') 
+            ? watermarkedPath.substring(1) 
+            : watermarkedPath);
       
-      // Read the watermarked file as buffer
+      // Validate the file exists before trying to read it
       const fs = await import('fs/promises');
+      await fs.access(absoluteWatermarkedPath); // Check if file exists
       const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
       
       // Clean up temp file
@@ -378,10 +384,13 @@ export class ArticleDownloadService {
       // Adobe service now returns relative path, convert to absolute for file reading
       const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath) 
         ? watermarkedPath 
-        : path.join(process.cwd(), watermarkedPath.replace(/^\//, ''));
+        : path.join(process.cwd(), watermarkedPath.startsWith('/') 
+            ? watermarkedPath.substring(1) 
+            : watermarkedPath);
       
-      // Read the watermarked file as buffer
+      // Validate the file exists before trying to read it
       const fs = await import('fs/promises');
+      await fs.access(absoluteWatermarkedPath); // Check if file exists
       const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
       
       // Clean up temp file

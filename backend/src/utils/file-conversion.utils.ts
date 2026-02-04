@@ -49,7 +49,12 @@ async function downloadFile(url: string, extension: string): Promise<string> {
   }
   
   const buffer = await response.arrayBuffer();
-  const tempPath = `/tmp/temp-${Date.now()}${extension}`;
+  
+  // Create temp directory in uploads folder (served by Express)
+  const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+  await fs.mkdir(tempDir, { recursive: true });
+  
+  const tempPath = path.join(tempDir, `temp-${Date.now()}${extension}`);
   await fs.writeFile(tempPath, Buffer.from(buffer));
   
   console.log(`✅ [Download] Saved to temp: ${tempPath}`);
