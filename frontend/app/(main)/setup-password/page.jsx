@@ -77,7 +77,7 @@ function SetupForm() {
 
         // 👇 REDIRECT UPDATE: Redirects to User Home
         setTimeout(() => {
-          window.location.href = "/law/home";
+          window.location.href = "/management-login";
         }, 2000);
 
       } else {
