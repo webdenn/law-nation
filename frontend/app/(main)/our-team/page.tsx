@@ -92,31 +92,6 @@ export default function OurTeamPage() {
             </section>
 
             {/* Call to Action: Join Us */}
-            <section className="max-w-5xl mx-auto px-6 mt-32">
-                <div className="bg-slate-900 rounded-3xl p-10 md:p-16 text-center relative overflow-hidden">
-                    {/* Decorative Circles */}
-                    <div className="absolute top-0 left-0 w-64 h-64 bg-red-600 rounded-full filter blur-[80px] opacity-10 -translate-x-1/2 -translate-y-1/2"></div>
-                    <div className="absolute bottom-0 right-0 w-64 h-64 bg-blue-600 rounded-full filter blur-[80px] opacity-10 translate-x-1/2 translate-y-1/2"></div>
-
-                    <div className="relative z-10">
-                        <Award className="w-12 h-12 text-red-500 mx-auto mb-6" />
-                        <h2 className="text-3xl font-bold text-white mb-4">
-                            Interested in Joining Our Board?
-                        </h2>
-                        <p className="text-slate-400 mb-8 max-w-xl mx-auto">
-                            We are constantly looking for experienced reviewers, editors, and legal contributors. If you share our passion for open-access law, we'd love to hear from you.
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                            <Link href="/join-board" className="bg-red-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-red-700 transition-all hover:shadow-lg hover:shadow-red-900/50">
-                                Apply for Editorial Board
-                            </Link>
-                            <Link href="/contact" className="bg-white/10 text-white px-8 py-3 rounded-xl font-bold hover:bg-white/20 transition-all backdrop-blur-sm">
-                                Contact Us
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            </section>
         </div>
     );
 }

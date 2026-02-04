@@ -1264,7 +1264,6 @@ export default function SubmitPaperPage() {
                       onChange={handleCaptchaChange}
                     />
                   </div>
-                  ``
                   <button
                     type="submit"
                     disabled={isLoading}
