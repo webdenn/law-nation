@@ -212,10 +212,12 @@ export class ArticleWorkflowService {
 
     try {
       // Step 1: Process clean DOCX (editor's upload)
-      const cleanDocxPath = resolveToAbsolutePath(data.pdfUrl);
+      // If it's a URL, we don't resolve to absolute local path - Adobe service will handle either
+      const isUrl = (path: string) => path.startsWith('http://') || path.startsWith('https://');
+      const cleanDocxPath = isUrl(data.pdfUrl) ? data.pdfUrl : resolveToAbsolutePath(data.pdfUrl);
       console.log(`📄 [Clean Process] Processing clean DOCX: ${cleanDocxPath}`);
 
-      if (!fileExistsAtPath(data.pdfUrl)) {
+      if (!isUrl(data.pdfUrl) && !fileExistsAtPath(data.pdfUrl)) {
         throw new Error(`DOCX file not found: ${cleanDocxPath}`);
       }
 
@@ -522,7 +524,9 @@ export class ArticleWorkflowService {
     let docxPath = data.pdfUrl; // This is actually a DOCX file for documents
 
     // Fix path resolution - convert relative path to absolute if needed
-    if (docxPath.startsWith('/uploads/')) {
+    const isUrl = (path: string) => path.startsWith('http://') || path.startsWith('https://');
+
+    if (!isUrl(docxPath) && docxPath.startsWith('/uploads/')) {
       docxPath = docxPath.replace('/uploads/', 'uploads/');
       docxPath = path.join(process.cwd(), docxPath);
       console.log(`📂 [Document Edit] Resolved absolute path: ${docxPath}`);
@@ -533,9 +537,9 @@ export class ArticleWorkflowService {
       throw new Error('Document workflow requires DOCX files');
     }
 
-    // Verify file exists
+    // Verify file exists (only for local files)
     const fs = await import('fs');
-    if (!fs.existsSync(docxPath)) {
+    if (!isUrl(docxPath) && !fs.existsSync(docxPath)) {
       throw new Error(`DOCX file not found: ${docxPath}`);
     }
 
@@ -548,11 +552,22 @@ export class ArticleWorkflowService {
       frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
     };
 
-    const watermarkedDocxPath = docxPath.replace(/\.docx$/i, '_edited_watermarked.docx');
+    // Generate local output paths
+    // If input is a URL, we need a base local path for outputs
+    let baseLocalPath: string;
+    if (isUrl(docxPath)) {
+      const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      baseLocalPath = path.join(tempDir, `doc-edit-${Date.now()}.docx`);
+    } else {
+      baseLocalPath = docxPath;
+    }
+
+    const watermarkedDocxPath = baseLocalPath.replace(/\.docx$/i, '_edited_watermarked.docx');
     await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
 
     // Convert edited DOCX to PDF for preview using Adobe Services
-    const pdfPath = docxPath.replace(/\.docx$/i, '_edited.pdf');
+    const pdfPath = baseLocalPath.replace(/\.docx$/i, '_edited.pdf');
     console.log(`🔄 [Adobe] Converting DOCX to PDF for preview: ${watermarkedDocxPath} → ${pdfPath}`);
     await adobeService.convertDocxToPdf(watermarkedDocxPath, pdfPath);
 
