@@ -183,10 +183,10 @@ export default function SubmitPaperPage() {
     }
 
     if (currentStep === 2) {
-      // 1. Title Length Validation (Min 50, Max 100)
-      if (!formData.articleTitle || formData.articleTitle.length < 50) {
+      // 1. Title Length Validation (Min 10, Max 100)
+      if (!formData.articleTitle || formData.articleTitle.length < 10) {
         toast.error(
-          `Title is too short! Current: ${formData.articleTitle.length}. Minimum required: 50 characters.`
+          `Title is too short! Current: ${formData.articleTitle.length}. Minimum required: 10 characters.`
         );
         return;
       }
@@ -203,21 +203,19 @@ export default function SubmitPaperPage() {
         return;
       }
 
-      // 3. Abstract Validation (Min 50, Max 500)
-      if (
-        !formData.detailedDescription ||
-        formData.detailedDescription.length < 50
-      ) {
+      // 3. Abstract Word Count Validation (Min 50, Max 300 words)
+      const wordCount = getWordCount(formData.detailedDescription);
+      if (wordCount < 50) {
         toast.error(
-          `Abstract is too short! Current: ${formData.detailedDescription.length} chars. Minimum required: 50.`
+          `Abstract is too short! Current: ${wordCount} words. Minimum required: 50 words.`
         );
         return;
       }
-      // Max 500 is handled by HTML maxLength, but good to check logic
-      if (formData.detailedDescription.length > 500) {
-        toast.error("Abstract must not exceed 500 characters.");
+      if (wordCount > 300) {
+        toast.error(`Abstract is too long! Current: ${wordCount} words. Maximum allowed: 300 words.`);
         return;
       }
+      // Max check removed here as it is handled by word count above
     }
 
     if (currentStep < totalSteps) {
@@ -941,12 +939,12 @@ export default function SubmitPaperPage() {
                         Article Title
                       </label>
                       <span
-                        className={`text-xs ${formData.articleTitle.length < 50
+                        className={`text-xs ${formData.articleTitle.length < 10
                           ? "text-red-500"
                           : "text-green-600"
                           }`}
                       >
-                        {formData.articleTitle.length}/100 chars (Min 50)
+                        {formData.articleTitle.length}/100 chars (Min 10)
                       </span>
                     </div>
                     <input
@@ -955,7 +953,7 @@ export default function SubmitPaperPage() {
                       value={formData.articleTitle}
                       onChange={handleInputChange}
                       maxLength={100} // Backend Max Limit
-                      placeholder="Enter a clear and concise title (Min 50 characters)"
+                      placeholder="Enter a clear and concise title (Min 10 characters)"
                       className="w-full text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-600"
                       required
                     />
@@ -971,12 +969,12 @@ export default function SubmitPaperPage() {
                         Detailed Description
                       </label>
                       <span
-                        className={`text-xs sm:text-sm ${formData.detailedDescription.length < 50
+                        className={`text-xs sm:text-sm ${getWordCount(formData.detailedDescription) < 50 || getWordCount(formData.detailedDescription) > 300
                           ? "text-red-500"
-                          : "text-gray-500"
+                          : "text-green-600"
                           }`}
                       >
-                        {formData.detailedDescription.length}/500 characters
+                        {getWordCount(formData.detailedDescription)}/300 words
                         (Min 50)
                       </span>
                     </div>
@@ -985,9 +983,8 @@ export default function SubmitPaperPage() {
                       name="detailedDescription"
                       value={formData.detailedDescription}
                       onChange={handleInputChange}
-                      placeholder="Provide a summary of your article (Max 500 characters)..."
-                      rows={6}
-                      maxLength={500} // ✅ LIMIT: User 500 se zyada type nahi kar payega
+                      placeholder="Provide a detailed summary of your article (50 - 300 words)..."
+                      rows={8}
                       className="w-full text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent resize-y"
                       required
                     />
