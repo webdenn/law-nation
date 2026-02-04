@@ -87,18 +87,31 @@ export class ArticleService {
       let oldPdfText = "";
       if (article.currentPdfUrl) {
         try {
-          // Resolve path if it's a URL or relative path
+          // Check if it's a URL or local path
           let oldPdfPath = article.currentPdfUrl;
-          if (oldPdfPath.startsWith('/') && !fs.existsSync(oldPdfPath)) {
-            oldPdfPath = path.join(process.cwd(), oldPdfPath.substring(1));
-          } else if (!path.isAbsolute(oldPdfPath)) {
-            oldPdfPath = path.join(process.cwd(), oldPdfPath);
-          }
+          
+          if (oldPdfPath.startsWith('http://') || oldPdfPath.startsWith('https://')) {
+            // It's a Supabase URL - we need to download it first or extract text differently
+            console.log(`🌐 [Document] Supabase URL detected for diff: ${oldPdfPath}`);
+            // For now, skip diff generation for Supabase URLs
+            // TODO: Implement URL-based text extraction
+            console.log(`⚠️ [Document] Skipping diff generation for Supabase URL`);
+          } else {
+            // It's a local path - handle as before
+            if (oldPdfPath.startsWith('/') && !fs.existsSync(oldPdfPath)) {
+              oldPdfPath = path.join(process.cwd(), oldPdfPath.substring(1));
+            } else if (!path.isAbsolute(oldPdfPath)) {
+              oldPdfPath = path.join(process.cwd(), oldPdfPath);
+            }
 
-          if (fs.existsSync(oldPdfPath)) {
-            const dataBuffer = fs.readFileSync(oldPdfPath);
-            const data = await pdfParse(dataBuffer);
-            oldPdfText = data.text;
+            if (fs.existsSync(oldPdfPath)) {
+              const dataBuffer = fs.readFileSync(oldPdfPath);
+              const data = await pdfParse(dataBuffer);
+              oldPdfText = data.text || "";
+              console.log(`📄 [Document] Extracted ${oldPdfText.length} chars from previous PDF`);
+            } else {
+              console.log(`⚠️ [Document] Previous PDF file not found: ${oldPdfPath}`);
+            }
           }
         } catch (e) {
           console.warn("Could not read old PDF for diff:", e);

@@ -156,12 +156,25 @@ export class AdobeService {
   async convertPdfToDocx(pdfPath: string, outputPath: string): Promise<string> {
     this.checkAvailability();
 
+    let localPdfPath: string;
+    let tempPdfPath: string | null = null;
+
     try {
       console.log(`🔄 [Adobe] Converting PDF to DOCX: ${pdfPath}`);
 
+      // Handle URLs by downloading first
+      if (this.isUrl(pdfPath)) {
+        console.log(`🌐 [Adobe] URL detected, downloading file first...`);
+        tempPdfPath = await this.downloadFile(pdfPath, '.pdf');
+        localPdfPath = tempPdfPath;
+      } else {
+        // For local paths, resolve to absolute path
+        localPdfPath = resolveToAbsolutePath(pdfPath);
+      }
+
       // Create an ExecutionContext using credentials
       const inputAsset = await this.pdfServices.upload({
-        readStream: fs.createReadStream(pdfPath),
+        readStream: fs.createReadStream(localPdfPath),
         mimeType: MimeType.PDF
       });
 
@@ -219,13 +232,30 @@ export class AdobeService {
       return new Promise((resolve, reject) => {
         outputStream.on('finish', () => {
           console.log(`✅ [Adobe] PDF converted to DOCX: ${outputPath}`);
+          
+          // Clean up temp file if we downloaded one
+          if (tempPdfPath) {
+            fs.unlink(tempPdfPath, () => {});
+          }
+          
           // Return absolute path - let caller handle conversion to relative
           resolve(outputPath);
         });
-        outputStream.on('error', reject);
+        outputStream.on('error', (error) => {
+          // Clean up temp file on error
+          if (tempPdfPath) {
+            fs.unlink(tempPdfPath, () => {});
+          }
+          reject(error);
+        });
       });
 
     } catch (err: any) {
+      // Clean up temp file on error
+      if (tempPdfPath) {
+        fs.unlink(tempPdfPath, () => {});
+      }
+      
       console.error('❌ [Adobe] PDF to DOCX conversion failed:', err);
       if (err instanceof SDKError || err instanceof ServiceUsageError || err instanceof ServiceApiError) {
         throw new InternalServerError(`Adobe PDF conversion failed: ${err.message}`);
@@ -241,25 +271,38 @@ export class AdobeService {
     this.checkAvailability();
 
     const startTime = Date.now();
+    let localDocxPath: string;
+    let tempDocxPath: string | null = null;
+
     console.log(`🔄 [Adobe] Starting DOCX to PDF conversion`);
     console.log(`   📂 Input: ${docxPath}`);
     console.log(`   📂 Output: ${outputPath}`);
 
-    // Check if input file exists
-    if (!fs.existsSync(docxPath)) {
-      console.error(`❌ [Adobe] Input file not found: ${docxPath}`);
-      throw new InternalServerError(`Input DOCX file not found: ${docxPath}`);
-    }
-
-    const fileSize = fs.statSync(docxPath).size;
-    console.log(`   📊 File size: ${(fileSize / 1024).toFixed(2)} KB`);
-
     try {
+      // Handle URLs by downloading first
+      if (this.isUrl(docxPath)) {
+        console.log(`🌐 [Adobe] URL detected, downloading file first...`);
+        tempDocxPath = await this.downloadFile(docxPath, '.docx');
+        localDocxPath = tempDocxPath;
+      } else {
+        // For local paths, resolve to absolute path
+        localDocxPath = resolveToAbsolutePath(docxPath);
+      }
+
+      // Check if input file exists
+      if (!fs.existsSync(localDocxPath)) {
+        console.error(`❌ [Adobe] Input file not found: ${localDocxPath}`);
+        throw new InternalServerError(`Input DOCX file not found: ${localDocxPath}`);
+      }
+
+      const fileSize = fs.statSync(localDocxPath).size;
+      console.log(`   📊 File size: ${(fileSize / 1024).toFixed(2)} KB`);
+
       console.log(`⬆️ [Adobe] Uploading DOCX to Adobe Services...`);
 
       // Create an ExecutionContext using credentials
       const inputAsset = await this.pdfServices.upload({
-        readStream: fs.createReadStream(docxPath),
+        readStream: fs.createReadStream(localDocxPath),
         mimeType: MimeType.DOCX
       });
 
@@ -307,11 +350,23 @@ export class AdobeService {
           console.log(`   📂 Output: ${outputPath}`);
           console.log(`   📊 Output size: ${(outputSize / 1024).toFixed(2)} KB`);
           console.log(`   ⏱️ Duration: ${duration}ms`);
+          
+          // Clean up temp file if we downloaded one
+          if (tempDocxPath) {
+            fs.unlink(tempDocxPath, () => {});
+          }
+          
           // Return absolute path - let caller handle conversion to relative
           resolve(outputPath);
         });
         outputStream.on('error', (error) => {
           console.error(`❌ [Adobe] Error writing output file:`, error);
+          
+          // Clean up temp file on error
+          if (tempDocxPath) {
+            fs.unlink(tempDocxPath, () => {});
+          }
+          
           reject(error);
         });
       });
@@ -319,6 +374,11 @@ export class AdobeService {
     } catch (err: any) {
       const endTime = Date.now();
       const duration = endTime - startTime;
+
+      // Clean up temp file on error
+      if (tempDocxPath) {
+        fs.unlink(tempDocxPath, () => {});
+      }
 
       console.error(`❌ [Adobe] DOCX to PDF conversion failed after ${duration}ms`);
       console.error(`   Error type: ${err.constructor.name}`);
@@ -337,6 +397,37 @@ export class AdobeService {
       }
       throw new InternalServerError('Adobe DOCX conversion failed');
     }
+  }
+
+  /**
+   * Download file from URL to temp location (similar to file-conversion.utils.ts)
+   */
+  private async downloadFile(url: string, extension: string): Promise<string> {
+    console.log(`🌐 [Adobe Download] Fetching file from URL: ${url}`);
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to download file: ${response.statusText}`);
+    }
+    
+    const buffer = await response.arrayBuffer();
+    
+    // Create temp directory in uploads folder (served by Express)
+    const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+    await fs.promises.mkdir(tempDir, { recursive: true });
+    
+    const tempPath = path.join(tempDir, `adobe-temp-${Date.now()}${extension}`);
+    await fs.promises.writeFile(tempPath, Buffer.from(buffer));
+    
+    console.log(`✅ [Adobe Download] Saved to temp: ${tempPath}`);
+    return tempPath;
+  }
+
+  /**
+   * Check if a path is a URL
+   */
+  private isUrl(filePath: string): boolean {
+    return filePath.startsWith('http://') || filePath.startsWith('https://');
   }
 
   /**
