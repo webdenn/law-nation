@@ -551,27 +551,39 @@ export class AdobeService {
     this.checkAvailability();
 
     let processingPath = pdfPath;
+    let tempPath: string | null = null;
+    let localPath: string;
 
     try {
-      console.log(`🔄 [Adobe] Extracting text from PDF using ExtractPDF: ${pdfPath}`);
+      console.log(`🔄 [Adobe] Extracting text from PDF: ${pdfPath}`);
 
-      const absolutePath = resolveToAbsolutePath(pdfPath);
+      // Step 0: Handle URLs immediately
+      if (this.isUrl(pdfPath)) {
+        console.log(`🌐 [Adobe Extract PDF] URL detected, downloading file first...`);
+        tempPath = await this.downloadFile(pdfPath, '.pdf');
+        localPath = tempPath;
+        processingPath = localPath;
+      } else {
+        localPath = resolveToAbsolutePath(pdfPath);
+        processingPath = localPath;
+      }
 
-      if (!fileExistsAtPath(pdfPath)) {
-        console.error(`❌ [Adobe] Input file missing: ${absolutePath}`);
-        throw new Error(`Input file not found locally: ${absolutePath}`);
+      // Verify file exists locally now (either it was local or downloaded)
+      if (!fs.existsSync(localPath)) {
+        console.error(`❌ [Adobe] Input file missing: ${localPath}`);
+        throw new Error(`Input file not found at: ${localPath}`);
       }
 
       // Step 1: Validate PDF before processing
       console.log(`🔍 [Adobe] Validating PDF structure...`);
-      const validation = await this.validatePdfFile(pdfPath);
+      const validation = await this.validatePdfFile(localPath);
 
       if (!validation.isValid) {
         console.warn(`⚠️ [Adobe] PDF validation failed: ${validation.error}`);
         if (validation.canRepair) {
-          const repairedPath = pdfPath.replace(/\.pdf$/i, '_repaired.pdf');
+          const repairedPath = localPath.replace(/\.pdf$/i, '_repaired.pdf');
           console.log(`🔧 [Adobe] Attempting PDF repair...`);
-          const repairSuccess = await this.repairPdfFile(pdfPath, repairedPath);
+          const repairSuccess = await this.repairPdfFile(localPath, repairedPath);
 
           if (repairSuccess) {
             console.log(`✅ [Adobe] PDF repaired successfully, using repaired version`);
@@ -583,19 +595,8 @@ export class AdobeService {
       }
 
       // Step 2: Try Adobe extraction
-      let localPath: string;
-      let tempPath: string | null = null;
-
-      // Handle URLs
-      if (this.isUrl(pdfPath)) {
-        console.log(`🌐 [Adobe Extract PDF] URL detected, downloading file first...`);
-        tempPath = await this.downloadFile(pdfPath, '.pdf');
-        localPath = tempPath;
-      } else {
-        localPath = resolveToAbsolutePath(pdfPath);
-      }
-
-      const absoluteProcessingPath = localPath; // This handles the repair logic partially, but repair creates a local file anyway
+      // Ensure we use the absolute path for the final processing path
+      const absoluteProcessingPath = resolveToAbsolutePath(processingPath);
 
       const inputAsset = await this.pdfServices.upload({
         readStream: fs.createReadStream(absoluteProcessingPath),
