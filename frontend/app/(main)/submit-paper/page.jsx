@@ -129,6 +129,12 @@ export default function SubmitPaperPage() {
     // ✅ Zod Schema: /^[a-zA-Z\s\-:,.'&()]+$/ (Letters, space, basic punctuation. NO NUMBERS)
     const titleRegex = /^[a-zA-Z\s\-:,.'&()]+$/;
 
+    // ✅ Strict Email Regex
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    // ✅ Phone Regex (Exactly 10 digits)
+    const phoneRegex = /^\d{10}$/;
+
     if (currentStep === 1) {
       // 1. Primary Author Check
       if (!formData.fullName || !formData.email) {
@@ -144,9 +150,17 @@ export default function SubmitPaperPage() {
         return;
       }
 
-      // Check if email contains @
-      if (!formData.email.includes("@")) {
-        toast.error("Please enter a valid email address (must contain '@').", {
+      // Check if email is valid
+      if (!emailRegex.test(formData.email)) {
+        toast.error("Please enter a valid email address (e.g., example@domain.com).", {
+          position: "top-center"
+        });
+        return;
+      }
+
+      // Check Primary Author Phone (if provided, must be 10 digits)
+      if (formData.phone && !phoneRegex.test(formData.phone)) {
+        toast.error("Primary Author phone number must be exactly 10 digits.", {
           position: "top-center"
         });
         return;
@@ -173,11 +187,14 @@ export default function SubmitPaperPage() {
       }
 
       // Check Second Author Email if exists
-      if (
-        formData.secondAuthorEmail &&
-        !formData.secondAuthorEmail.includes("@")
-      ) {
+      if (formData.secondAuthorEmail && !emailRegex.test(formData.secondAuthorEmail)) {
         toast.error("Second Author email must be a valid email address.");
+        return;
+      }
+
+      // Check Second Author Phone if exists
+      if (formData.secondAuthorPhone && !phoneRegex.test(formData.secondAuthorPhone)) {
+        toast.error("Second Author phone number must be exactly 10 digits.");
         return;
       }
     }
