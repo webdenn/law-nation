@@ -13,19 +13,19 @@ declare global {
     interface Request {
       fileUrl?: string;
       fileUrls?: Array<{ url: string; storageKey?: string }>;
-      fileMeta?: { 
-        url: string; 
+      fileMeta?: {
+        url: string;
         storageKey?: string;
-        watermarkedUrl?: string; 
-        fileSize?: number; 
+        watermarkedUrl?: string;
+        fileSize?: number;
       } | null;
-      isDocumentUpload?: boolean; 
+      isDocumentUpload?: boolean;
     }
   }
 }
 
 // No size limit for admin uploads
-const UNLIMITED_SIZE = Number.MAX_SAFE_INTEGER; 
+const UNLIMITED_SIZE = Number.MAX_SAFE_INTEGER;
 
 // Admin PDF directory
 const ADMIN_PDF_DIR = 'uploads/admin-pdfs/';
@@ -33,7 +33,7 @@ const ADMIN_PDF_DIR = 'uploads/admin-pdfs/';
 const isLocal = process.env.NODE_ENV === "local";
 
 // ---------- AWS S3 CONFIGURATION (CHANGED) ----------
-const AWS_REGION = process.env.AWS_REGION || "us-east-1";
+const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
 const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || "";
 const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || "";
 
@@ -45,24 +45,24 @@ const S3_BUCKET_THUMBNAILS = process.env.AWS_S3_BUCKET_THUMBNAILS || "thumbnails
 // Initialize S3 Client
 const s3Client = !isLocal && AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY
   ? new S3Client({
-      region: AWS_REGION,
-      credentials: {
-        accessKeyId: AWS_ACCESS_KEY_ID,
-        secretAccessKey: AWS_SECRET_ACCESS_KEY,
-      },
-    })
+    region: AWS_REGION,
+    credentials: {
+      accessKeyId: AWS_ACCESS_KEY_ID,
+      secretAccessKey: AWS_SECRET_ACCESS_KEY,
+    },
+  })
   : null;
 
 // ---------- PDF ONLY VALIDATION (STRICT) ----------
-const allowedDocumentMimes = [ "application/pdf" ];
+const allowedDocumentMimes = ["application/pdf"];
 const MAX_DOCUMENT_SIZE = parseInt(
   process.env.MAX_DOCUMENT_SIZE_BYTES ?? String(10 * 1024 * 1024),
   10
-); 
+);
 
 // For user uploads (PDF ONLY)
 const documentFileFilter = (req: Request, file: Express.Multer.File, cb: any) => {
-  const allowedMimes = [ "application/pdf" ];
+  const allowedMimes = ["application/pdf"];
   if (allowedMimes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -99,12 +99,12 @@ const adminPdfFileFilter = (req: Request, file: Express.Multer.File, cb: any) =>
 };
 
 // ---------- IMAGE VALIDATION ----------
-const allowedImageMimes = [ "image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif" ];
+const allowedImageMimes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
 
 const MAX_IMAGE_SIZE = parseInt(
   process.env.MAX_IMAGE_SIZE_BYTES ?? String(5 * 1024 * 1024),
   10
-); 
+);
 
 const imageFileFilter = (req: Request, file: Express.Multer.File, cb: any) => {
   if (allowedImageMimes.includes(file.mimetype)) {
@@ -122,7 +122,7 @@ if (isLocal) {
   const imageDir = "uploads/images/";
   const tempImageDir = "uploads/temp/images/";
   const visualDiffDir = "uploads/visual-diffs/";
-  const adminPdfDir = "uploads/admin-pdfs/"; 
+  const adminPdfDir = "uploads/admin-pdfs/";
 
   if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
   if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
@@ -222,13 +222,13 @@ const localAdminPdfStorage = multer.diskStorage({
 const localUploadAdminPdf = multer({
   storage: localAdminPdfStorage,
   fileFilter: adminPdfFileFilter,
-  limits: { fileSize: UNLIMITED_SIZE }, 
+  limits: { fileSize: UNLIMITED_SIZE },
 });
 
 const s3MemoryAdminPdf = multer({
   storage: multer.memoryStorage(),
   fileFilter: adminPdfFileFilter,
-  limits: { fileSize: UNLIMITED_SIZE }, 
+  limits: { fileSize: UNLIMITED_SIZE },
 });
 
 // ---------- IMAGE STORAGE CONFIG ----------
@@ -304,11 +304,26 @@ async function addUploadWatermark(
 async function uploadBufferToS3(
   buffer: Buffer,
   originalname: string,
-  mimetype: string,
+  inputMimetype: string, // Renamed to indicate it might be unreliable
   fileType: 'pdf' | 'image' | 'thumbnail' = 'pdf'
 ): Promise<{ url: string; storageKey: string }> {
   if (!s3Client) {
     throw new Error("AWS S3 client not initialized");
+  }
+
+  // 1. FORCE CORRECT CONTENT-TYPE
+  // Adobe fails if S3 returns "application/octet-stream" or "application/zip"
+  let finalMimeType = inputMimetype;
+  const ext = path.extname(originalname).toLowerCase();
+
+  if (ext === '.docx') {
+    finalMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  } else if (ext === '.pdf') {
+    finalMimeType = 'application/pdf';
+  } else if (ext === '.png') {
+    finalMimeType = 'image/png';
+  } else if (ext === '.jpg' || ext === '.jpeg') {
+    finalMimeType = 'image/jpeg';
   }
 
   // Choose bucket based on file type
@@ -327,23 +342,22 @@ async function uploadBufferToS3(
   }
 
   const uniqueId = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-  const ext = path.extname(originalname);
-  // Construct Key: e.g. "articles/123456-789.pdf"
   const storageKey = `${folder}/${uniqueId}${ext}`;
 
   const command = new PutObjectCommand({
     Bucket: bucketName,
     Key: storageKey,
     Body: buffer,
-    ContentType: mimetype,
-    // ACL: 'public-read', // Optional: Use this if not using Bucket Policies
+    // Use the FORCED mime type, not the one from the browser
+    ContentType: finalMimeType,
+    // Optional: Force 'inline' to help some viewers, though 'attachment' is safer for downloads
+    ContentDisposition: 'inline',
   });
 
   try {
     await s3Client.send(command);
 
     // Construct Public URL
-    // Format: https://{bucket}.s3.{region}.amazonaws.com/{key}
     const publicUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${storageKey}`;
 
     return { url: publicUrl, storageKey };
@@ -366,7 +380,7 @@ export const uploadDocument = (req: Request, res: Response, next: NextFunction) 
         const isLoggedIn = !!(req as any).user?.id;
         const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
         const tempFilePath = path.join(process.cwd(), directory, req.file.filename);
-        
+
         // Watermark Logic
         const watermarkedBuffer = await addUploadWatermark(tempFilePath, req.file.mimetype);
         fs.writeFileSync(tempFilePath, watermarkedBuffer);
@@ -396,7 +410,7 @@ export const uploadDocument = (req: Request, res: Response, next: NextFunction) 
         // Temp file for watermarking
         const tempDir = path.join(process.cwd(), 'uploads', 'temp');
         if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-        
+
         const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(file.originalname)}`);
         fs.writeFileSync(tempFilePath, file.buffer);
 
@@ -435,24 +449,24 @@ export const uploadDocument = (req: Request, res: Response, next: NextFunction) 
 export const uploadPdfOnly = (req: Request, res: Response, next: NextFunction) => {
   if (isLocal) {
     localUploadPdfOnly.single("pdf")(req, res, async (err) => {
-        // ... (Local logic unchanged)
-        if (err) return res.status(400).json({ error: err.message });
-        if (!req.file) return res.status(400).json({ error: "PDF file required" });
-  
-        try {
-          const tempFilePath = path.join(process.cwd(), 'uploads/pdfs/', req.file.filename);
-          const watermarkedBuffer = await addUploadWatermark(tempFilePath, req.file.mimetype);
-          fs.writeFileSync(tempFilePath, watermarkedBuffer);
-          const url = `/uploads/pdfs/${req.file.filename}`;
-          req.fileUrl = url;
-          req.fileMeta = { url, storageKey: req.file.filename };
-          next();
-        } catch (error) {
-          const url = `/uploads/pdfs/${req.file.filename}`;
-          req.fileUrl = url;
-          req.fileMeta = { url, storageKey: req.file.filename };
-          next();
-        }
+      // ... (Local logic unchanged)
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file) return res.status(400).json({ error: "PDF file required" });
+
+      try {
+        const tempFilePath = path.join(process.cwd(), 'uploads/pdfs/', req.file.filename);
+        const watermarkedBuffer = await addUploadWatermark(tempFilePath, req.file.mimetype);
+        fs.writeFileSync(tempFilePath, watermarkedBuffer);
+        const url = `/uploads/pdfs/${req.file.filename}`;
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+        next();
+      } catch (error) {
+        const url = `/uploads/pdfs/${req.file.filename}`;
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+        next();
+      }
     });
   } else {
     // CHANGED: Use s3MemoryPdfOnly
@@ -503,17 +517,17 @@ export const uploadPdf = uploadDocument;
 export const uploadMultiplePdfs = (fieldName = "pdfs", maxCount = 5) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (isLocal) {
-        // ... (Local logic unchanged)
-        localUploadDocument.array(fieldName, maxCount)(req, res, async (err: any) => {
-            if (err) return res.status(400).json({ error: err.message });
-            const files = (req.files as Express.Multer.File[] | undefined) ?? [];
-            if (!files.length) return res.status(400).json({ error: "PDF files required" });
-            req.fileUrls = files.map((f) => ({
-              url: `/uploads/pdfs/${f.filename}`,
-              storageKey: f.filename,
-            }));
-            next();
-          });
+      // ... (Local logic unchanged)
+      localUploadDocument.array(fieldName, maxCount)(req, res, async (err: any) => {
+        if (err) return res.status(400).json({ error: err.message });
+        const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+        if (!files.length) return res.status(400).json({ error: "PDF files required" });
+        req.fileUrls = files.map((f) => ({
+          url: `/uploads/pdfs/${f.filename}`,
+          storageKey: f.filename,
+        }));
+        next();
+      });
     } else {
       // CHANGED: Use s3MemoryDocument
       s3MemoryDocument.array(fieldName, maxCount)(req, res, async (err: any) => {
@@ -548,27 +562,27 @@ export const uploadOptionalPdf = (req: Request, res: Response, next: NextFunctio
   if (isLocal) {
     // ... (Local logic unchanged)
     localUploadDocument.single("pdf")(req, res, async (err: any) => {
-        if (err) return res.status(400).json({ error: err.message });
-        if (req.file) {
-          try {
-            const isLoggedIn = !!(req as any).user?.id;
-            const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
-            const tempFilePath = path.join(process.cwd(), directory, req.file.filename);
-            const watermarkedBuffer = await addUploadWatermark(tempFilePath, req.file.mimetype);
-            fs.writeFileSync(tempFilePath, watermarkedBuffer);
-            const url = `/${directory}${req.file.filename}`;
-            req.fileUrl = url;
-            req.fileMeta = { url, storageKey: req.file.filename };
-          } catch (error) {
-            const isLoggedIn = !!(req as any).user?.id;
-            const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
-            const url = `/${directory}${req.file.filename}`;
-            req.fileUrl = url;
-            req.fileMeta = { url, storageKey: req.file.filename };
-          }
+      if (err) return res.status(400).json({ error: err.message });
+      if (req.file) {
+        try {
+          const isLoggedIn = !!(req as any).user?.id;
+          const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+          const tempFilePath = path.join(process.cwd(), directory, req.file.filename);
+          const watermarkedBuffer = await addUploadWatermark(tempFilePath, req.file.mimetype);
+          fs.writeFileSync(tempFilePath, watermarkedBuffer);
+          const url = `/${directory}${req.file.filename}`;
+          req.fileUrl = url;
+          req.fileMeta = { url, storageKey: req.file.filename };
+        } catch (error) {
+          const isLoggedIn = !!(req as any).user?.id;
+          const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+          const url = `/${directory}${req.file.filename}`;
+          req.fileUrl = url;
+          req.fileMeta = { url, storageKey: req.file.filename };
         }
-        next();
-      });
+      }
+      next();
+    });
   } else {
     // CHANGED: s3MemoryDocument
     s3MemoryDocument.single("pdf")(req, res, async (err: any) => {
@@ -627,82 +641,82 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
   if (isLocal) {
     // ... (Local logic unchanged, complex nested fields)
     const upload = multer({
-        storage: multer.diskStorage({
-          destination: (req, file, cb) => {
-            let directory = '';
-            if (file.fieldname === 'document') {
-              directory = 'uploads/pdfs/';
-            } else if (file.fieldname === 'editorDocument') {
-              directory = 'uploads/editor-docs/';
-            }
-            if (!fs.existsSync(directory)) fs.mkdirSync(directory, { recursive: true });
-            cb(null, directory);
-          },
-          filename: (req, file, cb) => {
-            const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
-            cb(null, unique + path.extname(file.originalname));
-          },
-        }),
-        fileFilter: docxOnlyFileFilter,
-        limits: { fileSize: MAX_DOCUMENT_SIZE }
-      });
-  
-      upload.fields([
-        { name: 'document', maxCount: 1 },
-        { name: 'editorDocument', maxCount: 1 }
-      ])(req, res, async (err) => {
-        if (err) return res.status(400).json({ error: err.message });
-  
-        const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-  
-        try {
-          if (files.document && files.document[0]) {
-            const docFile = files.document[0];
-            const docFilePath = path.join(process.cwd(), 'uploads/pdfs/', docFile.filename);
-            const ext = path.extname(docFile.originalname).toLowerCase();
-            if (ext !== '.docx') {
-              const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
-              fs.writeFileSync(docFilePath, watermarkedBuffer);
-            }
-            req.fileMeta = {
-              url: `/uploads/pdfs/${docFile.filename}`,
-              storageKey: docFile.filename
-            };
-          } else {
-            return res.status(400).json({ error: "Corrected document file required" });
+      storage: multer.diskStorage({
+        destination: (req, file, cb) => {
+          let directory = '';
+          if (file.fieldname === 'document') {
+            directory = 'uploads/pdfs/';
+          } else if (file.fieldname === 'editorDocument') {
+            directory = 'uploads/editor-docs/';
           }
-  
-          if (files.editorDocument && files.editorDocument[0]) {
-            const editorDocFile = files.editorDocument[0];
-            const editorDocFilePath = path.join(process.cwd(), 'uploads/editor-docs/', editorDocFile.filename);
-            const ext = path.extname(editorDocFile.originalname).toLowerCase();
-            const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
-            
-            const watermarkedBuffer = await addUploadWatermark(editorDocFilePath, editorDocFile.mimetype);
-            fs.writeFileSync(editorDocFilePath, watermarkedBuffer);
-  
-            req.body.editorDocumentUrl = `/uploads/editor-docs/${editorDocFile.filename}`;
-            req.body.editorDocumentType = docType;
+          if (!fs.existsSync(directory)) fs.mkdirSync(directory, { recursive: true });
+          cb(null, directory);
+        },
+        filename: (req, file, cb) => {
+          const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+          cb(null, unique + path.extname(file.originalname));
+        },
+      }),
+      fileFilter: docxOnlyFileFilter,
+      limits: { fileSize: MAX_DOCUMENT_SIZE }
+    });
+
+    upload.fields([
+      { name: 'document', maxCount: 1 },
+      { name: 'editorDocument', maxCount: 1 }
+    ])(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+      try {
+        if (files.document && files.document[0]) {
+          const docFile = files.document[0];
+          const docFilePath = path.join(process.cwd(), 'uploads/pdfs/', docFile.filename);
+          const ext = path.extname(docFile.originalname).toLowerCase();
+          if (ext !== '.docx') {
+            const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
+            fs.writeFileSync(docFilePath, watermarkedBuffer);
           }
-          next();
-        } catch (error) {
-          if (files.document && files.document[0]) {
-            const docFile = files.document[0];
-            req.fileMeta = {
-              url: `/uploads/pdfs/${docFile.filename}`,
-              storageKey: docFile.filename
-            };
-          }
-          if (files.editorDocument && files.editorDocument[0]) {
-            const editorDocFile = files.editorDocument[0];
-            const ext = path.extname(editorDocFile.originalname).toLowerCase();
-            const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
-            req.body.editorDocumentUrl = `/uploads/editor-docs/${editorDocFile.filename}`;
-            req.body.editorDocumentType = docType;
-          }
-          next();
+          req.fileMeta = {
+            url: `/uploads/pdfs/${docFile.filename}`,
+            storageKey: docFile.filename
+          };
+        } else {
+          return res.status(400).json({ error: "Corrected document file required" });
         }
-      });
+
+        if (files.editorDocument && files.editorDocument[0]) {
+          const editorDocFile = files.editorDocument[0];
+          const editorDocFilePath = path.join(process.cwd(), 'uploads/editor-docs/', editorDocFile.filename);
+          const ext = path.extname(editorDocFile.originalname).toLowerCase();
+          const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
+
+          const watermarkedBuffer = await addUploadWatermark(editorDocFilePath, editorDocFile.mimetype);
+          fs.writeFileSync(editorDocFilePath, watermarkedBuffer);
+
+          req.body.editorDocumentUrl = `/uploads/editor-docs/${editorDocFile.filename}`;
+          req.body.editorDocumentType = docType;
+        }
+        next();
+      } catch (error) {
+        if (files.document && files.document[0]) {
+          const docFile = files.document[0];
+          req.fileMeta = {
+            url: `/uploads/pdfs/${docFile.filename}`,
+            storageKey: docFile.filename
+          };
+        }
+        if (files.editorDocument && files.editorDocument[0]) {
+          const editorDocFile = files.editorDocument[0];
+          const ext = path.extname(editorDocFile.originalname).toLowerCase();
+          const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
+          req.body.editorDocumentUrl = `/uploads/editor-docs/${editorDocFile.filename}`;
+          req.body.editorDocumentType = docType;
+        }
+        next();
+      }
+    });
   } else {
     // CHANGED: Multer memory storage (no specific supabase object needed here)
     const upload = multer({
@@ -730,9 +744,9 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
 
           const ext = path.extname(docFile.originalname).toLowerCase();
           let uploadBuffer;
-          
+
           if (ext === '.docx') {
-            uploadBuffer = docFile.buffer; 
+            uploadBuffer = docFile.buffer;
           } else {
             uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
           }
@@ -788,15 +802,15 @@ export const uploadImage = (req: Request, res: Response, next: NextFunction) => 
   if (isLocal) {
     // ... (Local logic unchanged)
     localUploadImage.single("image")(req, res, (err) => {
-        if (err) return res.status(400).json({ error: err.message });
-        if (!req.file) return res.status(400).json({ error: "Image file required" });
-        const isLoggedIn = !!(req as any).user?.id;
-        const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
-        const url = `/${directory}${req.file.filename}`;
-        req.fileUrl = url;
-        req.fileMeta = { url, storageKey: req.file.filename };
-        next();
-      });
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file) return res.status(400).json({ error: "Image file required" });
+      const isLoggedIn = !!(req as any).user?.id;
+      const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
+      const url = `/${directory}${req.file.filename}`;
+      req.fileUrl = url;
+      req.fileMeta = { url, storageKey: req.file.filename };
+      next();
+    });
   } else {
     // CHANGED: s3MemoryImage
     s3MemoryImage.single("image")(req, res, (err) => {
@@ -875,16 +889,16 @@ export const uploadOptionalImage = (req: Request, res: Response, next: NextFunct
   if (isLocal) {
     // ... (Local logic unchanged)
     localUploadImage.single("image")(req, res, (err) => {
-        if (err) return res.status(400).json({ error: err.message });
-        if (req.file) {
-          const isLoggedIn = !!(req as any).user?.id;
-          const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
-          const url = `/${directory}${req.file.filename}`;
-          req.fileUrl = url;
-          req.fileMeta = { url, storageKey: req.file.filename };
-        }
-        next();
-      });
+      if (err) return res.status(400).json({ error: err.message });
+      if (req.file) {
+        const isLoggedIn = !!(req as any).user?.id;
+        const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
+        const url = `/${directory}${req.file.filename}`;
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+      }
+      next();
+    });
   } else {
     // CHANGED: s3MemoryImage
     s3MemoryImage.single("image")(req, res, (err) => {
@@ -912,87 +926,87 @@ export const uploadArticleFiles = (req: Request, res: Response, next: NextFuncti
   if (isLocal) {
     // ... (Local logic unchanged, heavy nesting)
     const upload = multer({
-        storage: multer.diskStorage({
-          destination: (req, file, cb) => {
-            const isLoggedIn = !!(req as any).user?.id;
-            let directory = '';
-            if (file.fieldname === 'pdf') {
-              directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
-            } else {
-              directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
-            }
-            if (!fs.existsSync(directory)) fs.mkdirSync(directory, { recursive: true });
-            cb(null, directory);
-          },
-          filename: (req, file, cb) => {
-            const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
-            cb(null, unique + path.extname(file.originalname));
-          },
-        }),
-        limits: { fileSize: 10 * 1024 * 1024 }
-      });
-  
-      upload.fields([
-        { name: 'pdf', maxCount: 1 },
-        { name: 'thumbnail', maxCount: 1 },
-        { name: 'images', maxCount: 10 }
-      ])(req, res, async (err) => {
-        if (err) return res.status(400).json({ error: err.message });
-        const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-        const isLoggedIn = !!(req as any).user?.id;
-        try {
-          if (files.pdf && files.pdf[0]) {
-            const pdfFile = files.pdf[0];
-            const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
-            const pdfFilePath = path.join(process.cwd(), directory, pdfFile.filename);
-            const watermarkedBuffer = await addUploadWatermark(pdfFilePath, pdfFile.mimetype);
-            fs.writeFileSync(pdfFilePath, watermarkedBuffer);
-            req.fileMeta = {
-              url: `/${directory}${pdfFile.filename}`,
-              storageKey: pdfFile.filename
-            };
-            const isDocumentUpload = req.body.contentType === 'DOCUMENT' ||
-              req.body.documentType === 'PDF' ||
-              req.body.documentType === 'DOCX' ||
-              (!req.body.abstract && !req.body.keywords && !files.thumbnail && !files.images);
-            if (isDocumentUpload) {
-              req.body.contentType = 'DOCUMENT';
-              req.body.documentType = 'PDF';
-              req.body.requiresAdobeProcessing = true;
-              req.isDocumentUpload = true;
-            } else {
-              req.body.contentType = 'ARTICLE';
-            }
+      storage: multer.diskStorage({
+        destination: (req, file, cb) => {
+          const isLoggedIn = !!(req as any).user?.id;
+          let directory = '';
+          if (file.fieldname === 'pdf') {
+            directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+          } else {
+            directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
           }
-          if (files.thumbnail && files.thumbnail[0]) {
-            const thumbFile = files.thumbnail[0];
-            const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
-            req.body.thumbnailUrl = `/${directory}${thumbFile.filename}`;
+          if (!fs.existsSync(directory)) fs.mkdirSync(directory, { recursive: true });
+          cb(null, directory);
+        },
+        filename: (req, file, cb) => {
+          const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+          cb(null, unique + path.extname(file.originalname));
+        },
+      }),
+      limits: { fileSize: 10 * 1024 * 1024 }
+    });
+
+    upload.fields([
+      { name: 'pdf', maxCount: 1 },
+      { name: 'thumbnail', maxCount: 1 },
+      { name: 'images', maxCount: 10 }
+    ])(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const isLoggedIn = !!(req as any).user?.id;
+      try {
+        if (files.pdf && files.pdf[0]) {
+          const pdfFile = files.pdf[0];
+          const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+          const pdfFilePath = path.join(process.cwd(), directory, pdfFile.filename);
+          const watermarkedBuffer = await addUploadWatermark(pdfFilePath, pdfFile.mimetype);
+          fs.writeFileSync(pdfFilePath, watermarkedBuffer);
+          req.fileMeta = {
+            url: `/${directory}${pdfFile.filename}`,
+            storageKey: pdfFile.filename
+          };
+          const isDocumentUpload = req.body.contentType === 'DOCUMENT' ||
+            req.body.documentType === 'PDF' ||
+            req.body.documentType === 'DOCX' ||
+            (!req.body.abstract && !req.body.keywords && !files.thumbnail && !files.images);
+          if (isDocumentUpload) {
+            req.body.contentType = 'DOCUMENT';
+            req.body.documentType = 'PDF';
+            req.body.requiresAdobeProcessing = true;
+            req.isDocumentUpload = true;
+          } else {
+            req.body.contentType = 'ARTICLE';
           }
-          if (files.images && files.images.length > 0) {
-            const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
-            req.body.imageUrls = files.images.map(img => `/${directory}${img.filename}`);
-          }
-          next();
-        } catch (error) {
-            // Error handling ...
-            if (files.pdf && files.pdf[0]) {
-                const pdfFile = files.pdf[0];
-                const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
-                req.fileMeta = { url: `/${directory}${pdfFile.filename}`, storageKey: pdfFile.filename };
-            }
-            if (files.thumbnail && files.thumbnail[0]) {
-                const thumbFile = files.thumbnail[0];
-                const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
-                req.body.thumbnailUrl = `/${directory}${thumbFile.filename}`;
-            }
-            if (files.images && files.images.length > 0) {
-                const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
-                req.body.imageUrls = files.images.map(img => `/${directory}${img.filename}`);
-            }
-            next();
         }
-      });
+        if (files.thumbnail && files.thumbnail[0]) {
+          const thumbFile = files.thumbnail[0];
+          const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
+          req.body.thumbnailUrl = `/${directory}${thumbFile.filename}`;
+        }
+        if (files.images && files.images.length > 0) {
+          const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
+          req.body.imageUrls = files.images.map(img => `/${directory}${img.filename}`);
+        }
+        next();
+      } catch (error) {
+        // Error handling ...
+        if (files.pdf && files.pdf[0]) {
+          const pdfFile = files.pdf[0];
+          const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+          req.fileMeta = { url: `/${directory}${pdfFile.filename}`, storageKey: pdfFile.filename };
+        }
+        if (files.thumbnail && files.thumbnail[0]) {
+          const thumbFile = files.thumbnail[0];
+          const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
+          req.body.thumbnailUrl = `/${directory}${thumbFile.filename}`;
+        }
+        if (files.images && files.images.length > 0) {
+          const directory = isLoggedIn ? 'uploads/images/' : 'uploads/temp/images/';
+          req.body.imageUrls = files.images.map(img => `/${directory}${img.filename}`);
+        }
+        next();
+      }
+    });
   } else {
     // CHANGED: Multer memory (no supabase)
     const upload = multer({
@@ -1072,20 +1086,20 @@ export const uploadDocxOnly = (req: Request, res: Response, next: NextFunction) 
   if (isLocal) {
     // ... (Local logic unchanged)
     localUploadDocxOnly.single("docx")(req, res, async (err) => {
-        if (err) return res.status(400).json({ error: err.message });
-        if (!req.file) return res.status(400).json({ error: "DOCX file required" });
-        try {
-          const url = `/uploads/words/${req.file.filename}`;
-          req.fileUrl = url;
-          req.fileMeta = { url, storageKey: req.file.filename };
-          next();
-        } catch (error) {
-          const url = `/uploads/words/${req.file.filename}`;
-          req.fileUrl = url;
-          req.fileMeta = { url, storageKey: req.file.filename };
-          next();
-        }
-      });
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file) return res.status(400).json({ error: "DOCX file required" });
+      try {
+        const url = `/uploads/words/${req.file.filename}`;
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+        next();
+      } catch (error) {
+        const url = `/uploads/words/${req.file.filename}`;
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+        next();
+      }
+    });
   } else {
     // CHANGED: s3MemoryDocxOnly
     s3MemoryDocxOnly.single("docx")(req, res, async (err) => {
@@ -1126,35 +1140,35 @@ export const uploadReviewerDocxOnly = (req: Request, res: Response, next: NextFu
   if (isLocal) {
     // ... (Local logic unchanged)
     const reviewerUpload = multer({
-        storage: multer.diskStorage({
-          destination: (_req, _file, cb) => {
-            cb(null, 'uploads/words/');
-          },
-          filename: (_req, file, cb) => {
-            const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
-            cb(null, unique + path.extname(file.originalname));
-          },
-        }),
-        fileFilter: reviewerDocxFilter,
-        limits: { fileSize: MAX_DOCUMENT_SIZE },
-      });
-  
-      reviewerUpload.single("document")(req, res, async (err) => {
-        if (err) return res.status(400).json({ error: err.message });
-        if (!req.file) return res.status(400).json({ error: "DOCX file required for reviewer upload" });
-  
-        try {
-          const url = `/uploads/words/${req.file.filename}`;
-          req.fileUrl = url;
-          req.fileMeta = { url, storageKey: req.file.filename };
-          next();
-        } catch (error) {
-          const url = `/uploads/words/${req.file.filename}`;
-          req.fileUrl = url;
-          req.fileMeta = { url, storageKey: req.file.filename };
-          next();
-        }
-      });
+      storage: multer.diskStorage({
+        destination: (_req, _file, cb) => {
+          cb(null, 'uploads/words/');
+        },
+        filename: (_req, file, cb) => {
+          const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+          cb(null, unique + path.extname(file.originalname));
+        },
+      }),
+      fileFilter: reviewerDocxFilter,
+      limits: { fileSize: MAX_DOCUMENT_SIZE },
+    });
+
+    reviewerUpload.single("document")(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file) return res.status(400).json({ error: "DOCX file required for reviewer upload" });
+
+      try {
+        const url = `/uploads/words/${req.file.filename}`;
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+        next();
+      } catch (error) {
+        const url = `/uploads/words/${req.file.filename}`;
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
+        next();
+      }
+    });
   } else {
     // CHANGED: Multer memory (generic)
     const reviewerUpload = multer({
@@ -1189,37 +1203,37 @@ export const uploadReviewerDocxOnly = (req: Request, res: Response, next: NextFu
 
 // BANNER IMAGE UPLOAD HANDLER
 export const uploadBannerImage = (req: Request, res: Response, next: NextFunction) => {
-    if (isLocal) {
-        localUploadImage.single("image")(req, res, async (err) => {
-            if (err) return res.status(400).json({ error: err.message });
-            if (req.file) {
-                req.fileUrl = `/uploads/images/${req.file.filename}`;
-            }
-            next();
-        });
-    } else {
-        // CHANGED: s3MemoryImage
-        s3MemoryImage.single("image")(req, res, async (err) => {
-            if (err) return res.status(400).json({ error: err.message });
-            const file = req.file;
-            if (!file) return next();
+  if (isLocal) {
+    localUploadImage.single("image")(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      if (req.file) {
+        req.fileUrl = `/uploads/images/${req.file.filename}`;
+      }
+      next();
+    });
+  } else {
+    // CHANGED: s3MemoryImage
+    s3MemoryImage.single("image")(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      const file = req.file;
+      if (!file) return next();
 
-            try {
-                // CHANGED: uploadBufferToS3
-                const { url } = await uploadBufferToS3(
-                    file.buffer,
-                    file.originalname,
-                    file.mimetype,
-                    'image'
-                );
-                req.fileUrl = url;
-                next();
-            } catch (error) {
-                console.error("S3 Image Upload Error:", error);
-                res.status(500).json({ error: "Image upload failed" });
-            }
-        });
-    }
+      try {
+        // CHANGED: uploadBufferToS3
+        const { url } = await uploadBufferToS3(
+          file.buffer,
+          file.originalname,
+          file.mimetype,
+          'image'
+        );
+        req.fileUrl = url;
+        next();
+      } catch (error) {
+        console.error("S3 Image Upload Error:", error);
+        res.status(500).json({ error: "Image upload failed" });
+      }
+    });
+  }
 };
 
 // ADMIN PDF UPLOAD HANDLER (unlimited size)
@@ -1227,43 +1241,43 @@ export const uploadAdminPdf = (req: Request, res: Response, next: NextFunction) 
   if (isLocal) {
     // ... (Local logic unchanged)
     localUploadAdminPdf.single("pdf")(req, res, async (err) => {
-        if (err) return res.status(400).json({ error: err.message });
-        if (!req.file) return res.status(400).json({ error: "PDF file required" });
-  
-        try {
-          const filePath = path.join(process.cwd(), ADMIN_PDF_DIR, req.file.filename);
-          const { addAdminPdfWatermark } = await import('../utils/admin-pdf-watermark.utils.js');
-          const { watermarkedBuffer } = await addAdminPdfWatermark(filePath, {
-            title: req.body.title || 'Admin Upload',
-            issue: req.body.issue || new Date().toLocaleString('default', { month: 'long' }),
-            volume: req.body.volume || new Date().getFullYear().toString(),
-            adminName: (req as any).user?.name || 'LAW NATION ADMIN'
-          });
-  
-          const watermarkedFilename = req.file.filename.replace('.pdf', '_watermarked.pdf');
-          const watermarkedPath = path.join(process.cwd(), ADMIN_PDF_DIR, watermarkedFilename);
-          fs.writeFileSync(watermarkedPath, watermarkedBuffer);
-  
-          req.fileUrl = `/${ADMIN_PDF_DIR}${req.file.filename}`; 
-          req.fileMeta = { 
-            url: `/${ADMIN_PDF_DIR}${req.file.filename}`, 
-            watermarkedUrl: `/${ADMIN_PDF_DIR}${watermarkedFilename}`, 
-            storageKey: req.file.filename,
-            fileSize: req.file.size
-          };
-          
-          next();
-        } catch (error) {
-          const url = `/${ADMIN_PDF_DIR}${req.file.filename}`;
-          req.fileUrl = url;
-          req.fileMeta = { 
-            url, 
-            storageKey: req.file.filename,
-            fileSize: req.file.size
-          };
-          next();
-        }
-      });
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file) return res.status(400).json({ error: "PDF file required" });
+
+      try {
+        const filePath = path.join(process.cwd(), ADMIN_PDF_DIR, req.file.filename);
+        const { addAdminPdfWatermark } = await import('../utils/admin-pdf-watermark.utils.js');
+        const { watermarkedBuffer } = await addAdminPdfWatermark(filePath, {
+          title: req.body.title || 'Admin Upload',
+          issue: req.body.issue || new Date().toLocaleString('default', { month: 'long' }),
+          volume: req.body.volume || new Date().getFullYear().toString(),
+          adminName: (req as any).user?.name || 'LAW NATION ADMIN'
+        });
+
+        const watermarkedFilename = req.file.filename.replace('.pdf', '_watermarked.pdf');
+        const watermarkedPath = path.join(process.cwd(), ADMIN_PDF_DIR, watermarkedFilename);
+        fs.writeFileSync(watermarkedPath, watermarkedBuffer);
+
+        req.fileUrl = `/${ADMIN_PDF_DIR}${req.file.filename}`;
+        req.fileMeta = {
+          url: `/${ADMIN_PDF_DIR}${req.file.filename}`,
+          watermarkedUrl: `/${ADMIN_PDF_DIR}${watermarkedFilename}`,
+          storageKey: req.file.filename,
+          fileSize: req.file.size
+        };
+
+        next();
+      } catch (error) {
+        const url = `/${ADMIN_PDF_DIR}${req.file.filename}`;
+        req.fileUrl = url;
+        req.fileMeta = {
+          url,
+          storageKey: req.file.filename,
+          fileSize: req.file.size
+        };
+        next();
+      }
+    });
   } else {
     // CHANGED: s3MemoryAdminPdf
     s3MemoryAdminPdf.single("pdf")(req, res, async (err) => {
@@ -1279,7 +1293,7 @@ export const uploadAdminPdf = (req: Request, res: Response, next: NextFunction) 
         fs.writeFileSync(tempFilePath, file.buffer);
 
         const { addAdminPdfWatermark } = await import('../utils/admin-pdf-watermark.utils.js');
-        
+
         const { originalBuffer, watermarkedBuffer } = await addAdminPdfWatermark(tempFilePath, {
           title: req.body.title || 'Admin Upload',
           issue: req.body.issue || new Date().toLocaleString('default', { month: 'long' }),
@@ -1298,7 +1312,7 @@ export const uploadAdminPdf = (req: Request, res: Response, next: NextFunction) 
         );
 
         const watermarkedFilename = file.originalname.replace('.pdf', '_watermarked.pdf');
-        
+
         // CHANGED: uploadBufferToS3 (Upload Watermarked)
         const { url: watermarkedUrl } = await uploadBufferToS3(
           watermarkedBuffer,
@@ -1308,13 +1322,13 @@ export const uploadAdminPdf = (req: Request, res: Response, next: NextFunction) 
         );
 
         req.fileUrl = originalUrl;
-        req.fileMeta = { 
-          url: originalUrl, 
-          watermarkedUrl, 
+        req.fileMeta = {
+          url: originalUrl,
+          watermarkedUrl,
           storageKey,
           fileSize: file.size
         };
-        
+
         next();
       } catch (error) {
         console.error('❌ [Admin Upload] Upload failed:', error);
