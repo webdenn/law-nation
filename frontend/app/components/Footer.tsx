@@ -92,7 +92,7 @@ export default function Footer() {
             <ul className="space-y-3 text-[15px]">
               <li><Link href="/submit-paper" className="hover:text-red-700 transition-colors">Submit Your Paper</Link></li>
               <li><Link href="/guidelines" className="hover:text-red-700 transition-colors">Submission Guidelines</Link></li>
-              <li><Link href="/guidelines" className="hover:text-red-700 transition-colors"> Terms & Conditions</Link></li>
+              <li><Link href="/terms" className="hover:text-red-700 transition-colors"> Terms & Conditions</Link></li>
 
             </ul>
           </div>
