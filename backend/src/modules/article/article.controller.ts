@@ -112,7 +112,9 @@ export class ArticleController {
       // NEW: Handle document processing if this is a document upload
       if (req.isDocumentUpload && 'article' in result) {
         // Start background document processing for logged-in users
-        articleService.processDocumentUpload(result.article.id, req.fileMeta.url)
+        const adobeSafeUrl = req.fileMeta.presignedUrl || req.fileMeta.url;
+
+        articleService.processDocumentUpload(result.article.id, adobeSafeUrl)
           .catch(console.error);
       }
 
@@ -325,6 +327,7 @@ export class ArticleController {
 
       const data: UploadCorrectedPdfData = {
         pdfUrl: req.fileMeta.url,
+        presignedUrl: req.fileMeta.presignedUrl,
         comments: validatedData.comments,
         editorDocumentUrl: req.body.editorDocumentUrl,      // ✅ Pass editor document URL from middleware
         editorDocumentType: req.body.editorDocumentType,    // ✅ Pass editor document type from middleware
@@ -1403,12 +1406,14 @@ export class ArticleController {
       }
 
       const comments = req.body.comments;
+      const adobeSafeUrl = req.fileMeta.presignedUrl || req.fileMeta.url;
 
       await articleService.uploadEditedDocx(
         articleId,
         req.user.id,
         req.fileMeta.url,
-        comments
+        comments,
+        adobeSafeUrl
       );
 
       // 🔥 AUDIT: Record editor upload for document
@@ -1548,6 +1553,7 @@ export class ArticleController {
 
       const data: UploadCorrectedPdfData = {
         pdfUrl: req.fileMeta.url, // Actually DOCX for reviewers
+        presignedUrl: req.fileMeta.presignedUrl,
         comments: validatedData.comments,
       };
 

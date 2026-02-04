@@ -2,10 +2,12 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"; // CHANGED: AWS SDK
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"; // CHANGED: AWS SDK
 import type { Request, Response, NextFunction } from "express";
 import { addWatermarkToPdf } from "@/utils/pdf-watermark.utils.js";
 import { addSimpleWatermarkToWord } from "@/utils/word-watermark.utils.js";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { StringValidation } from "zod/v3";
 
 // Extend Request typing so req.fileUrl(s) are recognized
 declare global {
@@ -18,6 +20,7 @@ declare global {
         storageKey?: string;
         watermarkedUrl?: string;
         fileSize?: number;
+        presignedUrl?: string;
       } | null;
       isDocumentUpload?: boolean;
     }
@@ -304,67 +307,44 @@ async function addUploadWatermark(
 async function uploadBufferToS3(
   buffer: Buffer,
   originalname: string,
-  inputMimetype: string, // Renamed to indicate it might be unreliable
+  inputMimetype: string,
   fileType: 'pdf' | 'image' | 'thumbnail' = 'pdf'
-): Promise<{ url: string; storageKey: string }> {
-  if (!s3Client) {
-    throw new Error("AWS S3 client not initialized");
-  }
+): Promise<{ url: string; storageKey: string; presignedUrl: string }> { // <--- Return Type Updated
+  if (!s3Client) throw new Error("AWS S3 client not initialized");
 
-  // 1. FORCE CORRECT CONTENT-TYPE
-  // Adobe fails if S3 returns "application/octet-stream" or "application/zip"
+  // 1. Force Correct MimeType (Your existing fix)
   let finalMimeType = inputMimetype;
   const ext = path.extname(originalname).toLowerCase();
+  if (ext === '.docx') finalMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  else if (ext === '.pdf') finalMimeType = 'application/pdf';
 
-  if (ext === '.docx') {
-    finalMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-  } else if (ext === '.pdf') {
-    finalMimeType = 'application/pdf';
-  } else if (ext === '.png') {
-    finalMimeType = 'image/png';
-  } else if (ext === '.jpg' || ext === '.jpeg') {
-    finalMimeType = 'image/jpeg';
-  }
-
-  // Choose bucket based on file type
-  let bucketName: string;
-  let folder: string;
-
-  if (fileType === 'thumbnail') {
-    bucketName = S3_BUCKET_THUMBNAILS;
-    folder = 'thumbnails';
-  } else if (fileType === 'image') {
-    bucketName = S3_BUCKET_IMAGES;
-    folder = 'images';
-  } else {
-    bucketName = S3_BUCKET_ARTICLES;
-    folder = 'articles';
-  }
+  // 2. Select Bucket
+  let bucketName = S3_BUCKET_ARTICLES;
+  let folder = 'articles';
+  if (fileType === 'thumbnail') { bucketName = S3_BUCKET_THUMBNAILS; folder = 'thumbnails'; }
+  else if (fileType === 'image') { bucketName = S3_BUCKET_IMAGES; folder = 'images'; }
 
   const uniqueId = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
   const storageKey = `${folder}/${uniqueId}${ext}`;
 
-  const command = new PutObjectCommand({
+  // 3. Upload File
+  await s3Client.send(new PutObjectCommand({
     Bucket: bucketName,
     Key: storageKey,
     Body: buffer,
-    // Use the FORCED mime type, not the one from the browser
     ContentType: finalMimeType,
-    // Optional: Force 'inline' to help some viewers, though 'attachment' is safer for downloads
-    ContentDisposition: 'inline',
-  });
+  }));
 
-  try {
-    await s3Client.send(command);
+  // 4. Generate Links
+  const publicUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${storageKey}`;
 
-    // Construct Public URL
-    const publicUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${storageKey}`;
+  // GENERATE VIP PASS (PRESIGNED URL)
+  const presignedUrl = await getSignedUrl(s3Client, new GetObjectCommand({
+    Bucket: bucketName,
+    Key: storageKey
+  }), { expiresIn: 3600 }); // Valid for 1 hour
 
-    return { url: publicUrl, storageKey };
-  } catch (error) {
-    console.error("AWS S3 Upload Error:", error);
-    throw error;
-  }
+  return { url: publicUrl, storageKey, presignedUrl };
 }
 
 // ---------- DOCUMENT UPLOAD HANDLER ----------
