@@ -10,7 +10,7 @@ export const articleSubmissionSchema = z.object({
       "Author name can only contain letters and spaces (no numbers, special characters, or punctuation allowed)"
     ),
   authorEmail: z.string().email("Valid email is required"),
-  authorPhone: z.string().optional(),
+  authorPhone: z.string().regex(/^\d{10}$/, "Phone number must be exactly 10 digits").optional(),
   authorOrganization: z.string().optional(),
 
   // Second author (optional)
@@ -22,7 +22,7 @@ export const articleSubmissionSchema = z.object({
     )
     .optional(),
   secondAuthorEmail: z.string().email("Valid email is required for second author").optional(),
-  secondAuthorPhone: z.string().optional(),
+  secondAuthorPhone: z.string().regex(/^\d{10}$/, "Second author phone number must be exactly 10 digits").optional(),
   secondAuthorOrganization: z.string().optional(),
 
   // Article details
