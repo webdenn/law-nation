@@ -398,12 +398,19 @@ async function setupPassword(token: string, password: string) {
   // Hash password
   const passwordHash = await bcrypt.hash(password, SALT);
 
-  // Create user with appropriate role (editor or reviewer)
+  // Determine user type based on invitation
+  let userType: 'EDITOR' | 'REVIEWER' = 'EDITOR';
+  if (verification.resourceType === 'REVIEWER_INVITE') {
+    userType = 'REVIEWER';
+  }
+
+  // Create user with appropriate role and userType
   const user = await prisma.user.create({
     data: {
       name,
       email,
       passwordHash,
+      userType, // Set the correct user type
       roles: {
         create: {
           roleId,
