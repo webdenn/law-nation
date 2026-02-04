@@ -16,3 +16,5 @@ uploads/**/*
 !uploads/images/.gitkeep
 !uploads/editor-docs/.gitkeep
 !uploads/visual-diffs/.gitkeep
+dist
+next

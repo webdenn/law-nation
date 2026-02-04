@@ -193,7 +193,7 @@ export default function EditorDashboard() {
       setIsLoading(true);
       const cb = Date.now();
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles?assignedEditorId=${editorId}&cb=${cb}`,
+        `${NEXT_PUBLIC_BASE_URL}/articles?assignedEditorId=${editorId}&cb=${cb}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -258,7 +258,7 @@ export default function EditorDashboard() {
       const token = localStorage.getItem("editorToken");
       const cb = Date.now();
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/change-history?cb=${cb}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -322,7 +322,7 @@ export default function EditorDashboard() {
       }
 
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id
+        `${NEXT_PUBLIC_BASE_URL}/articles/${selectedArticle.id || selectedArticle._id
         }/upload-corrected`,
         {
           method: "PATCH",
@@ -386,7 +386,7 @@ export default function EditorDashboard() {
       setIsApproving(true); // ✅ Start Loading
       const token = localStorage.getItem("editorToken");
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id
+        `${NEXT_PUBLIC_BASE_URL}/articles/${selectedArticle.id || selectedArticle._id
         }/editor-approve`,
         {
           method: "PATCH",
@@ -466,7 +466,7 @@ export default function EditorDashboard() {
       const articleId = selectedArticle.id || selectedArticle._id;
 
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`,
         {
           method: "GET",
           headers: { Authorization: `Bearer ${token}` },

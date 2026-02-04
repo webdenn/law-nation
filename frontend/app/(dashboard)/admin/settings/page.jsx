@@ -7,7 +7,7 @@ import AdminSidebar from "../../../components/AdminSidebar";
 
 export default function FooterSettingsPage() {
     const router = useRouter();
-    const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000";
+    const nextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL;
 
     const [aboutText, setAboutText] = useState("");
     const [researchersText, setResearchersText] = useState("");
@@ -26,7 +26,7 @@ export default function FooterSettingsPage() {
 
     const fetchSettings = async () => {
         try {
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/settings/footer`);
+            const res = await fetch(`${nextPublicApiUrl}/settings/footer`);
             const data = await res.json();
             if (data.success && data.settings) {
                 setAboutText(data.settings.aboutText || "");
@@ -45,7 +45,7 @@ export default function FooterSettingsPage() {
         setSaving(true);
         try {
             const token = localStorage.getItem("adminToken");
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/settings/footer`, {
+            const res = await fetch(`${nextPublicApiUrl}/settings/footer`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",

@@ -38,7 +38,7 @@ const TeamCard = ({ member }: { member: Member }) => (
 export default function OurTeamPage() {
     const [teamMembers, setTeamMembers] = React.useState<Member[]>([]);
     const [loading, setLoading] = React.useState(true);
-    const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000";
+    const nextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL;
 
     React.useEffect(() => {
         fetchTeam();
@@ -46,7 +46,7 @@ export default function OurTeamPage() {
 
     const fetchTeam = async () => {
         try {
-            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/settings/our-people`);
+            const res = await fetch(`${nextPublicApiUrl}/settings/our-people`);
             const data = await res.json();
             if (data.success && data.settings) {
                 setTeamMembers(Array.isArray(data.settings.teamMembers) ? data.settings.teamMembers : []);

@@ -32,7 +32,7 @@ export default function AddReviewerPage() {
         }
 
         try {
-            const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/users/invite-reviewer`, {
+            const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/users/invite-reviewer`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

@@ -1,8 +1,12 @@
 
-import { PrismaClient } from "@prisma/client";
+import { createRequire } from "module";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import dotenv from 'dotenv';
+
+// --- THE FIX ---
+const require = createRequire(import.meta.url);
+const { PrismaClient } = require("@prisma/client");
 import bcrypt from 'bcrypt';
 
 // Load env vars

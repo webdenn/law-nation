@@ -1,0 +1,101 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
+
+      # --- 1. BUILD FRONTEND (Standard) ---
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build Frontend
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_BASE_URL: /api
+          NEXT_PUBLIC_API_URL: /api
+          NEXT_PUBLIC_RECAPTCHA_SITE_KEY: 6LcC-14sAAAAAC_Q30dcv0nnNhPFnGA-D2bxppVC
+
+      # --- 2. BUILD BACKEND (The Heavy Lifting) ---
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Build Backend & Generate Prisma
+        working-directory: ./backend
+        # We use dummy env vars just to satisfy the build process
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+          JWT_SECRET: "dummy"
+          DIRECT_URL: "dummy"
+        run: |
+          # Generate Prisma Client (Creates files inside node_modules)
+          npx prisma generate
+          
+          # Compile TypeScript to JavaScript (dist folder)
+          npm run build
+          
+          # CRITICAL: Remove devDependencies (TypeScript, etc) to shrink size
+          # This leaves only what is needed to run the app
+          npm prune --production
+
+      # --- 3. TRANSFER FILES ---
+      - name: Deploy to EC2
+        uses: easingthemes/ssh-deploy@main
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_KEY }}
+          REMOTE_HOST: ${{ secrets.EC2_HOST }}
+          REMOTE_USER: ${{ secrets.EC2_USER }}
+          TARGET: "/var/www/law-nation/"
+          SOURCE: "./"
+          # NOTE: We do NOT exclude backend/node_modules anymore!
+          # We transfer the pre-built, pruned modules.
+          EXCLUDE: "/.git/, /frontend/node_modules/, /backend/src/"
+
+      # --- 4. RESTART SERVER (Zero CPU usage) ---
+      - name: Post Deploy Steps
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            # Fix Permissions
+            sudo chown -R ubuntu:ubuntu /var/www/law-nation
+
+            # --- FRONTEND SETUP ---
+            APP_ROOT="/var/www/law-nation/frontend"
+            STANDALONE_DIR="$APP_ROOT/.next/standalone/frontend"
+            
+            mkdir -p $STANDALONE_DIR/public
+            cp -r $APP_ROOT/public/* $STANDALONE_DIR/public/ || true
+            mkdir -p $STANDALONE_DIR/.next/static
+            cp -r $APP_ROOT/.next/static/* $STANDALONE_DIR/.next/static/ || true
+
+            # --- BACKEND SETUP ---
+            cd /var/www/law-nation/backend
+            
+            # COPY ENV FILE (Crucial for runtime)
+            # We don't run npm install or prisma generate here anymore!
+            echo "Copying environment file..."
+            cp /home/ubuntu/production/app.env .env
+
+            # --- RESTART SERVICES ---
+            echo "Restarting services..."
+            sudo systemctl restart backend.service
+            sudo systemctl restart law-nation.service

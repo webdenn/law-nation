@@ -286,9 +286,8 @@ export default function SubmitPaperPage() {
       data.append("recaptchaToken", captchaToken);
 
       const token = localStorage.getItem("authToken");
-      const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
-
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/articles/submit-with-images`, {
+      const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL;
+      const response = await fetch(`${NEXT_PUBLIC_API_URL}/articles/submit-with-images`, {
         method: "POST",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -342,9 +341,9 @@ export default function SubmitPaperPage() {
     setIsLoading(true);
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/articles";
+      const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-      const res = await fetch(`${API_URL}/verify-code`, {
+      const res = await fetch(`${API_URL}/articles/verify-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -538,8 +537,8 @@ export default function SubmitPaperPage() {
                   setShowTermsModal(false);
                 }}
                 className={`px-6 py-2.5 rounded-lg font-bold shadow-md transition-all duration-300 flex items-center gap-2 ${termsScrolled
-                    ? "bg-gradient-to-r from-red-600 to-red-700 text-white transform hover:-translate-y-0.5 hover:shadow-lg cursor-pointer"
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  ? "bg-gradient-to-r from-red-600 to-red-700 text-white transform hover:-translate-y-0.5 hover:shadow-lg cursor-pointer"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
               >
                 {termsScrolled ? (

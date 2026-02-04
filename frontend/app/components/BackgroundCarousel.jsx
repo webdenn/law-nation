@@ -6,7 +6,7 @@ export default function BackgroundCarousel({ banners }) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Backup URL agar prop mein relative path aaye
-  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000";
+  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
   // 👇 Change 2: API Fetching wala useEffect hata diya kyunki data HomePage se aa raha hai
 

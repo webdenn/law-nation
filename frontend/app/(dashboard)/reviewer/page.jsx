@@ -131,7 +131,7 @@ export default function ReviewerDashboard() {
             const cb = Date.now();
             // ✅ CHANGED: assignedReviewerId instead of assignedEditorId
             const res = await fetch(
-                `${NEXT_PUBLIC_BASE_URL}/api/articles?assignedReviewerId=${reviewerId}&cb=${cb}`,
+                `${NEXT_PUBLIC_BASE_URL}/articles?assignedReviewerId=${reviewerId}&cb=${cb}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -195,7 +195,7 @@ export default function ReviewerDashboard() {
             const token = localStorage.getItem("reviewerToken");
             const cb = Date.now();
             const res = await fetch(
-                `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`,
+                `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/change-history?cb=${cb}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -306,7 +306,7 @@ export default function ReviewerDashboard() {
 
             // ✅ CHANGED: Using correct reviewer endpoint
             const res = await fetch(
-                `${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id
+                `${NEXT_PUBLIC_BASE_URL}/articles/${selectedArticle.id || selectedArticle._id
                 }/reviewer-upload`,
                 {
                     method: "PATCH",
@@ -372,7 +372,7 @@ export default function ReviewerDashboard() {
             const token = localStorage.getItem("reviewerToken");
             // ✅ CHANGED: Endpoint -> reviewer-approve
             const res = await fetch(
-                `${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id
+                `${NEXT_PUBLIC_BASE_URL}/articles/${selectedArticle.id || selectedArticle._id
                 }/reviewer-approve`,
                 {
                     method: "PATCH",
@@ -447,7 +447,7 @@ export default function ReviewerDashboard() {
             const articleId = selectedArticle.id || selectedArticle._id;
 
             const res = await fetch(
-                `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`,
+                `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`,
                 {
                     method: "GET",
                     headers: { Authorization: `Bearer ${token}` },
