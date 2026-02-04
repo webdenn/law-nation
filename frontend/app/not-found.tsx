@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { FileQuestion, Home, ArrowLeft } from "lucide-react";
+import { FileQuestion, ArrowLeft } from "lucide-react";
 
 export default function NotFound() {
     return (
@@ -23,16 +22,9 @@ export default function NotFound() {
 
                 {/* Buttons */}
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <Link
-                        href="/"
-                        className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-900/20"
-                    >
-                        <Home size={20} />
-                        Back to Home
-                    </Link>
                     <button
                         onClick={() => window.history.back()}
-                        className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-white text-slate-700 font-bold rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-900/20"
                     >
                         <ArrowLeft size={20} />
                         Go Back
