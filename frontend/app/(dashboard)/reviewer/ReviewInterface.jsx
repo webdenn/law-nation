@@ -187,7 +187,7 @@ const ReviewInterface = ({
                                 htmlFor="terms-acceptance"
                                 className="text-xs text-gray-600 leading-tight cursor-pointer hover:text-gray-800"
                             >
-                                I agree to the <span className="text-blue-600 font-semibold underline">Terms and Conditions</span>
+                                I agree to the <span className="text-blue-600 font-semibold underline">Terms of Submission</span>
                             </label>
                         </div>
 

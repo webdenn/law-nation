@@ -429,7 +429,7 @@ export default function SubmitPaperPage() {
             {/* Modal Header */}
             <div className="p-5 sm:p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
               <h3 className="text-xl font-bold text-gray-900">
-                Terms and Conditions
+                Terms of Submission
               </h3>
               <button
                 onClick={() => setShowTermsModal(false)}
@@ -462,59 +462,73 @@ export default function SubmitPaperPage() {
                 }
               }}
             >
-              <div className="space-y-4">
-                <p className="font-semibold text-gray-900">
-                  Please read the following terms carefully before submitting.
-                </p>
+              <div className="space-y-6">
+                <div className="text-center mb-6">
+                  <h4 className="text-lg font-bold text-gray-900 uppercase">Terms of Submission</h4>
+                </div>
+
                 <p>
-                  1. <strong>Originality:</strong> I/We declare that the manuscript is an
-                  original work and has not been published previously in any form. It is
-                  not currently under consideration for publication elsewhere.
+                  By submitting any material to this website, the Author agrees to be bound by the following Terms and Conditions. These terms constitute a legally binding agreement between the Author and Law Nation Prime Times Journal ("LN").
                 </p>
+
                 <p>
-                  2. <strong>Authorship:</strong> All authors have significantly contributed
-                  to the research and manuscript preparation. I confirm that I have the
-                  authority to submit this work on behalf of all co-authors.
+                  "Author's Submission" refers to all materials submitted by the Author to LN, including but not limited to research papers, articles, manuscripts, abstracts, figures, images, audio-visual materials, and/or any other accompanying data submitted by the Author.
                 </p>
-                <p>
-                  3. <strong>Copyright & Licensing:</strong> Upon acceptance, the copyright
-                  of the manuscript will be transferred to Law Nation Prime Times Journal.
-                  The journal reserves the right to distribute, publish, and reproduce the
-                  article.
-                </p>
-                <p>
-                  4. <strong>Liability:</strong> The authors bear full responsibility for
-                  the content. Law Nation Prime Times Journal is not liable for any claims
-                  related to plagiarism, defamation, or copyright infringement arising from
-                  the published work.
-                </p>
-                <p>
-                  5. <strong>Ethics:</strong> The research adheres to ethical standards. Any
-                  conflicts of interest have been disclosed.
-                </p>
-                <p>
-                  6. <strong>Review Process:</strong> I understand that the manuscript will
-                  undergo a peer-review process, and acceptance is subject to the reviewers'
-                  comments and editorial decision.
-                </p>
-                <p>
-                  7. <strong>Withdrawal Policy:</strong> Withdrawal of the manuscript after
-                  submission may be subject to the journal's withdrawal policy and potential
-                  fees if the review process has already commenced.
-                </p>
-                <p>
-                  8. <strong>Data Privacy:</strong> Personal data collected during submission
-                  will be used solely for the purpose of processing and publishing the article.
-                </p>
-                <p>
-                  9. <strong>Plagiarism Policy:</strong> I understand that my submission will
-                  be checked for plagiarism. If similarity counts exceed the permissible limit,
-                  the manuscript may be rejected immediately.
-                </p>
-                <p>
-                  10. <strong>Declaration:</strong> By clicking "I Accept", I confirm that all
-                  information provided is accurate and I agree to abide by the terms stated above.
-                </p>
+
+                <div>
+                  <h5 className="font-bold text-gray-900 mb-2">1. The Exclusivity Period:</h5>
+                  <p className="mb-2">To ensure the integrity of the review process, the Author agree to the following strict exclusivity terms:</p>
+                  <ul className="list-disc ml-6 space-y-2">
+                    <li>Upon submission, the Author grants LN an exclusive, irrevocable right to review the Author’s Submission for a period of sixty (60) days from the date of submission.</li>
+                    <li>The Author warrant that the Author’s Submission is not currently under review by any other publication, and the Author agree not to submit, publish, post, or license the Author’s Submission to any other third party during the said period.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900 mb-2">2. Transfer of Ownership and Copyright:</h5>
+                  <p className="mb-2">If, within the said period, LN (a) publishes the Author’s Submission, or (b) communicates acceptance of the Author’s Submission for future publication:</p>
+                  <ul className="list-disc ml-6 space-y-2">
+                    <li>The Author hereby assigns, transfers, and conveys all right, title, and interest in the Author’s Submission to LN, which shall include the copyright and intellectual property rights subject to the applicable laws.</li>
+                    <li>LN shall own the exclusive right to reproduce, distribute, display, perform, adapt, translate, and create derivative works of the Author’s Submission in any format now known or hereafter developed (including print, digital, and electronic databases).</li>
+                    <li>LN shall have all the rights in the Author’s Submission post publication which shall be valid for a full term of copyright and any extensions or renewals thereof. The Author retains no residual rights to the accepted/published work without the express written consent of LN.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900 mb-2">3. Editorial Discretion and Moral Rights:</h5>
+                  <p>LN reserves the absolute right to edit, redact, modify, shorten, or format the Author’s Submission as per editorial standards, clarity, or legal requirements.</p>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900 mb-2">4. Reversion of Rights (Rejection or Expiry):</h5>
+                  <ul className="list-disc ml-6 space-y-2 text-justify">
+                    <li>
+                      Ownership of the Author's Submission shall revert to the Author <strong>only if</strong>:
+                      <ul className="list-decimal ml-6 mt-1 space-y-1">
+                        <li>LN explicitly rejects the Author's Submission in writing; OR</li>
+                        <li>After expiry of sixty (60) days from the date of the Author’s Submission, <strong>without</strong> LN publishing the content or notifying the Author of acceptance/publication.</li>
+                      </ul>
+                    </li>
+                    <li>In any of aforementioned conditions in Clause 4(a) or 4(b), the Author’s Submission is no longer the property of LN, and the sixty (60) days is free to publish it elsewhere.</li>
+                    <li><strong>No Liability:</strong> LN shall not be liable for any loss of opportunity or damages resulting from the delay during the review period of sixty (60) days and/or subsequent rejection.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900 mb-2">5. Author Warranties and Strict Liability:</h5>
+                  <p className="mb-2">The Author represents and warrants that:</p>
+                  <ul className="list-disc ml-6 space-y-2">
+                    <li>The Author’s Submission is entirely original and is the Author’s own work.</li>
+                    <li>The Author’s Submission does not exceed the permissible limit of plagiarism i.e., 12 % and does not infringe upon the copyright, trademark, privacy, or any other rights of any third party.</li>
+                    <li>The Author’s Submission is not defamatory, libelous, obscene, or seditious, and does not violate the applicable laws.</li>
+                    <li>The Author agrees to indemnify, defend, and hold harmless LN, its publishers, editors, and agents from any and all claims, liabilities, legal fees, and damages arising from a breach of these warranties or any third-party claim regarding the Author’s Submission.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900 mb-2">6. Governing Law and Jurisdiction:</h5>
+                  <p>These Terms shall be governed by and construed in accordance with the laws of India. Any disputes regarding the ownership or publication of the Author’s Submission shall be subject to the exclusive jurisdiction of the courts located in New Delhi.</p>
+                </div>
                 {/* Extra spacer to ensure scrolling is needed on smaller screens */}
                 <div className="h-10"></div>
               </div>
