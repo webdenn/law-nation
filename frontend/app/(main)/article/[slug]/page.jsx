@@ -236,82 +236,15 @@ export default function ArticlePage({ params }) {
     );
 
 
-  // Helper: Render text with Medium-style formatting (typography + lists)
+  // Helper: Render text preserving original formatting (whitespace, newlines)
   const renderMediumContent = (text) => {
     if (!text) return null;
 
-    // Pre-process: Ensure lists are on new lines if they're stuck in the middle of text
-    // 1. Numbered lists (e.g., "text. 1. Item") -> "text.\n1. Item"
-    // We look for a period/colon/newline, space, digit, dot, space.
-    let formattedText = text
-      .replace(/([.:?!])\s+(\d+\.\s+)/g, "$1\n$2")  // Fix stuck numbered lists
-      .replace(/([.:?!])\s+([•*-]\s+)/g, "$1\n$2"); // Fix stuck bullets
-
-    // Also handle cases where a list starts a paragraph without a preceding punctuation match if needed,
-    // but the above covers the "inline" case. 
-    // Additional cleanup for common patterns:
-    formattedText = formattedText.replace(/(\n|^)(\d+\.)([^\s])/g, "$1$2 $3"); // Ensure space after dot in "1.Text"
-
-    const lines = formattedText.split('\n');
-    const elements = [];
-    let currentList = null;
-
-    const renderList = (list, key) => {
-      const Tag = list.type;
-      const listClass = list.type === 'ul' ? 'list-disc' : 'list-decimal';
-      return (
-        <Tag key={key} className={`mb-6 pl-5 space-y-2 ${listClass} ml-2 text-[20px] text-[#292929] leading-[32px]`}>
-          {list.items.map((item, i) => (
-            <li key={i} className="pl-1" dangerouslySetInnerHTML={{ __html: item }} />
-          ))}
-        </Tag>
-      );
-    };
-
-    lines.forEach((line, index) => {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        if (currentList) {
-          elements.push(renderList(currentList, `list-${index}`));
-          currentList = null;
-        }
-        return;
-      }
-
-      // Check for list items
-      const isBullet = /^[-*•]\s/.test(trimmed);
-      const isNumber = /^\d+\.\s/.test(trimmed);
-
-      if (isBullet || isNumber) {
-        const listType = isBullet ? 'ul' : 'ol';
-        // If switching list types or just starting
-        if (!currentList || currentList.type !== listType) {
-          if (currentList) elements.push(renderList(currentList, `list-${index}-prev`));
-          currentList = { type: listType, items: [] };
-        }
-        // Remove the marker for display
-        const itemContent = trimmed.replace(/^([-*•]|\d+\.)\s/, '');
-        currentList.items.push(itemContent);
-      } else {
-        // Close list if open
-        if (currentList) {
-          elements.push(renderList(currentList, `list-${index}`));
-          currentList = null;
-        }
-        // Regular paragraph (Medium style)
-        elements.push(
-          <p key={`p-${index}`} className="mb-8 text-[20px] text-[#292929] leading-[32px] tracking-tight text-justify">
-            {trimmed}
-          </p>
-        );
-      }
-    });
-
-    if (currentList) {
-      elements.push(renderList(currentList, `list-end`));
-    }
-
-    return elements;
+    return (
+      <div className="whitespace-pre-wrap text-[18px] sm:text-[20px] text-[#292929] leading-[32px] tracking-tight text-justify font-serif">
+        {text}
+      </div>
+    );
   };
 
   // Calculate guest content preserving structure
