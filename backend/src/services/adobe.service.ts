@@ -232,19 +232,19 @@ export class AdobeService {
       return new Promise((resolve, reject) => {
         outputStream.on('finish', () => {
           console.log(`✅ [Adobe] PDF converted to DOCX: ${outputPath}`);
-          
+
           // Clean up temp file if we downloaded one
           if (tempPdfPath) {
-            fs.unlink(tempPdfPath, () => {});
+            fs.unlink(tempPdfPath, () => { });
           }
-          
+
           // Return absolute path - let caller handle conversion to relative
           resolve(outputPath);
         });
         outputStream.on('error', (error) => {
           // Clean up temp file on error
           if (tempPdfPath) {
-            fs.unlink(tempPdfPath, () => {});
+            fs.unlink(tempPdfPath, () => { });
           }
           reject(error);
         });
@@ -253,9 +253,9 @@ export class AdobeService {
     } catch (err: any) {
       // Clean up temp file on error
       if (tempPdfPath) {
-        fs.unlink(tempPdfPath, () => {});
+        fs.unlink(tempPdfPath, () => { });
       }
-      
+
       console.error('❌ [Adobe] PDF to DOCX conversion failed:', err);
       if (err instanceof SDKError || err instanceof ServiceUsageError || err instanceof ServiceApiError) {
         throw new InternalServerError(`Adobe PDF conversion failed: ${err.message}`);
@@ -350,23 +350,23 @@ export class AdobeService {
           console.log(`   📂 Output: ${outputPath}`);
           console.log(`   📊 Output size: ${(outputSize / 1024).toFixed(2)} KB`);
           console.log(`   ⏱️ Duration: ${duration}ms`);
-          
+
           // Clean up temp file if we downloaded one
           if (tempDocxPath) {
-            fs.unlink(tempDocxPath, () => {});
+            fs.unlink(tempDocxPath, () => { });
           }
-          
+
           // Return absolute path - let caller handle conversion to relative
           resolve(outputPath);
         });
         outputStream.on('error', (error) => {
           console.error(`❌ [Adobe] Error writing output file:`, error);
-          
+
           // Clean up temp file on error
           if (tempDocxPath) {
-            fs.unlink(tempDocxPath, () => {});
+            fs.unlink(tempDocxPath, () => { });
           }
-          
+
           reject(error);
         });
       });
@@ -377,7 +377,7 @@ export class AdobeService {
 
       // Clean up temp file on error
       if (tempDocxPath) {
-        fs.unlink(tempDocxPath, () => {});
+        fs.unlink(tempDocxPath, () => { });
       }
 
       console.error(`❌ [Adobe] DOCX to PDF conversion failed after ${duration}ms`);
@@ -404,21 +404,21 @@ export class AdobeService {
    */
   private async downloadFile(url: string, extension: string): Promise<string> {
     console.log(`🌐 [Adobe Download] Fetching file from URL: ${url}`);
-    
+
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to download file: ${response.statusText}`);
     }
-    
+
     const buffer = await response.arrayBuffer();
-    
+
     // Create temp directory in uploads folder (served by Express)
     const tempDir = path.join(process.cwd(), 'uploads', 'temp');
     await fs.promises.mkdir(tempDir, { recursive: true });
-    
+
     const tempPath = path.join(tempDir, `adobe-temp-${Date.now()}${extension}`);
     await fs.promises.writeFile(tempPath, Buffer.from(buffer));
-    
+
     console.log(`✅ [Adobe Download] Saved to temp: ${tempPath}`);
     return tempPath;
   }
@@ -548,145 +548,175 @@ export class AdobeService {
    * Extract text from PDF using Adobe ExtractPDF API with validation and repair
    */
   async extractTextFromPdf(pdfPath: string): Promise<string> {
-  this.checkAvailability();
+    this.checkAvailability();
 
-  let processingPath = pdfPath; 
+    let processingPath = pdfPath;
 
-  try {
-    console.log(`🔄 [Adobe] Extracting text from PDF using ExtractPDF: ${pdfPath}`);
+    try {
+      console.log(`🔄 [Adobe] Extracting text from PDF using ExtractPDF: ${pdfPath}`);
 
-    const absolutePath = resolveToAbsolutePath(pdfPath);
+      const absolutePath = resolveToAbsolutePath(pdfPath);
 
-    if (!fileExistsAtPath(pdfPath)) {
-      console.error(`❌ [Adobe] Input file missing: ${absolutePath}`);
-      throw new Error(`Input file not found locally: ${absolutePath}`);
-    }
+      if (!fileExistsAtPath(pdfPath)) {
+        console.error(`❌ [Adobe] Input file missing: ${absolutePath}`);
+        throw new Error(`Input file not found locally: ${absolutePath}`);
+      }
 
-    // Step 1: Validate PDF before processing
-    console.log(`🔍 [Adobe] Validating PDF structure...`);
-    const validation = await this.validatePdfFile(pdfPath);
+      // Step 1: Validate PDF before processing
+      console.log(`🔍 [Adobe] Validating PDF structure...`);
+      const validation = await this.validatePdfFile(pdfPath);
 
-    if (!validation.isValid) {
-      console.warn(`⚠️ [Adobe] PDF validation failed: ${validation.error}`);
-      if (validation.canRepair) {
-        const repairedPath = pdfPath.replace(/\.pdf$/i, '_repaired.pdf');
-        console.log(`🔧 [Adobe] Attempting PDF repair...`);
-        const repairSuccess = await this.repairPdfFile(pdfPath, repairedPath);
+      if (!validation.isValid) {
+        console.warn(`⚠️ [Adobe] PDF validation failed: ${validation.error}`);
+        if (validation.canRepair) {
+          const repairedPath = pdfPath.replace(/\.pdf$/i, '_repaired.pdf');
+          console.log(`🔧 [Adobe] Attempting PDF repair...`);
+          const repairSuccess = await this.repairPdfFile(pdfPath, repairedPath);
 
-        if (repairSuccess) {
-          console.log(`✅ [Adobe] PDF repaired successfully, using repaired version`);
-          processingPath = repairedPath;
-        } else {
-          console.warn(`⚠️ [Adobe] PDF repair failed, continuing with original`);
+          if (repairSuccess) {
+            console.log(`✅ [Adobe] PDF repaired successfully, using repaired version`);
+            processingPath = repairedPath;
+          } else {
+            console.warn(`⚠️ [Adobe] PDF repair failed, continuing with original`);
+          }
         }
       }
-    }
 
-    // Step 2: Try Adobe extraction
-    const absoluteProcessingPath = resolveToAbsolutePath(processingPath);
+      // Step 2: Try Adobe extraction
+      let localPath: string;
+      let tempPath: string | null = null;
 
-    const inputAsset = await this.pdfServices.upload({
-      readStream: fs.createReadStream(absoluteProcessingPath),
-      mimeType: MimeType.PDF
-    });
+      // Handle URLs
+      if (this.isUrl(pdfPath)) {
+        console.log(`🌐 [Adobe Extract PDF] URL detected, downloading file first...`);
+        tempPath = await this.downloadFile(pdfPath, '.pdf');
+        localPath = tempPath;
+      } else {
+        localPath = resolveToAbsolutePath(pdfPath);
+      }
 
-    const ExtractPDFParams = AdobeSDK.ExtractPDFParams;
-    const ExtractElementType = AdobeSDK.ExtractElementType;
+      const absoluteProcessingPath = localPath; // This handles the repair logic partially, but repair creates a local file anyway
 
-    let params = new ExtractPDFParams({
-      elementsToExtract: [ExtractElementType.TEXT || 'TEXT']
-    });
-
-    const job = new ExtractPDFJob({ inputAsset, params });
-    console.log(`🔧 [Adobe] Created ExtractPDFJob`);
-
-    const pollingURL = await this.pdfServices.submit({ job });
-    const pdfServicesResponse = await this.pdfServices.getJobResult({
-      pollingURL,
-      resultType: ExtractPDFResult
-    });
-
-    const resultAsset = pdfServicesResponse.result.resource;
-    const streamAsset = await this.pdfServices.getContent({ asset: resultAsset });
-
-    // Step 3: Handle the Response (ZIP or JSON)
-    return new Promise((resolve, reject) => {
-      // Use Buffers instead of strings for memory efficiency
-      let chunks: any[] = [];
-      
-      streamAsset.readStream.on('data', (chunk: any) => {
-        chunks.push(chunk);
+      const inputAsset = await this.pdfServices.upload({
+        readStream: fs.createReadStream(absoluteProcessingPath),
+        mimeType: MimeType.PDF
       });
 
-      streamAsset.readStream.on('end', async () => {
-        try {
-          const totalBuffer = Buffer.concat(chunks);
-          
-          // Check if response is a ZIP package (Starts with 'PK')
-          if (totalBuffer.length > 0 && totalBuffer[0] === 0x50 && totalBuffer[1] === 0x4B) {
-            console.log("📦 [Adobe] ZIP detected. Extracting structuredData.json...");
-            
-            const zip = new AdmZip(totalBuffer);
-            const mainEntry = zip.getEntry('structuredData.json');
-            
-            if (mainEntry) {
-              const extractedJson = mainEntry.getData().toString('utf8');
-              const parsedData = JSON.parse(extractedJson);
-              
-              const rawText = (parsedData.elements || [])
-                .filter((el: any) => el.Text)
-                .map((el: any) => el.Text)
-                .join(' ');
+      const ExtractPDFParams = AdobeSDK.ExtractPDFParams;
+      const ExtractElementType = AdobeSDK.ExtractElementType;
 
-              console.log(`✅ [Adobe] Text successfully unzipped (${rawText.length} chars)`);
-              this.cleanupRepairedFile(processingPath, pdfPath);
-              return resolve(cleanTextForDatabase(rawText));
+      let params = new ExtractPDFParams({
+        elementsToExtract: [ExtractElementType.TEXT || 'TEXT']
+      });
+
+      const job = new ExtractPDFJob({ inputAsset, params });
+      console.log(`🔧 [Adobe] Created ExtractPDFJob`);
+
+      const pollingURL = await this.pdfServices.submit({ job });
+      const pdfServicesResponse = await this.pdfServices.getJobResult({
+        pollingURL,
+        resultType: ExtractPDFResult
+      });
+
+      const resultAsset = pdfServicesResponse.result.resource;
+      const streamAsset = await this.pdfServices.getContent({ asset: resultAsset });
+
+      // Step 3: Handle the Response (ZIP or JSON)
+      return new Promise((resolve, reject) => {
+        // Use Buffers instead of strings for memory efficiency
+        let chunks: any[] = [];
+
+        streamAsset.readStream.on('data', (chunk: any) => {
+          chunks.push(chunk);
+        });
+
+        streamAsset.readStream.on('end', async () => {
+          try {
+            const totalBuffer = Buffer.concat(chunks);
+
+            // Check if response is a ZIP package (Starts with 'PK')
+            if (totalBuffer.length > 0 && totalBuffer[0] === 0x50 && totalBuffer[1] === 0x4B) {
+              console.log("📦 [Adobe] ZIP detected. Extracting structuredData.json...");
+
+              const zip = new AdmZip(totalBuffer);
+              const mainEntry = zip.getEntry('structuredData.json');
+
+              if (mainEntry) {
+                const extractedJson = mainEntry.getData().toString('utf8');
+                const parsedData = JSON.parse(extractedJson);
+
+                const rawText = (parsedData.elements || [])
+                  .filter((el: any) => el.Text)
+                  .map((el: any) => el.Text)
+                  .join(' ');
+
+                console.log(`✅ [Adobe] Text successfully unzipped (${rawText.length} chars)`);
+                this.cleanupRepairedFile(processingPath, pdfPath);
+                return resolve(cleanTextForDatabase(rawText));
+              }
             }
+
+            // Fallback: Standard JSON processing
+            const jsonData = totalBuffer.toString('utf8');
+            const extractedData = JSON.parse(jsonData);
+            const rawExtractedText = (extractedData.elements || [])
+              .filter((element: any) => element.Text)
+              .map((element: any) => element.Text)
+              .join(' ');
+
+            console.log(`✅ [Adobe] Text extracted from JSON (${rawExtractedText.length} chars)`);
+            this.cleanupRepairedFile(processingPath, pdfPath);
+
+            // Clean up temp file
+            if (tempPath) {
+              fs.unlink(tempPath, () => { });
+            }
+
+            resolve(cleanTextForDatabase(rawExtractedText));
+
+          } catch (parseError) {
+            console.error("❌ [Adobe] Parsing failed, falling back to alternative extraction:", parseError);
+            this.cleanupRepairedFile(processingPath, pdfPath);
+
+            // Clean up temp file
+            if (tempPath) {
+              fs.unlink(tempPath, () => { });
+            }
+
+            resolve(await this.extractTextFromCorruptedPdf(pdfPath));
           }
+        });
 
-          // Fallback: Standard JSON processing
-          const jsonData = totalBuffer.toString('utf8');
-          const extractedData = JSON.parse(jsonData);
-          const rawExtractedText = (extractedData.elements || [])
-            .filter((element: any) => element.Text)
-            .map((element: any) => element.Text)
-            .join(' ');
-
-          console.log(`✅ [Adobe] Text extracted from JSON (${rawExtractedText.length} chars)`);
-          this.cleanupRepairedFile(processingPath, pdfPath);
-          resolve(cleanTextForDatabase(rawExtractedText));
-
-        } catch (parseError) {
-          console.error("❌ [Adobe] Parsing failed, falling back to alternative extraction:", parseError);
-          this.cleanupRepairedFile(processingPath, pdfPath);
-          resolve(await this.extractTextFromCorruptedPdf(pdfPath));
-        }
+        streamAsset.readStream.on('error', (err: any) => {
+          // Clean up temp file
+          if (tempPath) {
+            fs.unlink(tempPath, () => { });
+          }
+          reject(err);
+        });
       });
 
-      streamAsset.readStream.on('error', reject);
-    });
+    } catch (err: any) {
+      console.error('❌ [Adobe] PDF text extraction failed:', err);
+      this.cleanupRepairedFile(processingPath, pdfPath);
 
-  } catch (err: any) {
-    console.error('❌ [Adobe] PDF text extraction failed:', err);
-    this.cleanupRepairedFile(processingPath, pdfPath);
+      if (err.message && err.message.includes('BAD_PDF')) {
+        return await this.extractTextFromCorruptedPdf(pdfPath);
+      }
 
-    if (err.message && err.message.includes('BAD_PDF')) {
-      return await this.extractTextFromCorruptedPdf(pdfPath);
+      throw new InternalServerError(`Adobe PDF text extraction failed: ${err.message}`);
     }
-
-    throw new InternalServerError(`Adobe PDF text extraction failed: ${err.message}`);
   }
-}
 
-// Add this helper method to your class to keep the main function clean
-private cleanupRepairedFile(processingPath: string, originalPath: string) {
-  if (processingPath !== originalPath) {
-    try {
-      fs.unlinkSync(resolveToAbsolutePath(processingPath));
-      console.log(`🧹 [Adobe] Cleaned up repaired PDF file`);
-    } catch { }
-  }
-} /**
+  // Add this helper method to your class to keep the main function clean
+  private cleanupRepairedFile(processingPath: string, originalPath: string) {
+    if (processingPath !== originalPath) {
+      try {
+        fs.unlinkSync(resolveToAbsolutePath(processingPath));
+        console.log(`🧹 [Adobe] Cleaned up repaired PDF file`);
+      } catch { }
+    }
+  } /**
    * Alternative text extraction for corrupted PDFs that Adobe rejects
    */
   private async extractTextFromCorruptedPdf(pdfPath: string): Promise<string> {
@@ -758,13 +788,24 @@ private cleanupRepairedFile(processingPath: string, originalPath: string) {
     try {
       const fs = await import('fs');
       const mammoth = await import('mammoth');
-      const absolutePath = resolveToAbsolutePath(docxPath);
 
-      if (!fs.existsSync(absolutePath)) {
-        throw new Error(`File not found: ${absolutePath}`);
+      let localPath: string;
+      let tempPath: string | null = null;
+
+      // Handle URLs
+      if (this.isUrl(docxPath)) {
+        console.log(`🌐 [Mammoth] URL detected, downloading file first...`);
+        tempPath = await this.downloadFile(docxPath, '.docx');
+        localPath = tempPath;
+      } else {
+        localPath = resolveToAbsolutePath(docxPath);
       }
 
-      const result = await mammoth.extractRawText({ path: absolutePath });
+      if (!fs.existsSync(localPath)) {
+        throw new Error(`File not found: ${localPath}`);
+      }
+
+      const result = await mammoth.extractRawText({ path: localPath });
       const text = result.value; // The raw text
       const messages = result.messages; // Any warnings/messages
 
@@ -774,6 +815,11 @@ private cleanupRepairedFile(processingPath: string, originalPath: string) {
 
       const cleanedText = cleanTextForDatabase(text);
       console.log(`✅ [Mammoth] Extracted ${cleanedText.length} characters using Mammoth`);
+
+      // Clean up temp file if we downloaded one
+      if (tempPath) {
+        fs.unlink(tempPath, () => { });
+      }
 
       return cleanedText;
     } catch (error: any) {
@@ -789,20 +835,29 @@ private cleanupRepairedFile(processingPath: string, originalPath: string) {
     this.checkAvailability();
 
     try {
-      console.log(`� [Adobe Extract] Starting text extraction from converted DOCX...`);
+      console.log(`✨ [Adobe Extract] Starting text extraction from converted DOCX...`);
       console.log(`🔄 [Adobe] Extracting text from DOCX: ${docxPath}`);
 
-      // Convert relative path to absolute path using utility
-      const absolutePath = resolveToAbsolutePath(docxPath);
+      let localPath: string;
+      let tempPath: string | null = null;
 
-      if (!fileExistsAtPath(docxPath)) {
-        console.error(`❌ [Adobe] Input file missing: ${absolutePath}`);
-        throw new Error(`Input file not found locally: ${absolutePath}`);
+      // Handle URLs
+      if (this.isUrl(docxPath)) {
+        console.log(`🌐 [Adobe Extract] URL detected, downloading file first...`);
+        tempPath = await this.downloadFile(docxPath, '.docx');
+        localPath = tempPath;
+      } else {
+        localPath = resolveToAbsolutePath(docxPath);
+      }
+
+      if (!fs.existsSync(localPath)) {
+        console.error(`❌ [Adobe] Input file missing: ${localPath}`);
+        throw new Error(`Input file not found locally: ${localPath}`);
       }
 
       // Create an ExecutionContext using credentials
       const inputAsset = await this.pdfServices.upload({
-        readStream: fs.createReadStream(absolutePath),
+        readStream: fs.createReadStream(localPath),
         mimeType: MimeType.DOCX
       });
 
@@ -869,17 +924,35 @@ private cleanupRepairedFile(processingPath: string, originalPath: string) {
 
             const extractedText = cleanTextForDatabase(rawExtractedText);
             console.log(`✅ [Adobe] Text extracted from DOCX as JSON and cleaned (${extractedText.length} characters)`);
+
+            // Clean up temp file
+            if (tempPath) {
+              fs.unlink(tempPath, () => { });
+            }
+
             resolve(extractedText);
           } catch (parseError) {
             // If JSON parsing fails, treat the response as raw text
             console.log(`ℹ️ [Adobe] Response is raw text, not JSON. Using direct text content.`);
             const cleanedText = cleanTextForDatabase(jsonData);
             console.log(`✅ [Adobe] Text extracted from DOCX as raw text and cleaned (${cleanedText.length} characters)`);
+
+            // Clean up temp file
+            if (tempPath) {
+              fs.unlink(tempPath, () => { });
+            }
+
             resolve(cleanedText);
           }
         });
 
-        streamAsset.readStream.on('error', reject);
+        streamAsset.readStream.on('error', (err: any) => {
+          // Clean up temp file
+          if (tempPath) {
+            fs.unlink(tempPath, () => { });
+          }
+          reject(err);
+        });
       });
 
     } catch (err: any) {
@@ -917,8 +990,20 @@ private cleanupRepairedFile(processingPath: string, originalPath: string) {
       const fs = await import('fs');
       const path = await import('path'); // Ensure path is imported for resolveToAbsolutePath if needed
 
+      let localPath: string;
+      let tempPath: string | null = null;
+
+      // Handle URLs
+      if (this.isUrl(docxPath)) {
+        console.log(`🌐 [Adobe Watermark] URL detected, downloading file first...`);
+        tempPath = await this.downloadFile(docxPath, '.docx');
+        localPath = tempPath;
+      } else {
+        localPath = resolveToAbsolutePath(docxPath);
+      }
+
       // Resolve paths
-      const absoluteInputPath = resolveToAbsolutePath(docxPath);
+      const absoluteInputPath = localPath;
       const absoluteOutputPath = resolveToAbsolutePath(outputPath);
       const outputDir = path.dirname(absoluteOutputPath);
 
@@ -932,6 +1017,11 @@ private cleanupRepairedFile(processingPath: string, originalPath: string) {
 
       console.log(`✅ [Adobe] DOCX "watermarked" (copied) successfully`);
       console.log(`   📂 Output: ${outputPath}`);
+
+      // Clean up temp file
+      if (tempPath) {
+        fs.unlink(tempPath, () => { });
+      }
 
       return outputPath;
 
@@ -961,8 +1051,20 @@ private cleanupRepairedFile(processingPath: string, originalPath: string) {
       const fs = await import('fs');
       const path = await import('path');
 
+      let localPath: string;
+      let tempPath: string | null = null;
+
+      // Handle URLs
+      if (this.isUrl(pdfPath)) {
+        console.log(`🌐 [Adobe Watermark PDF] URL detected, downloading file first...`);
+        tempPath = await this.downloadFile(pdfPath, '.pdf');
+        localPath = tempPath;
+      } else {
+        localPath = resolveToAbsolutePath(pdfPath);
+      }
+
       // Convert relative paths to absolute
-      const absoluteInputPath = resolveToAbsolutePath(pdfPath);
+      const absoluteInputPath = localPath;
       const absoluteOutputPath = resolveToAbsolutePath(outputPath);
 
       // Ensure output directory exists
@@ -1180,6 +1282,11 @@ private cleanupRepairedFile(processingPath: string, originalPath: string) {
       console.log(`   📊 Output file size: ${watermarkedBytes.length} bytes`);
       console.log(`   💧 Watermark style: LAW NATION logo + PDF overlay (no header/footer duplication)`);
       console.log(`   🔧 Adobe validation: PDF integrity verified`);
+
+      // Clean up temp file
+      if (tempPath) {
+        fs.unlink(tempPath, () => { });
+      }
 
       return outputPath;
 
