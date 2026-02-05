@@ -6,6 +6,8 @@ import { resolveToAbsolutePath, fileExistsAtPath } from "@/utils/file-path.utils
 import { cleanWatermarkText, cleanTextForDatabase } from "@/utils/text-cleaning.utils.js";
 import { loadCompanyLogo } from "@/utils/logo-loader.utils.js";
 import AdmZip from "adm-zip";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 // Adobe SDK types and classes
 let AdobeSDK: any = null;
 let ServicePrincipalCredentials: any = null;
@@ -62,6 +64,23 @@ try {
 } catch (error) {
   console.warn("⚠️ [Adobe] Adobe PDF Services SDK not available:", error);
 }
+
+// S3 Configuration for file downloads (matches upload.middleware.ts)
+const isLocal = process.env.NODE_ENV === "local";
+const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
+const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || "";
+const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || "";
+
+// Initialize S3 Client (matches upload.middleware.ts)
+const s3Client = !isLocal && AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY
+  ? new S3Client({
+      region: AWS_REGION,
+      credentials: {
+        accessKeyId: AWS_ACCESS_KEY_ID,
+        secretAccessKey: AWS_SECRET_ACCESS_KEY,
+      },
+    })
+  : null;
 
 export class AdobeService {
   private pdfServices: any;
@@ -400,12 +419,51 @@ export class AdobeService {
   }
 
   /**
-   * Download file from URL to temp location (similar to file-conversion.utils.ts)
+   * Check if URL is an S3 URL
+   */
+  private isS3Url(url: string): boolean {
+    return url.includes('.s3.') && url.includes('amazonaws.com');
+  }
+
+  /**
+   * Generate presigned URL for S3 objects
+   */
+  private async generatePresignedUrl(s3Url: string): Promise<string> {
+    if (!s3Client) {
+      throw new Error('S3 client not initialized');
+    }
+
+    // Extract bucket and key from S3 URL
+    // https://law-nation.s3.ap-south-1.amazonaws.com/articles/filename.pdf
+    const urlParts = s3Url.replace('https://', '').split('/');
+    const bucketWithRegion = urlParts[0]; // law-nation.s3.ap-south-1.amazonaws.com
+    const bucket = bucketWithRegion.split('.')[0]; // law-nation
+    const key = urlParts.slice(1).join('/'); // articles/filename.pdf
+
+    console.log(`🔐 [S3] Generating presigned URL for bucket: ${bucket}, key: ${key}`);
+
+    const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+    const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // 1 hour
+
+    return presignedUrl;
+  }
+
+  /**
+   * Download file from URL to temp location (with S3 support)
    */
   private async downloadFile(url: string, extension: string): Promise<string> {
     console.log(`🌐 [Adobe Download] Fetching file from URL: ${url}`);
 
-    const response = await fetch(url);
+    let downloadUrl = url;
+
+    // If it's an S3 URL, generate presigned URL first
+    if (this.isS3Url(url)) {
+      console.log(`🔐 [Adobe Download] S3 URL detected, generating presigned URL...`);
+      downloadUrl = await this.generatePresignedUrl(url);
+      console.log(`✅ [Adobe Download] Presigned URL generated`);
+    }
+
+    const response = await fetch(downloadUrl);
     if (!response.ok) {
       throw new Error(`Failed to download file: ${response.statusText}`);
     }
