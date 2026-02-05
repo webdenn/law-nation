@@ -134,8 +134,11 @@ export default function EditorDashboard() {
         ? selectedArticle.originalPdfUrl
         : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`;
 
+      const originalIsS3 = originalPdfUrl.includes(".s3.") || originalPdfUrl.includes("amazonaws.com");
+      const originalHeaders = originalIsS3 ? {} : { Authorization: `Bearer ${token}` };
+
       const originalRes = await fetch(originalPdfUrl, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: originalHeaders
       });
       if (!originalRes.ok) throw new Error("Failed to fetch original PDF");
       const originalBlob = await originalRes.blob();
@@ -146,8 +149,11 @@ export default function EditorDashboard() {
         ? editedPdfUrl
         : `${NEXT_PUBLIC_BASE_URL}${editedPdfUrl}`;
 
+      const editedIsS3 = editedPdfFullUrl.includes(".s3.") || editedPdfFullUrl.includes("amazonaws.com");
+      const editedHeaders = editedIsS3 ? {} : { Authorization: `Bearer ${token}` };
+
       const editedRes = await fetch(editedPdfFullUrl, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: editedHeaders
       });
       if (!editedRes.ok) throw new Error("Failed to fetch edited PDF");
       const editedBlob = await editedRes.blob();
