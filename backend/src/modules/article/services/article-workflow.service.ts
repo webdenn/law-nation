@@ -1304,8 +1304,39 @@ export class ArticleWorkflowService {
     let contentHtml = '';
     if (article.currentWordUrl) {
       try {
-        console.log(`✨ [Document Publish] Extracting HTML from DOCX for rich formatting...`);
-        contentHtml = await adobeService.extractHtmlFromDocxUsingMammoth(article.currentWordUrl);
+        console.log(`✨ [Document Publish] Attempting HTML extraction from DOCX...`);
+
+        // Try to find CLEAN docx first to avoid watermarks (logos) in HTML
+        let docxPath = article.currentWordUrl;
+        const cleanDocxPath = docxPath.replace(/_watermarked|_edited_watermarked|_edited/g, '').replace('.docx', '.docx'); // simple cleanup heuristic
+        // Proper heuristic: try removing suffixes
+        const potentialCleanPaths = [
+          docxPath.replace('_edited_watermarked.docx', '.docx'),
+          docxPath.replace('_watermarked.docx', '.docx'),
+          docxPath.replace('_edited.docx', '.docx')
+        ];
+
+        const fs = await import('fs');
+        const { resolveToAbsolutePath } = await import("@/utils/file-path.utils.js");
+
+        let foundClean = false;
+        for (const p of potentialCleanPaths) {
+          if (p !== docxPath && p.endsWith('.docx')) {
+            try {
+              const absPath = resolveToAbsolutePath(p);
+              if (fs.existsSync(absPath)) {
+                console.log(`✅ [Document Publish] Found clean DOCX for HTML extraction: ${p}`);
+                docxPath = p;
+                foundClean = true;
+                break;
+              }
+            } catch (e) { /* ignore */ }
+          }
+        }
+
+        if (!foundClean) console.log(`⚠️ [Document Publish] Clean DOCX not found, using current (may have watermark): ${docxPath}`);
+
+        contentHtml = await adobeService.extractHtmlFromDocxUsingMammoth(docxPath);
         console.log(`✅ [Document Publish] Extracted HTML (${contentHtml.length} characters)`);
       } catch (error) {
         console.error('❌ [Document Publish] HTML extraction failed:', error);
@@ -1433,8 +1464,37 @@ export class ArticleWorkflowService {
 
     if (wordUrl) {
       try {
-        console.log(`✨ [Article Publish] Extracting HTML from DOCX for rich formatting...`);
-        contentHtml = await adobeService.extractHtmlFromDocxUsingMammoth(wordUrl);
+        console.log(`✨ [Article Publish] Attempting HTML extraction from DOCX...`);
+
+        // Try to find CLEAN docx first to avoid watermarks (logos) in HTML
+        let docxPath = wordUrl;
+        const potentialCleanPaths = [
+          docxPath.replace(/_edited_watermarked\.docx$/i, '.docx'),
+          docxPath.replace(/_watermarked\.docx$/i, '.docx'),
+          docxPath.replace(/_edited\.docx$/i, '.docx')
+        ];
+
+        const fs = await import('fs');
+        const { resolveToAbsolutePath } = await import("@/utils/file-path.utils.js");
+
+        let foundClean = false;
+        for (const p of potentialCleanPaths) {
+          if (p !== docxPath && p.toLowerCase().endsWith('.docx')) {
+            try {
+              const absPath = resolveToAbsolutePath(p);
+              if (fs.existsSync(absPath)) {
+                console.log(`✅ [Article Publish] Found clean DOCX for HTML extraction: ${p}`);
+                docxPath = p;
+                foundClean = true;
+                break;
+              }
+            } catch (e) { /* ignore */ }
+          }
+        }
+
+        if (!foundClean) console.log(`⚠️ [Article Publish] Clean DOCX not found, using available (may have watermark): ${docxPath}`);
+
+        contentHtml = await adobeService.extractHtmlFromDocxUsingMammoth(docxPath);
         console.log(`✅ [Article Publish] Extracted HTML (${contentHtml.length} characters)`);
       } catch (error) {
         console.error('❌ [Article Publish] HTML extraction failed:', error);
