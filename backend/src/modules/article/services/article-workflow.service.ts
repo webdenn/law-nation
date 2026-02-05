@@ -1300,6 +1300,23 @@ export class ArticleWorkflowService {
       extractedText = 'Document not yet processed. Please contact administrator.';
     }
 
+    // NEW: Extract HTML from DOCX for better formatting if available
+    let contentHtml = '';
+    if (article.currentWordUrl) {
+      try {
+        console.log(`✨ [Document Publish] Extracting HTML from DOCX for rich formatting...`);
+        contentHtml = await adobeService.extractHtmlFromDocxUsingMammoth(article.currentWordUrl);
+        console.log(`✅ [Document Publish] Extracted HTML (${contentHtml.length} characters)`);
+      } catch (error) {
+        console.error('❌ [Document Publish] HTML extraction failed:', error);
+        // Fallback to text with line breaks
+        contentHtml = extractedText.replace(/\n/g, '<br>');
+      }
+    } else {
+      // Fallback
+      contentHtml = extractedText.replace(/\n/g, '<br>');
+    }
+
     // Update article with extracted text and published status
     const updatedArticle = await prisma.article.update({
       where: { id: article.id },
@@ -1307,6 +1324,7 @@ export class ArticleWorkflowService {
         status: "PUBLISHED",
         approvedAt: new Date(),
         content: extractedText, // Store text from final version for user display
+        contentHtml: contentHtml, // Store HTML for rich formatting
         finalPdfUrl: article.currentPdfUrl, // Set final published version
       },
     });
@@ -1394,16 +1412,38 @@ export class ArticleWorkflowService {
       if (extractedText.includes("Text could not be extracted") && article.currentWordUrl) {
         console.warn(`⚠️ [Article Publish] PDF extraction failed during publish, falling back to Mammoth for DOCX...`);
         try {
+          const resolveToAbsolutePath = (await import("@/utils/file-path.utils.js")).resolveToAbsolutePath;
           const docxPath = resolveToAbsolutePath(article.currentWordUrl);
           const mammothText = await adobeService.extractTextFromDocxUsingMammoth(docxPath);
           if (mammothText && mammothText.length > 0) {
             console.log(`✅ [Article Publish] Mammoth fallback successful (${mammothText.length} chars)`);
             extractedText = mammothText;
           }
-        } catch (mammothError) {
-          console.error("❌ [Article Publish] Mammoth fallback failed:", mammothError);
+        } catch (e) {
+          console.error(e);
         }
       }
+    }
+
+    // NEW: Extract HTML from DOCX for rich formatting
+    let contentHtml = '';
+    // Prefer currentWordUrl if available (most likely to have correct formatting)
+    // Or if originalWordUrl is available and no edits were made
+    const wordUrl = article.currentWordUrl || (article.originalPdfUrl === article.currentPdfUrl ? article.originalWordUrl : null);
+
+    if (wordUrl) {
+      try {
+        console.log(`✨ [Article Publish] Extracting HTML from DOCX for rich formatting...`);
+        contentHtml = await adobeService.extractHtmlFromDocxUsingMammoth(wordUrl);
+        console.log(`✅ [Article Publish] Extracted HTML (${contentHtml.length} characters)`);
+      } catch (error) {
+        console.error('❌ [Article Publish] HTML extraction failed:', error);
+        // Fallback to text with line breaks
+        contentHtml = extractedText ? extractedText.replace(/\n/g, '<br>') : '';
+      }
+    } else {
+      // Fallback
+      contentHtml = extractedText ? extractedText.replace(/\n/g, '<br>') : '';
     }
 
     const updatedArticle = await prisma.article.update({
@@ -1411,7 +1451,10 @@ export class ArticleWorkflowService {
       data: {
         status: "PUBLISHED",
         approvedAt: new Date(),
-        content: extractedText, // Store extracted text from final version
+        reviewedAt: new Date(),
+        // content: extractedText, // Don't overwrite existing text if it's there
+        ...(extractedText && { content: extractedText }),
+        contentHtml: contentHtml,
         finalPdfUrl: article.currentPdfUrl, // Set final published version
       },
     });

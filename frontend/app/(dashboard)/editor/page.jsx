@@ -421,7 +421,7 @@ export default function EditorDashboard() {
 
     localStorage.removeItem("editorToken");
     localStorage.removeItem("editorUser");
-    router.push("/law/management-login/");
+    router.push("/management-login/");
   };
 
   const handleFileChange = (e) => {
