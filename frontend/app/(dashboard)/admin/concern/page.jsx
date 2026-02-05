@@ -18,7 +18,7 @@ export default function ConcernPage() {
         const token = localStorage.getItem("adminToken");
         const adminData = localStorage.getItem("adminUser");
         if (!token) {
-            router.push("/law/management-login/");
+            router.push("/management-login/");
         } else {
             if (adminData) setCurrentAdmin(JSON.parse(adminData));
             fetchHiddenArticles();

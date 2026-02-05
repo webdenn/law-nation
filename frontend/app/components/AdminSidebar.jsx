@@ -13,7 +13,7 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
     const handleLogout = () => {
         localStorage.clear();
         toast.info("Admin Logged Out");
-        router.push("/law/management-login/");
+        router.push("/management-login/");
         window.location.reload();
     };
 

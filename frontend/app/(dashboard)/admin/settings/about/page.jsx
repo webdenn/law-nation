@@ -20,7 +20,7 @@ export default function AboutSettingsPage() {
     useEffect(() => {
         const token = localStorage.getItem("adminToken");
         if (!token) {
-            router.push("/law/management-login/");
+            router.push("/management-login/");
         } else {
             fetchAboutContent();
         }
