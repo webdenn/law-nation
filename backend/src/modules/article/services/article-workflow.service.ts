@@ -1300,6 +1300,54 @@ export class ArticleWorkflowService {
       extractedText = 'Document not yet processed. Please contact administrator.';
     }
 
+    // NEW: Extract HTML from DOCX for better formatting if available
+    let contentHtml = '';
+    if (article.currentWordUrl) {
+      try {
+        console.log(`✨ [Document Publish] Attempting HTML extraction from DOCX...`);
+
+        // Try to find CLEAN docx first to avoid watermarks (logos) in HTML
+        let docxPath = article.currentWordUrl;
+        const cleanDocxPath = docxPath.replace(/_watermarked|_edited_watermarked|_edited/g, '').replace('.docx', '.docx'); // simple cleanup heuristic
+        // Proper heuristic: try removing suffixes
+        const potentialCleanPaths = [
+          docxPath.replace('_edited_watermarked.docx', '.docx'),
+          docxPath.replace('_watermarked.docx', '.docx'),
+          docxPath.replace('_edited.docx', '.docx')
+        ];
+
+        const fs = await import('fs');
+        const { resolveToAbsolutePath } = await import("@/utils/file-path.utils.js");
+
+        let foundClean = false;
+        for (const p of potentialCleanPaths) {
+          if (p !== docxPath && p.endsWith('.docx')) {
+            try {
+              const absPath = resolveToAbsolutePath(p);
+              if (fs.existsSync(absPath)) {
+                console.log(`✅ [Document Publish] Found clean DOCX for HTML extraction: ${p}`);
+                docxPath = p;
+                foundClean = true;
+                break;
+              }
+            } catch (e) { /* ignore */ }
+          }
+        }
+
+        if (!foundClean) console.log(`⚠️ [Document Publish] Clean DOCX not found, using current (may have watermark): ${docxPath}`);
+
+        contentHtml = await adobeService.extractHtmlFromDocxUsingMammoth(docxPath);
+        console.log(`✅ [Document Publish] Extracted HTML (${contentHtml.length} characters)`);
+      } catch (error) {
+        console.error('❌ [Document Publish] HTML extraction failed:', error);
+        // Fallback to text with line breaks
+        contentHtml = extractedText.replace(/\n/g, '<br>');
+      }
+    } else {
+      // Fallback
+      contentHtml = extractedText.replace(/\n/g, '<br>');
+    }
+
     // Update article with extracted text and published status
     const updatedArticle = await prisma.article.update({
       where: { id: article.id },
@@ -1307,6 +1355,7 @@ export class ArticleWorkflowService {
         status: "PUBLISHED",
         approvedAt: new Date(),
         content: extractedText, // Store text from final version for user display
+        contentHtml: contentHtml, // Store HTML for rich formatting
         finalPdfUrl: article.currentPdfUrl, // Set final published version
       },
     });
@@ -1394,16 +1443,67 @@ export class ArticleWorkflowService {
       if (extractedText.includes("Text could not be extracted") && article.currentWordUrl) {
         console.warn(`⚠️ [Article Publish] PDF extraction failed during publish, falling back to Mammoth for DOCX...`);
         try {
+          const resolveToAbsolutePath = (await import("@/utils/file-path.utils.js")).resolveToAbsolutePath;
           const docxPath = resolveToAbsolutePath(article.currentWordUrl);
           const mammothText = await adobeService.extractTextFromDocxUsingMammoth(docxPath);
           if (mammothText && mammothText.length > 0) {
             console.log(`✅ [Article Publish] Mammoth fallback successful (${mammothText.length} chars)`);
             extractedText = mammothText;
           }
-        } catch (mammothError) {
-          console.error("❌ [Article Publish] Mammoth fallback failed:", mammothError);
+        } catch (e) {
+          console.error(e);
         }
       }
+    }
+
+    // NEW: Extract HTML from DOCX for rich formatting
+    let contentHtml = '';
+    // Prefer currentWordUrl if available (most likely to have correct formatting)
+    // Or if originalWordUrl is available and no edits were made
+    const wordUrl = article.currentWordUrl || (article.originalPdfUrl === article.currentPdfUrl ? article.originalWordUrl : null);
+
+    if (wordUrl) {
+      try {
+        console.log(`✨ [Article Publish] Attempting HTML extraction from DOCX...`);
+
+        // Try to find CLEAN docx first to avoid watermarks (logos) in HTML
+        let docxPath = wordUrl;
+        const potentialCleanPaths = [
+          docxPath.replace(/_edited_watermarked\.docx$/i, '.docx'),
+          docxPath.replace(/_watermarked\.docx$/i, '.docx'),
+          docxPath.replace(/_edited\.docx$/i, '.docx')
+        ];
+
+        const fs = await import('fs');
+        const { resolveToAbsolutePath } = await import("@/utils/file-path.utils.js");
+
+        let foundClean = false;
+        for (const p of potentialCleanPaths) {
+          if (p !== docxPath && p.toLowerCase().endsWith('.docx')) {
+            try {
+              const absPath = resolveToAbsolutePath(p);
+              if (fs.existsSync(absPath)) {
+                console.log(`✅ [Article Publish] Found clean DOCX for HTML extraction: ${p}`);
+                docxPath = p;
+                foundClean = true;
+                break;
+              }
+            } catch (e) { /* ignore */ }
+          }
+        }
+
+        if (!foundClean) console.log(`⚠️ [Article Publish] Clean DOCX not found, using available (may have watermark): ${docxPath}`);
+
+        contentHtml = await adobeService.extractHtmlFromDocxUsingMammoth(docxPath);
+        console.log(`✅ [Article Publish] Extracted HTML (${contentHtml.length} characters)`);
+      } catch (error) {
+        console.error('❌ [Article Publish] HTML extraction failed:', error);
+        // Fallback to text with line breaks
+        contentHtml = extractedText ? extractedText.replace(/\n/g, '<br>') : '';
+      }
+    } else {
+      // Fallback
+      contentHtml = extractedText ? extractedText.replace(/\n/g, '<br>') : '';
     }
 
     const updatedArticle = await prisma.article.update({
@@ -1411,7 +1511,10 @@ export class ArticleWorkflowService {
       data: {
         status: "PUBLISHED",
         approvedAt: new Date(),
-        content: extractedText, // Store extracted text from final version
+        reviewedAt: new Date(),
+        // content: extractedText, // Don't overwrite existing text if it's there
+        ...(extractedText && { content: extractedText }),
+        contentHtml: contentHtml,
         finalPdfUrl: article.currentPdfUrl, // Set final published version
       },
     });
