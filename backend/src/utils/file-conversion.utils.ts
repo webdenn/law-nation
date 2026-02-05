@@ -1,6 +1,8 @@
+// /src/utils/file-conversion.utils.ts
 import fs from 'fs/promises';
 import path from 'path';
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { AdobeService } from '@/services/adobe.service.js';
 
 // S3 client for uploading converted files (matches upload.middleware.ts)
@@ -62,56 +64,12 @@ async function downloadFile(url: string, extension: string): Promise<string> {
 }
 
 /**
- * Save converted file locally (development) or upload to S3 (production)
- */
-async function saveConvertedFile(
-  localFilePath: string,
-  originalUrl: string,
-  targetExtension: string
-): Promise<string> {
-  if (useLocalStorage()) {
-    // Development: Save to local uploads directory
-    console.log(`💾 [Local] Saving converted file locally`);
-    
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    const pdfsDir = path.join(uploadsDir, 'pdfs');
-    const wordsDir = path.join(uploadsDir, 'words');
-    
-    // Ensure directories exist
-    await fs.mkdir(uploadsDir, { recursive: true });
-    await fs.mkdir(pdfsDir, { recursive: true });
-    await fs.mkdir(wordsDir, { recursive: true });
-    
-    // Generate unique filename
-    const timestamp = Date.now();
-    const randomId = Math.floor(Math.random() * 1000000);
-    const fileName = `${timestamp}-${randomId}${targetExtension}`;
-    
-    const targetDir = targetExtension === '.pdf' ? pdfsDir : wordsDir;
-    const targetPath = path.join(targetDir, fileName);
-    
-    // Copy converted file to uploads directory
-    await fs.copyFile(localFilePath, targetPath);
-    
-    // Return relative path for local development
-    // This matches the static route in app.ts: app.use("/uploads", ...)
-    const relativePath = `/uploads/${targetExtension === '.pdf' ? 'pdfs' : 'words'}/${fileName}`;
-    console.log(`✅ [Local] Saved to: ${relativePath}`);
-    
-    return relativePath;
-  } else {
-    // Production: Upload to S3
-    return await uploadToS3(localFilePath, originalUrl);
-  }
-}
-
-/**
  * Upload file to S3 storage (production only)
  */
-async function uploadToS3(
+export async function uploadToS3(
   localFilePath: string,
   originalUrl: string
-): Promise<string> {
+): Promise<{ url: string; presignedUrl: string }> {
   if (!s3Client) {
     throw new Error('S3 client not initialized');
   }
@@ -145,8 +103,60 @@ async function uploadToS3(
   // Generate public URL
   const publicUrl = `https://${S3_BUCKET_ARTICLES}.s3.${AWS_REGION}.amazonaws.com/${storageKey}`;
   
-  console.log(`✅ [Upload] Uploaded to S3: ${publicUrl}`);
-  return publicUrl;
+  // 3. GENERATE VIP PASS (Presigned URL)
+  const presignedUrl = await getSignedUrl(s3Client, new GetObjectCommand({
+    Bucket: S3_BUCKET_ARTICLES,
+    Key: storageKey
+  }), { expiresIn: 3600 }); // Valid for 1 hour
+  
+  console.log(`✅ [Upload] Uploaded to S3 (Secure): ${publicUrl}`);
+  
+  // Return BOTH URLs
+  return { url: publicUrl, presignedUrl };
+}
+
+/**
+ * Save converted file locally (development) or upload to S3 (production)
+ */
+async function saveConvertedFile(
+  localFilePath: string,
+  originalUrl: string,
+  targetExtension: string
+): Promise<{url: string; presignedUrl?: string}> {
+  if (useLocalStorage()) {
+    // Development: Save to local uploads directory
+    console.log(`💾 [Local] Saving converted file locally`);
+    
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    const pdfsDir = path.join(uploadsDir, 'pdfs');
+    const wordsDir = path.join(uploadsDir, 'words');
+    
+    // Ensure directories exist
+    await fs.mkdir(uploadsDir, { recursive: true });
+    await fs.mkdir(pdfsDir, { recursive: true });
+    await fs.mkdir(wordsDir, { recursive: true });
+    
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomId = Math.floor(Math.random() * 1000000);
+    const fileName = `${timestamp}-${randomId}${targetExtension}`;
+    
+    const targetDir = targetExtension === '.pdf' ? pdfsDir : wordsDir;
+    const targetPath = path.join(targetDir, fileName);
+    
+    // Copy converted file to uploads directory
+    await fs.copyFile(localFilePath, targetPath);
+    
+    // Return relative path for local development
+    // This matches the static route in app.ts: app.use("/uploads", ...)
+    const relativePath = `/uploads/${targetExtension === '.pdf' ? 'pdfs' : 'words'}/${fileName}`;
+    console.log(`✅ [Local] Saved to: ${relativePath}`);
+    
+    return { url: relativePath };
+  } else {
+    // Production: Upload to S3
+    return await uploadToS3(localFilePath, originalUrl);
+  }
 }
 
 /**
@@ -155,7 +165,7 @@ async function uploadToS3(
  */
 export async function convertWordToPdf(
   wordFilePath: string
-): Promise<string> {
+): Promise<{url: string; presignedUrl?: string}> {
   let localWordPath: string;
   let isRemote = false;
   let tempWordPath: string | null = null;
@@ -183,8 +193,8 @@ export async function convertWordToPdf(
     
     console.log(`✅ [Adobe] DOCX to PDF conversion successful`);
 
-    // --- UPDATED: Save the file via S3 (Prod) or Local Uploads (Dev) ---
-    const finalUrl = await saveConvertedFile(
+    // Save the file via S3 (Prod) or Local Uploads (Dev)
+    const result = await saveConvertedFile(
         pdfAbsolutePath, 
         wordFilePath, 
         '.pdf'
@@ -192,10 +202,9 @@ export async function convertWordToPdf(
     
     // Clean up temp files
     if (tempWordPath) await fs.unlink(tempWordPath).catch(() => {});
-    // Optionally clean up the generated pdf from temp folder after upload/move
-    // await fs.unlink(pdfAbsolutePath).catch(() => {}); 
     
-    return finalUrl;
+    // CORRECTED: Return the object directly
+    return result;
 
   } catch (error) {
     // Clean up temp files on error
@@ -212,7 +221,7 @@ export async function convertWordToPdf(
  */
 export async function convertPdfToWord(
   pdfFilePath: string
-): Promise<string> {
+): Promise<{url: string; presignedUrl?: string}> {
   let localPdfPath: string;
   let isRemote = false;
   let tempPdfPath: string | null = null;
@@ -268,9 +277,8 @@ export async function convertPdfToWord(
       fileToUploadPath = docxAbsolutePath;
     }
 
-    // --- UPDATED: Save the file via S3 (Prod) or Local Uploads (Dev) ---
-    // This ensures the file is accessible publicly via URL
-    const finalUrl = await saveConvertedFile(
+    // Save the file via S3 (Prod) or Local Uploads (Dev)
+    const result = await saveConvertedFile(
         fileToUploadPath, 
         pdfFilePath, 
         '.docx'
@@ -279,7 +287,8 @@ export async function convertPdfToWord(
     // Clean up temp files
     if (tempPdfPath) await fs.unlink(tempPdfPath).catch(() => {});
     
-    return finalUrl;
+    // CORRECTED: Return the object directly
+    return result;
 
   } catch (error) {
     // Clean up temp files on error
@@ -304,6 +313,7 @@ export function getFileType(filePath: string): 'pdf' | 'docx' | 'unknown' {
 /**
  * Ensure both PDF and Word versions exist
  * Converts the file if the other format doesn't exist
+ * Note: Returns URLs as strings to maintain backward compatibility with callers
  */
 export async function ensureBothFormats(
   filePath: string
@@ -319,10 +329,14 @@ export async function ensureBothFormats(
   
   if (fileType === 'pdf') {
     pdfPath = filePath;
-    wordPath = await convertPdfToWord(filePath);
+    // CORRECTED: Extract 'url' from the object return
+    const result = await convertPdfToWord(filePath);
+    wordPath = result.url;
   } else {
     wordPath = filePath;
-    pdfPath = await convertWordToPdf(filePath);
+    // CORRECTED: Extract 'url' from the object return
+    const result = await convertWordToPdf(filePath);
+    pdfPath = result.url;
   }
   
   return { pdfPath, wordPath };
