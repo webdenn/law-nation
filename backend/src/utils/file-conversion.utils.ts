@@ -1,7 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { AdobeService } from '@/services/adobe.service.js';
 
 // S3 client for uploading converted files (matches upload.middleware.ts)
@@ -39,45 +38,12 @@ function isUrl(filePath: string): boolean {
 }
 
 /**
- * Check if URL is an S3 URL
- */
-function isS3Url(url: string): boolean {
-  return url.includes('.s3.') && url.includes('amazonaws.com');
-}
-
-/**
- * Generate presigned URL for S3 objects
- */
-async function generatePresignedUrl(s3Url: string): Promise<string> {
-  if (!s3Client) {
-    throw new Error('S3 client not initialized');
-  }
-
-  const urlParts = s3Url.replace('https://', '').split('/');
-  const bucketWithRegion = urlParts[0];
-  const bucket = bucketWithRegion.split('.')[0];
-  const key = urlParts.slice(1).join('/');
-
-  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-  return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-}
-
-/**
- * Download file from URL to temp location (with S3 support)
+ * Download file from URL to temp location (with public S3 support)
  */
 async function downloadFile(url: string, extension: string): Promise<string> {
   console.log(`🌐 [Download] Fetching file from URL: ${url}`);
   
-  let downloadUrl = url;
-
-  // If it's an S3 URL, generate presigned URL first
-  if (isS3Url(url)) {
-    console.log(`🔐 [Download] S3 URL detected, generating presigned URL...`);
-    downloadUrl = await generatePresignedUrl(url);
-    console.log(`✅ [Download] Presigned URL generated`);
-  }
-  
-  const response = await fetch(downloadUrl);
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to download file: ${response.statusText}`);
   }
