@@ -43,6 +43,7 @@ export interface AssignEditorData {
 
 export interface UploadCorrectedPdfData {
   pdfUrl: string;
+  presignedUrl: string,
   comments?: string | undefined;
   editorDocumentUrl?: string | undefined;
   editorDocumentType?: "PDF" | "WORD" | undefined;

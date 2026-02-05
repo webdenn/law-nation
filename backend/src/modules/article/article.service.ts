@@ -71,7 +71,7 @@ export class ArticleService {
   }
 
   // NEW: Handle editor DOCX upload for documents
-  async uploadEditedDocx(articleId: string, editorId: string, docxPath: string, comments?: string) {
+  async uploadEditedDocx(articleId: string, editorId: string, docxPath: string, comments?: string, adobeSafeUrl?: string) {
     try {
       console.log(`✏️ [Document] Editor ${editorId} uploading edited DOCX for ${articleId}`);
 

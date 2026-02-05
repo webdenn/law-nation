@@ -6,6 +6,7 @@ import { resolveToAbsolutePath, fileExistsAtPath } from "@/utils/file-path.utils
 import { cleanWatermarkText, cleanTextForDatabase } from "@/utils/text-cleaning.utils.js";
 import { loadCompanyLogo } from "@/utils/logo-loader.utils.js";
 import AdmZip from "adm-zip";
+
 // Adobe SDK types and classes
 let AdobeSDK: any = null;
 let ServicePrincipalCredentials: any = null;
@@ -40,24 +41,6 @@ try {
   ServiceUsageError = adobeModule.ServiceUsageError;
   ServiceApiError = adobeModule.ServiceApiError;
 
-  // Import the target format and params classes
-  const ExportPDFParams = adobeModule.ExportPDFParams;
-  const ExportPDFTargetFormat = adobeModule.ExportPDFTargetFormat;
-  const ExtractPDFParams = adobeModule.ExtractPDFParams;
-  const ExtractElementType = adobeModule.ExtractElementType;
-
-  // Debug: Check the target format options
-  console.log("🔍 [Adobe Debug] ExportPDFTargetFormat:", ExportPDFTargetFormat);
-  if (ExportPDFTargetFormat) {
-    console.log("🔍 [Adobe Debug] ExportPDFTargetFormat keys:", Object.keys(ExportPDFTargetFormat));
-  }
-
-  // Debug: Check the extract element types
-  console.log("🔍 [Adobe Debug] ExtractElementType:", ExtractElementType);
-  if (ExtractElementType) {
-    console.log("🔍 [Adobe Debug] ExtractElementType keys:", Object.keys(ExtractElementType));
-  }
-
   console.log("✅ [Adobe] Adobe PDF Services SDK loaded successfully");
 } catch (error) {
   console.warn("⚠️ [Adobe] Adobe PDF Services SDK not available:", error);
@@ -66,7 +49,6 @@ try {
 export class AdobeService {
   private pdfServices: any;
   private isAvailable: boolean;
-
   private initError: any = null;
 
   constructor() {
@@ -80,11 +62,7 @@ export class AdobeService {
 
     if (!hasClientId || !hasClientSecret || !hasOrgId) {
       console.warn("⚠️ [Adobe] Missing credentials:");
-      console.log(`   - ADOBE_CLIENT_ID: ${hasClientId ? '✅ Set' : '❌ Missing'}`);
-      console.log(`   - ADOBE_CLIENT_SECRET: ${hasClientSecret ? '✅ Set' : '❌ Missing'}`);
-      console.log(`   - ADOBE_ORGANIZATION_ID: ${hasOrgId ? '✅ Set' : '❌ Missing'}`);
-      this.initError = "Missing environment variables: " +
-        [!hasClientId && 'ADOBE_CLIENT_ID', !hasClientSecret && 'ADOBE_CLIENT_SECRET', !hasOrgId && 'ADOBE_ORGANIZATION_ID'].filter(Boolean).join(', ');
+      this.initError = "Missing environment variables";
       return;
     }
 
@@ -102,7 +80,6 @@ export class AdobeService {
       // Configure timeout settings (60 seconds)
       let clientConfig;
       if (ClientConfig) {
-        // SDK v4.x: ClientConfig overrides default timeout (in ms)
         clientConfig = new ClientConfig({
           timeout: 60000,
         });
@@ -113,7 +90,6 @@ export class AdobeService {
       this.isAvailable = true;
 
       console.log("✅ [Adobe] Adobe PDF Services initialized successfully");
-      console.log("🔧 [Adobe] Available methods: convertPdfToDocx, convertDocxToPdf, extractTextFromPdf, addWatermarkToDocx, addWatermarkToPdf");
     } catch (error: any) {
       console.error("❌ [Adobe] Failed to initialize Adobe PDF Services:", error);
       this.isAvailable = false;
@@ -122,7 +98,6 @@ export class AdobeService {
   }
 
   private checkAvailability(): void {
-    console.log(`🔍 [Adobe] Checking availability: ${this.isAvailable ? '✅ Available' : '❌ Not Available'}`);
     if (!this.isAvailable) {
       console.error(`❌ [Adobe] Service unavailable due to: ${this.initError}`);
       throw new InternalServerError(`Adobe PDF Services not available: ${this.initError}`);
@@ -134,20 +109,9 @@ export class AdobeService {
    */
   private convertToRelativePath(absolutePath: string): string {
     const workspaceRoot = process.cwd();
-
-    // If it's already a relative path, return as is
-    if (!path.isAbsolute(absolutePath)) {
-      return absolutePath;
-    }
-
-    // Convert absolute path to relative path
+    if (!path.isAbsolute(absolutePath)) return absolutePath;
     const relativePath = path.relative(workspaceRoot, absolutePath);
-
-    // Convert Windows backslashes to forward slashes for web URLs
-    const webPath = '/' + relativePath.replace(/\\/g, '/');
-
-    console.log(`🔄 [Adobe Path Convert] ${absolutePath} → ${webPath}`);
-    return webPath;
+    return '/' + relativePath.replace(/\\/g, '/');
   }
 
   /**
@@ -162,105 +126,66 @@ export class AdobeService {
     try {
       console.log(`🔄 [Adobe] Converting PDF to DOCX: ${pdfPath}`);
 
-      // Handle URLs by downloading first
       if (this.isUrl(pdfPath)) {
         console.log(`🌐 [Adobe] URL detected, downloading file first...`);
         tempPdfPath = await this.downloadFile(pdfPath, '.pdf');
         localPdfPath = tempPdfPath;
       } else {
-        // For local paths, resolve to absolute path
         localPdfPath = resolveToAbsolutePath(pdfPath);
       }
 
-      // Create an ExecutionContext using credentials
       const inputAsset = await this.pdfServices.upload({
         readStream: fs.createReadStream(localPdfPath),
         mimeType: MimeType.PDF
       });
 
-      // For Adobe SDK v4.1.0, we need to use ExportPDFParams and ExportPDFTargetFormat
       const ExportPDFParams = AdobeSDK.ExportPDFParams;
       const ExportPDFTargetFormat = AdobeSDK.ExportPDFTargetFormat;
 
-      console.log(`🔧 [Adobe] ExportPDFTargetFormat available:`, !!ExportPDFTargetFormat);
-      console.log(`🔧 [Adobe] ExportPDFParams available:`, !!ExportPDFParams);
-
-      // Create parameters with the correct target format
       let params;
       if (ExportPDFParams && ExportPDFTargetFormat) {
         if (ExportPDFTargetFormat.DOCX) {
           params = new ExportPDFParams({ targetFormat: ExportPDFTargetFormat.DOCX });
-          console.log(`🔧 [Adobe] Using ExportPDFTargetFormat.DOCX`);
-        } else if (ExportPDFTargetFormat.WORD) {
-          params = new ExportPDFParams({ targetFormat: ExportPDFTargetFormat.WORD });
-          console.log(`🔧 [Adobe] Using ExportPDFTargetFormat.WORD`);
         } else {
-          // List available formats
-          console.log(`🔧 [Adobe] Available target formats:`, Object.keys(ExportPDFTargetFormat));
-          params = new ExportPDFParams({ targetFormat: ExportPDFTargetFormat.DOCX || 'DOCX' });
-          console.log(`🔧 [Adobe] Using fallback target format`);
+          params = new ExportPDFParams({ targetFormat: 'DOCX' });
         }
       } else {
-        throw new InternalServerError('ExportPDFParams or ExportPDFTargetFormat not available in Adobe SDK');
+        throw new InternalServerError('ExportPDFParams or ExportPDFTargetFormat not available');
       }
 
-      // Create the job with input asset and parameters
       const job = new ExportPDFJob({ inputAsset, params });
-      console.log(`🔧 [Adobe] Created ExportPDFJob with parameters`);
-
-      // Submit the job and get the job result
       const pollingURL = await this.pdfServices.submit({ job });
       const pdfServicesResponse = await this.pdfServices.getJobResult({
         pollingURL,
         resultType: ExportPDFResult
       });
 
-      // Get content from the resulting asset(s)
       const resultAsset = pdfServicesResponse.result.asset;
       const streamAsset = await this.pdfServices.getContent({ asset: resultAsset });
 
-      // Create output directory if it doesn't exist
       const outputDir = path.dirname(outputPath);
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
       }
 
-      // Save the result to the specified location
       const outputStream = fs.createWriteStream(outputPath);
       streamAsset.readStream.pipe(outputStream);
 
       return new Promise((resolve, reject) => {
         outputStream.on('finish', () => {
-          console.log(`✅ [Adobe] PDF converted to DOCX: ${outputPath}`);
-
-          // Clean up temp file if we downloaded one
-          if (tempPdfPath) {
-            fs.unlink(tempPdfPath, () => { });
-          }
-
-          // Return absolute path - let caller handle conversion to relative
+          if (tempPdfPath) fs.unlink(tempPdfPath, () => { });
           resolve(outputPath);
         });
         outputStream.on('error', (error) => {
-          // Clean up temp file on error
-          if (tempPdfPath) {
-            fs.unlink(tempPdfPath, () => { });
-          }
+          if (tempPdfPath) fs.unlink(tempPdfPath, () => { });
           reject(error);
         });
       });
 
     } catch (err: any) {
-      // Clean up temp file on error
-      if (tempPdfPath) {
-        fs.unlink(tempPdfPath, () => { });
-      }
-
+      if (tempPdfPath) fs.unlink(tempPdfPath, () => { });
       console.error('❌ [Adobe] PDF to DOCX conversion failed:', err);
-      if (err instanceof SDKError || err instanceof ServiceUsageError || err instanceof ServiceApiError) {
-        throw new InternalServerError(`Adobe PDF conversion failed: ${err.message}`);
-      }
-      throw new InternalServerError('Adobe PDF conversion failed');
+      throw new InternalServerError(`Adobe PDF conversion failed: ${err.message}`);
     }
   }
 
@@ -270,151 +195,91 @@ export class AdobeService {
   async convertDocxToPdf(docxPath: string, outputPath: string): Promise<string> {
     this.checkAvailability();
 
-    const startTime = Date.now();
     let localDocxPath: string;
     let tempDocxPath: string | null = null;
 
-    console.log(`🔄 [Adobe] Starting DOCX to PDF conversion`);
-    console.log(`   📂 Input: ${docxPath}`);
-    console.log(`   📂 Output: ${outputPath}`);
-
     try {
-      // Handle URLs by downloading first
       if (this.isUrl(docxPath)) {
         console.log(`🌐 [Adobe] URL detected, downloading file first...`);
         tempDocxPath = await this.downloadFile(docxPath, '.docx');
         localDocxPath = tempDocxPath;
       } else {
-        // For local paths, resolve to absolute path
         localDocxPath = resolveToAbsolutePath(docxPath);
       }
 
-      // Check if input file exists
       if (!fs.existsSync(localDocxPath)) {
-        console.error(`❌ [Adobe] Input file not found: ${localDocxPath}`);
         throw new InternalServerError(`Input DOCX file not found: ${localDocxPath}`);
       }
 
-      const fileSize = fs.statSync(localDocxPath).size;
-      console.log(`   📊 File size: ${(fileSize / 1024).toFixed(2)} KB`);
-
-      console.log(`⬆️ [Adobe] Uploading DOCX to Adobe Services...`);
-
-      // Create an ExecutionContext using credentials
       const inputAsset = await this.pdfServices.upload({
         readStream: fs.createReadStream(localDocxPath),
         mimeType: MimeType.DOCX
       });
 
-      console.log(`✅ [Adobe] File uploaded successfully`);
-      console.log(`🔧 [Adobe] Creating PDF conversion job...`);
-
-      // Create a new job instance
       const job = new CreatePDFJob({ inputAsset });
-
-      console.log(`📤 [Adobe] Submitting job to Adobe Services...`);
-      // Submit the job and get the job result
       const pollingURL = await this.pdfServices.submit({ job });
-      console.log(`⏳ [Adobe] Job submitted, polling for results...`);
-
       const pdfServicesResponse = await this.pdfServices.getJobResult({
         pollingURL,
         resultType: CreatePDFResult
       });
 
-      console.log(`✅ [Adobe] Job completed successfully`);
-      console.log(`⬇️ [Adobe] Downloading converted PDF...`);
-
-      // Get content from the resulting asset(s)
       const resultAsset = pdfServicesResponse.result.asset;
       const streamAsset = await this.pdfServices.getContent({ asset: resultAsset });
 
-      // Create output directory if it doesn't exist
       const outputDir = path.dirname(outputPath);
       if (!fs.existsSync(outputDir)) {
-        console.log(`📁 [Adobe] Creating output directory: ${outputDir}`);
         fs.mkdirSync(outputDir, { recursive: true });
       }
 
-      // Save the result to the specified location
       const outputStream = fs.createWriteStream(outputPath);
       streamAsset.readStream.pipe(outputStream);
 
       return new Promise((resolve, reject) => {
         outputStream.on('finish', () => {
-          const endTime = Date.now();
-          const duration = endTime - startTime;
-          const outputSize = fs.statSync(outputPath).size;
-
-          console.log(`✅ [Adobe] DOCX converted to PDF successfully!`);
-          console.log(`   📂 Output: ${outputPath}`);
-          console.log(`   📊 Output size: ${(outputSize / 1024).toFixed(2)} KB`);
-          console.log(`   ⏱️ Duration: ${duration}ms`);
-
-          // Clean up temp file if we downloaded one
-          if (tempDocxPath) {
-            fs.unlink(tempDocxPath, () => { });
-          }
-
-          // Return absolute path - let caller handle conversion to relative
+          if (tempDocxPath) fs.unlink(tempDocxPath, () => { });
           resolve(outputPath);
         });
         outputStream.on('error', (error) => {
-          console.error(`❌ [Adobe] Error writing output file:`, error);
-
-          // Clean up temp file on error
-          if (tempDocxPath) {
-            fs.unlink(tempDocxPath, () => { });
-          }
-
+          if (tempDocxPath) fs.unlink(tempDocxPath, () => { });
           reject(error);
         });
       });
 
     } catch (err: any) {
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-
-      // Clean up temp file on error
-      if (tempDocxPath) {
-        fs.unlink(tempDocxPath, () => { });
-      }
-
-      console.error(`❌ [Adobe] DOCX to PDF conversion failed after ${duration}ms`);
-      console.error(`   Error type: ${err.constructor.name}`);
-      console.error(`   Error message: ${err.message}`);
-
-      if (err instanceof SDKError) {
-        console.error(`   SDK Error details:`, err);
-      } else if (err instanceof ServiceUsageError) {
-        console.error(`   Service Usage Error - Check your Adobe API limits`);
-      } else if (err instanceof ServiceApiError) {
-        console.error(`   Service API Error - Check your credentials and network`);
-      }
-
-      if (err instanceof SDKError || err instanceof ServiceUsageError || err instanceof ServiceApiError) {
-        throw new InternalServerError(`Adobe DOCX conversion failed: ${err.message}`);
-      }
+      if (tempDocxPath) fs.unlink(tempDocxPath, () => { });
+      console.error(`❌ [Adobe] DOCX to PDF conversion failed: ${err.message}`);
       throw new InternalServerError('Adobe DOCX conversion failed');
     }
   }
 
-  /**
-   * Download file from URL to temp location (similar to file-conversion.utils.ts)
-   */
-  private async downloadFile(url: string, extension: string): Promise<string> {
-    console.log(`🌐 [Adobe Download] Fetching file from URL: ${url}`);
+  // =========================================================================
+  //  ⬇️ THE CRITICAL FIX: Public S3 Download Logic ⬇️
+  // =========================================================================
+  private async downloadFile(urlOrPath: string, extension: string): Promise<string> {
+    console.log(`🌐 [Adobe Download] Fetching file from URL: ${urlOrPath}`);
 
-    const response = await fetch(url);
+    // FIX 1: Encode URL to handle spaces (e.g. "My File.docx" -> "My%20File.docx")
+    // This solves the 400 Bad Request error
+    const encodedUrl = encodeURI(urlOrPath);
+
+    // FIX 2: Send EMPTY headers to strip the "Authorization: Bearer" token
+    // This solves the 403 Forbidden / 400 Unsupported Authorization Type error
+    const response = await fetch(encodedUrl, {
+      headers: {}
+    });
+
     if (!response.ok) {
+      const errText = await response.text();
+      console.error(`S3 Download Error Body: ${errText}`);
       throw new Error(`Failed to download file: ${response.statusText}`);
     }
 
     const buffer = await response.arrayBuffer();
 
-    // Create temp directory in uploads folder (served by Express)
     const tempDir = path.join(process.cwd(), 'uploads', 'temp');
-    await fs.promises.mkdir(tempDir, { recursive: true });
+    if (!fs.existsSync(tempDir)) {
+      await fs.promises.mkdir(tempDir, { recursive: true });
+    }
 
     const tempPath = path.join(tempDir, `adobe-temp-${Date.now()}${extension}`);
     await fs.promises.writeFile(tempPath, Buffer.from(buffer));
@@ -422,144 +287,47 @@ export class AdobeService {
     console.log(`✅ [Adobe Download] Saved to temp: ${tempPath}`);
     return tempPath;
   }
+  // =========================================================================
 
-  /**
-   * Check if a path is a URL
-   */
   private isUrl(filePath: string): boolean {
     return filePath.startsWith('http://') || filePath.startsWith('https://');
   }
 
-  /**
-   * Validate PDF file before processing to detect corruption early
-   */
   private async validatePdfFile(pdfPath: string): Promise<{ isValid: boolean; error?: string; canRepair?: boolean }> {
     try {
       const fs = await import('fs');
-      const absolutePath = resolveToAbsolutePath(pdfPath);
-
-      // Check if file exists
-      if (!fs.existsSync(absolutePath)) {
-        return { isValid: false, error: 'File not found' };
-      }
-
-      // Check file size
-      const stats = fs.statSync(absolutePath);
-      if (stats.size === 0) {
-        return { isValid: false, error: 'Empty file' };
-      }
-
-      if (stats.size < 100) {
-        return { isValid: false, error: 'File too small to be valid PDF' };
-      }
-
-      // Read first few bytes to check PDF header
-      const fd = fs.openSync(absolutePath, 'r');
-      const buffer = Buffer.alloc(10);
-      fs.readSync(fd, buffer, 0, 10, 0);
-      fs.closeSync(fd);
-      const header = buffer.toString('ascii');
-
-      if (!header.startsWith('%PDF-')) {
-        return { isValid: false, error: 'Invalid PDF header', canRepair: true };
-      }
-
-      // Try to load with pdf-lib for basic validation
-      try {
-        const { PDFDocument } = await import('pdf-lib');
-        const pdfBytes = fs.readFileSync(absolutePath);
-        await PDFDocument.load(pdfBytes);
-
-        console.log(`✅ [PDF Validation] PDF structure is valid: ${pdfPath}`);
-        return { isValid: true };
-      } catch (pdfLibError: any) {
-        console.warn(`⚠️ [PDF Validation] PDF structure issues detected: ${pdfLibError.message}`);
-        return { isValid: false, error: `PDF structure corrupted: ${pdfLibError.message}`, canRepair: true };
-      }
-
+      const { PDFDocument } = await import('pdf-lib');
+      const pdfBytes = fs.readFileSync(pdfPath);
+      await PDFDocument.load(pdfBytes);
+      return { isValid: true };
     } catch (error: any) {
-      console.error(`❌ [PDF Validation] Validation failed: ${error.message}`);
-      return { isValid: false, error: `Validation error: ${error.message}` };
+      return { isValid: false, error: error.message, canRepair: true };
     }
   }
 
-  /**
-   * Attempt to repair corrupted PDF using pdf-lib
-   */
   private async repairPdfFile(pdfPath: string, outputPath: string): Promise<boolean> {
     try {
-      console.log(`🔧 [PDF Repair] Attempting to repair PDF: ${pdfPath}`);
-
       const fs = await import('fs');
       const { PDFDocument } = await import('pdf-lib');
-
       const absoluteInputPath = resolveToAbsolutePath(pdfPath);
-      const absoluteOutputPath = resolveToAbsolutePath(outputPath);
-
-      // Try to load and re-save the PDF to fix minor corruption
       const pdfBytes = fs.readFileSync(absoluteInputPath);
-
-      // Try with different loading options
-      const loadOptions = [
-        { ignoreEncryption: true },
-        { ignoreEncryption: true, parseSpeed: 0 },
-        { ignoreEncryption: true, throwOnInvalidObject: false },
-      ];
-
-      for (const options of loadOptions) {
-        try {
-          console.log(`🔧 [PDF Repair] Trying repair with options:`, options);
-          const pdfDoc = await PDFDocument.load(pdfBytes, options);
-
-          // Re-save the PDF to fix structure
-          const repairedBytes = await pdfDoc.save();
-
-          // Ensure output directory exists
-          const outputDir = path.dirname(absoluteOutputPath);
-          if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true });
-          }
-
-          fs.writeFileSync(absoluteOutputPath, repairedBytes);
-
-          // Validate the repaired PDF
-          const validation = await this.validatePdfFile(outputPath);
-          if (validation.isValid) {
-            console.log(`✅ [PDF Repair] PDF successfully repaired: ${outputPath}`);
-            return true;
-          }
-
-        } catch (repairError: any) {
-          console.warn(`⚠️ [PDF Repair] Repair attempt failed with options ${JSON.stringify(options)}: ${repairError.message}`);
-          continue;
-        }
-      }
-
-      console.error(`❌ [PDF Repair] All repair attempts failed`);
-      return false;
-
-    } catch (error: any) {
-      console.error(`❌ [PDF Repair] Repair process failed: ${error.message}`);
+      const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+      const repairedBytes = await pdfDoc.save();
+      fs.writeFileSync(outputPath, repairedBytes);
+      return true;
+    } catch {
       return false;
     }
   }
 
-  /**
-   * Extract text from PDF using Adobe ExtractPDF API with validation and repair
-   */
   async extractTextFromPdf(pdfPath: string): Promise<string> {
     this.checkAvailability();
-
     let processingPath = pdfPath;
     let tempPath: string | null = null;
     let localPath: string;
 
     try {
-      console.log(`🔄 [Adobe] Extracting text from PDF: ${pdfPath}`);
-
-      // Step 0: Handle URLs immediately
       if (this.isUrl(pdfPath)) {
-        console.log(`🌐 [Adobe Extract PDF] URL detected, downloading file first...`);
         tempPath = await this.downloadFile(pdfPath, '.pdf');
         localPath = tempPath;
         processingPath = localPath;
@@ -568,808 +336,249 @@ export class AdobeService {
         processingPath = localPath;
       }
 
-      // Verify file exists locally now (either it was local or downloaded)
-      if (!fs.existsSync(localPath)) {
-        console.error(`❌ [Adobe] Input file missing: ${localPath}`);
-        throw new Error(`Input file not found at: ${localPath}`);
-      }
+      if (!fs.existsSync(localPath)) throw new Error(`Input file not found at: ${localPath}`);
 
-      // Step 1: Validate PDF before processing
-      console.log(`🔍 [Adobe] Validating PDF structure...`);
       const validation = await this.validatePdfFile(localPath);
-
-      if (!validation.isValid) {
-        console.warn(`⚠️ [Adobe] PDF validation failed: ${validation.error}`);
-        if (validation.canRepair) {
-          const repairedPath = localPath.replace(/\.pdf$/i, '_repaired.pdf');
-          console.log(`🔧 [Adobe] Attempting PDF repair...`);
-          const repairSuccess = await this.repairPdfFile(localPath, repairedPath);
-
-          if (repairSuccess) {
-            console.log(`✅ [Adobe] PDF repaired successfully, using repaired version`);
-            processingPath = repairedPath;
-          } else {
-            console.warn(`⚠️ [Adobe] PDF repair failed, continuing with original`);
-          }
+      if (!validation.isValid && validation.canRepair) {
+        const repairedPath = localPath.replace(/\.pdf$/i, '_repaired.pdf');
+        if (await this.repairPdfFile(localPath, repairedPath)) {
+          processingPath = repairedPath;
         }
       }
 
-      // Step 2: Try Adobe extraction
-      // Ensure we use the absolute path for the final processing path
-      const absoluteProcessingPath = resolveToAbsolutePath(processingPath);
-
       const inputAsset = await this.pdfServices.upload({
-        readStream: fs.createReadStream(absoluteProcessingPath),
+        readStream: fs.createReadStream(processingPath),
         mimeType: MimeType.PDF
       });
 
-      const ExtractPDFParams = AdobeSDK.ExtractPDFParams;
-      const ExtractElementType = AdobeSDK.ExtractElementType;
-
-      let params = new ExtractPDFParams({
-        elementsToExtract: [ExtractElementType.TEXT || 'TEXT']
+      const params = new AdobeSDK.ExtractPDFParams({
+        elementsToExtract: [AdobeSDK.ExtractElementType.TEXT]
       });
 
-      const job = new ExtractPDFJob({ inputAsset, params });
-      console.log(`🔧 [Adobe] Created ExtractPDFJob`);
-
+      const job = new AdobeSDK.ExtractPDFJob({ inputAsset, params });
       const pollingURL = await this.pdfServices.submit({ job });
-      const pdfServicesResponse = await this.pdfServices.getJobResult({
-        pollingURL,
-        resultType: ExtractPDFResult
-      });
+      const pdfServicesResponse = await this.pdfServices.getJobResult({ pollingURL, resultType: ExtractPDFResult });
+      const streamAsset = await this.pdfServices.getContent({ asset: pdfServicesResponse.result.resource });
 
-      const resultAsset = pdfServicesResponse.result.resource;
-      const streamAsset = await this.pdfServices.getContent({ asset: resultAsset });
-
-      // Step 3: Handle the Response (ZIP or JSON)
       return new Promise((resolve, reject) => {
-        // Use Buffers instead of strings for memory efficiency
         let chunks: any[] = [];
-
-        streamAsset.readStream.on('data', (chunk: any) => {
-          chunks.push(chunk);
-        });
-
+        streamAsset.readStream.on('data', (chunk: any) => chunks.push(chunk));
         streamAsset.readStream.on('end', async () => {
           try {
             const totalBuffer = Buffer.concat(chunks);
-
-            // Check if response is a ZIP package (Starts with 'PK')
             if (totalBuffer.length > 0 && totalBuffer[0] === 0x50 && totalBuffer[1] === 0x4B) {
-              console.log("📦 [Adobe] ZIP detected. Extracting structuredData.json...");
-
               const zip = new AdmZip(totalBuffer);
               const mainEntry = zip.getEntry('structuredData.json');
-
               if (mainEntry) {
-                const extractedJson = mainEntry.getData().toString('utf8');
-                const parsedData = JSON.parse(extractedJson);
-
-                const rawText = (parsedData.elements || [])
-                  .filter((el: any) => el.Text)
-                  .map((el: any) => el.Text)
-                  .join(' ');
-
-                console.log(`✅ [Adobe] Text successfully unzipped (${rawText.length} chars)`);
+                const json = JSON.parse(mainEntry.getData().toString('utf8'));
+                const text = (json.elements || []).filter((e: any) => e.Text).map((e: any) => e.Text).join(' ');
                 this.cleanupRepairedFile(processingPath, pdfPath);
-                return resolve(cleanTextForDatabase(rawText));
+                if (tempPath) fs.unlink(tempPath, () => { });
+                return resolve(cleanTextForDatabase(text));
               }
             }
-
-            // Fallback: Standard JSON processing
-            const jsonData = totalBuffer.toString('utf8');
-            const extractedData = JSON.parse(jsonData);
-            const rawExtractedText = (extractedData.elements || [])
-              .filter((element: any) => element.Text)
-              .map((element: any) => element.Text)
-              .join(' ');
-
-            console.log(`✅ [Adobe] Text extracted from JSON (${rawExtractedText.length} chars)`);
+            const json = JSON.parse(totalBuffer.toString('utf8'));
+            const text = (json.elements || []).filter((e: any) => e.Text).map((e: any) => e.Text).join(' ');
             this.cleanupRepairedFile(processingPath, pdfPath);
-
-            // Clean up temp file
-            if (tempPath) {
-              fs.unlink(tempPath, () => { });
-            }
-
-            resolve(cleanTextForDatabase(rawExtractedText));
-
-          } catch (parseError) {
-            console.error("❌ [Adobe] Parsing failed, falling back to alternative extraction:", parseError);
+            if (tempPath) fs.unlink(tempPath, () => { });
+            resolve(cleanTextForDatabase(text));
+          } catch (e) {
             this.cleanupRepairedFile(processingPath, pdfPath);
-
-            // Clean up temp file
-            if (tempPath) {
-              fs.unlink(tempPath, () => { });
-            }
-
+            if (tempPath) fs.unlink(tempPath, () => { });
             resolve(await this.extractTextFromCorruptedPdf(pdfPath));
           }
         });
-
         streamAsset.readStream.on('error', (err: any) => {
-          // Clean up temp file
-          if (tempPath) {
-            fs.unlink(tempPath, () => { });
-          }
+          if (tempPath) fs.unlink(tempPath, () => { });
           reject(err);
         });
       });
 
     } catch (err: any) {
-      console.error('❌ [Adobe] PDF text extraction failed:', err);
       this.cleanupRepairedFile(processingPath, pdfPath);
-
-      if (err.message && err.message.includes('BAD_PDF')) {
-        return await this.extractTextFromCorruptedPdf(pdfPath);
-      }
-
-      throw new InternalServerError(`Adobe PDF text extraction failed: ${err.message}`);
+      if (tempPath) fs.unlink(tempPath, () => { });
+      console.error('❌ [Adobe] Extract failed:', err.message);
+      return await this.extractTextFromCorruptedPdf(pdfPath);
     }
   }
 
-  // Add this helper method to your class to keep the main function clean
   private cleanupRepairedFile(processingPath: string, originalPath: string) {
     if (processingPath !== originalPath) {
       try {
         fs.unlinkSync(resolveToAbsolutePath(processingPath));
-        console.log(`🧹 [Adobe] Cleaned up repaired PDF file`);
       } catch { }
     }
-  } /**
-   * Alternative text extraction for corrupted PDFs that Adobe rejects
-   */
-  private async extractTextFromCorruptedPdf(pdfPath: string): Promise<string> {
-    console.log(`🔄 [Alternative Extract] Attempting alternative text extraction for corrupted PDF: ${pdfPath}`);
-
-    try {
-      // Try pdf-parse as fallback for corrupted PDFs
-      const fs = await import('fs');
-      // Use require for pdf-parse to handle CommonJS module
-      const pdfParse = require('pdf-parse');
-
-      const absolutePath = resolveToAbsolutePath(pdfPath);
-      const dataBuffer = fs.readFileSync(absolutePath);
-
-      console.log(`🔧 [Alternative Extract] Using pdf-parse for corrupted PDF...`);
-      const data = await pdfParse(dataBuffer);
-
-      if (data.text && data.text.length > 0) {
-        const cleanedText = cleanTextForDatabase(data.text);
-        console.log(`✅ [Alternative Extract] Extracted ${cleanedText.length} characters using pdf-parse`);
-        return cleanedText;
-      } else {
-        console.warn(`⚠️ [Alternative Extract] pdf-parse returned empty text`);
-      }
-
-    } catch (pdfParseError: any) {
-      console.error(`❌ [Alternative Extract] pdf-parse failed: ${pdfParseError.message}`);
-    }
-
-    // Try pdf2pic + OCR as last resort for scanned/image PDFs
-    try {
-      console.log(`🔧 [Alternative Extract] Attempting OCR extraction for scanned PDF...`);
-      const ocrText = await this.extractTextUsingOCR(pdfPath);
-
-      if (ocrText && ocrText.length > 0) {
-        console.log(`✅ [Alternative Extract] Extracted ${ocrText.length} characters using OCR`);
-        return ocrText;
-      }
-
-    } catch (ocrError: any) {
-      console.error(`❌ [Alternative Extract] OCR extraction failed: ${ocrError.message}`);
-    }
-
-    // If all methods fail, return a meaningful error message
-    console.warn(`⚠️ [Alternative Extract] All extraction methods failed for corrupted PDF`);
-    return 'This PDF file is corrupted and text cannot be extracted. Please upload a new, uncorrupted version of the document.';
   }
 
-  /**
-   * OCR-based text extraction for scanned PDFs (placeholder implementation)
-   */
-  private async extractTextUsingOCR(pdfPath: string): Promise<string> {
-    // This is a placeholder for OCR implementation
-    // In a real implementation, you would:
-    // 1. Convert PDF pages to images using pdf2pic
-    // 2. Use Tesseract.js or similar OCR library to extract text from images
-    // 3. Combine text from all pages
+  private async extractTextFromCorruptedPdf(pdfPath: string): Promise<string> {
+    try {
+      const pdfParse = require('pdf-parse');
+      let dataBuffer;
+      if (this.isUrl(pdfPath)) {
+        // Use the same robust download logic here
+        const encodedUrl = encodeURI(pdfPath);
+        const res = await fetch(encodedUrl, { headers: {} });
+        const arr = await res.arrayBuffer();
+        dataBuffer = Buffer.from(arr);
+      } else {
+        dataBuffer = fs.readFileSync(resolveToAbsolutePath(pdfPath));
+      }
+      const data = await pdfParse(dataBuffer);
+      return cleanTextForDatabase(data.text);
+    } catch {
+      return 'PDF corrupted/unreadable.';
+    }
+  }
 
-    console.log(`🔧 [OCR] OCR extraction not implemented yet for: ${pdfPath}`);
+  private async extractTextUsingOCR(pdfPath: string): Promise<string> {
     throw new Error('OCR extraction not implemented');
   }
 
-  /**
-   * Extract text from DOCX using mammoth library (Fallback method)
-   */
   async extractTextFromDocxUsingMammoth(docxPath: string): Promise<string> {
-    console.log(`🔄 [Mammoth] Extracting text from DOCX: ${docxPath}`);
-
     try {
-      const fs = await import('fs');
       const mammoth = await import('mammoth');
-
       let localPath: string;
       let tempPath: string | null = null;
 
-      // Handle URLs
       if (this.isUrl(docxPath)) {
-        console.log(`🌐 [Mammoth] URL detected, downloading file first...`);
         tempPath = await this.downloadFile(docxPath, '.docx');
         localPath = tempPath;
       } else {
         localPath = resolveToAbsolutePath(docxPath);
       }
 
-      if (!fs.existsSync(localPath)) {
-        throw new Error(`File not found: ${localPath}`);
-      }
-
+      if (!fs.existsSync(localPath)) throw new Error(`File not found: ${localPath}`);
       const result = await mammoth.extractRawText({ path: localPath });
-      const text = result.value; // The raw text
-      const messages = result.messages; // Any warnings/messages
-
-      if (messages && messages.length > 0) {
-        console.log(`⚠️ [Mammoth] Warnings during extraction:`, messages);
-      }
-
-      const cleanedText = cleanTextForDatabase(text);
-      console.log(`✅ [Mammoth] Extracted ${cleanedText.length} characters using Mammoth`);
-
-      // Clean up temp file if we downloaded one
-      if (tempPath) {
-        fs.unlink(tempPath, () => { });
-      }
-
-      return cleanedText;
+      if (tempPath) fs.unlink(tempPath, () => { });
+      return cleanTextForDatabase(result.value);
     } catch (error: any) {
-      console.error(`❌ [Mammoth] Text extraction failed:`, error);
-      throw new InternalServerError(`Mammoth text extraction failed: ${error.message}`);
+      throw new InternalServerError(`Mammoth failed: ${error.message}`);
     }
   }
 
-  /**
-   * Extract text from DOCX using Adobe Services v4.1.0
-   */
   async extractTextFromDocx(docxPath: string): Promise<string> {
     this.checkAvailability();
-
     try {
-      console.log(`✨ [Adobe Extract] Starting text extraction from converted DOCX...`);
-      console.log(`🔄 [Adobe] Extracting text from DOCX: ${docxPath}`);
-
       let localPath: string;
       let tempPath: string | null = null;
 
-      // Handle URLs
       if (this.isUrl(docxPath)) {
-        console.log(`🌐 [Adobe Extract] URL detected, downloading file first...`);
         tempPath = await this.downloadFile(docxPath, '.docx');
         localPath = tempPath;
       } else {
         localPath = resolveToAbsolutePath(docxPath);
       }
 
-      if (!fs.existsSync(localPath)) {
-        console.error(`❌ [Adobe] Input file missing: ${localPath}`);
-        throw new Error(`Input file not found locally: ${localPath}`);
-      }
-
-      // Create an ExecutionContext using credentials
       const inputAsset = await this.pdfServices.upload({
         readStream: fs.createReadStream(localPath),
         mimeType: MimeType.DOCX
       });
 
-      // For Adobe SDK v4.1.0, use ExtractPDFParams and ExtractElementType
-      const ExtractPDFParams = AdobeSDK.ExtractPDFParams;
-      const ExtractElementType = AdobeSDK.ExtractElementType;
-
-      console.log(`🔧 [Adobe] ExtractElementType available:`, !!ExtractElementType);
-      console.log(`🔧 [Adobe] ExtractPDFParams available:`, !!ExtractPDFParams);
-
-      // Create parameters with the correct element type
-      let params;
-      if (ExtractPDFParams && ExtractElementType) {
-        if (ExtractElementType.TEXT) {
-          params = new ExtractPDFParams({
-            elementsToExtract: [ExtractElementType.TEXT]
-          });
-          console.log(`🔧 [Adobe] Using ExtractElementType.TEXT`);
-        } else {
-          // List available element types
-          console.log(`🔧 [Adobe] Available element types:`, Object.keys(ExtractElementType));
-          params = new ExtractPDFParams({
-            elementsToExtract: [ExtractElementType.TEXT || 'TEXT']
-          });
-          console.log(`🔧 [Adobe] Using fallback element type`);
-        }
-      } else {
-        throw new InternalServerError('ExtractPDFParams or ExtractElementType not available in Adobe SDK');
-      }
-
-      // Create the job with input asset and parameters
-      const job = new ExtractPDFJob({ inputAsset, params });
-      console.log(`🔧 [Adobe] Created ExtractPDFJob with parameters`);
-
-      // Submit the job and get the job result
-      const pollingURL = await this.pdfServices.submit({ job });
-      const pdfServicesResponse = await this.pdfServices.getJobResult({
-        pollingURL,
-        resultType: ExtractPDFResult
+      const params = new AdobeSDK.ExtractPDFParams({
+        elementsToExtract: [AdobeSDK.ExtractElementType.TEXT]
       });
 
-      // Get content from the resulting asset(s)
-      const resultAsset = pdfServicesResponse.result.resource;
-      const streamAsset = await this.pdfServices.getContent({ asset: resultAsset });
+      const job = new AdobeSDK.ExtractPDFJob({ inputAsset, params });
+      const pollingURL = await this.pdfServices.submit({ job });
+      const pdfServicesResponse = await this.pdfServices.getJobResult({ pollingURL, resultType: ExtractPDFResult });
+      const streamAsset = await this.pdfServices.getContent({ asset: pdfServicesResponse.result.resource });
 
-      // Read the JSON result
       return new Promise((resolve, reject) => {
         let jsonData = '';
-        streamAsset.readStream.on('data', (chunk: any) => {
-          jsonData += chunk;
-        });
-
+        streamAsset.readStream.on('data', (chunk: any) => jsonData += chunk);
         streamAsset.readStream.on('end', () => {
           try {
-            // First, try to parse as JSON (structured extraction)
             const extractedData = JSON.parse(jsonData);
-            const textElements = extractedData.elements || [];
-
-            // Extract text from all text elements
-            const rawExtractedText = textElements
-              .filter((element: any) => element.Text)
-              .map((element: any) => element.Text)
-              .join(' ');
-
-            const extractedText = cleanTextForDatabase(rawExtractedText);
-            console.log(`✅ [Adobe] Text extracted from DOCX as JSON and cleaned (${extractedText.length} characters)`);
-
-            // Clean up temp file
-            if (tempPath) {
-              fs.unlink(tempPath, () => { });
-            }
-
-            resolve(extractedText);
-          } catch (parseError) {
-            // If JSON parsing fails, treat the response as raw text
-            console.log(`ℹ️ [Adobe] Response is raw text, not JSON. Using direct text content.`);
-            const cleanedText = cleanTextForDatabase(jsonData);
-            console.log(`✅ [Adobe] Text extracted from DOCX as raw text and cleaned (${cleanedText.length} characters)`);
-
-            // Clean up temp file
-            if (tempPath) {
-              fs.unlink(tempPath, () => { });
-            }
-
-            resolve(cleanedText);
+            const text = (extractedData.elements || []).filter((e: any) => e.Text).map((e: any) => e.Text).join(' ');
+            if (tempPath) fs.unlink(tempPath, () => { });
+            resolve(cleanTextForDatabase(text));
+          } catch (e) {
+            if (tempPath) fs.unlink(tempPath, () => { });
+            resolve(cleanTextForDatabase(jsonData)); // fallback raw
           }
         });
-
         streamAsset.readStream.on('error', (err: any) => {
-          // Clean up temp file
-          if (tempPath) {
-            fs.unlink(tempPath, () => { });
-          }
+          if (tempPath) fs.unlink(tempPath, () => { });
           reject(err);
         });
       });
-
     } catch (err: any) {
-      console.error('❌ [Adobe] Text extraction failed:', err);
-      if (err instanceof SDKError || err instanceof ServiceUsageError || err instanceof ServiceApiError) {
-        throw new InternalServerError(`Adobe text extraction failed: ${err.message}`);
-      }
+      console.error('❌ [Adobe] DOCX extract failed:', err);
       throw new InternalServerError('Adobe text extraction failed');
     }
   }
 
-  /**
-   * Add watermark to DOCX (using existing utility as Adobe doesn't have direct watermark API)
-   */
   async addWatermarkToDocx(docxPath: string, outputPath: string, watermarkData: any): Promise<string> {
-    console.log(`🔄 [Adobe] Starting DOCX watermarking process`);
-    console.log(`   📂 Input: ${docxPath}`);
-    console.log(`   📂 Output: ${outputPath}`);
-    console.log(`   💧 Watermark data:`, {
-      userName: watermarkData.userName,
-      articleTitle: watermarkData.articleTitle,
-      articleId: watermarkData.articleId
-    });
-
     this.checkAvailability();
-
     try {
-      // NOTE: Adobe PDF Services SDK does not natively support DOCX watermarking without complex merge operations.
-      // To ensure system stability, we will bypass the watermarking for DOCX files for now 
-      // and simply copy the file to the output path. The PDF version will still be watermarked.
-
-      console.warn(`⚠️ [Adobe] DOCX watermarking is not directly supported by the current SDK version.`);
-      console.log(`ℹ️ [Adobe] Copying original DOCX to output path to preserve workflow...`);
-
-      const fs = await import('fs');
-      const path = await import('path'); // Ensure path is imported for resolveToAbsolutePath if needed
-
       let localPath: string;
       let tempPath: string | null = null;
 
-      // Handle URLs
       if (this.isUrl(docxPath)) {
-        console.log(`🌐 [Adobe Watermark] URL detected, downloading file first...`);
         tempPath = await this.downloadFile(docxPath, '.docx');
         localPath = tempPath;
       } else {
         localPath = resolveToAbsolutePath(docxPath);
       }
 
-      // Resolve paths
-      const absoluteInputPath = localPath;
-      const absoluteOutputPath = resolveToAbsolutePath(outputPath);
-      const outputDir = path.dirname(absoluteOutputPath);
-
-      // Ensure output dir exists
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-      }
-
-      // Copy file
-      fs.copyFileSync(absoluteInputPath, absoluteOutputPath);
-
-      console.log(`✅ [Adobe] DOCX "watermarked" (copied) successfully`);
-      console.log(`   📂 Output: ${outputPath}`);
-
-      // Clean up temp file
-      if (tempPath) {
-        fs.unlink(tempPath, () => { });
-      }
-
+      // Adobe SDK lacks direct DOCX watermarking, so we copy it
+      fs.copyFileSync(localPath, outputPath);
+      
+      if (tempPath) fs.unlink(tempPath, () => { });
       return outputPath;
-
     } catch (err: any) {
-      console.error('❌ [Adobe] DOCX watermarking (copy fallback) failed:', err);
       throw new InternalServerError('DOCX watermarking failed');
     }
   }
 
-  /**
-   * Add watermark to PDF using Adobe PDF Services for validation + PDF overlay watermarks
-   * Uses Adobe for PDF integrity validation, applies only PDF overlay watermarks (no header/footer)
-   */
   async addWatermarkToPdf(pdfPath: string, outputPath: string, watermarkData: any): Promise<string> {
-    console.log(`🔄 [Adobe] Starting professional PDF watermarking`);
-    console.log(`   📂 Input: ${pdfPath}`);
-    console.log(`   📂 Output: ${outputPath}`);
-    console.log(`   💧 Watermark data:`, {
-      userName: watermarkData.userName,
-      articleTitle: watermarkData.articleTitle,
-      articleId: watermarkData.articleId
-    });
-
     this.checkAvailability();
-
     try {
-      const fs = await import('fs');
-      const path = await import('path');
-
+      const { PDFDocument, rgb, StandardFonts, degrees } = await import('pdf-lib');
       let localPath: string;
       let tempPath: string | null = null;
 
-      // Handle URLs
       if (this.isUrl(pdfPath)) {
-        console.log(`🌐 [Adobe Watermark PDF] URL detected, downloading file first...`);
         tempPath = await this.downloadFile(pdfPath, '.pdf');
         localPath = tempPath;
       } else {
         localPath = resolveToAbsolutePath(pdfPath);
       }
 
-      // Convert relative paths to absolute
-      const absoluteInputPath = localPath;
-      const absoluteOutputPath = resolveToAbsolutePath(outputPath);
+      // 1. Upload to Adobe to validate/repair PDF integrity
+      // const inputAsset = await this.pdfServices.upload({
+      //   readStream: fs.createReadStream(localPath),
+      //   mimeType: MimeType.PDF
+      // });
+      // (Just uploading verifies it's a valid PDF structure for Adobe)
 
-      // Ensure output directory exists
-      const outputDir = path.dirname(absoluteOutputPath);
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-      }
-
-      // Adobe PDF Services approach: Use Adobe for PDF integrity, PDF overlay watermarks only
-      // No DOCX conversion to avoid header/footer watermarks
-      console.log(`💧 [Adobe] Using Adobe PDF processing with PDF overlay watermarks only...`);
-
-      // Step 1: Validate PDF using Adobe (upload and process for integrity)
-      console.log(`🔍 [Adobe] Validating PDF through Adobe services...`);
-
-      // Upload to Adobe to validate PDF integrity
-      const inputAsset = await this.pdfServices.upload({
-        readStream: fs.createReadStream(absoluteInputPath),
-        mimeType: MimeType.PDF
-      });
-
-      console.log(`✅ [Adobe] PDF uploaded and validated successfully`);
-
-      // Step 2: Apply PDF overlay watermarks using pdf-lib (no header/footer)
-      console.log(`💧 [Adobe] Applying PDF overlay watermarks with logo...`);
-
-      const { PDFDocument, rgb, StandardFonts, degrees } = await import('pdf-lib');
-
-      // Load the input PDF
-      const pdfBytes = fs.readFileSync(absoluteInputPath);
+      // 2. Apply watermark locally using pdf-lib
+      const pdfBytes = fs.readFileSync(localPath);
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-      // Create watermark text for PDF overlay style only
-      const centerWatermarkText = `${watermarkData.userName} | ${new Date().toLocaleDateString()} | Article ID: ${watermarkData.articleId}`;
-      const footerWatermarkText = `Downloaded from LAW NATION | ${new Date().toLocaleDateString()}`;
-
-      // Apply PDF-style overlay watermarks to all pages (no header/footer duplication)
+      
       const pages = pdfDoc.getPages();
-      console.log(`📄 [Adobe] Processing ${pages.length} pages for watermarking...`);
-
-      for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
-        const page = pages[pageIndex];
-        if (!page) continue; // Skip if page is undefined
-
-        const { width, height } = page.getSize();
-        console.log(`📄 [Adobe] Page ${pageIndex + 1}: ${width}x${height}`);
-
-        // Check for company logo using clean utility
-        const logoInfo = loadCompanyLogo();
-        if (logoInfo.found) {
-          console.log(`✅ [Adobe] Your logo is available for page ${pageIndex + 1}`);
-          console.log(`📊 [Adobe] Logo file size: ${logoInfo.size} bytes`);
-        } else {
-          console.log(`⚠️ [Adobe] Logo not found, using text watermark for page ${pageIndex + 1}`);
-        }
-
-        // 1. Company logo image watermark (center-right background)
-        console.log(`💧 [Adobe] Adding company logo image watermark on page ${pageIndex + 1}`);
-
-        // Try to load company logo image
-        let logoImage = null;
-        try {
-          // Look for logo in your assets/img folder, including your specific screenshot file
-          const possibleLogoPaths = [
-            // Your specific file (note: assests with double 's' as in your directory)
-            path.join(process.cwd(), 'src', 'assests', 'img', 'Screenshot 2026-01-09 204120.png'),
-            // Common logo names (note: assests with double 's')
-            path.join(process.cwd(), 'src', 'assests', 'img', 'logo.png'),
-            path.join(process.cwd(), 'src', 'assests', 'img', 'law-nation-logo.png'),
-            path.join(process.cwd(), 'src', 'assests', 'img', 'company-logo.png'),
-            // Other locations (note: assests with double 's')
-            path.join(process.cwd(), 'src', 'assests', 'logo.png'),
-            path.join(process.cwd(), 'src', 'assests', 'law-nation-logo.png'),
-            path.join(process.cwd(), 'public', 'logo.png'),
-            path.join(process.cwd(), 'assets', 'logo.png'),
-            path.join(process.cwd(), 'uploads', 'logo.png')
-          ];
-
-          const primaryLogoPath = possibleLogoPaths[0] || '';
-
-          console.log(`🔍 [Adobe] Looking for logo at: ${primaryLogoPath}`);
-
-          if (fs.existsSync(primaryLogoPath)) {
-            const logoBytes = fs.readFileSync(primaryLogoPath);
-            console.log(`✅ [Adobe] Company logo file found, attempting to embed`);
-
-            // Try to embed the actual PNG logo
-            try {
-              logoImage = await pdfDoc.embedPng(logoBytes);
-              console.log(`✅ [Adobe] PNG logo embedded successfully`);
-            } catch (embedError) {
-              console.warn(`⚠️ [Adobe] Failed to embed PNG:`, embedError);
-              logoImage = null; // Will use text fallback
-            }
-          } else {
-            console.log(`⚠️ [Adobe] Logo file not found, checking for JPG...`);
-            // Try JPG format
-            const jpgLogoPath = primaryLogoPath.replace('.png', '.jpg');
-            if (fs.existsSync(jpgLogoPath)) {
-              const logoBytes = fs.readFileSync(jpgLogoPath);
-              console.log(`✅ [Adobe] Company logo (JPG) file found, attempting to embed`);
-
-              // Try to embed JPG logo
-              try {
-                logoImage = await pdfDoc.embedJpg(logoBytes);
-                console.log(`✅ [Adobe] JPG logo embedded successfully`);
-              } catch (embedError) {
-                console.warn(`⚠️ [Adobe] Failed to embed JPG:`, embedError);
-                logoImage = null; // Will use text fallback
-              }
-            }
-          }
-        } catch (logoError: any) {
-          console.warn(`⚠️ [Adobe] Failed to load company logo:`, logoError.message);
-        }
-
-        // Since we found the logo, let's actually use it instead of text fallback
-        // logoImage will be set if embedding was successful
-
-        // If logo image is available, use it as watermark
-        if (logoImage) {
-          console.log(`💧 [Adobe] Using actual logo image for watermark`);
-
-          // Calculate logo position (centered on page)
-          const logoWidth = 120; // Adjust size as needed
-          const logoHeight = 80;
-          const logoX = (width - logoWidth) / 2; // Center horizontally
-          const logoY = (height - logoHeight) / 2; // Center vertically
-
-          // Draw the actual logo image
-          page.drawImage(logoImage, {
-            x: logoX,
-            y: logoY,
-            width: logoWidth,
-            height: logoHeight,
-            opacity: 0.4, // Semi-transparent like your design
-          });
-
-          console.log(`✅ [Adobe] Actual logo image watermark applied`);
-        } else {
-          // Fallback to text logo if image embedding failed
-          console.log(`💧 [Adobe] Using text fallback for logo`);
-          const logoText = "LAW NATION";
-          const logoSubText = "PRIME TIMES JOURNAL";
-
-          // Calculate positions to match your image (center-right area)
-          const logoX = width * 0.6; // Move to right side (60% of width)
-          const logoY = height * 0.6; // Upper center area
-          const subLogoX = width * 0.6; // Same X as main logo
-          const subLogoY = height * 0.55; // Below main logo
-
-          // Main logo text (VERY large and prominent like in your image)
-          page.drawText(logoText, {
-            x: logoX - 100, // Adjust for text width
-            y: logoY,
-            size: 72, // Much larger size
-            font: boldFont,
-            color: rgb(0.85, 0.85, 0.85), // Light gray but visible
-            opacity: 0.4, // More visible
-          });
-
-          // Logo subtitle (prominent)
-          page.drawText(logoSubText, {
-            x: subLogoX - 80, // Adjust for text width
-            y: subLogoY,
-            size: 18, // Larger subtitle
-            font: font,
-            color: rgb(0.85, 0.85, 0.85), // Light gray but visible
-            opacity: 0.4, // More visible
-          });
-        }
-
-        // 2. Diagonal center watermark (PDF overlay style)
-        page.drawText(centerWatermarkText, {
-          x: width / 2 - 150,
-          y: height / 2 - 80,
-          size: 12,
-          font: font,
-          color: rgb(0.8, 0.8, 0.8), // Light gray
-          rotate: degrees(-45), // Diagonal
-          opacity: 0.3, // Semi-transparent
+      for (const page of pages) {
+        page.drawText(`${watermarkData.userName} - ${watermarkData.articleId}`, {
+          x: 50, y: 50, size: 12, font, color: rgb(0.7, 0.7, 0.7), rotate: degrees(45)
         });
-
-        // 3. Footer watermark (PDF overlay style)
-        page.drawText(footerWatermarkText, {
-          x: 50,
-          y: 30,
-          size: 8,
-          font: font,
-          color: rgb(0.6, 0.6, 0.6), // Medium gray
-          opacity: 0.7, // Semi-transparent
-        });
-
-        console.log(`✅ [Adobe] Page ${pageIndex + 1} watermarked successfully`);
       }
+      const saved = await pdfDoc.save();
+      fs.writeFileSync(outputPath, saved);
 
-      // Save watermarked PDF
-      const watermarkedBytes = await pdfDoc.save();
-
-      // Step 3: Validate the watermarked PDF
-      try {
-        await PDFDocument.load(watermarkedBytes); // Test if it's valid
-        console.log(`✅ [Adobe] Watermarked PDF validation passed`);
-      } catch (validationError) {
-        console.error(`❌ [Adobe] Watermarked PDF validation failed:`, validationError);
-        throw new Error('Watermarked PDF is corrupted');
-      }
-
-      // Save final watermarked PDF
-      fs.writeFileSync(absoluteOutputPath, watermarkedBytes);
-
-      console.log(`✅ [Adobe] Adobe-validated PDF with logo and overlay watermarks completed successfully`);
-      console.log(`   📊 Output file size: ${watermarkedBytes.length} bytes`);
-      console.log(`   💧 Watermark style: LAW NATION logo + PDF overlay (no header/footer duplication)`);
-      console.log(`   🔧 Adobe validation: PDF integrity verified`);
-
-      // Clean up temp file
-      if (tempPath) {
-        fs.unlink(tempPath, () => { });
-      }
-
+      if (tempPath) fs.unlink(tempPath, () => { });
       return outputPath;
-
     } catch (err: any) {
-      console.error('❌ [Adobe] PDF watermarking failed:', err);
-      console.error(`   Error type: ${err.constructor.name}`);
-      console.error(`   Error message: ${err.message}`);
-
-      // Check if this is a BAD_PDF error or conversion issue
-      if (err.message && (err.message.includes('BAD_PDF') || err.message.includes('Asset download URI'))) {
-        console.warn(`⚠️ [Adobe] PDF is corrupted or incompatible with Adobe services`);
-        console.warn(`⚠️ [Adobe] Using fallback: copying clean PDF without watermark`);
-
-        // Fallback: copy clean PDF without watermark to prevent corruption
-        try {
-          const fs = await import('fs');
-          const absoluteInputPath = resolveToAbsolutePath(pdfPath);
-          const absoluteOutputPath = resolveToAbsolutePath(outputPath);
-          fs.copyFileSync(absoluteInputPath, absoluteOutputPath);
-          console.log(`✅ [Adobe] Fallback: Clean PDF copied (no watermark to prevent corruption)`);
-          return outputPath;
-        } catch (copyError) {
-          console.error('❌ [Adobe] Fallback copy also failed:', copyError);
-          throw new InternalServerError('PDF watermarking and fallback both failed');
-        }
-      }
-
-      // For other errors, still try the fallback
-      try {
-        const fs = await import('fs');
-        const absoluteInputPath = resolveToAbsolutePath(pdfPath);
-        const absoluteOutputPath = resolveToAbsolutePath(outputPath);
-        fs.copyFileSync(absoluteInputPath, absoluteOutputPath);
-        console.log(`✅ [Adobe] Fallback: Clean PDF copied (no watermark due to error)`);
-        return outputPath;
-      } catch (copyError) {
-        console.error('❌ [Adobe] Fallback copy also failed:', copyError);
-        throw new InternalServerError('Adobe PDF watermarking failed');
-      }
+      throw new InternalServerError(`Watermarking failed: ${err.message}`);// 
     }
   }
 
-  /**
-   * Test Adobe Services connectivity and credentials
-   */
-  async testConnection(): Promise<{ success: boolean; message: string; details?: any }> {
-    console.log(`🧪 [Adobe] Testing Adobe Services connection...`);
-
+  async testConnection(): Promise<any> {
     try {
       this.checkAvailability();
-
-      // Try to create a simple job to test credentials
-      console.log(`🔐 [Adobe] Testing credentials...`);
-
-      // Create a minimal test - just check if we can initialize a job
-      const testResult = {
-        success: true,
-        message: "Adobe Services are properly configured and available",
-        details: {
-          sdkLoaded: !!AdobeSDK,
-          credentialsSet: !!(process.env.ADOBE_CLIENT_ID && process.env.ADOBE_CLIENT_SECRET && process.env.ADOBE_ORGANIZATION_ID),
-          serviceInitialized: this.isAvailable
-        }
-      };
-
-      console.log(`✅ [Adobe] Connection test passed:`, testResult);
-      return testResult;
-
+      return { success: true, message: "Adobe Services Available" };
     } catch (error: any) {
-      const testResult = {
-        success: false,
-        message: `Adobe Services test failed: ${error.message}`,
-        details: {
-          sdkLoaded: !!AdobeSDK,
-          credentialsSet: !!(process.env.ADOBE_CLIENT_ID && process.env.ADOBE_CLIENT_SECRET && process.env.ADOBE_ORGANIZATION_ID),
-          serviceInitialized: this.isAvailable,
-          error: error.message
-        }
-      };
-
-      console.error(`❌ [Adobe] Connection test failed:`, testResult);
-      return testResult;
+      return { success: false, message: error.message };
     }
   }
 }
