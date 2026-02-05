@@ -456,6 +456,30 @@ export class AdobeService {
     }
   }
 
+  async extractHtmlFromDocxUsingMammoth(docxPath: string): Promise<string> {
+    try {
+      const mammoth = await import('mammoth');
+      let localPath: string;
+      let tempPath: string | null = null;
+
+      if (this.isUrl(docxPath)) {
+        tempPath = await this.downloadFile(docxPath, '.docx');
+        localPath = tempPath;
+      } else {
+        localPath = resolveToAbsolutePath(docxPath);
+      }
+
+      if (!fs.existsSync(localPath)) throw new Error(`File not found: ${localPath}`);
+
+      const result = await mammoth.convertToHtml({ path: localPath });
+
+      if (tempPath) fs.unlink(tempPath, () => { });
+      return result.value; // Returns HTML string
+    } catch (error: any) {
+      throw new InternalServerError(`Mammoth HTML conversion failed: ${error.message}`);
+    }
+  }
+
   async extractTextFromDocx(docxPath: string): Promise<string> {
     this.checkAvailability();
     try {
@@ -523,7 +547,7 @@ export class AdobeService {
 
       // Adobe SDK lacks direct DOCX watermarking, so we copy it
       fs.copyFileSync(localPath, outputPath);
-      
+
       if (tempPath) fs.unlink(tempPath, () => { });
       return outputPath;
     } catch (err: any) {
@@ -556,7 +580,7 @@ export class AdobeService {
       const pdfBytes = fs.readFileSync(localPath);
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      
+
       const pages = pdfDoc.getPages();
       for (const page of pages) {
         page.drawText(`${watermarkData.userName} - ${watermarkData.articleId}`, {

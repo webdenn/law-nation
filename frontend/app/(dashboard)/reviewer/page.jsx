@@ -402,7 +402,7 @@ export default function ReviewerDashboard() {
         // ✅ CHANGED: removing reviewer tokens
         localStorage.removeItem("reviewerToken");
         localStorage.removeItem("reviewerUser");
-        router.push("/law/management-login/");
+        router.push("/management-login/");
     };
 
     const handleDownloadFile = async (fileUrl, fileName, type) => {
