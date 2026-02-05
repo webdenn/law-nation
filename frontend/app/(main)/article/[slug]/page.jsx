@@ -241,7 +241,7 @@ export default function ArticlePage({ params }) {
     if (!text) return null;
 
     return (
-      <div className="whitespace-pre-wrap text-[18px] sm:text-[20px] text-[#292929] leading-[32px] tracking-tight text-justify font-serif">
+      <div className="whitespace-pre-wrap text-[16px] sm:text-[18px] text-[#292929] leading-[28px] tracking-tight text-justify font-serif">
         {text}
       </div>
     );
@@ -380,7 +380,7 @@ export default function ArticlePage({ params }) {
                 // ✅ Logged In: Show Full Content (HTML or Text)
                 article.contentHtml ? (
                   <div
-                    className="whitespace-pre-wrap text-[18px] sm:text-[20px] text-[#292929] leading-[32px] tracking-tight text-justify font-serif"
+                    className="whitespace-pre-wrap text-[16px] sm:text-[18px] text-[#292929] leading-[28px] tracking-tight text-justify font-serif [&_img]:max-h-[300px] [&_img]:w-auto [&_img]:mx-auto [&_img]:my-6"
                     dangerouslySetInnerHTML={{ __html: article.contentHtml }}
                   />
                 ) : article.content ? (
