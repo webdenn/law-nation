@@ -510,13 +510,11 @@ export class AdobeService {
 
   async addWatermarkToPdf(pdfPath: string, outputPath: string, watermarkData: any): Promise<string> {
     this.checkAvailability();
-    let tempPath: string | null = null;
-    
     try {
       const { PDFDocument, rgb, StandardFonts, degrees } = await import('pdf-lib');
       let localPath: string;
+      let tempPath: string | null = null;
 
-      // 1. Resolve & Download from S3 (Headers stripped logic)
       if (this.isUrl(pdfPath)) {
         tempPath = await this.downloadFile(pdfPath, '.pdf');
         localPath = tempPath;
@@ -524,49 +522,34 @@ export class AdobeService {
         localPath = resolveToAbsolutePath(pdfPath);
       }
 
-      // 2. Read file bytes
-      const pdfBytes = fs.readFileSync(localPath);
-      
-      // 3. LOAD WITH FIXES (REMOVED redundant Adobe upload validation)
-      // ignoreEncryption handles those "invisible" permission flags
-      const pdfDoc = await PDFDocument.load(pdfBytes, { 
-        ignoreEncryption: true, 
-        throwOnInvalidObject: false 
+      // 1. Upload to Adobe to validate/repair PDF integrity
+      const inputAsset = await this.pdfServices.upload({
+        readStream: fs.createReadStream(localPath),
+        mimeType: MimeType.PDF
       });
+      // (Just uploading verifies it's a valid PDF structure for Adobe)
 
+      // 2. Apply watermark locally using pdf-lib
+      const pdfBytes = fs.readFileSync(localPath);
+      const pdfDoc = await PDFDocument.load(pdfBytes);
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const pages = pdfDoc.getPages();
       
+      const pages = pdfDoc.getPages();
       for (const page of pages) {
         page.drawText(`${watermarkData.userName} - ${watermarkData.articleId}`, {
           x: 50, y: 50, size: 12, font, color: rgb(0.7, 0.7, 0.7), rotate: degrees(45)
         });
       }
-
       const saved = await pdfDoc.save();
-
-      // 4. Ensure directory exists (Crucial for fresh EC2 folders)
-      const outputDir = path.dirname(outputPath);
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-      }
-
       fs.writeFileSync(outputPath, saved);
 
       if (tempPath) fs.unlink(tempPath, () => { });
       return outputPath;
-
     } catch (err: any) {
-      // Because you have no PM2 logs, we log to stdout so the process 
-      // manager (whatever you use) might capture it.
-      console.error('❌ WATERMARKING CRASHED:', err.message);
-      if (tempPath) fs.unlink(tempPath, () => { });
-      
-      // Throwing the message back to the frontend so you can see it in Network tab
-      throw new InternalServerError(`Watermark Error: ${err.message}`);
+      throw new InternalServerError('PDF watermarking failed');
     }
-}
-  
+  }
+
   async testConnection(): Promise<any> {
     try {
       this.checkAvailability();
