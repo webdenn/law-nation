@@ -206,7 +206,7 @@ export class ArticleWorkflowService {
     }
 
     // Validate uploaded file is DOCX
-    if (!data.pdfUrl.toLowerCase().endsWith('.docx')) {
+    if (!data.presignedUrl.toLowerCase().endsWith('.docx')) {
       throw new BadRequestError('Please upload a DOCX file');
     }
 
@@ -214,10 +214,10 @@ export class ArticleWorkflowService {
       // Step 1: Process clean DOCX (editor's upload)
       // If it's a URL, we don't resolve to absolute local path - Adobe service will handle either
       const isUrl = (path: string) => path.startsWith('http://') || path.startsWith('https://');
-      const cleanDocxPath = isUrl(data.pdfUrl) ? data.pdfUrl : resolveToAbsolutePath(data.pdfUrl);
+      const cleanDocxPath = isUrl(data.presignedUrl) ? data.presignedUrl : resolveToAbsolutePath(data.presignedUrl);
       console.log(`📄 [Clean Process] Processing clean DOCX: ${cleanDocxPath}`);
 
-      if (!isUrl(data.pdfUrl) && !fileExistsAtPath(data.pdfUrl)) {
+      if (!isUrl(data.presignedUrl) && !fileExistsAtPath(data.presignedUrl)) {
         throw new Error(`DOCX file not found: ${cleanDocxPath}`);
       }
 
@@ -503,7 +503,7 @@ export class ArticleWorkflowService {
     }
 
     // NEW: Use improved workflow for DOCX uploads
-    if (data.pdfUrl.toLowerCase().endsWith('.docx')) {
+    if (data.presignedUrl.toLowerCase().endsWith('.docx')) {
       console.log(`🚀 [Upload] Using improved workflow for DOCX upload`);
       return await this.uploadCorrectedDocxImproved(articleId, editorId, data, userRoles);
     }
@@ -521,7 +521,7 @@ export class ArticleWorkflowService {
     console.log(`📄 [Document Edit] Processing DOCX upload for document ${article.id}`);
 
     // For documents, the uploaded file should be DOCX
-    let docxPath = data.pdfUrl; // This is actually a DOCX file for documents
+    let docxPath = data.presignedUrl; // This is actually a DOCX file for documents
 
     // Fix path resolution - convert relative path to absolute if needed
     const isUrl = (path: string) => path.startsWith('http://') || path.startsWith('https://');
@@ -612,7 +612,7 @@ export class ArticleWorkflowService {
   // Existing article editing logic - Enhanced to detect DOCX uploads
   private async handleArticleEdit(article: any, editorId: string, data: UploadCorrectedPdfData) {
     // Check if this is a DOCX upload - if so, treat as document workflow
-    const isDocxUpload = data.pdfUrl.toLowerCase().endsWith('.docx');
+    const isDocxUpload = data.presignedUrl.toLowerCase().endsWith('.docx');
 
     if (isDocxUpload) {
       console.log(`📄 [Article Edit] DOCX detected - switching to document workflow for ${article.id}`);
@@ -634,9 +634,9 @@ export class ArticleWorkflowService {
     }
 
     console.log(
-      `📄 [Editor Upload] Converting file to both formats: ${data.pdfUrl}`
+      `📄 [Editor Upload] Converting file to both formats: ${data.presignedUrl}`
     );
-    const { pdfPath, wordPath } = await ensureBothFormats(data.pdfUrl);
+    const { pdfPath, wordPath } = await ensureBothFormats(data.presignedUrl);
 
     const oldFilePath = article.currentPdfUrl;
     const newFilePath = pdfPath;
@@ -930,16 +930,16 @@ export class ArticleWorkflowService {
     }
 
     // Validate uploaded file is DOCX (reviewers can only upload DOCX)
-    if (!data.pdfUrl.toLowerCase().endsWith('.docx')) {
+    if (!data.presignedUrl.toLowerCase().endsWith('.docx')) {
       throw new BadRequestError('Reviewers can only upload DOCX files');
     }
 
     try {
       // Process reviewer's DOCX upload
-      const docxPath = resolveToAbsolutePath(data.pdfUrl);
+      const docxPath = resolveToAbsolutePath(data.presignedUrl);
       console.log(`📄 [Reviewer Upload] Processing DOCX: ${docxPath}`);
 
-      if (!fileExistsAtPath(data.pdfUrl)) {
+      if (!fileExistsAtPath(data.presignedUrl)) {
         throw new Error(`DOCX file not found: ${docxPath}`);
       }
 

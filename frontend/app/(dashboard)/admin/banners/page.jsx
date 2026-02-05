@@ -20,7 +20,7 @@ export default function BannerManagementPage() {
     useEffect(() => {
         const token = localStorage.getItem("adminToken");
         if (!token) {
-            router.push("/management-login");
+            router.push("/management-login/");
         } else {
             fetchBanners();
         }

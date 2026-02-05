@@ -57,7 +57,11 @@ export async function addWatermarkToPdf(
     
     // 2. Load PDF document
     console.log('📖 [Watermark] Loading PDF document...');
-    const pdfDoc = await PDFDocument.load(pdfBytes);
+    // const pdfDoc = await PDFDocument.load(pdfBytes);
+    const pdfDoc = await PDFDocument.load(pdfBytes, { 
+    ignoreEncryption: true,        // Bypasses "Owner Restrictions" in legal PDFs
+    throwOnInvalidObject: false    // Prevents crashing on minor structural errors
+   });
     const pages = pdfDoc.getPages();
     
     console.log(`� [Watermark] PDF has ${pages.length} pages`);

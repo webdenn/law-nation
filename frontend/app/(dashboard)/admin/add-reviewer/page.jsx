@@ -26,7 +26,7 @@ export default function AddReviewerPage() {
             toast.error("Session Expired. Please Login Again.");
             setLoading(false);
             setTimeout(() => {
-                router.push("/management-login");
+                router.push("/management-login/");
             }, 1500);
             return;
         }

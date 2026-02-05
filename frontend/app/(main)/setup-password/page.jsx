@@ -75,9 +75,10 @@ function SetupForm() {
         localStorage.clear();
         sessionStorage.clear();
 
-        // 👇 REDIRECT UPDATE: Redirects to User Home
+        // 👇 REDIRECT UPDATE: Redirects to User Home with hard reload to ensure path correctness
         setTimeout(() => {
-          window.location.href = "/management-login";
+          // Use exact path matching user requirement
+          window.location.replace("/law/management-login/");
         }, 2000);
 
       } else {

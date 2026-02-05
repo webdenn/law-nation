@@ -34,10 +34,12 @@ export default function SessionChecker() {
                         if (key === "adminToken") {
                             if (window.location.pathname.startsWith("/admin")) {
                                 toast.error("Admin session expired. Please login again.");
-                                router.push("/management-login");
+                                router.push("/management-login/");
                             }
                         } else {
-                            if (window.location.pathname !== "/login" && !window.location.pathname.startsWith("/admin")) {
+                            // Fix: Don't redirect if already on login pages
+                            const path = window.location.pathname;
+                            if (!path.includes("/login") && !path.includes("/management-login") && !path.startsWith("/admin")) {
                                 toast.error("Session expired. Please login again.");
                                 router.push("/login");
                             }
@@ -70,7 +72,7 @@ export default function SessionChecker() {
                     dispatch(logout());
 
                     if (window.location.pathname.startsWith("/admin")) {
-                        router.push("/management-login");
+                        router.push("/management-login/");
                     } else {
                         router.push("/login");
                     }
