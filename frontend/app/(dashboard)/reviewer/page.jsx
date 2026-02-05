@@ -168,7 +168,7 @@ export default function ReviewerDashboard() {
         }
 
         if (!token) {
-            router.push("/law/management-login/");
+            router.push("/management-login/");
             return;
         }
 
@@ -181,7 +181,7 @@ export default function ReviewerDashboard() {
             } catch (e) {
                 console.error("Error parsing user data", e);
                 localStorage.removeItem("reviewerUser");
-                router.push("/law/management-login/");
+                router.push("/management-login/");
             }
         }
     }, []);

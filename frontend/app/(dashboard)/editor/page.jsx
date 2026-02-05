@@ -233,7 +233,7 @@ export default function EditorDashboard() {
 
     // 2. Agar Editor token nahi hai to Login bhej do
     if (!token) {
-      router.push("/law/management-login/");
+      router.push("/management-login/");
       return;
     }
 
@@ -248,7 +248,7 @@ export default function EditorDashboard() {
       } catch (e) {
         console.error("Error parsing user data", e);
         localStorage.removeItem("editorUser"); // Corrupt data hatao
-        router.push("/law/management-login/");
+        router.push("/management-login/");
       }
     }
   }, []); // 👈 Yahan [router] hata kar [] kar do (Sirf ek baar chalega)
