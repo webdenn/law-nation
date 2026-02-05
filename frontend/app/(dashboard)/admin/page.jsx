@@ -353,17 +353,23 @@ export default function AdminDashboard() {
       if (!targetPdfUrl) throw new Error("Target PDF for comparison missing");
 
       // 1. Fetch Original PDF
+      const originalIsS3 = selectedArticle.originalPdfUrl.includes(".s3.") || selectedArticle.originalPdfUrl.includes("amazonaws.com");
+      const originalHeaders = originalIsS3 ? {} : { Authorization: `Bearer ${token}` };
+
       const originalRes = await fetch(
         selectedArticle.originalPdfUrl.startsWith("http") ? selectedArticle.originalPdfUrl : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: originalHeaders }
       );
       const originalBlob = await originalRes.blob();
       const originalFile = new File([originalBlob], "original.pdf", { type: "application/pdf" });
 
       // 2. Fetch Current (Edited/Target) PDF
+      const targetIsS3 = targetPdfUrl.includes(".s3.") || targetPdfUrl.includes("amazonaws.com");
+      const targetHeaders = targetIsS3 ? {} : { Authorization: `Bearer ${token}` };
+
       const editedRes = await fetch(
         targetPdfUrl.startsWith("http") ? targetPdfUrl : `${NEXT_PUBLIC_BASE_URL}${targetPdfUrl}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: targetHeaders }
       );
       const editedBlob = await editedRes.blob();
       const editedFile = new File([editedBlob], "edited.pdf", { type: "application/pdf" });
