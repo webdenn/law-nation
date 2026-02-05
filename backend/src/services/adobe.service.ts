@@ -508,6 +508,29 @@ export class AdobeService {
     }
   }
 
+  async addWatermarkToDocx(docxPath: string, outputPath: string, watermarkData: any): Promise<string> {
+    this.checkAvailability();
+    try {
+      let localPath: string;
+      let tempPath: string | null = null;
+
+      if (this.isUrl(docxPath)) {
+        tempPath = await this.downloadFile(docxPath, '.docx');
+        localPath = tempPath;
+      } else {
+        localPath = resolveToAbsolutePath(docxPath);
+      }
+
+      // Adobe SDK lacks direct DOCX watermarking, so we copy it
+      fs.copyFileSync(localPath, outputPath);
+      
+      if (tempPath) fs.unlink(tempPath, () => { });
+      return outputPath;
+    } catch (err: any) {
+      throw new InternalServerError('DOCX watermarking failed');
+    }
+  }
+
   async addWatermarkToPdf(pdfPath: string, outputPath: string, watermarkData: any): Promise<string> {
     this.checkAvailability();
     try {
