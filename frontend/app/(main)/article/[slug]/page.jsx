@@ -252,7 +252,11 @@ export default function ArticlePage({ params }) {
     if (token || !article) return "";
 
     // Helper to strip HTML tags via regex (SSR safe)
-    const stripHtml = (html) => html.replace(/<[^>]*>?/gm, '');
+    const stripHtml = (html) => {
+      let text = html.replace(/<br\s*\/?>/gi, '\n'); // Replace <br> with newline
+      text = text.replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|ul|ol)>/gi, '\n\n'); // Replace block closers with double newline
+      return text.replace(/<[^>]*>?/gm, ''); // Remove remaining tags
+    };
 
     let textContent = article.content;
     if (!textContent || textContent.includes("Text extraction failed")) {
@@ -375,7 +379,10 @@ export default function ArticlePage({ params }) {
               {token ? (
                 // ✅ Logged In: Show Full Content (HTML or Text)
                 article.contentHtml ? (
-                  <div dangerouslySetInnerHTML={{ __html: article.contentHtml }} />
+                  <div
+                    className="whitespace-pre-wrap text-[18px] sm:text-[20px] text-[#292929] leading-[32px] tracking-tight text-justify font-serif"
+                    dangerouslySetInnerHTML={{ __html: article.contentHtml }}
+                  />
                 ) : article.content ? (
                   <div className="font-serif max-w-2xl mx-auto">
                     {renderMediumContent(article.content)}
