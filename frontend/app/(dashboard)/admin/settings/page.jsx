@@ -18,7 +18,7 @@ export default function FooterSettingsPage() {
     useEffect(() => {
         const token = localStorage.getItem("adminToken");
         if (!token) {
-            router.push("/management-login");
+            router.push("/law/management-login/");
         } else {
             fetchSettings();
         }

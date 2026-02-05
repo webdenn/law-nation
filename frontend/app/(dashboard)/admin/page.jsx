@@ -45,7 +45,7 @@ export default function AdminDashboard() {
     const token = localStorage.getItem("adminToken");
     const adminData = localStorage.getItem("adminUser");
     if (!token) {
-      router.push("/management-login");
+      router.push("/law/management-login/");
     } else {
       try {
         if (adminData) {
@@ -54,7 +54,7 @@ export default function AdminDashboard() {
         setIsAuthorized(true);
       } catch (error) {
         localStorage.removeItem("adminToken");
-        router.push("/management-login");
+        router.push("/law/management-login/");
       }
     }
   }, [router]);

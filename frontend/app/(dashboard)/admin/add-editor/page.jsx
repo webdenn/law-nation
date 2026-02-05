@@ -26,7 +26,7 @@ export default function AddEditorPage() {
       toast.error("Session Expired. Please Login Again.");
       setLoading(false);
       setTimeout(() => {
-        router.push("/admin-login");
+        router.push("/law/management-login/");
       }, 1500);
       return;
     }

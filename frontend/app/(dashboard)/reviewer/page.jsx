@@ -168,7 +168,7 @@ export default function ReviewerDashboard() {
         }
 
         if (!token) {
-            router.push("/management-login");
+            router.push("/law/management-login/");
             return;
         }
 
@@ -181,7 +181,7 @@ export default function ReviewerDashboard() {
             } catch (e) {
                 console.error("Error parsing user data", e);
                 localStorage.removeItem("reviewerUser");
-                router.push("/management-login");
+                router.push("/law/management-login/");
             }
         }
     }, []);
@@ -400,7 +400,7 @@ export default function ReviewerDashboard() {
         // ✅ CHANGED: removing reviewer tokens
         localStorage.removeItem("reviewerToken");
         localStorage.removeItem("reviewerUser");
-        router.push("/management-login");
+        router.push("/law/management-login/");
     };
 
     const handleDownloadFile = async (fileUrl, fileName, type) => {
