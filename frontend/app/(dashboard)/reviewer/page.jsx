@@ -413,9 +413,16 @@ export default function ReviewerDashboard() {
                 ? fileUrl
                 : `${NEXT_PUBLIC_BASE_URL}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
 
+            // ✅ FIX: Only send Authorization header to backend APIs, not S3 URLs
+            const isS3Url = fullUrl.includes('.s3.') || fullUrl.includes('amazonaws.com');
+            const headers = {};
+            if (!isS3Url) {
+                headers.Authorization = `Bearer ${token}`;
+            }
+
             const res = await fetch(fullUrl, {
                 method: "GET",
-                headers: { Authorization: `Bearer ${token}` },
+                headers: headers,
             });
 
             if (!res.ok) throw new Error("Download failed");
