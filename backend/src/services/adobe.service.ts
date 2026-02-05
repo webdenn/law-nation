@@ -471,7 +471,11 @@ export class AdobeService {
 
       if (!fs.existsSync(localPath)) throw new Error(`File not found: ${localPath}`);
 
-      const result = await mammoth.convertToHtml({ path: localPath });
+      const options = {
+        convertImage: mammoth.images.imgElement(() => { return []; }) // 🚫 Block all images (removes watermark logo)
+      };
+
+      const result = await mammoth.convertToHtml({ path: localPath }, options);
 
       if (tempPath) fs.unlink(tempPath, () => { });
       return result.value; // Returns HTML string
