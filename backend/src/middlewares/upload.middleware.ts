@@ -584,14 +584,14 @@ export const uploadOptionalPdf = (req: Request, res: Response, next: NextFunctio
         fs.unlinkSync(tempFilePath);
 
         // CHANGED: uploadBufferToS3
-        const { url, storageKey } = await uploadBufferToS3(
+        const { url, storageKey, presignedUrl } = await uploadBufferToS3(
           watermarkedBuffer,
           file.originalname,
           file.mimetype
         );
 
         req.fileUrl = url;
-        req.fileMeta = { url, storageKey };
+        req.fileMeta = { url, storageKey, presignedUrl };
         next();
       } catch (error) {
         console.error('❌ [Upload] Watermark/Upload failed:', error);
@@ -733,13 +733,13 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
           fs.unlinkSync(tempFilePath);
 
           // CHANGED: uploadBufferToS3
-          const { url, storageKey } = await uploadBufferToS3(
+          const { url, storageKey, presignedUrl } = await uploadBufferToS3(
             uploadBuffer,
             docFile.originalname,
             docFile.mimetype,
             'pdf'
           );
-          req.fileMeta = { url, storageKey };
+          req.fileMeta = { url, storageKey, presignedUrl };
         } else {
           return res.status(400).json({ error: "Corrected document file required" });
         }
