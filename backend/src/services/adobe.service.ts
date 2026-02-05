@@ -546,10 +546,10 @@ export class AdobeService {
       }
 
       // 1. Upload to Adobe to validate/repair PDF integrity
-      const inputAsset = await this.pdfServices.upload({
-        readStream: fs.createReadStream(localPath),
-        mimeType: MimeType.PDF
-      });
+      // const inputAsset = await this.pdfServices.upload({
+      //   readStream: fs.createReadStream(localPath),
+      //   mimeType: MimeType.PDF
+      // });
       // (Just uploading verifies it's a valid PDF structure for Adobe)
 
       // 2. Apply watermark locally using pdf-lib
