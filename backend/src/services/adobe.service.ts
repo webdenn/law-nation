@@ -569,7 +569,7 @@ export class AdobeService {
       if (tempPath) fs.unlink(tempPath, () => { });
       return outputPath;
     } catch (err: any) {
-      throw new InternalServerError('PDF watermarking failed');
+      throw new InternalServerError(`Watermarking failed: ${err.message}`);
     }
   }
 
