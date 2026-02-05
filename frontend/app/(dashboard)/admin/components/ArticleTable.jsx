@@ -99,8 +99,7 @@ export default function ArticleTable({
                                     {/* 1. PDF & Abstract */}
                                     <td className="p-5">
                                         <p
-                                            onClick={() => handlePdfClick(art.pdfUrl)}
-                                            className="font-bold text-gray-800 underline cursor-pointer hover:text-red-600"
+                                            className="font-bold text-gray-800"
                                         >
                                             {art.title}
                                         </p>
@@ -209,8 +208,7 @@ export default function ArticleTable({
                             <div className="flex justify-between items-start gap-3">
                                 <div className="flex-1">
                                     <p
-                                        onClick={() => handlePdfClick(art.pdfUrl)}
-                                        className="font-bold text-gray-900 text-lg leading-snug cursor-pointer hover:text-red-600 hover:underline mb-1"
+                                        className="font-bold text-gray-900 text-lg leading-snug mb-1"
                                     >
                                         {art.title}
                                     </p>
