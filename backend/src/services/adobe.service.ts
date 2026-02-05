@@ -533,11 +533,12 @@ export class AdobeService {
 
   async addWatermarkToPdf(pdfPath: string, outputPath: string, watermarkData: any): Promise<string> {
     this.checkAvailability();
+    let tempPath: string | null = null;
     try {
       const { PDFDocument, rgb, StandardFonts, degrees } = await import('pdf-lib');
       let localPath: string;
-      let tempPath: string | null = null;
 
+      // 1. Resolve & Download from S3 (Your stripped-header logic works here)
       if (this.isUrl(pdfPath)) {
         tempPath = await this.downloadFile(pdfPath, '.pdf');
         localPath = tempPath;
@@ -545,34 +546,41 @@ export class AdobeService {
         localPath = resolveToAbsolutePath(pdfPath);
       }
 
-      // 1. Upload to Adobe to validate/repair PDF integrity
-      const inputAsset = await this.pdfServices.upload({
-        readStream: fs.createReadStream(localPath),
-        mimeType: MimeType.PDF
-      });
-      // (Just uploading verifies it's a valid PDF structure for Adobe)
-
-      // 2. Apply watermark locally using pdf-lib
+      // 2. Load the PDF (Using the flags to bypass invisible restrictions)
       const pdfBytes = fs.readFileSync(localPath);
-      const pdfDoc = await PDFDocument.load(pdfBytes);
+      const pdfDoc = await PDFDocument.load(pdfBytes, { 
+        ignoreEncryption: true, 
+        throwOnInvalidObject: false 
+      });
+
+      // 3. Watermark logic
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      
       const pages = pdfDoc.getPages();
       for (const page of pages) {
         page.drawText(`${watermarkData.userName} - ${watermarkData.articleId}`, {
           x: 50, y: 50, size: 12, font, color: rgb(0.7, 0.7, 0.7), rotate: degrees(45)
         });
       }
+
+      // 4. Save & Ensure Directory Exists
       const saved = await pdfDoc.save();
+      const outputDir = path.dirname(outputPath);
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
       fs.writeFileSync(outputPath, saved);
 
       if (tempPath) fs.unlink(tempPath, () => { });
       return outputPath;
     } catch (err: any) {
-      throw new InternalServerError('PDF watermarking failed');
+      // Log the real error to your terminal so you can see it
+      console.error('❌ WATERMARK FAILED:', err.message);
+      if (tempPath) fs.unlink(tempPath, () => { });
+      throw new InternalServerError(`PDF watermarking failed: ${err.message}`);
     }
   }
 
+  
   async testConnection(): Promise<any> {
     try {
       this.checkAvailability();
