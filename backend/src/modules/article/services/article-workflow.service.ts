@@ -429,7 +429,7 @@ export class ArticleWorkflowService {
     // Fallback to existing content if available and not corrupted
     if (article.content && article.content.trim().length > 0) {
       // Check if existing content looks corrupted
-      const hasCorruptedData = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|PKx|��|AEstructuredData/.test(article.content);
+      const hasCorruptedData = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|PKx|  |AEstructuredData/.test(article.content);
 
       if (!hasCorruptedData) {
         console.log(`ℹ️ [Text Extract] Using existing clean content as fallback (${article.content.length} characters)`);
@@ -991,7 +991,7 @@ export class ArticleWorkflowService {
         }
       }
 
-      // Create watermarked versions
+      // Create watermarked versions using the SAME utilities as editor workflow
       const watermarkData = {
         userName: 'LAW NATION REVIEWER',
         downloadDate: new Date(),
@@ -1000,11 +1000,19 @@ export class ArticleWorkflowService {
         frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
       };
 
-      // Watermark DOCX
-      await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
+      // Import proper watermark utilities (same as editor uses)
+      const { addWatermarkToPdf } = await import('@/utils/pdf-watermark.utils.js');
+      const { addSimpleWatermarkToWord } = await import('@/utils/word-watermark.utils.js');
 
-      // Watermark PDF
-      await adobeService.addWatermarkToPdf(pdfPath, watermarkedPdfPath, watermarkData);
+      // Watermark DOCX using proper utility
+      console.log(`💧 [Reviewer] Adding proper watermark to DOCX`);
+      const watermarkedDocxBuffer = await addSimpleWatermarkToWord(docxPath, watermarkData);
+      fs.writeFileSync(watermarkedDocxPath, watermarkedDocxBuffer);
+
+      // Watermark PDF using proper utility (same as editor)
+      console.log(`💧 [Reviewer] Adding proper watermark to PDF`);
+      const watermarkedPdfBuffer = await addWatermarkToPdf(pdfPath, watermarkData, 'REVIEWER', 'DRAFT');
+      fs.writeFileSync(watermarkedPdfPath, watermarkedPdfBuffer);
 
       // Upload watermarked files to S3 if in production
       let finalWatermarkedDocxUrl: string;
@@ -1503,7 +1511,7 @@ export class ArticleWorkflowService {
     // First, check if we already have clean extracted text
     if (article.content && article.content.trim().length > 0) {
       // Check if the content looks clean (not corrupted binary data)
-      const hasCorruptedData = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|PKx|��|AEstructuredData/.test(article.content);
+      const hasCorruptedData = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|PKx|  |AEstructuredData/.test(article.content);
 
       if (!hasCorruptedData && !article.content.includes("PDF file is corrupted") && !article.content.includes("Text could not be extracted")) {
         console.log(`✅ [Article Publish] Using existing clean content (${article.content.length} characters)`);
