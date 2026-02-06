@@ -651,6 +651,12 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
 
       try {
         if (files.document && files.document[0]) {
+          
+          // Add safety checks
+          if (!docFile || !docFile.filename) {
+            console.error('❌ [Upload] Invalid file object:', docFile);
+            return res.status(400).json({ error: "Invalid file upload" });
+          }
           const docFile = files.document[0];
           const docFilePath = path.join(process.cwd(), 'uploads/pdfs/', docFile.filename);
           const ext = path.extname(docFile.originalname || docFile.filename || '').toLowerCase();
@@ -1374,3 +1380,4 @@ export const uploadAdminPdf = (req: Request, res: Response, next: NextFunction) 
     });
   }
 };
+
