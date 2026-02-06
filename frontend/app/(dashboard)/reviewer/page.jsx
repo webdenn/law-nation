@@ -71,6 +71,11 @@ export default function ReviewerDashboard() {
             const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
             if (!editedPdfUrl) throw new Error("Edited PDF URL not found.");
 
+            // ✅ FIX: Define originalPdfUrl before using it
+            const originalPdfUrl = selectedArticle.originalPdfUrl.startsWith("http")
+                ? selectedArticle.originalPdfUrl
+                : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`;
+
             const originalIsS3 = originalPdfUrl.includes(".s3.") || originalPdfUrl.includes("amazonaws.com");
             const originalHeaders = originalIsS3 ? {} : { Authorization: `Bearer ${token}` };
 
@@ -512,6 +517,11 @@ export default function ReviewerDashboard() {
         const cleanUrl = path.startsWith("http")
             ? path
             : `${NEXT_PUBLIC_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+
+        // 🛑 STOP: Do NOT cache-bust S3 Presigned URLs (it breaks the signature)
+        if (cleanUrl.includes('amazonaws.com') || cleanUrl.includes('s3.')) {
+            return cleanUrl;
+        }
 
         return `${cleanUrl}?cb=${pdfTimestamp}`;
     };
