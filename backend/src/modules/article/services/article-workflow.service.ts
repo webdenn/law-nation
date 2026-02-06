@@ -9,6 +9,7 @@ import {
 } from "@/utils/http-errors.util.js";
 import { resolveToAbsolutePath, fileExistsAtPath } from "@/utils/file-path.utils.js";
 import { extractPdfContent } from "@/utils/pdf-extract.utils.js";
+import { addWatermarkToPdf as addLocalWatermark } from "@/utils/pdf-watermark.utils.js";
 import {
   ensureBothFormats,
   getFileType,
@@ -267,8 +268,24 @@ export class ArticleWorkflowService {
 
       // Create watermarked PDF (overlay/background style) - Apply to clean PDF directly
       const watermarkedPdfPath = cleanPdfPath.replace(/\.pdf$/i, '_watermarked.pdf');
-      console.log(`💧 [Watermark] Adding PDF-style watermark (overlay/background)`);
-      await adobeService.addWatermarkToPdf(cleanPdfPath, watermarkedPdfPath, watermarkData);
+      console.log(`💧 [Watermark] Adding Logo-style watermark (Local)`);
+
+      // Use local utils to add logo + role text (Editor)
+      const pdfBuffer = await addLocalWatermark(
+        cleanPdfPath,
+        {
+          userName: 'LAW NATION EDITOR',
+          downloadDate: watermarkData.downloadDate,
+          articleTitle: watermarkData.articleTitle,
+          articleId: watermarkData.articleId,
+          articleSlug: article.slug || undefined,
+          frontendUrl: watermarkData.frontendUrl
+        },
+        'EDITOR',   // Force EDITOR role
+        'DRAFT'     // Status
+      );
+      fs.writeFileSync(watermarkedPdfPath, pdfBuffer);
+      console.log(`✅ [Watermark] Editor watermark applied locally`);
 
       // Step 6: Convert paths to relative for database storage
       const { convertToWebPath } = await import('@/utils/file-path.utils.js');
@@ -1003,8 +1020,23 @@ export class ArticleWorkflowService {
       // Watermark DOCX
       await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
 
-      // Watermark PDF
-      await adobeService.addWatermarkToPdf(pdfPath, watermarkedPdfPath, watermarkData);
+      // Watermark PDF using Local Utils (Logo)
+      // await adobeService.addWatermarkToPdf(pdfPath, watermarkedPdfPath, watermarkData);
+      const pdfBuffer = await addLocalWatermark(
+        pdfPath,
+        {
+          userName: 'LAW NATION REVIEWER',
+          downloadDate: watermarkData.downloadDate,
+          articleTitle: watermarkData.articleTitle,
+          articleId: watermarkData.articleId,
+          articleSlug: article.slug || undefined,
+          frontendUrl: watermarkData.frontendUrl
+        },
+        'REVIEWER', // Force REVIEWER role
+        'DRAFT'     // Status
+      );
+      fs.writeFileSync(watermarkedPdfPath, pdfBuffer);
+      console.log(`✅ [Watermark] Reviewer watermark applied locally`);
 
       // Upload watermarked files to S3 if in production
       let finalWatermarkedDocxUrl: string;
