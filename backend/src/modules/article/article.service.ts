@@ -89,7 +89,7 @@ export class ArticleService {
         try {
           // Check if it's a URL or local path
           let oldPdfPath = article.currentPdfUrl;
-          
+
           if (oldPdfPath.startsWith('http://') || oldPdfPath.startsWith('https://')) {
             // It's a Supabase URL - we need to download it first or extract text differently
             console.log(`🌐 [Document] Supabase URL detected for diff: ${oldPdfPath}`);
@@ -340,6 +340,16 @@ export class ArticleService {
   async downloadEditorDocxWithWatermark(articleId: string, watermarkData: any) {
     return articleDownloadService.downloadReviewerDocxWithWatermark(articleId, watermarkData);
   }
+  // NEW: Get admin DOCX URL
+  async getAdminDocxUrl(articleId: string) {
+    return articleDownloadService.getAdminDocxUrl(articleId);
+  }
+
+  // NEW: Download admin DOCX with watermark
+  async downloadAdminDocxWithWatermark(articleId: string, watermarkData: any) {
+    return articleDownloadService.downloadAdminDocxWithWatermark(articleId, watermarkData);
+  }
+
   async downloadDiff(
     changeLogId: string,
     userId: string,
