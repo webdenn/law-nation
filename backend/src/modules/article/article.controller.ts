@@ -327,7 +327,7 @@ export class ArticleController {
 
       const data: UploadCorrectedPdfData = {
         pdfUrl: req.fileMeta.url,
-        presignedUrl: req.fileMeta.presignedUrl,
+        presignedUrl: req.fileMeta.presignedUrl || req.fileMeta.url,
         comments: validatedData.comments,
         editorDocumentUrl: req.body.editorDocumentUrl,      // ✅ Pass editor document URL from middleware
         editorDocumentType: req.body.editorDocumentType,    // ✅ Pass editor document type from middleware
@@ -1615,7 +1615,7 @@ export class ArticleController {
 
       const data: UploadCorrectedPdfData = {
         pdfUrl: req.fileMeta.url, // Actually DOCX for reviewers
-        presignedUrl: req.fileMeta.presignedUrl,
+        presignedUrl: req.fileMeta.presignedUrl || req.fileMeta.url,
         comments: validatedData.comments,
       };
 

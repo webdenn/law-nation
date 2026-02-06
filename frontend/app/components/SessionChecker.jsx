@@ -40,7 +40,8 @@ export default function SessionChecker() {
                             }
                         } else {
                             const path = window.location.pathname;
-                            if (!path.includes("/login") && !path.includes("/management-login") && !path.startsWith("/admin")) {
+                            // Update: Use includes to handle base paths like /law/admin
+                            if (!path.includes("/login") && !path.includes("/management-login") && !path.includes("/admin")) {
                                 toast.error("Session expired. Please login again.");
                                 router.push("/login");
                             }
@@ -95,7 +96,8 @@ export default function SessionChecker() {
                             console.error("Unauthorized request detected. Logging out...");
 
                             // Check which token is relevant
-                            const isAdmin = window.location.pathname.startsWith("/admin");
+                            // Update: Use includes to handle /law/admin prefix
+                            const isAdmin = window.location.pathname.includes("/admin");
 
                             localStorage.removeItem("token");
                             localStorage.removeItem("authToken");
