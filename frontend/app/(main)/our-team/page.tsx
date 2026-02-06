@@ -18,7 +18,15 @@ const TeamCard = ({ member }: { member: Member }) => (
         <div className="relative w-32 h-32 mb-6">
             <div className="absolute inset-0 bg-red-600 rounded-full opacity-0 group-hover:opacity-10 transition-opacity duration-300 scale-110"></div>
             <div className="w-full h-full rounded-full overflow-hidden border-4 border-slate-50 shadow-inner bg-slate-200 flex items-center justify-center">
-                <span className="text-3xl font-black text-slate-300">{member.name.charAt(0)}</span>
+                {member.image ? (
+                    <img
+                        src={member.image}
+                        alt={member.name}
+                        className="w-full h-full object-cover"
+                    />
+                ) : (
+                    <span className="text-3xl font-black text-slate-300">{member.name.charAt(0)}</span>
+                )}
             </div>
         </div>
 
