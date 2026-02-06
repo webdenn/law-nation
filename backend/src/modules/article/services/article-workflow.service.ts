@@ -1,5 +1,6 @@
 import { prisma } from "@/db/db.js";
 import path from "path";
+import fs from "fs";
 import {
   NotFoundError,
   BadRequestError,
@@ -944,11 +945,35 @@ export class ArticleWorkflowService {
 
     try {
       // Process reviewer's DOCX upload (supports both local paths and S3 URLs)
-      const docxPath = resolveToAbsolutePath(data.presignedUrl);
+      const docxPath = data.presignedUrl;
       console.log(`📄 [Reviewer Upload] Processing DOCX: ${docxPath}`);
 
+      // Generate proper output paths
+      // For S3 URLs, we need to create temp paths; for local files, use the same directory
+      const isUrl = docxPath.startsWith('http://') || docxPath.startsWith('https://');
+      let pdfPath: string;
+      let watermarkedDocxPath: string;
+      let watermarkedPdfPath: string;
+
+      if (isUrl) {
+        // For S3 URLs, create temp file paths
+        const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        const timestamp = Date.now();
+        pdfPath = path.join(tempDir, `reviewer_${timestamp}.pdf`);
+        watermarkedDocxPath = path.join(tempDir, `reviewer_${timestamp}_watermarked.docx`);
+        watermarkedPdfPath = path.join(tempDir, `reviewer_${timestamp}_watermarked.pdf`);
+      } else {
+        // For local files, use the same directory structure
+        const absoluteDocxPath = resolveToAbsolutePath(docxPath);
+        pdfPath = absoluteDocxPath.replace(/\.docx$/i, '_reviewer.pdf');
+        watermarkedDocxPath = absoluteDocxPath.replace(/\.docx$/i, '_reviewer_watermarked.docx');
+        watermarkedPdfPath = pdfPath.replace(/\.pdf$/i, '_watermarked.pdf');
+      }
+
       // Convert DOCX to PDF for preview
-      const pdfPath = docxPath.replace(/\.docx$/i, '_reviewer.pdf');
       console.log(`🔄 [Adobe] Converting reviewer DOCX to PDF`);
       await adobeService.convertDocxToPdf(docxPath, pdfPath);
 
@@ -976,17 +1001,16 @@ export class ArticleWorkflowService {
       };
 
       // Watermark DOCX
-      const watermarkedDocxPath = docxPath.replace(/\.docx$/i, '_reviewer_watermarked.docx');
       await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
 
       // Watermark PDF
-      const watermarkedPdfPath = pdfPath.replace(/\.pdf$/i, '_watermarked.pdf');
       await adobeService.addWatermarkToPdf(pdfPath, watermarkedPdfPath, watermarkData);
 
       // Convert paths to relative for database
       const { convertToWebPath } = await import('@/utils/file-path.utils.js');
       const relativeWatermarkedDocx = convertToWebPath(watermarkedDocxPath);
       const relativeWatermarkedPdf = convertToWebPath(watermarkedPdfPath);
+
 
       // Update article with reviewer's version
       const updatedArticle = await prisma.article.update({
