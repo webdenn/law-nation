@@ -71,6 +71,11 @@ export default function ReviewerDashboard() {
             const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
             if (!editedPdfUrl) throw new Error("Edited PDF URL not found.");
 
+            // ✅ FIX: Define originalPdfUrl before using it
+            const originalPdfUrl = selectedArticle.originalPdfUrl.startsWith("http")
+                ? selectedArticle.originalPdfUrl
+                : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`;
+
             const originalIsS3 = originalPdfUrl.includes(".s3.") || originalPdfUrl.includes("amazonaws.com");
             const originalHeaders = originalIsS3 ? {} : { Authorization: `Bearer ${token}` };
 
