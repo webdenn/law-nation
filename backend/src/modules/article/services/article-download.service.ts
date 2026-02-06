@@ -53,7 +53,7 @@
 //     console.log(`📥 [Download Word] Serving edited/corrected version: ${article.currentWordUrl}`);
 //     return article;
 //   }
-  
+
 //   // NEW: Get original DOCX URL (converted from user's original PDF)
 //   async getOriginalDocxUrl(articleId: string) {
 //     const article = await prisma.article.findUnique({
@@ -81,11 +81,11 @@
 
 //     return article;
 //   }
-  
+
 //   // NEW: Download original DOCX with watermark using Adobe services
 //   async downloadOriginalDocxWithWatermark(articleId: string, watermarkData: any) {
 //     const article = await this.getOriginalDocxUrl(articleId);
-    
+
 //     if (!article.originalWordUrl) {
 //       throw new NotFoundError("Original DOCX not available");
 //     }
@@ -96,38 +96,38 @@
 //       // Generate temporary output path for watermarked file
 //       const timestamp = Date.now();
 //       const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `original-watermarked-${timestamp}.docx`);
-      
+
 //       // Use Adobe service for watermarking
 //       const watermarkedPath = await adobeService.addWatermarkToDocx(
 //         article.originalWordUrl,
 //         tempOutputPath,
 //         watermarkData
 //       );
-      
+
 //       // Adobe service now returns relative path, convert to absolute for file reading
 //       const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath) 
 //         ? watermarkedPath 
 //         : path.join(process.cwd(), watermarkedPath.replace(/^\//, ''));
-      
+
 //       // Read the watermarked file as buffer
 //       const fs = await import('fs/promises');
 //       const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
-      
+
 //       // Clean up temp file
 //       await fs.unlink(absoluteWatermarkedPath).catch(() => {});
-      
+
 //       console.log(`✅ [Adobe] Watermark added to original DOCX successfully`);
 //       return watermarkedBuffer;
 //     } catch (error) {
 //       console.error(`❌ [Adobe] Failed to add watermark to original DOCX:`, error);
-      
+
 //       // Fallback to old watermarking method
 //       console.log(`🔄 [Fallback] Using local watermarking for original DOCX`);
 //       const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
 //       return await addSimpleWatermarkToWord(article.originalWordUrl, watermarkData);
 //     }
 //   }
-  
+
 //   // NEW: Get editor's DOCX URL (corrected version)
 //   async getEditorDocxUrl(articleId: string) {
 //     const article = await prisma.article.findUnique({
@@ -155,7 +155,7 @@
 
 //     return article;
 //   }
-  
+
 //   // NEW: Get reviewer's DOCX URL (corrected version after editor)
 //   async getReviewerDocxUrl(articleId: string) {
 //     const article = await prisma.article.findUnique({
@@ -190,11 +190,11 @@
 
 //     return article;
 //   }
-  
+
 //   // NEW: Download reviewer's DOCX with watermark using Adobe services
 //   async downloadReviewerDocxWithWatermark(articleId: string, watermarkData: any) {
 //     const article = await this.getReviewerDocxUrl(articleId);
-    
+
 //     if (!article.currentWordUrl) {
 //       throw new NotFoundError("Reviewer's DOCX not available");
 //     }
@@ -205,31 +205,31 @@
 //       // Generate temporary output path for watermarked file
 //       const timestamp = Date.now();
 //       const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `reviewer-watermarked-${timestamp}.docx`);
-      
+
 //       // Use Adobe service for watermarking
 //       const watermarkedPath = await adobeService.addWatermarkToDocx(
 //         article.currentWordUrl,
 //         tempOutputPath,
 //         watermarkData
 //       );
-      
+
 //       // Adobe service now returns relative path, convert to absolute for file reading
 //       const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath) 
 //         ? watermarkedPath 
 //         : path.join(process.cwd(), watermarkedPath.replace(/^\//, ''));
-      
+
 //       // Read the watermarked file as buffer
 //       const fs = await import('fs/promises');
 //       const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
-      
+
 //       // Clean up temp file
 //       await fs.unlink(absoluteWatermarkedPath).catch(() => {});
-      
+
 //       console.log(`✅ [Adobe] Watermark added to reviewer's DOCX successfully`);
 //       return watermarkedBuffer;
 //     } catch (error) {
 //       console.error(`❌ [Adobe] Failed to add watermark to reviewer's DOCX:`, error);
-      
+
 //       // Fallback to old watermarking method
 //       console.log(`🔄 [Fallback] Using local watermarking for reviewer's DOCX`);
 //       const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
@@ -363,7 +363,7 @@
 //       // Generate temporary output path for watermarked file
 //       const timestamp = Date.now();
 //       const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `admin-${versionType}-${timestamp}.docx`);
-      
+
 //       // Use Adobe service for watermarking
 //       const watermarkedPath = await adobeService.addWatermarkToDocx(
 //         version.url,
@@ -374,19 +374,19 @@
 //           versionType: versionType.toUpperCase()
 //         }
 //       );
-      
+
 //       // Adobe service now returns relative path, convert to absolute for file reading
 //       const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath) 
 //         ? watermarkedPath 
 //         : path.join(process.cwd(), watermarkedPath.replace(/^\//, ''));
-      
+
 //       // Read the watermarked file as buffer
 //       const fs = await import('fs/promises');
 //       const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
-      
+
 //       // Clean up temp file
 //       await fs.unlink(absoluteWatermarkedPath).catch(() => {});
-      
+
 //       console.log(`✅ [Admin Download] Watermark added to ${versionType} version successfully`);
 //       return {
 //         buffer: watermarkedBuffer,
@@ -395,7 +395,7 @@
 //       };
 //     } catch (error) {
 //       console.error(`❌ [Admin Download] Failed to add watermark to ${versionType} version:`, error);
-      
+
 //       // Fallback to old watermarking method
 //       console.log(`🔄 [Fallback] Using local watermarking for ${versionType} version`);
 //       const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
@@ -404,7 +404,7 @@
 //         userName: `ADMIN - ${watermarkData.userName}`,
 //         versionType: versionType.toUpperCase()
 //       });
-      
+
 //       return {
 //         buffer: watermarkedBuffer,
 //         filename: `${versionsInfo.articleTitle}-${versionType}-version.docx`,
@@ -412,7 +412,7 @@
 //       };
 //     }
 //   }
-  
+
 //   //Download diff as PDF or Word
 //   async downloadDiff(
 //     changeLogId: string,
@@ -774,10 +774,10 @@ export class ArticleDownloadService {
   async getArticlePdfUrl(articleId: string) {
     const article = await prisma.article.findUnique({
       where: { id: articleId, status: "PUBLISHED" },
-      select: { 
+      select: {
         currentPdfUrl: true, // This is the edited/corrected version
         title: true,
-        contentType: true 
+        contentType: true
       },
     });
 
@@ -792,10 +792,10 @@ export class ArticleDownloadService {
   async getArticleWordUrl(articleId: string) {
     const article = await prisma.article.findUnique({
       where: { id: articleId, status: "PUBLISHED" },
-      select: { 
+      select: {
         currentWordUrl: true, // This is the edited/corrected version
         title: true,
-        contentType: true 
+        contentType: true
       },
     });
 
@@ -810,16 +810,16 @@ export class ArticleDownloadService {
     console.log(`📥 [Download Word] Serving edited/corrected version: ${article.currentWordUrl}`);
     return article;
   }
-  
+
   // NEW: Get original DOCX URL (converted from user's original PDF)
   async getOriginalDocxUrl(articleId: string) {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
-      select: { 
-        originalWordUrl: true, 
+      select: {
+        originalWordUrl: true,
         title: true,
         contentType: true,
-        status: true 
+        status: true
       },
     });
 
@@ -838,11 +838,11 @@ export class ArticleDownloadService {
 
     return article;
   }
-  
+
   // NEW: Download original DOCX with watermark using Adobe services
   async downloadOriginalDocxWithWatermark(articleId: string, watermarkData: any) {
     const article = await this.getOriginalDocxUrl(articleId);
-    
+
     if (!article.originalWordUrl) {
       throw new NotFoundError("Original DOCX not available");
     }
@@ -853,46 +853,46 @@ export class ArticleDownloadService {
       // Generate temporary output path for watermarked file
       const timestamp = Date.now();
       const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `original-watermarked-${timestamp}.docx`);
-      
+
       // Use Adobe service for watermarking
       const watermarkedPath = await adobeService.addWatermarkToDocx(
         article.originalWordUrl,
         tempOutputPath,
         watermarkData
       );
-      
+
       // Adobe service now returns relative path, convert to absolute for file reading
-      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath) 
-        ? watermarkedPath 
-        : path.join(process.cwd(), watermarkedPath.startsWith('/') 
-            ? watermarkedPath.substring(1) 
-            : watermarkedPath);
-      
+      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath)
+        ? watermarkedPath
+        : path.join(process.cwd(), watermarkedPath.startsWith('/')
+          ? watermarkedPath.substring(1)
+          : watermarkedPath);
+
       // Validate the file exists before trying to read it
       const fs = await import('fs/promises');
       await fs.access(absoluteWatermarkedPath); // Check if file exists
       const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
-      
+
       // Clean up temp file
-      await fs.unlink(absoluteWatermarkedPath).catch(() => {});
-      
+      await fs.unlink(absoluteWatermarkedPath).catch(() => { });
+
       console.log(`✅ [Adobe] Watermark added to original DOCX successfully`);
       return watermarkedBuffer;
     } catch (error) {
       console.error(`❌ [Adobe] Failed to add watermark to original DOCX:`, error);
-      
+
       // Fallback to old watermarking method
       console.log(`🔄 [Fallback] Using local watermarking for original DOCX`);
       const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
       return await addSimpleWatermarkToWord(article.originalWordUrl, watermarkData);
     }
   }
-  
+
   // NEW: Get editor's DOCX URL (corrected version)
   async getEditorDocxUrl(articleId: string) {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
-      select: { 
+      select: {
         currentWordUrl: true, // This is the editor's corrected DOCX
         title: true,
         contentType: true,
@@ -915,12 +915,12 @@ export class ArticleDownloadService {
 
     return article;
   }
-  
+
   // NEW: Get reviewer's DOCX URL (corrected version after editor)
   async getReviewerDocxUrl(articleId: string) {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
-      select: { 
+      select: {
         currentWordUrl: true, // This could be reviewer's version if they uploaded
         title: true,
         contentType: true,
@@ -950,11 +950,11 @@ export class ArticleDownloadService {
 
     return article;
   }
-  
+
   // NEW: Download reviewer's DOCX with watermark using Adobe services
   async downloadReviewerDocxWithWatermark(articleId: string, watermarkData: any) {
     const article = await this.getReviewerDocxUrl(articleId);
-    
+
     if (!article.currentWordUrl) {
       throw new NotFoundError("Reviewer's DOCX not available");
     }
@@ -965,34 +965,34 @@ export class ArticleDownloadService {
       // Generate temporary output path for watermarked file
       const timestamp = Date.now();
       const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `reviewer-watermarked-${timestamp}.docx`);
-      
+
       // Use Adobe service for watermarking
       const watermarkedPath = await adobeService.addWatermarkToDocx(
         article.currentWordUrl,
         tempOutputPath,
         watermarkData
       );
-      
+
       // Adobe service now returns relative path, convert to absolute for file reading
-      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath) 
-        ? watermarkedPath 
-        : path.join(process.cwd(), watermarkedPath.startsWith('/') 
-            ? watermarkedPath.substring(1) 
-            : watermarkedPath);
-      
+      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath)
+        ? watermarkedPath
+        : path.join(process.cwd(), watermarkedPath.startsWith('/')
+          ? watermarkedPath.substring(1)
+          : watermarkedPath);
+
       // Validate the file exists before trying to read it
       const fs = await import('fs/promises');
       await fs.access(absoluteWatermarkedPath); // Check if file exists
       const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
-      
+
       // Clean up temp file
-      await fs.unlink(absoluteWatermarkedPath).catch(() => {});
-      
+      await fs.unlink(absoluteWatermarkedPath).catch(() => { });
+
       console.log(`✅ [Adobe] Watermark added to reviewer's DOCX successfully`);
       return watermarkedBuffer;
     } catch (error) {
       console.error(`❌ [Adobe] Failed to add watermark to reviewer's DOCX:`, error);
-      
+
       // Fallback to old watermarking method
       console.log(`🔄 [Fallback] Using local watermarking for reviewer's DOCX`);
       const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
@@ -1101,9 +1101,9 @@ export class ArticleDownloadService {
 
   // NEW: Admin download specific version with watermark
   async downloadAdminVersionWithWatermark(
-    articleId: string, 
+    articleId: string,
     versionType: 'original' | 'editor' | 'reviewer' | 'current',
-    userId: string, 
+    userId: string,
     userRoles: string[],
     watermarkData: any
   ) {
@@ -1126,7 +1126,7 @@ export class ArticleDownloadService {
       // Generate temporary output path for watermarked file
       const timestamp = Date.now();
       const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `admin-${versionType}-${timestamp}.docx`);
-      
+
       // Use Adobe service for watermarking
       const watermarkedPath = await adobeService.addWatermarkToDocx(
         version.url,
@@ -1137,22 +1137,22 @@ export class ArticleDownloadService {
           versionType: versionType.toUpperCase()
         }
       );
-      
+
       // Adobe service now returns relative path, convert to absolute for file reading
-      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath) 
-        ? watermarkedPath 
-        : path.join(process.cwd(), watermarkedPath.startsWith('/') 
-            ? watermarkedPath.substring(1) 
-            : watermarkedPath);
-      
+      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath)
+        ? watermarkedPath
+        : path.join(process.cwd(), watermarkedPath.startsWith('/')
+          ? watermarkedPath.substring(1)
+          : watermarkedPath);
+
       // Validate the file exists before trying to read it
       const fs = await import('fs/promises');
       await fs.access(absoluteWatermarkedPath); // Check if file exists
       const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
-      
+
       // Clean up temp file
-      await fs.unlink(absoluteWatermarkedPath).catch(() => {});
-      
+      await fs.unlink(absoluteWatermarkedPath).catch(() => { });
+
       console.log(`✅ [Admin Download] Watermark added to ${versionType} version successfully`);
       return {
         buffer: watermarkedBuffer,
@@ -1161,7 +1161,7 @@ export class ArticleDownloadService {
       };
     } catch (error) {
       console.error(`❌ [Admin Download] Failed to add watermark to ${versionType} version:`, error);
-      
+
       // Fallback to old watermarking method
       console.log(`🔄 [Fallback] Using local watermarking for ${versionType} version`);
       const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
@@ -1170,7 +1170,7 @@ export class ArticleDownloadService {
         userName: `ADMIN - ${watermarkData.userName}`,
         versionType: versionType.toUpperCase()
       });
-      
+
       return {
         buffer: watermarkedBuffer,
         filename: `${versionsInfo.articleTitle}-${versionType}-version.docx`,
@@ -1178,7 +1178,95 @@ export class ArticleDownloadService {
       };
     }
   }
-  
+
+  // NEW: Get admin's DOCX URL (latest version uploaded by admin)
+  async getAdminDocxUrl(articleId: string) {
+    // 1. Get all change logs for this article, ordered by version descending
+    const logs = await prisma.articleChangeLog.findMany({
+      where: { articleId },
+      orderBy: { versionNumber: 'desc' },
+      include: {
+        editor: { // editedBy maps to User
+          select: { userType: true, role: true } // Selecting both to be safe
+        }
+      }
+    });
+
+    // 2. Find the latest log where user was ADMIN and file is DOCX
+    let adminDocxUrl = null;
+    let foundLog = null;
+
+    for (const log of logs) {
+      if (log.editor?.userType === 'ADMIN' || log.editor?.role === 'ADMIN') {
+        const candidateUrl = log.editorDocumentUrl || log.newFileUrl;
+
+        if (candidateUrl && (candidateUrl.endsWith('.docx') || candidateUrl.endsWith('.doc'))) {
+          adminDocxUrl = candidateUrl;
+          foundLog = log;
+          break;
+        }
+      }
+    }
+
+    if (!adminDocxUrl) {
+      throw new NotFoundError("Admin DOCX version not available for this article");
+    }
+
+    return {
+      currentWordUrl: adminDocxUrl,
+      title: foundLog.articleId || "Article",
+      contentType: 'DOCUMENT'
+    };
+  }
+
+  // NEW: Download admin's DOCX with watermark using Adobe services
+  async downloadAdminDocxWithWatermark(articleId: string, watermarkData: any) {
+    const articleData = await this.getAdminDocxUrl(articleId);
+
+    console.log(`💧 [Adobe] Adding watermark to Admin DOCX: ${articleData.currentWordUrl}`);
+
+    try {
+      // Generate temporary output path for watermarked file
+      const timestamp = Date.now();
+      const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `admin-watermarked-${timestamp}.docx`);
+
+      // Use Adobe service for watermarking
+      const watermarkedPath = await adobeService.addWatermarkToDocx(
+        articleData.currentWordUrl,
+        tempOutputPath,
+        {
+          ...watermarkData,
+          userName: `ADMIN - ${watermarkData.userName}`
+        }
+      );
+
+      // Adobe service now returns relative path, convert to absolute for file reading
+      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath)
+        ? watermarkedPath
+        : path.join(process.cwd(), watermarkedPath.startsWith('/')
+          ? watermarkedPath.substring(1)
+          : watermarkedPath);
+
+      // Validate the file exists before trying to read it
+      const fs = await import('fs/promises');
+      await fs.access(absoluteWatermarkedPath); // Check if file exists
+      const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
+
+      // Clean up temp file
+      await fs.unlink(absoluteWatermarkedPath).catch(() => { });
+
+      console.log(`✅ [Adobe] Watermark added to Admin DOCX successfully`);
+      return watermarkedBuffer;
+    } catch (error) {
+      console.error(`❌ [Adobe] Failed to add watermark to Admin DOCX:`, error);
+
+      // Fallback to old watermarking method
+      console.log(`🔄 [Fallback] Using local watermarking for Admin DOCX`);
+      const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
+      return await addSimpleWatermarkToWord(articleData.currentWordUrl, watermarkData);
+    }
+  }
+
   //Download diff as PDF or Word
   async downloadDiff(
     changeLogId: string,
@@ -1322,9 +1410,8 @@ export class ArticleDownloadService {
     if (originalType === requestedFormat) {
       console.log(`✅ [Editor Doc] Format matches, returning original file`);
 
-      const filename = `editor-doc-v${changeLog.versionNumber}-${
-        changeLog.article.id
-      }.${requestedFormat === "word" ? "docx" : "pdf"}`;
+      const filename = `editor-doc-v${changeLog.versionNumber}-${changeLog.article.id
+        }.${requestedFormat === "word" ? "docx" : "pdf"}`;
       const mimeType =
         requestedFormat === "word"
           ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -1348,9 +1435,8 @@ export class ArticleDownloadService {
       );
 
       const convertedPath = requestedFormat === "pdf" ? pdfPath : wordPath;
-      const filename = `editor-doc-v${changeLog.versionNumber}-${
-        changeLog.article.id
-      }.${requestedFormat === "word" ? "docx" : "pdf"}`;
+      const filename = `editor-doc-v${changeLog.versionNumber}-${changeLog.article.id
+        }.${requestedFormat === "word" ? "docx" : "pdf"}`;
       const mimeType =
         requestedFormat === "word"
           ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"

@@ -341,7 +341,7 @@ export default function DocumentViewer({
 
                                     {/* Admin Edited - Always Visible, Disabled if missing */}
                                     <button
-                                        onClick={() => handleDownloadFile(selectedArticle.latestAdminDocxUrl, `Admin_Edited_${selectedArticle.title}`, "Word")}
+                                        onClick={() => handleDownloadFile(`/articles/${selectedArticle.id}/download/admin-docx`, `Admin_Edited_${selectedArticle.title}`, "Word")}
                                         disabled={!selectedArticle.latestAdminDocxUrl}
                                         className={`w-full py-2 border rounded text-xs font-bold transition ${selectedArticle.latestAdminDocxUrl
                                             ? "bg-gray-50 hover:bg-gray-100 text-red-700 border-gray-200"

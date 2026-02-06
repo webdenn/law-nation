@@ -74,10 +74,21 @@ export default function SessionChecker() {
 
                     // Only intercept 401 (Unauthorized). 403 (Forbidden) should just show an error, not logout.
                     if (response.status === 401) {
-                        // Avoid intercepting login/auth requests themselves if they fail
-                        // Also check for "auth" in URL to be safer
-                        const isAuthRequest = url.includes("/login") ||
-                            //   url.includes("auth/") || 
+                        // 1. Check if we are already on a login page
+                        const isLoginPage = typeof window !== 'undefined' && (
+                            window.location.pathname.includes('/login') ||
+                            window.location.pathname.includes('/management-login')
+                        );
+
+                        if (isLoginPage) {
+                            // If we are on login page, 401 is expected (invalid credentials)
+                            // DO NOT LOGOUT, DO NOT REDIRECT
+                            return response;
+                        }
+
+                        // 2. Check if the request itself was an auth request (double check)
+                        const isAuthRequest = url.includes("/auth/login") ||
+                            url.includes("/auth/admin-login") ||
                             url.includes("/management-login");
 
                         if (!isAuthRequest) {
