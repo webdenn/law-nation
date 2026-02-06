@@ -816,7 +816,7 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
             finalMimetype,
             'pdf'
           );
-          req.fileMeta = { url, storageKey };
+          req.fileMeta = { url, storageKey, presignedUrl: url };
         } else {
           return res.status(400).json({ error: "Corrected document file required" });
         }
