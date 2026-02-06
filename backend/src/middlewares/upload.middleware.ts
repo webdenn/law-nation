@@ -706,77 +706,95 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
     });
 
     upload.fields([
-      { name: 'document', maxCount: 1 },
-      { name: 'editorDocument', maxCount: 1 }
-    ])(req, res, async (err) => {
-      if (err) return res.status(400).json({ error: err.message });
+    { name: 'document', maxCount: 1 },      // Required: corrected article
+    { name: 'editorDocument', maxCount: 1 } // Optional: editor's notes/diff
+   ])(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message });
 
-      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
-      try {
+    try {
+        // Handle main corrected document (required)
         if (files.document && files.document[0]) {
-          const docFile = files.document[0];
-          const tempDir = path.join(process.cwd(), 'uploads', 'temp');
-          if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+            const docFile = files.document[0];
+            const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-          const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(docFile.originalname)}`);
-          fs.writeFileSync(tempFilePath, docFile.buffer);
+            const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(docFile.originalname)}`);
+            fs.writeFileSync(tempFilePath, docFile.buffer);
 
-          const ext = path.extname(docFile.originalname).toLowerCase();
-          let uploadBuffer;
+            const ext = path.extname(docFile.originalname).toLowerCase();
+            let uploadBuffer;
+            let finalMimetype = docFile.mimetype;
+            let finalFilename = docFile.originalname;
 
-          if (ext === '.docx') {
-            uploadBuffer = docFile.buffer;
-          } else {
-            uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
-          }
-          fs.unlinkSync(tempFilePath);
+            if (ext === '.docx') {
+                // Convert DOCX to PDF
+                console.log('📄 Converting DOCX to PDF for preview...');
+                const { convertDocxToPdf } = await import('../services/adobe.service.js');
+                const pdfBuffer = await convertDocxToPdf(tempFilePath);
 
-          // CHANGED: uploadBufferToS3
-          const { url, storageKey, presignedUrl } = await uploadBufferToS3(
-            uploadBuffer,
-            docFile.originalname,
-            docFile.mimetype,
-            'pdf'
-          );
-          req.fileMeta = { url, storageKey, presignedUrl };
+                // Save PDF to temp
+                const pdfTempPath = tempFilePath.replace('.docx', '.pdf');
+                fs.writeFileSync(pdfTempPath, pdfBuffer);
+
+                // Watermark the PDF
+                uploadBuffer = await addUploadWatermark(pdfTempPath, 'application/pdf');
+
+                // Clean up temp PDF
+                fs.unlinkSync(pdfTempPath);
+
+                // Update file info for S3
+                finalMimetype = 'application/pdf';
+                finalFilename = docFile.originalname.replace('.docx', '.pdf');
+            } else {
+                // PDF file - just watermark
+                uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
+            }
+
+            // Remove original temp file
+            fs.unlinkSync(tempFilePath);
+
+            // Upload to S3
+            const { url, storageKey, presignedUrl } = await uploadBufferToS3(
+                uploadBuffer,
+                finalFilename,  // reflects .pdf if converted
+                finalMimetype,  // reflects application/pdf if converted
+                'pdf'
+            );
+
+            req.fileMeta = { url, storageKey, presignedUrl };
         } else {
-          return res.status(400).json({ error: "Corrected document file required" });
+            return res.status(400).json({ error: "Corrected document file required" });
         }
 
+        // Handle editor document (optional) - Following similar logic if needed
         if (files.editorDocument && files.editorDocument[0]) {
-          const editorDocFile = files.editorDocument[0];
-          const ext = path.extname(editorDocFile.originalname).toLowerCase();
-          const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
+            const editorDocFile = files.editorDocument[0];
+            const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+            const tempFilePath = path.join(tempDir, `editor-temp-${Date.now()}${path.extname(editorDocFile.originalname)}`);
+            fs.writeFileSync(tempFilePath, editorDocFile.buffer);
 
-          const tempDir = path.join(process.cwd(), 'uploads', 'temp');
-          const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(editorDocFile.originalname)}`);
-          fs.writeFileSync(tempFilePath, editorDocFile.buffer);
+            const watermarkedBuffer = await addUploadWatermark(tempFilePath, editorDocFile.mimetype);
+            fs.unlinkSync(tempFilePath);
 
-          const watermarkedBuffer = await addUploadWatermark(tempFilePath, editorDocFile.mimetype);
-          fs.unlinkSync(tempFilePath);
+            const { url } = await uploadBufferToS3(
+                watermarkedBuffer,
+                editorDocFile.originalname,
+                editorDocFile.mimetype,
+                'pdf'
+            );
 
-          // CHANGED: uploadBufferToS3
-          const { url } = await uploadBufferToS3(
-            watermarkedBuffer,
-            editorDocFile.originalname,
-            editorDocFile.mimetype,
-            'pdf'
-          );
-
-          req.body.editorDocumentUrl = url;
-          req.body.editorDocumentType = docType;
+            req.body.editorDocumentUrl = url;
+            req.body.editorDocumentType = path.extname(editorDocFile.originalname).toLowerCase().includes('doc') ? 'WORD' : 'PDF';
         }
 
         next();
-      } catch (e) {
+    } catch (e) {
         console.error("S3 upload error:", e);
         return res.status(500).json({ error: "File upload failed" });
-      }
-    });
-  }
-};
-
+    }
+});
 // ---------- SINGLE IMAGE UPLOAD ----------
 export const uploadImage = (req: Request, res: Response, next: NextFunction) => {
   if (isLocal) {
@@ -1317,3 +1335,4 @@ export const uploadAdminPdf = (req: Request, res: Response, next: NextFunction) 
     });
   }
 };
+
