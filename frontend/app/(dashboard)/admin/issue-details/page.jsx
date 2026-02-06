@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import AdminSidebar from "../../../components/AdminSidebar";
 
@@ -61,6 +61,7 @@ export default function IssueDetailsPage() {
                 setUploadedIssues(prev => prev.map(item =>
                     item.id === id ? { ...item, isVisible: !currentVisibility } : item
                 ));
+                toast.dismiss(); // Clear existing toasts
                 toast.success(`Issue ${!currentVisibility ? "visible" : "hidden"} successfully`);
             } else {
                 toast.error(data.error || "Failed to update visibility");
@@ -80,7 +81,6 @@ export default function IssueDetailsPage() {
 
     return (
         <div className="flex min-h-screen bg-gray-50 flex-col md:flex-row relative">
-            <ToastContainer position="top-right" autoClose={3000} theme="colored" />
 
             {/* Mobile Overlay */}
             {isMobileMenuOpen && (
