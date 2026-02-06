@@ -588,8 +588,16 @@ export class AdobeService {
 
       const pages = pdfDoc.getPages();
       for (const page of pages) {
+        const { width, height } = page.getSize();
+        // Add watermark diagonally across the page
         page.drawText(`${watermarkData.userName} - ${watermarkData.articleId}`, {
-          x: 50, y: 50, size: 12, font, color: rgb(0.7, 0.7, 0.7), rotate: degrees(45)
+          x: width / 4,
+          y: height / 2,
+          size: 18,
+          font,
+          color: rgb(0.5, 0.5, 0.5),
+          rotate: degrees(45),
+          opacity: 0.5,
         });
       }
       const saved = await pdfDoc.save();

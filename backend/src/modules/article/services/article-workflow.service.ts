@@ -1006,11 +1006,60 @@ export class ArticleWorkflowService {
       // Watermark PDF
       await adobeService.addWatermarkToPdf(pdfPath, watermarkedPdfPath, watermarkData);
 
-      // Convert paths to relative for database
-      const { convertToWebPath } = await import('@/utils/file-path.utils.js');
-      const relativeWatermarkedDocx = convertToWebPath(watermarkedDocxPath);
-      const relativeWatermarkedPdf = convertToWebPath(watermarkedPdfPath);
+      // Upload watermarked files to S3 if in production
+      let finalWatermarkedDocxUrl: string;
+      let finalWatermarkedPdfUrl: string;
 
+      if (isUrl) {
+        // Production: Upload watermarked files to S3
+        console.log(`☁️ [Reviewer Upload] Uploading watermarked files to S3...`);
+        const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+
+        const s3Client = new S3Client({
+          region: process.env.AWS_REGION || 'ap-south-1',
+          credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+          },
+        });
+
+        const bucketName = process.env.AWS_S3_BUCKET_ARTICLES || 'articles-bucket';
+        const timestamp = Date.now();
+
+        // Upload watermarked DOCX
+        const docxBuffer = fs.readFileSync(watermarkedDocxPath);
+        const docxKey = `articles/reviewer_${timestamp}_watermarked.docx`;
+        await s3Client.send(new PutObjectCommand({
+          Bucket: bucketName,
+          Key: docxKey,
+          Body: docxBuffer,
+          ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        }));
+        finalWatermarkedDocxUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || 'ap-south-1'}.amazonaws.com/${docxKey}`;
+
+        // Upload watermarked PDF
+        const pdfBuffer = fs.readFileSync(watermarkedPdfPath);
+        const pdfKey = `articles/reviewer_${timestamp}_watermarked.pdf`;
+        await s3Client.send(new PutObjectCommand({
+          Bucket: bucketName,
+          Key: pdfKey,
+          Body: pdfBuffer,
+          ContentType: 'application/pdf',
+        }));
+        finalWatermarkedPdfUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || 'ap-south-1'}.amazonaws.com/${pdfKey}`;
+
+        // Clean up temp files
+        fs.unlinkSync(watermarkedDocxPath);
+        fs.unlinkSync(watermarkedPdfPath);
+        fs.unlinkSync(pdfPath);
+
+        console.log(`✅ [Reviewer Upload] Uploaded to S3: DOCX=${finalWatermarkedDocxUrl}, PDF=${finalWatermarkedPdfUrl}`);
+      } else {
+        // Local: Use file paths as-is
+        const { convertToWebPath } = await import('@/utils/file-path.utils.js');
+        finalWatermarkedDocxUrl = convertToWebPath(watermarkedDocxPath);
+        finalWatermarkedPdfUrl = convertToWebPath(watermarkedPdfPath);
+      }
 
       // Update article with reviewer's version
       const updatedArticle = await prisma.article.update({
@@ -1018,8 +1067,8 @@ export class ArticleWorkflowService {
         data: {
           content: extractedText,
           contentHtml: extractedText.replace(/\n/g, '<br>'),
-          currentPdfUrl: relativeWatermarkedPdf,
-          currentWordUrl: relativeWatermarkedDocx,
+          currentPdfUrl: finalWatermarkedPdfUrl,
+          currentWordUrl: finalWatermarkedDocxUrl,
           status: "REVIEWER_IN_PROGRESS",
           reviewedAt: new Date(),
         },
@@ -1031,7 +1080,7 @@ export class ArticleWorkflowService {
           articleId: article.id,
           versionNumber: await this.getNextVersionNumber(articleId),
           oldFileUrl: article.currentWordUrl || "",
-          newFileUrl: relativeWatermarkedDocx,
+          newFileUrl: finalWatermarkedDocxUrl,
           fileType: "DOCX",
           diffData: {
             type: "reviewer_edit",
@@ -1051,8 +1100,8 @@ export class ArticleWorkflowService {
         article: updatedArticle,
         extractedTextLength: extractedText.length,
         files: {
-          watermarkedDocx: relativeWatermarkedDocx,
-          watermarkedPdf: relativeWatermarkedPdf,
+          watermarkedDocx: finalWatermarkedDocxUrl,
+          watermarkedPdf: finalWatermarkedPdfUrl,
         }
       };
 
