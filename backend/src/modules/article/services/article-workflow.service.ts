@@ -9,7 +9,6 @@ import {
 } from "@/utils/http-errors.util.js";
 import { resolveToAbsolutePath, fileExistsAtPath } from "@/utils/file-path.utils.js";
 import { extractPdfContent } from "@/utils/pdf-extract.utils.js";
-import { addWatermarkToPdf as addLocalWatermark } from "@/utils/pdf-watermark.utils.js";
 import {
   ensureBothFormats,
   getFileType,
@@ -269,32 +268,7 @@ export class ArticleWorkflowService {
       // Create watermarked PDF (overlay/background style) - Apply to clean PDF directly
       const watermarkedPdfPath = cleanPdfPath.replace(/\.pdf$/i, '_watermarked.pdf');
       console.log(`💧 [Watermark] Adding PDF-style watermark (overlay/background)`);
-      
-      // Check if uploader is Reviewer - use Local Watermark (Logo) if so
-      const isReviewer = userRoles.includes('reviewer') || userRoles.includes('REVIEWER');
-
-      if (isReviewer) {
-        console.log(`💧 [Watermark] Using Local Watermark (Logo) for Reviewer upload`);
-        // Use local utils to add logo + role text
-        const pdfBuffer = await addLocalWatermark(
-          cleanPdfPath,
-          {
-            userName: 'LAW NATION REVIEWER', 
-            downloadDate: watermarkData.downloadDate,
-            articleTitle: watermarkData.articleTitle,
-            articleId: watermarkData.articleId,
-            articleSlug: article.slug || undefined,
-            frontendUrl: watermarkData.frontendUrl
-          },
-          'REVIEWER', // Force REVIEWER role
-          'DRAFT'     // Status
-        );
-        fs.writeFileSync(watermarkedPdfPath, pdfBuffer);
-        console.log(`✅ [Watermark] Reviewer watermark applied locally`);
-      } else {
-        // Default to Adobe Watermark (Diagonal) for Editors/Admins
-        await adobeService.addWatermarkToPdf(cleanPdfPath, watermarkedPdfPath, watermarkData);
-      }
+      await adobeService.addWatermarkToPdf(cleanPdfPath, watermarkedPdfPath, watermarkData);
 
       // Step 6: Convert paths to relative for database storage
       const { convertToWebPath } = await import('@/utils/file-path.utils.js');
