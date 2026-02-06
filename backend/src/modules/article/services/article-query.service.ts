@@ -609,8 +609,14 @@ export class ArticleQueryService {
       mappedLog.pdfUrl = await this.getPresignedUrl(basePdfUrl || "");
 
       // 3. Determine Role
-      if ((log.diffData as any)?.type === 'reviewer_edit') {
+      const editorId = (log.editor as any)?.id;
+      const isAssignedEditor = editorId && editorId === article.assignedEditorId;
+      const isAssignedReviewer = editorId && editorId === article.assignedReviewerId;
+
+      if ((log.diffData as any)?.type === 'reviewer_edit' || isAssignedReviewer) {
         mappedLog.role = 'Reviewer';
+      } else if (isAssignedEditor) {
+        mappedLog.role = 'Editor';
       } else {
         const roles = (log.editor as any).roles?.map((ur: any) => ur.role?.name) || [];
         if (roles.includes('admin') || roles.includes('ADMIN')) {
