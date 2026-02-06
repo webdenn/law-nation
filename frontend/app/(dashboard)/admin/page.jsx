@@ -262,8 +262,11 @@ export default function AdminDashboard() {
           // Skip if no URL or if it's just the original file
           if (!url || url === originalPdf) return;
 
-          const isDoc = url.toLowerCase().endsWith('.docx') || url.toLowerCase().endsWith('.doc');
-          const isPdf = url.toLowerCase().endsWith('.pdf');
+          // Helper to check extension ignoring query params
+          const checkExt = (u, ext) => u.split('?')[0].toLowerCase().endsWith(ext);
+
+          const isDoc = checkExt(url, '.docx') || checkExt(url, '.doc');
+          const isPdf = checkExt(url, '.pdf');
 
           if (role === 'editor') {
             if (isDoc) editorDocx = url;
@@ -317,7 +320,7 @@ export default function AdminDashboard() {
     }
   };
 
-  
+
   const handleDownloadFile = async (fileUrl, fileName, type) => {
     if (!fileUrl) return toast.error("File not available");
     try {
@@ -400,7 +403,12 @@ export default function AdminDashboard() {
       ? path
       : `${NEXT_PUBLIC_BASE_URL}/${path.replace(/\\/g, "/").replace(/^\//, "")}`;
 
-    // Add timestamp to prevent PDF caching
+    // 🛑 STOP: Do NOT cache-bust S3 Presigned URLs (it breaks the signature)
+    if (cleanPath.includes('amazonaws.com') || cleanPath.includes('s3.')) {
+      return cleanPath;
+    }
+
+    // Add timestamp to prevent PDF caching for local files only
     return `${cleanPath}?cb=${Date.now()}`;
   };
   // ✅ FETCH DATA (Articles + Editors)

@@ -9,6 +9,10 @@ import {
   // generateDiffSummary, // COMMENTED: Frontend handles diff calculation
 } from "@/utils/diff-calculator.utils.js";
 import type { ArticleListFilters } from "../types/article-submission.type.js";
+
+// Ensure URL is available globally for node
+import { URL } from 'url';
+
 //Article Query Service Handles listing, getting, and reading articles
 export class ArticleQueryService {
   //List articles with filters (Admin/Editor)
@@ -32,7 +36,7 @@ export class ArticleQueryService {
 
     const skip = (page - 1) * limit;
 
-   // Fetch data first to free up connection
+    // Fetch data first to free up connection
     const articles = await prisma.article.findMany({
       where,
       skip,
@@ -57,6 +61,64 @@ export class ArticleQueryService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  // Helper to generate presigned URL for S3 objects
+  private async getPresignedUrl(fileUrl: string): Promise<string> {
+    if (!fileUrl) return fileUrl;
+
+    // Check if it's an S3 URL (simple heuristic)
+    // Local: starts with /uploads or http://localhost
+    // S3: https://bucket.s3.region.amazonaws.com/key or similar
+    const isS3 = fileUrl.includes('.s3.') && fileUrl.includes('amazonaws.com');
+
+    if (!isS3) return fileUrl;
+
+    try {
+      const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3');
+      const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
+
+      const client = new S3Client({
+        region: process.env.AWS_REGION || 'ap-south-1',
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+        },
+      });
+
+      // Extract Key from URL
+      // Format: https://bucket.s3.region.amazonaws.com/key
+      // or https://s3.region.amazonaws.com/bucket/key (less common for virtual-hosted)
+
+      const bucketName = process.env.AWS_S3_BUCKET_ARTICLES || 'articles-bucket';
+      let key = fileUrl;
+
+      // URL decoding might be needed
+      try {
+        const urlObj = new URL(fileUrl);
+        // pathname is /key (if virtual hosted)
+        key = urlObj.pathname.substring(1); // remove leading /
+        key = decodeURIComponent(key);
+      } catch (e) {
+        // Fallback or regex if URL parsing fails
+        console.warn('Failed to parse URL for key extraction:', e);
+      }
+
+      console.log(`🔑 [Presigner] Generating signed URL for key: ${key}`);
+
+      const command = new GetObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+      });
+
+      // Expire in 1 hour (3600 seconds)
+      const signedUrl = await getSignedUrl(client, command, { expiresIn: 3600 });
+      return signedUrl;
+
+    } catch (error) {
+      console.error('❌ [Presigner] Failed to generate presigned URL:', error);
+      return fileUrl; // Fallback to original
+    }
   }
 
   //Get single article details (full access - for logged-in users)
@@ -502,17 +564,11 @@ export class ArticleQueryService {
     const latestEditorDocUrl = latestChangeLog?.editorDocumentUrl || null;
     const latestEditorDocType = latestChangeLog?.editorDocumentType || null;
 
-    return {
-      article: {
-        id: article.id,
-        title: article.title,
-        status: article.status,
-        originalPdfUrl: article.originalPdfUrl,
-        currentPdfUrl: article.currentPdfUrl,
-        editorDocumentUrl: latestEditorDocUrl,
-        editorDocumentType: latestEditorDocType,
-      },
-      changeLogs: changeLogs.map((log) => ({
+
+
+    // Wait for all mappings (presigning)
+    const mappedLogs = await Promise.all(changeLogs.map(async (log) => {
+      const mappedLog = {
         id: log.id,
         versionNumber: log.versionNumber,
         fileType: log.fileType,
@@ -527,37 +583,67 @@ export class ArticleQueryService {
         editorDocumentType: log.editorDocumentType,
         newFileUrl: log.newFileUrl,
         oldFileUrl: log.oldFileUrl,
-        pdfUrl: (() => {
-          if (log.fileType !== 'DOCX' || !log.newFileUrl) return log.newFileUrl;
+        pdfUrl: "", // Calculate below
+        role: "", // Calculate below
+      };
 
-          // Handle improved workflow naming convention (watermarked DOCX -> PDF)
-          if (log.newFileUrl.endsWith('_watermarked.docx')) {
-            // 🔧 FIX: Check if it's a reviewer file (don't add "clean" to reviewer files)
-            if (log.newFileUrl.includes('_reviewer_watermarked.docx')) {
-              // Reviewer files: filename_reviewer_watermarked.docx -> filename_reviewer_watermarked.pdf
-              return log.newFileUrl.replace(/_watermarked\.docx$/i, '_watermarked.pdf');
-            } else {
-              // Editor files: filename_watermarked.docx -> filename_clean_watermarked.pdf
-              return log.newFileUrl.replace(/_watermarked\.docx$/i, '_clean_watermarked.pdf');
-            }
+      // 1. Calculate base PDF URL (before presigning)
+      let basePdfUrl = log.newFileUrl;
+      if (log.fileType === 'DOCX' && log.newFileUrl) {
+        // Handle improved workflow naming convention (watermarked DOCX -> PDF)
+        if (log.newFileUrl.endsWith('_watermarked.docx')) {
+          // 🔧 FIX: Check if it's a reviewer file (don't add "clean" to reviewer files)
+          if (log.newFileUrl.includes('_reviewer_watermarked.docx')) {
+            // Reviewer files: filename_reviewer_watermarked.docx -> filename_reviewer_watermarked.pdf
+            basePdfUrl = log.newFileUrl.replace(/_watermarked\.docx$/i, '_watermarked.pdf');
+          } else {
+            // Editor files: filename_watermarked.docx -> filename_clean_watermarked.pdf
+            basePdfUrl = log.newFileUrl.replace(/_watermarked\.docx$/i, '_clean_watermarked.pdf');
           }
+        } else {
+          basePdfUrl = log.newFileUrl.replace(/\.docx$/i, '.pdf');
+        }
+      }
 
-          return log.newFileUrl.replace(/\.docx$/i, '.pdf');
-        })(),
-        role: (() => {
-          if ((log.diffData as any)?.type === 'reviewer_edit') return 'Reviewer';
+      // 2. Presign URL if needed
+      mappedLog.pdfUrl = await this.getPresignedUrl(basePdfUrl || "");
 
+      // 3. Determine Role
+      const editorId = (log.editor as any)?.id;
+      const isAssignedEditor = editorId && editorId === article.assignedEditorId;
+      const isAssignedReviewer = editorId && editorId === article.assignedReviewerId;
 
-          // Check user roles
-          // Roles structure is User -> UserRole[] -> Role
-          const roles = (log.editor as any).roles?.map((ur: any) => ur.role?.name) || [];
-          if (roles.includes('admin') || roles.includes('ADMIN')) return 'admin'; // Lowercase to match frontend check
-          return 'Editor';
-        })(),
-      })),
+      if ((log.diffData as any)?.type === 'reviewer_edit' || isAssignedReviewer) {
+        mappedLog.role = 'Reviewer';
+      } else if (isAssignedEditor) {
+        mappedLog.role = 'Editor';
+      } else {
+        const roles = (log.editor as any).roles?.map((ur: any) => ur.role?.name) || [];
+        if (roles.includes('admin') || roles.includes('ADMIN')) {
+          mappedLog.role = 'admin';
+        } else {
+          mappedLog.role = 'Editor';
+        }
+      }
+
+      return mappedLog;
+    }));
+
+    return {
+      article: {
+        id: article.id,
+        title: article.title,
+        status: article.status,
+        originalPdfUrl: article.originalPdfUrl,
+        currentPdfUrl: article.currentPdfUrl,
+        editorDocumentUrl: latestEditorDocUrl,
+        editorDocumentType: latestEditorDocType,
+      },
+      changeLogs: mappedLogs,
       totalVersions: changeLogs.length + 1,
       accessLevel: isAdmin ? "admin" : "editor",
     };
+
   }
 
   // Get published articles for users (with visibility filter)
@@ -566,14 +652,14 @@ export class ArticleQueryService {
       status: "PUBLISHED",
       isVisible: true, // Only show visible articles to users
     };
-    
+
     if (category) {
       where.category = category;
     }
 
     const skip = (page - 1) * limit;
 
-   // Fetch data first
+    // Fetch data first
     const articles = await prisma.article.findMany({
       where,
       skip,
@@ -614,7 +700,7 @@ export class ArticleQueryService {
       status: "PUBLISHED",
       // No isVisible filter - admin sees all published articles
     };
-    
+
     if (category) {
       where.category = category;
     }

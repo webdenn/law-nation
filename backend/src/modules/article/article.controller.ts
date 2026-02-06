@@ -538,8 +538,13 @@ export class ArticleController {
         }
       );
 
-      // Add watermark to PDF with role-based URL inclusion
-      console.log(`💧 [Download PDF] Adding watermark for USER role`);
+      // Determine user role for watermarking
+      const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
+      const watermarkRole = userRoles.includes('reviewer') ? 'REVIEWER' :
+        userRoles.includes('editor') ? 'EDITOR' : 'USER';
+
+      // Add watermark to PDF with role-based URL inclusion and TEXT
+      console.log(`💧 [Download PDF] Adding watermark for ${watermarkRole} role`);
       const watermarkedPdf = await addWatermarkToPdf(
         article.currentPdfUrl,
         {
@@ -550,7 +555,7 @@ export class ArticleController {
           articleSlug: article.slug,
           frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
         },
-        'USER',           // User role - will include URL if published
+        watermarkRole,    // Pass dynamic role so "LAW NATION REVIEWER" text appears
         article.status    // Article status - URL only for PUBLISHED
       );
 
