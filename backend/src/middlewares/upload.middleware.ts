@@ -653,17 +653,17 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
         if (files.document && files.document[0]) {
           const docFile = files.document[0];
           const docFilePath = path.join(process.cwd(), 'uploads/pdfs/', docFile.filename);
-          const ext = path.extname(docFile.originalname).toLowerCase();
+          const ext = path.extname(docFile.originalname || docFile.filename || '').toLowerCase();
           
           if (ext === '.docx' || ext === '.doc') {
-            console.log('📄 [Editor Upload Local] Converting DOCX to PDF for preview...');
+            console.log('[Editor Upload Local] Converting DOCX to PDF for preview...');
             
             try {
               const { adobeService } = await import('../services/adobe.service.js');
               const pdfFilePath = docFilePath.replace(/\.(docx|doc)$/i, '.pdf');
               
               await adobeService.convertDocxToPdf(docFilePath, pdfFilePath);
-              console.log('✅ [Editor Upload Local] DOCX converted to PDF successfully');
+              console.log('[Editor Upload Local] DOCX converted to PDF successfully');
               
               const watermarkedBuffer = await addUploadWatermark(pdfFilePath, 'application/pdf');
               fs.writeFileSync(pdfFilePath, watermarkedBuffer);
@@ -686,7 +686,7 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
                 url: `/uploads/pdfs/${docFile.filename}`,
                 storageKey: docFile.filename
               };
-              console.log('⚠️ [Editor Upload Local] Uploaded watermarked DOCX as fallback');
+              console.log('[Editor Upload Local] Uploaded watermarked DOCX as fallback');
             }
           } else {
             const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
@@ -753,36 +753,36 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
           const tempDir = path.join(process.cwd(), 'uploads', 'temp');
           if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-          const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(docFile.originalname)}`);
+          const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(docFile.originalname || docFile.filename || '')}`);
           fs.writeFileSync(tempFilePath, docFile.buffer);
 
-          const ext = path.extname(docFile.originalname).toLowerCase();
+          const ext = path.extname(docFile.originalname || docFile.filename || '').toLowerCase();
           let uploadBuffer;
           let finalFilename = docFile.originalname;
           let finalMimetype = docFile.mimetype;
 
           if (ext === '.docx' || ext === '.doc') {
-            console.log('📄 [Editor Upload] Converting DOCX to PDF for preview...');
+            console.log('[Editor Upload] Converting DOCX to PDF for preview...');
             
             try {
               const { adobeService } = await import('../services/adobe.service.js');
               const pdfTempPath = tempFilePath.replace(/\.(docx|doc)$/i, '.pdf');
               
               await adobeService.convertDocxToPdf(tempFilePath, pdfTempPath);
-              console.log('✅ [Editor Upload] DOCX converted to PDF successfully');
+              console.log('[Editor Upload] DOCX converted to PDF successfully');
               
               uploadBuffer = await addUploadWatermark(pdfTempPath, 'application/pdf');
               
               fs.unlinkSync(pdfTempPath);
               
-              finalFilename = docFile.originalname.replace(/\.(docx|doc)$/i, '.pdf');
+              finalFilename = (docFile.originalname || docFile.filename).replace(/\.(docx|doc)$/i, '.pdf');
               finalMimetype = 'application/pdf';
               
               console.log('✅ [Editor Upload] PDF watermarked successfully');
             } catch (conversionError) {
-              console.error('❌ [Editor Upload] DOCX to PDF conversion failed:', conversionError);
+              console.error('[Editor Upload] DOCX to PDF conversion failed:', conversionError);
               uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
-              console.log('⚠️ [Editor Upload] Uploaded watermarked DOCX as fallback');
+              console.log('[Editor Upload] Uploaded watermarked DOCX as fallback');
             }
           } else {
             uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
