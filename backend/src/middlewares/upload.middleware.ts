@@ -714,27 +714,23 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
       try {
-         // Handle main corrected document (required)
         if (files.document && files.document[0]) {
           const docFile = files.document[0];
-          const docFilePath = path.join(process.cwd(), 'uploads/pdfs/', docFile.filename);
+          const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+          if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-          console.log(`🔖 [Upload] Adding watermark to editor's corrected document...`);
+          const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(docFile.originalname)}`);
+          fs.writeFileSync(tempFilePath, docFile.buffer);
 
-          // For DOCX files, save clean version for improved workflow and create watermarked version
           const ext = path.extname(docFile.originalname).toLowerCase();
+          let uploadBuffer;
+
           if (ext === '.docx') {
-            console.log(`📄 [Upload] DOCX detected - preserving clean version for improved workflow`);
-            
-            // Keep the original clean file as-is for improved workflow
-            // The improved workflow will handle watermarking properly
-            console.log(`✅ [Upload] Clean DOCX preserved for improved workflow`);
+            uploadBuffer = docFile.buffer;
           } else {
-            // For non-DOCX files, apply watermark as before
-            const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
-            fs.writeFileSync(docFilePath, watermarkedBuffer);
-            console.log(`✅ [Upload] Watermarked corrected document saved`);
+            uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
           }
+          fs.unlinkSync(tempFilePath);
 
           // CHANGED: uploadBufferToS3
           const { url, storageKey, presignedUrl } = await uploadBufferToS3(
@@ -1321,4 +1317,3 @@ export const uploadAdminPdf = (req: Request, res: Response, next: NextFunction) 
     });
   }
 };
-
