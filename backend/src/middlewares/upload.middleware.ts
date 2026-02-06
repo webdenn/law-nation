@@ -654,14 +654,58 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
           const docFile = files.document[0];
           const docFilePath = path.join(process.cwd(), 'uploads/pdfs/', docFile.filename);
           const ext = path.extname(docFile.originalname).toLowerCase();
-          if (ext !== '.docx') {
+          
+          if (ext === '.docx' || ext === '.doc') {
+            // Convert DOCX to PDF for proper iframe display
+            console.log('📄 [Editor Upload Local] Converting DOCX to PDF for preview...');
+            
+            try {
+              // Import Adobe service
+              const { adobeService } = await import('../services/adobe.service.js');
+              
+              // Create PDF output path
+              const pdfFilePath = docFilePath.replace(/\.(docx|doc)$/i, '.pdf');
+              
+              // Convert DOCX to PDF
+              await adobeService.convertDocxToPdf(docFilePath, pdfFilePath);
+              console.log('✅ [Editor Upload Local] DOCX converted to PDF successfully');
+              
+              // Apply watermark to the PDF
+              const watermarkedBuffer = await addUploadWatermark(pdfFilePath, 'application/pdf');
+              fs.writeFileSync(pdfFilePath, watermarkedBuffer);
+              
+              // Delete original DOCX
+              fs.unlinkSync(docFilePath);
+              
+              // Update filename to PDF
+              const pdfFilename = docFile.filename.replace(/\.(docx|doc)$/i, '.pdf');
+              
+              req.fileMeta = {
+                url: `/uploads/pdfs/${pdfFilename}`,
+                storageKey: pdfFilename
+              };
+              
+              console.log('✅ [Editor Upload Local] PDF watermarked successfully');
+            } catch (conversionError) {
+              console.error('❌ [Editor Upload Local] DOCX to PDF conversion failed:', conversionError);
+              // Fallback: use original DOCX with watermark
+              const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
+              fs.writeFileSync(docFilePath, watermarkedBuffer);
+              req.fileMeta = {
+                url: `/uploads/pdfs/${docFile.filename}`,
+                storageKey: docFile.filename
+              };
+              console.log('⚠️ [Editor Upload Local] Uploaded watermarked DOCX as fallback');
+            }
+          } else {
+            // PDF file - just watermark
             const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
             fs.writeFileSync(docFilePath, watermarkedBuffer);
+            req.fileMeta = {
+              url: `/uploads/pdfs/${docFile.filename}`,
+              storageKey: docFile.filename
+            };
           }
-          req.fileMeta = {
-            url: `/uploads/pdfs/${docFile.filename}`,
-            storageKey: docFile.filename
-          };
         } else {
           return res.status(400).json({ error: "Corrected document file required" });
         }
@@ -724,10 +768,43 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
 
           const ext = path.extname(docFile.originalname).toLowerCase();
           let uploadBuffer;
+          let finalMimetype = docFile.mimetype;
+          let finalFilename = docFile.originalname;
 
-          if (ext === '.docx') {
-            uploadBuffer = docFile.buffer;
+          if (ext === '.docx' || ext === '.doc') {
+            // Convert DOCX to PDF for proper iframe display
+            console.log('📄 [Editor Upload] Converting DOCX to PDF for preview...');
+            
+            try {
+              // Import Adobe service
+              const { adobeService } = await import('../services/adobe.service.js');
+              
+              // Create PDF output path
+              const pdfTempPath = tempFilePath.replace(/\.(docx|doc)$/i, '.pdf');
+              
+              // Convert DOCX to PDF
+              await adobeService.convertDocxToPdf(tempFilePath, pdfTempPath);
+              console.log('✅ [Editor Upload] DOCX converted to PDF successfully');
+              
+              // Apply watermark to the PDF
+              uploadBuffer = await addUploadWatermark(pdfTempPath, 'application/pdf');
+              
+              // Clean up temp PDF
+              fs.unlinkSync(pdfTempPath);
+              
+              // Update file info to PDF
+              finalMimetype = 'application/pdf';
+              finalFilename = docFile.originalname.replace(/\.(docx|doc)$/i, '.pdf');
+              
+              console.log('✅ [Editor Upload] PDF watermarked successfully');
+            } catch (conversionError) {
+              console.error('❌ [Editor Upload] DOCX to PDF conversion failed:', conversionError);
+              // Fallback: upload original DOCX with watermark
+              uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
+              console.log('⚠️ [Editor Upload] Uploaded watermarked DOCX as fallback');
+            }
           } else {
+            // PDF file - just watermark
             uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
           }
           fs.unlinkSync(tempFilePath);
@@ -735,14 +812,15 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
           // CHANGED: uploadBufferToS3
           const { url, storageKey, presignedUrl } = await uploadBufferToS3(
             uploadBuffer,
-            docFile.originalname,
-            docFile.mimetype,
+            finalFilename,
+            finalMimetype,
             'pdf'
           );
           req.fileMeta = { url, storageKey, presignedUrl };
         } else {
           return res.status(400).json({ error: "Corrected document file required" });
-        }  
+        }
+
         if (files.editorDocument && files.editorDocument[0]) {
           const editorDocFile = files.editorDocument[0];
           const ext = path.extname(editorDocFile.originalname).toLowerCase();
@@ -1316,8 +1394,3 @@ export const uploadAdminPdf = (req: Request, res: Response, next: NextFunction) 
     });
   }
 };
-
-
-
-
-
