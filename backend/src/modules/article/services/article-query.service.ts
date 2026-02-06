@@ -593,7 +593,8 @@ export class ArticleQueryService {
         // Handle improved workflow naming convention (watermarked DOCX -> PDF)
         if (log.newFileUrl.endsWith('_watermarked.docx')) {
           // 🔧 FIX: Check if it's a reviewer file (don't add "clean" to reviewer files)
-          if (log.newFileUrl.includes('_reviewer_watermarked.docx')) {
+          // Reviewer files are named: reviewer_{timestamp}_watermarked.docx
+          if (log.newFileUrl.includes('reviewer_')) {
             // Reviewer files: filename_reviewer_watermarked.docx -> filename_reviewer_watermarked.pdf
             basePdfUrl = log.newFileUrl.replace(/_watermarked\.docx$/i, '_watermarked.pdf');
           } else {
