@@ -943,13 +943,9 @@ export class ArticleWorkflowService {
     }
 
     try {
-      // Process reviewer's DOCX upload
+      // Process reviewer's DOCX upload (supports both local paths and S3 URLs)
       const docxPath = resolveToAbsolutePath(data.presignedUrl);
       console.log(`📄 [Reviewer Upload] Processing DOCX: ${docxPath}`);
-
-      if (!fileExistsAtPath(data.presignedUrl)) {
-        throw new Error(`DOCX file not found: ${docxPath}`);
-      }
 
       // Convert DOCX to PDF for preview
       const pdfPath = docxPath.replace(/\.docx$/i, '_reviewer.pdf');
