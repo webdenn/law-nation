@@ -17,7 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <StoreProvider>
           <SessionChecker />
           {children} {/* Isme (main) ya (dashboard) ka content aayega */}
-          <ToastContainer position="top-center" limit={1} />
+          <ToastContainer position="top-center" limit={1} autoClose={3000} />
         </StoreProvider>
       </body>
     </html>

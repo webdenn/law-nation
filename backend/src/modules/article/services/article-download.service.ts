@@ -1181,26 +1181,41 @@ export class ArticleDownloadService {
 
   // NEW: Get admin's DOCX URL (latest version uploaded by admin)
   async getAdminDocxUrl(articleId: string) {
+    console.log(`🔍 [Admin Download] Fetching Admin DOCX for article ${articleId}`);
+
     // 1. Get all change logs for this article, ordered by version descending
     const logs = await prisma.articleChangeLog.findMany({
       where: { articleId },
       orderBy: { versionNumber: 'desc' },
       include: {
         editor: { // editedBy maps to User
-          select: { userType: true, role: true } // Selecting both to be safe
+          select: {
+            userType: true,
+            roles: {
+              include: {
+                role: true
+              }
+            }
+          }
         }
       }
     });
+
+    console.log(`🔍 [Admin Download] Found ${logs.length} logs. Searching for Admin...`);
 
     // 2. Find the latest log where user was ADMIN and file is DOCX
     let adminDocxUrl = null;
     let foundLog = null;
 
     for (const log of logs) {
-      if (log.editor?.userType === 'ADMIN' || log.editor?.role === 'ADMIN') {
+      const isUserTypeAdmin = log.editor?.userType === 'ADMIN';
+      const hasAdminRole = log.editor?.roles?.some((r: any) => r.role?.name?.toLowerCase() === 'admin');
+
+      if (isUserTypeAdmin || hasAdminRole) {
         const candidateUrl = log.editorDocumentUrl || log.newFileUrl;
 
         if (candidateUrl && (candidateUrl.endsWith('.docx') || candidateUrl.endsWith('.doc'))) {
+          console.log(`✅ [Admin Download] Found Admin DOCX: ${candidateUrl}`);
           adminDocxUrl = candidateUrl;
           foundLog = log;
           break;
