@@ -43,7 +43,8 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
         { name: "Add New Reviewer", path: "/admin/add-reviewer" },
         { name: "Editors & Reviewers", path: "/admin/staff" }, // New Item
         { name: "Concern", path: "/admin/concern" },
-        { name: "Upload Issue", path: "/admin/upload-issue" }, // New Item
+        { name: "Upload Issue", path: "/admin/upload-issue" },
+        { name: "Issue Details", path: "/admin/issue-details" }, // New Item
         { name: "Banner Management", path: "/admin/banners" },
         {
             name: "Site Settings",
