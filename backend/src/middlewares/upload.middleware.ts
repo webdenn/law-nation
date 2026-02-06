@@ -722,69 +722,27 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
           const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(docFile.originalname)}`);
           fs.writeFileSync(tempFilePath, docFile.buffer);
 
-        //   const ext = path.extname(docFile.originalname).toLowerCase();
-        //   let uploadBuffer;
+          const ext = path.extname(docFile.originalname).toLowerCase();
+          let uploadBuffer;
 
-        //   if (ext === '.docx') {
-        //     uploadBuffer = docFile.buffer;
-        //   } else {
-        //     uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
-        //   }
-        //   fs.unlinkSync(tempFilePath);
+          if (ext === '.docx') {
+            uploadBuffer = docFile.buffer;
+          } else {
+            uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
+          }
+          fs.unlinkSync(tempFilePath);
 
-        //   // CHANGED: uploadBufferToS3
-        //   const { url, storageKey, presignedUrl } = await uploadBufferToS3(
-        //     uploadBuffer,
-        //     docFile.originalname,
-        //     docFile.mimetype,
-        //     'pdf'
-        //   );
-        //   req.fileMeta = { url, storageKey, presignedUrl };
-        // } else {
-        //   return res.status(400).json({ error: "Corrected document file required" });
-        // }
-      
-       const ext = path.extname(docFile.originalname).toLowerCase();
-       let uploadBuffer;
-       let finalMimetype = docFile.mimetype;
-       let finalFilename = docFile.originalname;
-
-if (ext === '.docx') {
-    // Convert DOCX to PDF
-    console.log('📄 Converting DOCX to PDF for preview...');
-    
-    const { convertDocxToPdf } = await import('../services/adobe.service.js');
-    const pdfBuffer = await convertDocxToPdf(tempFilePath);
-
-    // Save PDF to temp
-    const pdfTempPath = tempFilePath.replace('.docx', '.pdf');
-    fs.writeFileSync(pdfTempPath, pdfBuffer);
-
-    // Watermark the PDF
-    uploadBuffer = await addUploadWatermark(pdfTempPath, 'application/pdf');
-
-    // Clean up
-    fs.unlinkSync(pdfTempPath);
-
-    // Update file info
-    finalMimetype = 'application/pdf';
-    finalFilename = docFile.originalname.replace('.docx', '.pdf');
-} else {
-    // PDF file - just watermark
-    uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
-}
-
-// Remove original temp file
-fs.unlinkSync(tempFilePath);
-
-// Upload to S3
-const { url, storageKey, presignedUrl } = await uploadBufferToS3(
-    uploadBuffer,
-    finalFilename, // Now .pdf if it was a docx
-    finalMimetype, // Now application/pdf if it was a docx
-    'pdf'
-);
-      
+          // CHANGED: uploadBufferToS3
+          const { url, storageKey, presignedUrl } = await uploadBufferToS3(
+            uploadBuffer,
+            docFile.originalname,
+            docFile.mimetype,
+            'pdf'
+          );
+          req.fileMeta = { url, storageKey, presignedUrl };
+        } else {
+          return res.status(400).json({ error: "Corrected document file required" });
+        }  
         if (files.editorDocument && files.editorDocument[0]) {
           const editorDocFile = files.editorDocument[0];
           const ext = path.extname(editorDocFile.originalname).toLowerCase();
@@ -1358,6 +1316,7 @@ export const uploadAdminPdf = (req: Request, res: Response, next: NextFunction) 
     });
   }
 };
+
 
 
 
