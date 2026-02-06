@@ -725,9 +725,11 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
           const ext = path.extname(docFile.originalname).toLowerCase();
           let uploadBuffer;
 
-          // Apply watermark to both DOCX and PDF files
-          uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
-          
+          if (ext === '.docx') {
+            uploadBuffer = docFile.buffer;
+          } else {
+            uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
+          }
           fs.unlinkSync(tempFilePath);
 
           // CHANGED: uploadBufferToS3
