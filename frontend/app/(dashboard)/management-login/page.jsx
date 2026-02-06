@@ -180,6 +180,14 @@ export default function Adminlogin() {
                     {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
+                <div className="flex justify-end mt-2">
+                  <a
+                    href="/management-forgot-password"
+                    className="text-xs font-semibold text-red-600 hover:text-red-700"
+                  >
+                    Forgot Password?
+                  </a>
+                </div>
               </div>
 
 
