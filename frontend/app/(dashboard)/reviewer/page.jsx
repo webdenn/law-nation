@@ -513,6 +513,11 @@ export default function ReviewerDashboard() {
             ? path
             : `${NEXT_PUBLIC_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
 
+        // 🛑 STOP: Do NOT cache-bust S3 Presigned URLs (it breaks the signature)
+        if (cleanUrl.includes('amazonaws.com') || cleanUrl.includes('s3.')) {
+            return cleanUrl;
+        }
+
         return `${cleanUrl}?cb=${pdfTimestamp}`;
     };
 
