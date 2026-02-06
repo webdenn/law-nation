@@ -651,15 +651,18 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
 
       try {
         if (files.document && files.document[0]) {
+          const docFile = files.document[0];
           
           // Add safety checks
           if (!docFile || !docFile.filename) {
             console.error('❌ [Upload] Invalid file object:', docFile);
             return res.status(400).json({ error: "Invalid file upload" });
           }
-          const docFile = files.document[0];
+          
           const docFilePath = path.join(process.cwd(), 'uploads/pdfs/', docFile.filename);
           const ext = path.extname(docFile.originalname || docFile.filename || '').toLowerCase();
+          
+          console.log(`📁 [Upload] File received: ${docFile.filename}, Extension: ${ext}`);
           
           if (ext === '.docx' || ext === '.doc') {
             console.log('[Editor Upload Local] Converting DOCX to PDF for preview...');
@@ -756,15 +759,26 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
       try {
         if (files.document && files.document[0]) {
           const docFile = files.document[0];
+          
+          // Add safety checks
+          if (!docFile || !docFile.buffer) {
+            console.error('❌ [Upload] Invalid file object or missing buffer:', docFile);
+            return res.status(400).json({ error: "Invalid file upload" });
+          }
+
           const tempDir = path.join(process.cwd(), 'uploads', 'temp');
           if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-          const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(docFile.originalname || docFile.filename || '')}`);
+          const fileExt = path.extname(docFile.originalname || docFile.filename || '.docx');
+          const tempFilePath = path.join(tempDir, `temp-${Date.now()}${fileExt}`);
           fs.writeFileSync(tempFilePath, docFile.buffer);
 
-          const ext = path.extname(docFile.originalname || docFile.filename || '').toLowerCase();
+          const ext = fileExt.toLowerCase();
+          
+          console.log(`📁 [Upload] File received: ${docFile.originalname || 'unknown'}, Extension: ${ext}`);
+          
           let uploadBuffer;
-          let finalFilename = docFile.originalname;
+          let finalFilename = docFile.originalname || `upload-${Date.now()}${fileExt}`;
           let finalMimetype = docFile.mimetype;
 
           if (ext === '.docx' || ext === '.doc') {
@@ -1380,4 +1394,3 @@ export const uploadAdminPdf = (req: Request, res: Response, next: NextFunction) 
     });
   }
 };
-
