@@ -922,7 +922,15 @@ export class ArticleWorkflowService {
       throw new ForbiddenError("You are not assigned as reviewer to this article");
     }
 
-    const validStatuses = ["ASSIGNED_TO_REVIEWER", "REVIEWER_EDITING", "REVIEWER_IN_PROGRESS"];
+    const validStatuses = [
+      "ASSIGNED_TO_REVIEWER",
+      "REVIEWER_EDITING",
+      "REVIEWER_IN_PROGRESS",
+      "ASSIGNED_TO_EDITOR",
+      "EDITOR_IN_PROGRESS",
+      "EDITOR_EDITING",
+      "EDITOR_APPROVED"
+    ];
     if (!validStatuses.includes(article.status)) {
       throw new BadRequestError(
         `Cannot upload corrections in current status: ${article.status}`
