@@ -1,0 +1,7 @@
+src/middlewares/upload.middleware.ts(5,62): error TS2307: Cannot find module '@aws-sdk/client-s3' or its corresponding type declarations.
+src/middlewares/upload.middleware.ts(9,30): error TS2307: Cannot find module '@aws-sdk/s3-request-presigner' or its corresponding type declarations.
+src/modules/article/services/article-workflow.service.ts(1016,61): error TS2307: Cannot find module '@aws-sdk/client-s3' or its corresponding type declarations.
+src/modules/article/services/article-workflow.service.ts(1103,28): error TS2304: Cannot find name 'relativeWatermarkedDocx'.
+src/modules/article/services/article-workflow.service.ts(1104,27): error TS2304: Cannot find name 'relativeWatermarkedPdf'.
+src/utils/file-conversion.utils.ts(4,62): error TS2307: Cannot find module '@aws-sdk/client-s3' or its corresponding type declarations.
+src/utils/file-conversion.utils.ts(5,30): error TS2307: Cannot find module '@aws-sdk/s3-request-presigner' or its corresponding type declarations.
