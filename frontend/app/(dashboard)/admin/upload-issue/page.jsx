@@ -27,6 +27,10 @@ export default function AdminUploadIssuePage() {
         "July", "August", "September", "October", "November", "December"
     ];
 
+    const [uploadedIssues, setUploadedIssues] = useState([]);
+    const [isListOpen, setIsListOpen] = useState(true);
+    const [loadingList, setLoadingList] = useState(false);
+
     useEffect(() => {
         const token = localStorage.getItem("adminToken");
         const adminData = localStorage.getItem("adminUser");
@@ -34,8 +38,26 @@ export default function AdminUploadIssuePage() {
             router.push("/management-login/");
         } else {
             if (adminData) setCurrentAdmin(JSON.parse(adminData));
+            fetchUploadedIssues(token);
         }
     }, [router]);
+
+    const fetchUploadedIssues = async (token) => {
+        setLoadingList(true);
+        try {
+            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/pdfs`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setUploadedIssues(data.data.pdfs || []);
+            }
+        } catch (error) {
+            console.error("Failed to fetch issues:", error);
+        } finally {
+            setLoadingList(false);
+        }
+    };
 
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
@@ -79,6 +101,8 @@ export default function AdminUploadIssuePage() {
                 setShortDescription("");
                 setFile(null);
                 if (fileInputRef.current) fileInputRef.current.value = "";
+                // Refresh list
+                fetchUploadedIssues(token);
             } else {
                 toast.error(data.error || "Upload failed");
             }
@@ -228,11 +252,82 @@ export default function AdminUploadIssuePage() {
                                         )}
                                     </button>
                                 </div>
-                                <p className="text-[10px] text-gray-400 mt-2 ml-1">
+                                <p className="text-xs text-gray-400 mt-2 ml-1">
                                     * Supports unlimited file size. Automatic watermarking will be applied.
                                 </p>
                             </div>
                         </form>
+                    </div>
+
+                    {/* Uploaded Issues List */}
+                    <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+                        <button
+                            onClick={() => setIsListOpen(!isListOpen)}
+                            className="w-full flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 hover:bg-gray-100 transition text-left"
+                        >
+                            <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-red-600">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                                </svg>
+                                Uploaded Issues Details
+                            </h3>
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth={1.5}
+                                stroke="currentColor"
+                                className={`w-5 h-5 text-gray-500 transition-transform ${isListOpen ? 'rotate-180' : ''}`}
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                            </svg>
+                        </button>
+
+                        {isListOpen && (
+                            <div className="p-6">
+                                {loadingList ? (
+                                    <p className="text-center text-gray-500 py-4">Loading issues...</p>
+                                ) : uploadedIssues.length === 0 ? (
+                                    <p className="text-center text-gray-500 py-4">No issues uploaded yet.</p>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="bg-gray-50 text-gray-600 font-bold uppercase text-xs">
+                                                <tr>
+                                                    <th className="px-4 py-3 rounded-l-lg">Title</th>
+                                                    <th className="px-4 py-3">Issue/Volume</th>
+                                                    <th className="px-4 py-3">Upload Date</th>
+                                                    <th className="px-4 py-3">File Size</th>
+                                                    <th className="px-4 py-3 rounded-r-lg text-right">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100">
+                                                {uploadedIssues.map((item) => (
+                                                    <tr key={item.id} className="hover:bg-gray-50 transition">
+                                                        <td className="px-4 py-4 font-medium text-gray-900">{item.title}</td>
+                                                        <td className="px-4 py-4 text-gray-600">{item.issue} {item.volume}</td>
+                                                        <td className="px-4 py-4 text-gray-500">
+                                                            {new Date(item.uploadedAt).toLocaleDateString()}
+                                                        </td>
+                                                        <td className="px-4 py-4 text-gray-500">{item.fileSize}</td>
+                                                        <td className="px-4 py-4 text-right">
+                                                            <a
+                                                                href={item.watermarkedPdfUrl || item.originalPdfUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-red-600 hover:text-red-800 font-bold text-xs uppercase hover:underline"
+                                                            >
+                                                                View PDF
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                 </div>
