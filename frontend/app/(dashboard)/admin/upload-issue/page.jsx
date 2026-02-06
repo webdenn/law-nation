@@ -27,6 +27,10 @@ export default function AdminUploadIssuePage() {
         "July", "August", "September", "October", "November", "December"
     ];
 
+    const [uploadedIssues, setUploadedIssues] = useState([]);
+    const [isListOpen, setIsListOpen] = useState(true);
+    const [loadingList, setLoadingList] = useState(false);
+
     useEffect(() => {
         const token = localStorage.getItem("adminToken");
         const adminData = localStorage.getItem("adminUser");
@@ -34,8 +38,26 @@ export default function AdminUploadIssuePage() {
             router.push("/management-login/");
         } else {
             if (adminData) setCurrentAdmin(JSON.parse(adminData));
+            fetchUploadedIssues(token);
         }
     }, [router]);
+
+    const fetchUploadedIssues = async (token) => {
+        setLoadingList(true);
+        try {
+            const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/pdfs`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setUploadedIssues(data.data.pdfs || []);
+            }
+        } catch (error) {
+            console.error("Failed to fetch issues:", error);
+        } finally {
+            setLoadingList(false);
+        }
+    };
 
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
@@ -79,6 +101,8 @@ export default function AdminUploadIssuePage() {
                 setShortDescription("");
                 setFile(null);
                 if (fileInputRef.current) fileInputRef.current.value = "";
+                // Refresh list
+                fetchUploadedIssues(token);
             } else {
                 toast.error(data.error || "Upload failed");
             }
@@ -228,12 +252,14 @@ export default function AdminUploadIssuePage() {
                                         )}
                                     </button>
                                 </div>
-                                <p className="text-[10px] text-gray-400 mt-2 ml-1">
+                                <p className="text-xs text-gray-400 mt-2 ml-1">
                                     * Supports unlimited file size. Automatic watermarking will be applied.
                                 </p>
                             </div>
                         </form>
                     </div>
+
+
 
                 </div>
             </main>

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import AdminSidebar from "../../../components/AdminSidebar";
-import { Trash2, Edit2, Plus, Save, X, Users } from "lucide-react";
+import { Trash2, Edit2, Plus, Save, X, Users, Upload } from "lucide-react";
 
 export default function OurPeopleSettingsPage() {
     const router = useRouter();
@@ -16,6 +16,7 @@ export default function OurPeopleSettingsPage() {
     // UI State
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     // Form State
@@ -25,7 +26,8 @@ export default function OurPeopleSettingsPage() {
         name: "",
         role: "",
         bio: "",
-        specialization: ""
+        specialization: "",
+        image: ""
     });
 
     useEffect(() => {
@@ -132,7 +134,8 @@ export default function OurPeopleSettingsPage() {
             name: member.name,
             role: member.role || "",
             bio: member.bio || "",
-            specialization: member.specialization || ""
+            specialization: member.specialization || "",
+            image: member.image || ""
         });
         setEditId(member.id);
         setIsEditing(true);
@@ -142,6 +145,49 @@ export default function OurPeopleSettingsPage() {
         if (confirm(`Are you sure you want to remove this Team Member?`)) {
             const updatedTeam = teamMembers.filter(m => m.id !== id);
             await handleAction(updatedTeam, `Team Member removed successfully!`);
+        }
+    };
+
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Validations
+        if (!file.type.startsWith('image/')) {
+            toast.error("Please upload an image file");
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error("Image size must be less than 5MB");
+            return;
+        }
+
+        setUploading(true);
+        const formDataUpload = new FormData();
+        formDataUpload.append('image', file);
+
+        try {
+            const token = localStorage.getItem("adminToken");
+            const res = await fetch(`${nextPublicApiUrl}/settings/upload-image`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
+                body: formDataUpload
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setFormData(prev => ({ ...prev, image: data.url }));
+                toast.success("Image uploaded successfully!");
+            } else {
+                toast.error(data.error || "Failed to upload image");
+            }
+        } catch (error) {
+            console.error("Upload Error:", error);
+            toast.error("Error uploading image");
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -167,7 +213,7 @@ export default function OurPeopleSettingsPage() {
     };
 
     const resetForm = () => {
-        setFormData({ name: "", role: "", bio: "", specialization: "" });
+        setFormData({ name: "", role: "", bio: "", specialization: "", image: "" });
         setEditId(null);
         setIsEditing(false);
     };
@@ -231,7 +277,20 @@ export default function OurPeopleSettingsPage() {
                                     <div key={member.id} className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between group hover:border-gray-200 transition-all h-full">
                                         <div className="mb-4">
                                             <div className="flex justify-between items-start mb-2">
-                                                <h3 className="font-bold text-lg text-gray-900 line-clamp-1">{member.name}</h3>
+                                                <div className="flex items-center gap-3">
+                                                    {member.image ? (
+                                                        <img
+                                                            src={member.image}
+                                                            alt={member.name}
+                                                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center border border-gray-200">
+                                                            <span className="text-gray-400 font-bold text-xs">{member.name?.charAt(0)}</span>
+                                                        </div>
+                                                    )}
+                                                    <h3 className="font-bold text-lg text-gray-900 line-clamp-1">{member.name}</h3>
+                                                </div>
                                                 <div className="flex gap-1">
                                                     <button
                                                         onClick={() => handleEdit(member)}
@@ -280,6 +339,45 @@ export default function OurPeopleSettingsPage() {
                             </div>
 
                             <form onSubmit={handleSubmit} className="space-y-5">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2 uppercase">Profile Image</label>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-20 h-20 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+                                            {formData.image ? (
+                                                <img
+                                                    src={formData.image}
+                                                    alt="Preview"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <Users className="text-gray-400" size={32} />
+                                            )}
+                                        </div>
+                                        <div className="flex-1">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleImageUpload}
+                                                className="hidden"
+                                                id="image-upload"
+                                            />
+                                            <label
+                                                htmlFor="image-upload"
+                                                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold uppercase cursor-pointer transition ${uploading
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                                                    }`}
+                                            >
+                                                <Upload size={16} />
+                                                {uploading ? 'Uploading...' : 'Upload Photo'}
+                                            </label>
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Recommended: Square image, max 5MB.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-2 uppercase">Full Name</label>
                                     <input

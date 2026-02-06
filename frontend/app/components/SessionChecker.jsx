@@ -11,6 +11,7 @@ export default function SessionChecker() {
     const router = useRouter();
 
     useEffect(() => {
+        // 1. Periodic Token Expiry Check
         const checkSession = () => {
             const tokenKeys = ["token", "authToken", "adminToken"];
 
@@ -32,14 +33,15 @@ export default function SessionChecker() {
                         dispatch(logout());
 
                         if (key === "adminToken") {
-                            if (window.location.pathname.startsWith("/admin")) {
+                            // Avoid redirect loop if already on management-login
+                            if (!window.location.pathname.includes("/management-login")) {
                                 toast.error("Admin session expired. Please login again.");
                                 router.push("/management-login/");
                             }
                         } else {
-                            // Fix: Don't redirect if already on login pages
                             const path = window.location.pathname;
-                            if (!path.includes("/login") && !path.includes("/management-login") && !path.startsWith("/admin")) {
+                            // Update: Use includes to handle base paths like /law/admin
+                            if (!path.includes("/login") && !path.includes("/management-login") && !path.includes("/admin")) {
                                 toast.error("Session expired. Please login again.");
                                 router.push("/login");
                             }
@@ -56,30 +58,66 @@ export default function SessionChecker() {
         checkSession();
         const interval = setInterval(checkSession, 30000); // Check every 30 seconds
 
-        // Global Fetch Interceptor to catch 401/403
+        // 2. Global Fetch Interceptor to catch 401s
         const originalFetch = window.fetch;
-        window.fetch = async (...args) => {
-            const response = await originalFetch(...args);
 
-            if (response.status === 401 || response.status === 403) {
-                const url = args[0].toString();
-                // Avoid intercepting login/auth requests themselves if they fail
-                if (!url.includes("/login") && !url.includes("/management-login")) {
-                    console.error("Unauthorized request detected. Logging out...");
-                    localStorage.removeItem("token");
-                    localStorage.removeItem("authToken");
-                    localStorage.removeItem("adminToken");
-                    dispatch(logout());
-
-                    if (window.location.pathname.startsWith("/admin")) {
-                        router.push("/management-login/");
-                    } else {
-                        router.push("/login");
-                    }
+        // Prevent double wrapping
+        if (!originalFetch.__isInterceptor) {
+            window.fetch = async (...args) => {
+                let url = args[0];
+                if (url instanceof Request) {
+                    url = url.url;
                 }
-            }
-            return response;
-        };
+                url = url ? url.toString() : "";
+
+                try {
+                    const response = await originalFetch(...args);
+
+                    // Only intercept 401 (Unauthorized). 403 (Forbidden) should just show an error, not logout.
+                    if (response.status === 401) {
+                        // 1. Check if we are already on a login page
+                        const isLoginPage = typeof window !== 'undefined' && (
+                            window.location.pathname.includes('/login') ||
+                            window.location.pathname.includes('/management-login')
+                        );
+
+                        if (isLoginPage) {
+                            // If we are on login page, 401 is expected (invalid credentials)
+                            // DO NOT LOGOUT, DO NOT REDIRECT
+                            return response;
+                        }
+
+                        // 2. Check if the request itself was an auth request (double check)
+                        const isAuthRequest = url.includes("/auth/login") ||
+                            url.includes("/auth/admin-login") ||
+                            url.includes("/management-login");
+
+                        if (!isAuthRequest) {
+                            console.error("Unauthorized request detected. Logging out...");
+
+                            // Check which token is relevant
+                            // Update: Use includes to handle /law/admin prefix
+                            const isAdmin = window.location.pathname.includes("/admin");
+
+                            localStorage.removeItem("token");
+                            localStorage.removeItem("authToken");
+                            localStorage.removeItem("adminToken");
+                            dispatch(logout());
+
+                            if (isAdmin) {
+                                router.push("/management-login/");
+                            } else {
+                                router.push("/login");
+                            }
+                        }
+                    }
+                    return response;
+                } catch (error) {
+                    throw error;
+                }
+            };
+            window.fetch.__isInterceptor = true;
+        }
 
         const handleStorageChange = (e) => {
             if (["token", "authToken", "adminToken"].includes(e.key) && !e.newValue) {
@@ -91,8 +129,12 @@ export default function SessionChecker() {
         return () => {
             clearInterval(interval);
             window.removeEventListener("storage", handleStorageChange);
+            // Restore original fetch if we modified it
+            if (window.fetch.__isInterceptor) {
+                window.fetch = originalFetch;
+            }
         };
     }, [dispatch, router]);
 
-    return null; // This component renders nothing
+    return null;
 }

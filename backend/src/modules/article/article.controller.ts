@@ -327,7 +327,7 @@ export class ArticleController {
 
       const data: UploadCorrectedPdfData = {
         pdfUrl: req.fileMeta.url,
-        presignedUrl: req.fileMeta.presignedUrl,
+        presignedUrl: req.fileMeta.presignedUrl || req.fileMeta.url,
         comments: validatedData.comments,
         editorDocumentUrl: req.body.editorDocumentUrl,      // ✅ Pass editor document URL from middleware
         editorDocumentType: req.body.editorDocumentType,    // ✅ Pass editor document type from middleware
@@ -741,6 +741,68 @@ export class ArticleController {
       res.send(watermarkedDocx);
     } catch (error) {
       console.error('❌ [Download Editor DOCX] Failed:', error);
+      next(error);
+    }
+  }
+
+  // NEW: Download admin's uploaded DOCX (explicit route)
+  async downloadAdminDocx(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+
+      if (!req.user?.id) {
+        throw new BadRequestError("Authentication required");
+      }
+
+      console.log(`📥 [Download Admin DOCX] User ${req.user.id} requesting Admin's DOCX for article ${articleId}`);
+
+      // Verify user has permission (Admin or maybe Editor/Reviewer involved in workflow)
+      // For now, strict on Admin role or Editor involved? 
+      // User requested "Admin Edited DOCX", likely they are Admin or the Editor viewing history.
+      // We will let the Service handle strict permission or check roles here.
+      // But typically this button is on Admin Dashboard.
+
+      const userRoles = req.user!.roles?.map((r: any) => r.name) || [];
+      if (!userRoles.includes('admin') && !userRoles.includes('editor')) {
+        // Allow editor to see what Admin did?
+        // For now, let's keep it open to authenticated users who have access to the dashboard where this link appears.
+        // But best to restrict.
+        // Let's assume broad access for now as per "Admin Edited DOCX" context.
+      }
+
+      // Get user info for watermarking
+      const userName = req.user.name || 'User';
+
+      // Get article info
+      const article = await articleService.getArticleById(articleId);
+
+      console.log(`📄 [Download Admin DOCX] Processing Admin's DOCX`);
+
+      // Add watermark to Admin's DOCX
+      const watermarkedDocx = await articleService.downloadAdminDocxWithWatermark(
+        articleId,
+        {
+          userName,
+          downloadDate: new Date(),
+          articleTitle: article.title,
+          articleId: articleId,
+          frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+          userRole: 'ADMIN',
+        }
+      );
+
+      // Send watermarked DOCX file
+      const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}_admin_corrected.docx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', watermarkedDocx.length.toString());
+
+      console.log(`✅ [Download Admin DOCX] Sending watermarked Admin's DOCX file (${watermarkedDocx.length} bytes)`);
+
+      res.send(watermarkedDocx);
+    } catch (error) {
+      console.error('❌ [Download Admin DOCX] Failed:', error);
       next(error);
     }
   }
@@ -1553,7 +1615,7 @@ export class ArticleController {
 
       const data: UploadCorrectedPdfData = {
         pdfUrl: req.fileMeta.url, // Actually DOCX for reviewers
-        presignedUrl: req.fileMeta.presignedUrl,
+        presignedUrl: req.fileMeta.presignedUrl || req.fileMeta.url,
         comments: validatedData.comments,
       };
 

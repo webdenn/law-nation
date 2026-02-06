@@ -7,15 +7,15 @@ import ReCAPTCHA from "react-google-recaptcha";
 
 export default function Adminlogin() {
   const router = useRouter()
-  
+
   // ✅ FIX 1: Sirf redirect logic ko handle kiya
   useEffect(() => {
     const editorToken = localStorage.getItem("editorToken");
     const adminToken = localStorage.getItem("adminToken");
     if (editorToken) {
-        router.push("/editor");
+      router.push("/editor");
     } else if (adminToken) {
-        router.push("/admin");
+      router.push("/admin");
     }
   }, [router])
 
@@ -27,9 +27,9 @@ export default function Adminlogin() {
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
   // ... baaki states ke saath ye line add kar do:
-const [captchaToken, setCaptchaToken] = useState(null);
-  
-  
+  const [captchaToken, setCaptchaToken] = useState(null);
+
+
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -44,10 +44,10 @@ const [captchaToken, setCaptchaToken] = useState(null);
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Please enter a valid email address"
     }
-    
+
     if (!formData.password) {
       newErrors.password = "Password is required"
-    } else if (formData.password.length < 6) { 
+    } else if (formData.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters"
     }
 
@@ -57,7 +57,7 @@ const [captchaToken, setCaptchaToken] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!validateForm()) {
       toast.error("Please fix the errors above")
       return
@@ -65,19 +65,19 @@ const [captchaToken, setCaptchaToken] = useState(null);
 
     // ✅ FIX 1: Captcha check add kiya
     if (!captchaToken) {
-        toast.error("Please complete the reCAPTCHA challenge");
-        return;
+      toast.error("Please complete the reCAPTCHA challenge");
+      return;
     }
 
     setIsLoading(true)
 
     try {
       const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
-      
+
       // ✅ FIX 2: Naya payload banaya jisme token bhi hai
       const payload = {
-          ...formData,               // email & password
-          recaptchaToken: captchaToken // 🔥 Backend ye dhoond raha hai
+        ...formData,               // email & password
+        recaptchaToken: captchaToken // 🔥 Backend ye dhoond raha hai
       }
 
       const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/auth/admin-login`, {
@@ -92,16 +92,16 @@ const [captchaToken, setCaptchaToken] = useState(null);
         throw new Error(data.message || "Login failed")
       }
 
-      localStorage.clear(); 
+      localStorage.clear();
       toast.success("Login Successful!")
-      
+
       const userRoles = data.user.roles || []
-      const isEditor = userRoles.some(role => 
-        (role.name?.toLowerCase() === "editor") || 
+      const isEditor = userRoles.some(role =>
+        (role.name?.toLowerCase() === "editor") ||
         (role.role?.name?.toLowerCase() === "editor")
       )
-      const isReviewer = userRoles.some(role => 
-        (role.name?.toLowerCase() === "reviewer") || 
+      const isReviewer = userRoles.some(role =>
+        (role.name?.toLowerCase() === "reviewer") ||
         (role.role?.name?.toLowerCase() === "reviewer")
       )
       const tokenToSave = data.accessToken || data.token;
@@ -131,9 +131,10 @@ const [captchaToken, setCaptchaToken] = useState(null);
 
   return (
     <div className="h-screen flex overflow-hidden">
-      <ToastContainer position="top-right" autoClose={2000} />
+      {/* <ToastContainer position="top-right" autoClose={2000} /> */}
       {/* Left Side - Visual Section (Aapka Original Design) */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-red-800 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+        <div className="absolute inset-0 bg-linear-to-br from-indigo-500/10 to-purple-500/10 backdrop-blur-3xl" />
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-full h-full" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
@@ -183,13 +184,13 @@ const [captchaToken, setCaptchaToken] = useState(null);
 
 
 
-                <div className="mb-4">
-                              <ReCAPTCHA
-                                // || "" add karna hai taki undefined na jaye
-                                sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ""}
-                                onChange={(token) => setCaptchaToken(token)}
-                              />
-                            </div>
+              <div className="mb-4">
+                <ReCAPTCHA
+                  // || "" add karna hai taki undefined na jaye
+                  sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ""}
+                  onChange={(token) => setCaptchaToken(token)}
+                />
+              </div>
 
 
               <button

@@ -1,5 +1,6 @@
 import { prisma } from "@/db/db.js";
 import path from "path";
+import fs from "fs";
 import {
   NotFoundError,
   BadRequestError,
@@ -922,7 +923,15 @@ export class ArticleWorkflowService {
       throw new ForbiddenError("You are not assigned as reviewer to this article");
     }
 
-    const validStatuses = ["ASSIGNED_TO_REVIEWER", "REVIEWER_EDITING", "REVIEWER_IN_PROGRESS"];
+    const validStatuses = [
+      "ASSIGNED_TO_REVIEWER",
+      "REVIEWER_EDITING",
+      "REVIEWER_IN_PROGRESS",
+      "ASSIGNED_TO_EDITOR",
+      "EDITOR_IN_PROGRESS",
+      "EDITOR_EDITING",
+      "EDITOR_APPROVED"
+    ];
     if (!validStatuses.includes(article.status)) {
       throw new BadRequestError(
         `Cannot upload corrections in current status: ${article.status}`
@@ -935,16 +944,36 @@ export class ArticleWorkflowService {
     }
 
     try {
-      // Process reviewer's DOCX upload
-      const docxPath = resolveToAbsolutePath(data.presignedUrl);
+      // Process reviewer's DOCX upload (supports both local paths and S3 URLs)
+      const docxPath = data.presignedUrl;
       console.log(`📄 [Reviewer Upload] Processing DOCX: ${docxPath}`);
 
-      if (!fileExistsAtPath(data.presignedUrl)) {
-        throw new Error(`DOCX file not found: ${docxPath}`);
+      // Generate proper output paths
+      // For S3 URLs, we need to create temp paths; for local files, use the same directory
+      const isUrl = docxPath.startsWith('http://') || docxPath.startsWith('https://');
+      let pdfPath: string;
+      let watermarkedDocxPath: string;
+      let watermarkedPdfPath: string;
+
+      if (isUrl) {
+        // For S3 URLs, create temp file paths
+        const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        const timestamp = Date.now();
+        pdfPath = path.join(tempDir, `reviewer_${timestamp}.pdf`);
+        watermarkedDocxPath = path.join(tempDir, `reviewer_${timestamp}_watermarked.docx`);
+        watermarkedPdfPath = path.join(tempDir, `reviewer_${timestamp}_watermarked.pdf`);
+      } else {
+        // For local files, use the same directory structure
+        const absoluteDocxPath = resolveToAbsolutePath(docxPath);
+        pdfPath = absoluteDocxPath.replace(/\.docx$/i, '_reviewer.pdf');
+        watermarkedDocxPath = absoluteDocxPath.replace(/\.docx$/i, '_reviewer_watermarked.docx');
+        watermarkedPdfPath = pdfPath.replace(/\.pdf$/i, '_watermarked.pdf');
       }
 
       // Convert DOCX to PDF for preview
-      const pdfPath = docxPath.replace(/\.docx$/i, '_reviewer.pdf');
       console.log(`🔄 [Adobe] Converting reviewer DOCX to PDF`);
       await adobeService.convertDocxToPdf(docxPath, pdfPath);
 
@@ -972,17 +1001,65 @@ export class ArticleWorkflowService {
       };
 
       // Watermark DOCX
-      const watermarkedDocxPath = docxPath.replace(/\.docx$/i, '_reviewer_watermarked.docx');
       await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
 
       // Watermark PDF
-      const watermarkedPdfPath = pdfPath.replace(/\.pdf$/i, '_watermarked.pdf');
       await adobeService.addWatermarkToPdf(pdfPath, watermarkedPdfPath, watermarkData);
 
-      // Convert paths to relative for database
-      const { convertToWebPath } = await import('@/utils/file-path.utils.js');
-      const relativeWatermarkedDocx = convertToWebPath(watermarkedDocxPath);
-      const relativeWatermarkedPdf = convertToWebPath(watermarkedPdfPath);
+      // Upload watermarked files to S3 if in production
+      let finalWatermarkedDocxUrl: string;
+      let finalWatermarkedPdfUrl: string;
+
+      if (isUrl) {
+        // Production: Upload watermarked files to S3
+        console.log(`☁️ [Reviewer Upload] Uploading watermarked files to S3...`);
+        const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+
+        const s3Client = new S3Client({
+          region: process.env.AWS_REGION || 'ap-south-1',
+          credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+          },
+        });
+
+        const bucketName = process.env.AWS_S3_BUCKET_ARTICLES || 'articles-bucket';
+        const timestamp = Date.now();
+
+        // Upload watermarked DOCX
+        const docxBuffer = fs.readFileSync(watermarkedDocxPath);
+        const docxKey = `articles/reviewer_${timestamp}_watermarked.docx`;
+        await s3Client.send(new PutObjectCommand({
+          Bucket: bucketName,
+          Key: docxKey,
+          Body: docxBuffer,
+          ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        }));
+        finalWatermarkedDocxUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || 'ap-south-1'}.amazonaws.com/${docxKey}`;
+
+        // Upload watermarked PDF
+        const pdfBuffer = fs.readFileSync(watermarkedPdfPath);
+        const pdfKey = `articles/reviewer_${timestamp}_watermarked.pdf`;
+        await s3Client.send(new PutObjectCommand({
+          Bucket: bucketName,
+          Key: pdfKey,
+          Body: pdfBuffer,
+          ContentType: 'application/pdf',
+        }));
+        finalWatermarkedPdfUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || 'ap-south-1'}.amazonaws.com/${pdfKey}`;
+
+        // Clean up temp files
+        fs.unlinkSync(watermarkedDocxPath);
+        fs.unlinkSync(watermarkedPdfPath);
+        fs.unlinkSync(pdfPath);
+
+        console.log(`✅ [Reviewer Upload] Uploaded to S3: DOCX=${finalWatermarkedDocxUrl}, PDF=${finalWatermarkedPdfUrl}`);
+      } else {
+        // Local: Use file paths as-is
+        const { convertToWebPath } = await import('@/utils/file-path.utils.js');
+        finalWatermarkedDocxUrl = convertToWebPath(watermarkedDocxPath);
+        finalWatermarkedPdfUrl = convertToWebPath(watermarkedPdfPath);
+      }
 
       // Update article with reviewer's version
       const updatedArticle = await prisma.article.update({
@@ -990,8 +1067,8 @@ export class ArticleWorkflowService {
         data: {
           content: extractedText,
           contentHtml: extractedText.replace(/\n/g, '<br>'),
-          currentPdfUrl: relativeWatermarkedPdf,
-          currentWordUrl: relativeWatermarkedDocx,
+          currentPdfUrl: finalWatermarkedPdfUrl,
+          currentWordUrl: finalWatermarkedDocxUrl,
           status: "REVIEWER_IN_PROGRESS",
           reviewedAt: new Date(),
         },
@@ -1003,7 +1080,7 @@ export class ArticleWorkflowService {
           articleId: article.id,
           versionNumber: await this.getNextVersionNumber(articleId),
           oldFileUrl: article.currentWordUrl || "",
-          newFileUrl: relativeWatermarkedDocx,
+          newFileUrl: finalWatermarkedDocxUrl,
           fileType: "DOCX",
           diffData: {
             type: "reviewer_edit",
@@ -1023,8 +1100,8 @@ export class ArticleWorkflowService {
         article: updatedArticle,
         extractedTextLength: extractedText.length,
         files: {
-          watermarkedDocx: relativeWatermarkedDocx,
-          watermarkedPdf: relativeWatermarkedPdf,
+          watermarkedDocx: finalWatermarkedDocxUrl,
+          watermarkedPdf: finalWatermarkedPdfUrl,
         }
       };
 
