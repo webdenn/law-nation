@@ -403,7 +403,12 @@ export default function AdminDashboard() {
       ? path
       : `${NEXT_PUBLIC_BASE_URL}/${path.replace(/\\/g, "/").replace(/^\//, "")}`;
 
-    // Add timestamp to prevent PDF caching
+    // 🛑 STOP: Do NOT cache-bust S3 Presigned URLs (it breaks the signature)
+    if (cleanPath.includes('amazonaws.com') || cleanPath.includes('s3.')) {
+      return cleanPath;
+    }
+
+    // Add timestamp to prevent PDF caching for local files only
     return `${cleanPath}?cb=${Date.now()}`;
   };
   // ✅ FETCH DATA (Articles + Editors)
