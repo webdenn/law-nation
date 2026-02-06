@@ -652,16 +652,59 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
       try {
         if (files.document && files.document[0]) {
           const docFile = files.document[0];
+          
+          // Add safety checks
+          if (!docFile || !docFile.filename) {
+            console.error('❌ [Upload] Invalid file object:', docFile);
+            return res.status(400).json({ error: "Invalid file upload" });
+          }
+          
           const docFilePath = path.join(process.cwd(), 'uploads/pdfs/', docFile.filename);
-          const ext = path.extname(docFile.originalname).toLowerCase();
-          if (ext !== '.docx') {
+          const ext = path.extname(docFile.originalname || docFile.filename || '').toLowerCase();
+          
+          console.log(`📁 [Upload] File received: ${docFile.filename}, Extension: ${ext}`);
+          
+          if (ext === '.docx' || ext === '.doc') {
+            console.log('[Editor Upload Local] Converting DOCX to PDF for preview...');
+            
+            try {
+              const { adobeService } = await import('../services/adobe.service.js');
+              const pdfFilePath = docFilePath.replace(/\.(docx|doc)$/i, '.pdf');
+              
+              await adobeService.convertDocxToPdf(docFilePath, pdfFilePath);
+              console.log('[Editor Upload Local] DOCX converted to PDF successfully');
+              
+              const watermarkedBuffer = await addUploadWatermark(pdfFilePath, 'application/pdf');
+              fs.writeFileSync(pdfFilePath, watermarkedBuffer);
+              
+              fs.unlinkSync(docFilePath);
+              
+              const pdfFilename = docFile.filename.replace(/\.(docx|doc)$/i, '.pdf');
+              
+              req.fileMeta = {
+                url: `/uploads/pdfs/${pdfFilename}`,
+                storageKey: pdfFilename
+              };
+              
+              console.log('✅ [Editor Upload Local] PDF watermarked successfully');
+            } catch (conversionError) {
+              console.error('❌ [Editor Upload Local] DOCX to PDF conversion failed:', conversionError);
+              const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
+              fs.writeFileSync(docFilePath, watermarkedBuffer);
+              req.fileMeta = {
+                url: `/uploads/pdfs/${docFile.filename}`,
+                storageKey: docFile.filename
+              };
+              console.log('[Editor Upload Local] Uploaded watermarked DOCX as fallback');
+            }
+          } else {
             const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
             fs.writeFileSync(docFilePath, watermarkedBuffer);
+            req.fileMeta = {
+              url: `/uploads/pdfs/${docFile.filename}`,
+              storageKey: docFile.filename
+            };
           }
-          req.fileMeta = {
-            url: `/uploads/pdfs/${docFile.filename}`,
-            storageKey: docFile.filename
-          };
         } else {
           return res.status(400).json({ error: "Corrected document file required" });
         }
@@ -716,30 +759,64 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
       try {
         if (files.document && files.document[0]) {
           const docFile = files.document[0];
+          
+          // Add safety checks
+          if (!docFile || !docFile.buffer) {
+            console.error('❌ [Upload] Invalid file object or missing buffer:', docFile);
+            return res.status(400).json({ error: "Invalid file upload" });
+          }
+
           const tempDir = path.join(process.cwd(), 'uploads', 'temp');
           if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-          const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(docFile.originalname)}`);
+          const fileExt = path.extname(docFile.originalname || docFile.filename || '.docx');
+          const tempFilePath = path.join(tempDir, `temp-${Date.now()}${fileExt}`);
           fs.writeFileSync(tempFilePath, docFile.buffer);
 
-          const ext = path.extname(docFile.originalname).toLowerCase();
+          const ext = fileExt.toLowerCase();
+          
+          console.log(`📁 [Upload] File received: ${docFile.originalname || 'unknown'}, Extension: ${ext}`);
+          
           let uploadBuffer;
+          let finalFilename = docFile.originalname || `upload-${Date.now()}${fileExt}`;
+          let finalMimetype = docFile.mimetype;
 
-          if (ext === '.docx') {
-            uploadBuffer = docFile.buffer;
+          if (ext === '.docx' || ext === '.doc') {
+            console.log('[Editor Upload] Converting DOCX to PDF for preview...');
+            
+            try {
+              const { adobeService } = await import('../services/adobe.service.js');
+              const pdfTempPath = tempFilePath.replace(/\.(docx|doc)$/i, '.pdf');
+              
+              await adobeService.convertDocxToPdf(tempFilePath, pdfTempPath);
+              console.log('[Editor Upload] DOCX converted to PDF successfully');
+              
+              uploadBuffer = await addUploadWatermark(pdfTempPath, 'application/pdf');
+              
+              fs.unlinkSync(pdfTempPath);
+              
+              finalFilename = (docFile.originalname || docFile.filename).replace(/\.(docx|doc)$/i, '.pdf');
+              finalMimetype = 'application/pdf';
+              
+              console.log('✅ [Editor Upload] PDF watermarked successfully');
+            } catch (conversionError) {
+              console.error('[Editor Upload] DOCX to PDF conversion failed:', conversionError);
+              uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
+              console.log('[Editor Upload] Uploaded watermarked DOCX as fallback');
+            }
           } else {
             uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
           }
           fs.unlinkSync(tempFilePath);
 
           // CHANGED: uploadBufferToS3
-          const { url, storageKey, presignedUrl } = await uploadBufferToS3(
+          const { url, storageKey } = await uploadBufferToS3(
             uploadBuffer,
-            docFile.originalname,
-            docFile.mimetype,
+            finalFilename,
+            finalMimetype,
             'pdf'
           );
-          req.fileMeta = { url, storageKey, presignedUrl };
+          req.fileMeta = { url, storageKey, presignedUrl: url };
         } else {
           return res.status(400).json({ error: "Corrected document file required" });
         }
