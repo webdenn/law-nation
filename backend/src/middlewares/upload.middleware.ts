@@ -726,7 +726,8 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
           let uploadBuffer;
 
           if (ext === '.docx') {
-            uploadBuffer = docFile.buffer;
+            // uploadBuffer = docFile.buffer;
+            uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
           } else {
             uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
           }
@@ -1317,3 +1318,4 @@ export const uploadAdminPdf = (req: Request, res: Response, next: NextFunction) 
     });
   }
 };
+
