@@ -743,47 +743,48 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
         // } else {
         //   return res.status(400).json({ error: "Corrected document file required" });
         // }
+      
        const ext = path.extname(docFile.originalname).toLowerCase();
        let uploadBuffer;
-      let finalMimetype = docFile.mimetype;
+       let finalMimetype = docFile.mimetype;
        let finalFilename = docFile.originalname;
 
-     if (ext === '.docx') {
-       // Convert DOCX to PDF
-       console.log('📄 Converting DOCX to PDF for preview...');
-       const { convertDocxToPdf } = await import('../services/adobe.service.js');
-       const pdfBuffer = await convertDocxToPdf(tempFilePath);
+if (ext === '.docx') {
+    // Convert DOCX to PDF
+    console.log('📄 Converting DOCX to PDF for preview...');
     
-       // Save PDF to temp
-        const pdfTempPath = tempFilePath.replace('.docx', '.pdf');
-        fs.writeFileSync(pdfTempPath, pdfBuffer);
-    
-       // Watermark the PDF
-        uploadBuffer = await addUploadWatermark(pdfTempPath, 'application/pdf');
-    
-      // Clean up
-        fs.unlinkSync(pdfTempPath);
-    
-       // Update file info
-       finalMimetype = 'application/pdf';
-        finalFilename = docFile.originalname.replace('.docx', '.pdf');
-    } else {
-       // PDF file - just watermark
-      uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
-  }
+    const { convertDocxToPdf } = await import('../services/adobe.service.js');
+    const pdfBuffer = await convertDocxToPdf(tempFilePath);
 
-   fs.unlinkSync(tempFilePath);
+    // Save PDF to temp
+    const pdfTempPath = tempFilePath.replace('.docx', '.pdf');
+    fs.writeFileSync(pdfTempPath, pdfBuffer);
 
-     // Upload to S3
-      const { url, storageKey, presignedUrl } = await uploadBufferToS3(
+    // Watermark the PDF
+    uploadBuffer = await addUploadWatermark(pdfTempPath, 'application/pdf');
+
+    // Clean up
+    fs.unlinkSync(pdfTempPath);
+
+    // Update file info
+    finalMimetype = 'application/pdf';
+    finalFilename = docFile.originalname.replace('.docx', '.pdf');
+} else {
+    // PDF file - just watermark
+    uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
+}
+
+// Remove original temp file
+fs.unlinkSync(tempFilePath);
+
+// Upload to S3
+const { url, storageKey, presignedUrl } = await uploadBufferToS3(
     uploadBuffer,
-    finalFilename,  // ← Now it's .pdf
-    finalMimetype,  // ← Now it's application/pdf
+    finalFilename, // Now .pdf if it was a docx
+    finalMimetype, // Now application/pdf if it was a docx
     'pdf'
-   );
-
-          
-
+);
+      
         if (files.editorDocument && files.editorDocument[0]) {
           const editorDocFile = files.editorDocument[0];
           const ext = path.extname(editorDocFile.originalname).toLowerCase();
@@ -1357,6 +1358,7 @@ export const uploadAdminPdf = (req: Request, res: Response, next: NextFunction) 
     });
   }
 };
+
 
 
 
