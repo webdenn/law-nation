@@ -1211,14 +1211,22 @@ export class ArticleDownloadService {
       const isUserTypeAdmin = log.editor?.userType === 'ADMIN';
       const hasAdminRole = log.editor?.roles?.some((r: any) => r.role?.name?.toLowerCase() === 'admin');
 
-      if (isUserTypeAdmin || hasAdminRole) {
-        const candidateUrl = log.editorDocumentUrl || log.newFileUrl;
+      const candidateUrl = log.editorDocumentUrl || log.newFileUrl;
 
-        if (candidateUrl && (candidateUrl.endsWith('.docx') || candidateUrl.endsWith('.doc'))) {
+      // Debug Logs
+      console.log(`🔍 [Admin Download Check] Log ID: ${log.id}, User: ${log.editor?.email} (Type: ${log.editor?.userType})`);
+      console.log(`   - Is Admin?: ${isUserTypeAdmin || hasAdminRole} (Roles: ${JSON.stringify(log.editor?.roles?.map((r: any) => r.role?.name))})`);
+      console.log(`   - Candidate URL: ${candidateUrl}`);
+
+      if (isUserTypeAdmin || hasAdminRole) {
+        // Use includes() instead of endsWith() to handle query parameters (e.g. S3 signatures)
+        if (candidateUrl && (candidateUrl.includes('.docx') || candidateUrl.includes('.doc'))) {
           console.log(`✅ [Admin Download] Found Admin DOCX: ${candidateUrl}`);
           adminDocxUrl = candidateUrl;
           foundLog = log;
           break;
+        } else {
+          console.log(`⚠️ [Admin Download] Valid Admin Log found but URL mismatch/missing: ${candidateUrl}`);
         }
       }
     }
