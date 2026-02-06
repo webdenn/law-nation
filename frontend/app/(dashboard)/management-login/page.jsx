@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { toast, ToastContainer } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 import ReCAPTCHA from "react-google-recaptcha";
@@ -181,12 +182,12 @@ export default function Adminlogin() {
                   </button>
                 </div>
                 <div className="flex justify-end mt-2">
-                  <a
+                  <Link
                     href="/management-forgot-password"
                     className="text-xs font-semibold text-red-600 hover:text-red-700"
                   >
                     Forgot Password?
-                  </a>
+                  </Link>
                 </div>
               </div>
 
