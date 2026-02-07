@@ -34,14 +34,19 @@ export default function SessionChecker() {
 
                         if (key === "adminToken") {
                             // Avoid redirect loop if already on management-login
-                            if (!window.location.pathname.includes("/management-login")) {
+                            const path = window.location.pathname.toLowerCase();
+                            if (!path.includes("/management-login")) {
                                 toast.error("Admin session expired. Please login again.");
                                 router.push("/management-login/");
                             }
                         } else {
-                            const path = window.location.pathname;
-                            // Update: Use includes to handle base paths like /law/admin
-                            if (!path.includes("/login") && !path.includes("/management-login") && !path.includes("/admin")) {
+                            const path = window.location.pathname.toLowerCase();
+                            // Update: Use includes to handle base paths like /law/admin and other roles
+                            if (!path.includes("/login") &&
+                                !path.includes("/management-login") &&
+                                !path.includes("/admin") &&
+                                !path.includes("/editor") &&
+                                !path.includes("/reviewer")) {
                                 toast.error("Session expired. Please login again.");
                                 router.push("/login");
                             }
@@ -96,15 +101,18 @@ export default function SessionChecker() {
                             console.error("Unauthorized request detected. Logging out...");
 
                             // Check which token is relevant
-                            // Update: Use includes to handle /law/admin prefix
-                            const isAdmin = window.location.pathname.includes("/admin");
+                            // Update: Use includes to handle /law/admin prefix and other roles
+                            const path = window.location.pathname.toLowerCase();
+                            const isManagementRoute = path.includes("/admin") || path.includes("/editor") || path.includes("/reviewer");
 
                             localStorage.removeItem("token");
                             localStorage.removeItem("authToken");
                             localStorage.removeItem("adminToken");
+                            localStorage.removeItem("editorToken");
+                            localStorage.removeItem("reviewerToken");
                             dispatch(logout());
 
-                            if (isAdmin) {
+                            if (isManagementRoute) {
                                 router.push("/management-login/");
                             } else {
                                 router.push("/login");
