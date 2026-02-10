@@ -626,8 +626,16 @@ export default function ReviewerDashboard() {
                             <button
                                 onClick={() => {
                                     // ✅ Validation: Only show if Reviewer has uploaded
-                                    // Using the same strict check as the upload lock
-                                    if (!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl)) {
+                                    // Logic: Check if LATEST change is by REVIEWER
+                                    const latestLog = changeHistory
+                                        ?.sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))[0];
+
+                                    const isLastActionByReviewer = latestLog?.changedBy?.role === "REVIEWER";
+
+                                    // Also allow if status is finalized (Reviewer Approved/Published)
+                                    const hasReviewerUploadedRefined = isLastActionByReviewer || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED" || selectedArticle.status === "APPROVED";
+
+                                    if (!hasReviewerUploadedRefined) {
                                         toast.error("Please upload a correction first to view Reviewer PDF");
                                         return;
                                     }
