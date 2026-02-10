@@ -184,6 +184,21 @@ const ReviewInterface = ({
         );
     };
 
+    // ✅ DERIVE LAST EDITOR PDF (To distinguish Reviewer Upload from Editor Upload)
+    const lastEditorLog = changeHistory
+        ?.filter(log => log.changedBy?.role === "EDITOR")
+        .sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))[0];
+
+    // The Editor's final PDF is either from the log, or the 'editorDocumentUrl' field, or fallback to original
+    const lastEditorPdf = lastEditorLog?.pdfUrl || selectedArticle?.editorDocumentUrl || selectedArticle?.originalPdfUrl;
+
+    // ✅ CHECK if Reviewer has uploaded
+    // If currentPdfUrl is DIFFERENT from the Editor's final PDF, then Reviewer has uploaded.
+    const hasReviewerUploaded = selectedArticle?.currentPdfUrl && selectedArticle.currentPdfUrl !== lastEditorPdf;
+
+    // Lock if Reviewer has uploaded OR status is approved/published
+    const isLocked = hasReviewerUploaded || selectedArticle?.status === "REVIEWER_APPROVED" || selectedArticle?.status === "PUBLISHED" || selectedArticle?.status === "APPROVED";
+
     if (!selectedArticle) return null;
 
     return (
@@ -243,7 +258,7 @@ const ReviewInterface = ({
                     <div className="space-y-3">
 
                         {/* Success Message if Uploaded */}
-                        {((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "REVIEWER_APPROVED") && (
+                        {isLocked && (
                             <div className="bg-green-50 p-3 rounded-lg border border-green-200 flex items-center gap-3 mb-2">
                                 <div className="bg-green-100 p-1.5 rounded-full shrink-0">
                                     <CheckCircleIcon />
@@ -257,14 +272,14 @@ const ReviewInterface = ({
 
                         {/* Corrected File Input */}
                         <div className={`border-2 border-dashed rounded-lg p-3 text-center relative transition 
-                             ${((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "REVIEWER_APPROVED")
+                             ${isLocked
                                 ? "border-gray-200 bg-gray-100 cursor-not-allowed opacity-60"
                                 : "border-gray-300 bg-gray-50 hover:bg-gray-100 cursor-pointer"}`}
                         >
                             <input
                                 type="file"
                                 accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                                disabled={!!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "REVIEWER_APPROVED"}
+                                disabled={!!isLocked}
                                 onChange={(e) => {
                                     const file = e.target.files[0];
                                     if (file) {
@@ -294,7 +309,7 @@ const ReviewInterface = ({
                                 CORRECTED FILE (DOCX ONLY)
                             </p>
                             <p className="text-xs truncate font-medium text-gray-700">
-                                {((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "REVIEWER_APPROVED")
+                                {isLocked
                                     ? "🔒 Upload Locked"
                                     : uploadedFile ? `📄 ${uploadedFile.name}` : "Select Corrected DOCX"
                                 }
@@ -302,7 +317,7 @@ const ReviewInterface = ({
                         </div>
 
                         {/* Selected File Display (Post-Modal) */}
-                        {!((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl)) && uploadedFile && declarationAccepted && (
+                        {!isLocked && uploadedFile && declarationAccepted && (
                             <div className="bg-blue-50 p-2 rounded border border-blue-100 flex items-center gap-2 text-xs text-blue-800">
                                 <CheckCircleIcon />
                                 <span className="font-bold">Ready to Upload:</span>
@@ -317,7 +332,7 @@ const ReviewInterface = ({
                             placeholder="Describe changes (e.g. Fixed typos on pg 2)..."
                             value={uploadComment}
                             onChange={(e) => setUploadComment(e.target.value)}
-                            disabled={!!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "REVIEWER_APPROVED"}
+                            disabled={!!isLocked}
                         />
 
                         {/* MOVED T&C TO MODAL - REMOVED FROM HERE */}
@@ -325,8 +340,8 @@ const ReviewInterface = ({
                         {/* Upload Button */}
                         <button
                             onClick={handleUploadCorrection}
-                            disabled={!uploadedFile || isUploading || !declarationAccepted || !!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "REVIEWER_APPROVED"}
-                            className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${(!uploadedFile || isUploading || !declarationAccepted || !!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "REVIEWER_APPROVED")
+                            disabled={!uploadedFile || isUploading || !declarationAccepted || !!isLocked === false} // isLocked check
+                            className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${(!uploadedFile || isUploading || !declarationAccepted || isLocked)
                                 ? "bg-gray-300 cursor-not-allowed"
                                 : "bg-blue-600 hover:bg-blue-700 active:scale-95"
                                 }`}
@@ -369,11 +384,11 @@ const ReviewInterface = ({
                     <h3 className="font-bold text-gray-800 mb-4">User Original Docx</h3>
                     <div className="flex flex-col gap-3">
                         {/* Prefer Editor's Corrected Word file */}
-                        {(selectedArticle.editorCorrectedDocxUrl || selectedArticle.editorDocumentUrl || selectedArticle.originalWordUrl) ? (
+                        {(selectedArticle.currentWordUrl || selectedArticle.editorCorrectedDocxUrl || selectedArticle.originalWordUrl) ? (
                             <button
                                 onClick={() =>
                                     handleDownloadFile(
-                                        selectedArticle.editorCorrectedDocxUrl || selectedArticle.editorDocumentUrl || selectedArticle.originalWordUrl,
+                                        selectedArticle.currentWordUrl || selectedArticle.editorCorrectedDocxUrl || selectedArticle.originalWordUrl,
                                         selectedArticle.title + "_editor_version",
                                         "Word"
                                     )
