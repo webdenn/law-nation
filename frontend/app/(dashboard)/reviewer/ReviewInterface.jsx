@@ -235,7 +235,7 @@ const ReviewInterface = ({
 
                 {/* 4. PREVIOUS VERSION (EDITOR) */}
                 <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h3 className="font-bold text-gray-800 mb-4">Previous Version (Editor)</h3>
+                    <h3 className="font-bold text-gray-800 mb-4">User Original Docx</h3>
                     <div className="flex flex-col gap-3">
                         {/* Prefer Editor's Corrected Word file */}
                         {(selectedArticle.editorCorrectedDocxUrl || selectedArticle.editorDocumentUrl || selectedArticle.originalWordUrl) ? (
