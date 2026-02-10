@@ -12,6 +12,7 @@
     "@reduxjs/toolkit": "^2.11.2",
     "diff": "^8.0.3",
     "lucide-react": "^0.562.0",
+    "mammoth": "^1.11.0",
     "next": "16.0.8",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.4.530",
