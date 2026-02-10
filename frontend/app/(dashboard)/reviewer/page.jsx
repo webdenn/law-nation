@@ -72,7 +72,7 @@ export default function ReviewerDashboard() {
 
             // 1. "Old" Document = Editor's PDF (Previously approved by editor)
             // Use lastEditorPdf found in fetchChangeHistory or from article field
-            const originalPdfUrl = lastEditorPdf || selectedArticle.editorDocumentUrl || selectedArticle.originalPdfUrl;
+            let originalPdfUrl = lastEditorPdf || selectedArticle.editorDocumentUrl || selectedArticle.originalPdfUrl;
 
             // 2. "New" Document = Reviewer's Upload (Current PDF) or the specific log's PDF
             const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
