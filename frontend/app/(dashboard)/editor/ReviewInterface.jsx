@@ -87,6 +87,8 @@ const ReviewInterface = ({
   isApproving, // ✅ NEW: Loading state for approval
 }) => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [declarationAccepted, setDeclarationAccepted] = useState(false);
 
   // ✅ PREVIEW MODAL COMPONENT
   const PreviewModal = () => {
