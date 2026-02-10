@@ -337,7 +337,7 @@ const ReviewInterface = ({
                         {/* Upload Button */}
                         <button
                             onClick={handleUploadCorrection}
-                            disabled={!uploadedFile || isUploading || !declarationAccepted || !!isLocked === false} // isLocked check
+                            disabled={!uploadedFile || isUploading || !declarationAccepted || isLocked} // isLocked check
                             className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${(!uploadedFile || isUploading || !declarationAccepted || isLocked)
                                 ? "bg-gray-300 cursor-not-allowed"
                                 : "bg-blue-600 hover:bg-blue-700 active:scale-95"
