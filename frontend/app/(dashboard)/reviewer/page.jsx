@@ -355,6 +355,15 @@ export default function ReviewerDashboard() {
                     setPdfViewMode("current");
                     setPdfTimestamp(Date.now());
                 }
+
+                // ✅ UPDATE DIFF DATA (If provided by backend)
+                if (data.diffResult || data.diffData) {
+                    setCurrentDiffData(data.diffResult || data.diffData);
+                } else {
+                    // Fallback: If not in response, maybe fetch latest log details?
+                    // For now, assume backend sends it or user can view visual diff.
+                    setCurrentDiffData(null);
+                }
             } else {
                 toast.update(toastId, {
                     render: data.error || data.message || "Upload failed",
