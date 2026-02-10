@@ -236,10 +236,26 @@ const ReviewInterface = ({
                   type="file"
                   accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      setUploadedFile(e.target.files[0]);
+                    const file = e.target.files[0];
+                    if (file) {
+                      setUploadedFile(file);
                       setDeclarationAccepted(false);
+                      setPreviewHtml(""); // Reset preview
                       setShowPreviewModal(true); // OPEN MODAL
+
+                      // ✅ GENERATE PREVIEW USING MAMMOTH
+                      const reader = new FileReader();
+                      reader.onload = async (event) => {
+                        try {
+                          const arrayBuffer = event.target.result;
+                          const result = await mammoth.convertToHtml({ arrayBuffer });
+                          setPreviewHtml(result.value);
+                        } catch (err) {
+                          console.error("Preview Generation Failed", err);
+                          setPreviewHtml("<p class='text-red-500'>Failed to generate preview. The file might be corrupted or incompatible.</p>");
+                        }
+                      };
+                      reader.readAsArrayBuffer(file);
                     }
                   }}
                   className="absolute inset-0 opacity-0 cursor-pointer z-10"
