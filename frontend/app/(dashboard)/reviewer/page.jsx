@@ -68,13 +68,22 @@ export default function ReviewerDashboard() {
 
             if (!selectedArticle?.originalPdfUrl) throw new Error("Original PDF URL not found");
 
-            const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
-            if (!editedPdfUrl) throw new Error("Edited PDF URL not found.");
+            // ✅ LOGIC: Compare Editor's Corrected Version (Old) vs Reviewer's Version (New)
 
-            // ✅ FIX: Define originalPdfUrl before using it
-            const originalPdfUrl = selectedArticle.originalPdfUrl.startsWith("http")
-                ? selectedArticle.originalPdfUrl
-                : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`;
+            // 1. "Old" Document = Editor's PDF (Previously approved by editor)
+            // Use lastEditorPdf found in fetchChangeHistory or from article field
+            const originalPdfUrl = lastEditorPdf || selectedArticle.editorDocumentUrl || selectedArticle.originalPdfUrl;
+
+            // 2. "New" Document = Reviewer's Upload (Current PDF) or the specific log's PDF
+            const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
+
+            if (!originalPdfUrl) throw new Error("Base PDF (Editor/Original) not found");
+            if (!editedPdfUrl) throw new Error("Comparison PDF (Reviewer) not found.");
+
+            // ✅ FIX: Process URL properly
+            originalPdfUrl = originalPdfUrl.startsWith("http")
+                ? originalPdfUrl
+                : `${NEXT_PUBLIC_BASE_URL}${originalPdfUrl}`;
 
             const originalIsS3 = originalPdfUrl.includes(".s3.") || originalPdfUrl.includes("amazonaws.com");
             const originalHeaders = originalIsS3 ? {} : { Authorization: `Bearer ${token}` };
@@ -617,8 +626,9 @@ export default function ReviewerDashboard() {
                             <button
                                 onClick={() => {
                                     // ✅ Validation: Only show if Reviewer has uploaded
-                                    if (!hasReviewerUploaded) {
-                                        toast.warning("Please upload a file to view Reviewer PDF");
+                                    // Using the same strict check as the upload lock
+                                    if (!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl)) {
+                                        toast.error("Please upload a correction first to view Reviewer PDF");
                                         return;
                                     }
 
