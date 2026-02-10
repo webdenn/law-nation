@@ -142,67 +142,88 @@ const ReviewInterface = ({
             Upload Correction
           </h3>
 
-          <div className="space-y-3">
-            {/* Corrected File Input */}
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center bg-gray-50 relative hover:bg-gray-100 transition cursor-pointer">
-              <input
-                type="file"
-                accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={(e) => setUploadedFile(e.target.files[0])}
-                className="absolute inset-0 opacity-0 cursor-pointer z-10"
-              />
-              <p className="text-[10px] font-bold text-gray-500 uppercase">
-                CORRECTED FILE (DOCX ONLY)
-              </p>
-              <p className="text-xs truncate font-medium text-gray-700">
-                {uploadedFile ? `📄 ${uploadedFile.name}` : "Select Corrected DOCX"}
+          {/* CHECK IF ALREADY UPLOADED */}
+          {(selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED") ? (
+            <div className="bg-green-50 p-4 rounded-lg border border-green-200 text-center">
+              <div className="mx-auto bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mb-2">
+                <CheckCircleIcon />
+              </div>
+              <h4 className="text-green-800 font-bold text-sm">Correction Uploaded</h4>
+              <p className="text-xs text-green-600 mt-1">
+                You have successfully uploaded the correction.
               </p>
             </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Corrected File Input */}
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center bg-gray-50 relative hover:bg-gray-100 transition cursor-pointer">
+                <input
+                  type="file"
+                  accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={(e) => {
+                    setUploadedFile(e.target.files[0]);
+                    setDeclarationAccepted(false); // Reset confirmation on new file
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                />
+                <p className="text-[10px] font-bold text-gray-500 uppercase">
+                  CORRECTED FILE (DOCX ONLY)
+                </p>
+                <p className="text-xs truncate font-medium text-gray-700">
+                  {uploadedFile ? `📄 ${uploadedFile.name}` : "Select Corrected DOCX"}
+                </p>
+              </div>
 
-            {/* Comment Input */}
-            <textarea
-              className="w-full p-2 text-sm border rounded bg-gray-50 focus:ring-2 ring-red-200 outline-none resize-none mt-2"
-              rows="2"
-              placeholder="Describe changes (e.g. Fixed typos on pg 2)..."
-              value={uploadComment}
-              onChange={(e) => setUploadComment(e.target.value)}
-            />
+              {/* PREVIEW & CONFIRMATION */}
+              {uploadedFile && (
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                  <p className="text-[10px] font-bold text-blue-800 uppercase mb-1">Preview & Confirm</p>
+                  <div className="flex items-center gap-2 mb-2 text-xs text-gray-700">
+                    <WordIcon />
+                    <span className="truncate flex-1">{uploadedFile.name}</span>
+                    <span className="text-gray-400">({(uploadedFile.size / 1024).toFixed(1)} KB)</span>
+                  </div>
 
-            {/* T&C Checkbox */}
-            <div className="flex items-start gap-2 py-2">
-              <input
-                type="checkbox"
-                id="terms-acceptance"
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                checked={declarationAccepted}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setShowTermsModal(true);
-                  } else {
-                    setDeclarationAccepted(false);
-                  }
-                }}
+                  <div className="flex items-start gap-2 pt-2 border-t border-blue-200">
+                    <input
+                      type="checkbox"
+                      id="preview-acceptance"
+                      className="mt-0.5 h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      checked={declarationAccepted}
+                      onChange={(e) => setDeclarationAccepted(e.target.checked)}
+                    />
+                    <label
+                      htmlFor="preview-acceptance"
+                      className="text-xs text-gray-600 leading-tight cursor-pointer hover:text-gray-800"
+                    >
+                      I have previewed the document and confirm it is ready for upload.
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Comment Input */}
+              <textarea
+                className="w-full p-2 text-sm border rounded bg-gray-50 focus:ring-2 ring-red-200 outline-none resize-none mt-2"
+                rows="2"
+                placeholder="Describe changes (e.g. Fixed typos on pg 2)..."
+                value={uploadComment}
+                onChange={(e) => setUploadComment(e.target.value)}
               />
-              <label
-                htmlFor="terms-acceptance"
-                className="text-xs text-gray-600 leading-tight cursor-pointer hover:text-gray-800"
+
+              {/* Upload Button */}
+              <button
+                onClick={handleUploadCorrection}
+                disabled={!uploadedFile || isUploading || !declarationAccepted}
+                className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${!uploadedFile || isUploading || !declarationAccepted
+                  ? "bg-gray-300 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700 active:scale-95"
+                  }`}
               >
-                I agree to the <span className="text-blue-600 font-semibold underline">Terms of Submission</span>
-              </label>
+                {isUploading ? "Processing Diff..." : "Upload & Generate Diff"}
+              </button>
             </div>
-
-            {/* Upload Button */}
-            <button
-              onClick={handleUploadCorrection}
-              disabled={!uploadedFile || isUploading || !declarationAccepted}
-              className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${!uploadedFile || isUploading || !declarationAccepted
-                ? "bg-gray-300 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700 active:scale-95"
-                }`}
-            >
-              {isUploading ? "Processing Diff..." : "Upload & Generate Diff"}
-            </button>
-          </div>
+          )}
         </div>
 
         {/* T&C Modal */}

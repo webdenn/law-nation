@@ -636,13 +636,16 @@ export default function EditorDashboard() {
 
               <button
                 onClick={() => {
+                  if (!selectedArticle.currentPdfUrl) {
+                    return toast.error("Please upload a correction first to view the Edited PDF.");
+                  }
                   setPdfViewMode("current");
                   setIsMobileMenuOpen(false);
                 }}
                 className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "current"
                   ? "bg-white text-red-700 shadow-lg"
                   : "hover:bg-red-800 text-white"
-                  }`}
+                  } ${!selectedArticle.currentPdfUrl ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 View Edited PDF
                 {pdfViewMode === "current" && (
