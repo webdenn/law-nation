@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import mammoth from "mammoth";
 import TermsModal from "../../components/TermsModal";
 
 // ✅ 1. ICONS (Yahi define kar diye taaki import ki tension na ho)
@@ -89,6 +90,7 @@ const ReviewInterface = ({
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [declarationAccepted, setDeclarationAccepted] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState(""); // ✅ Preview State
 
   // ✅ PREVIEW MODAL COMPONENT
   const PreviewModal = () => {
@@ -96,16 +98,18 @@ const ReviewInterface = ({
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100">
-          <div className="bg-blue-600 p-4 flex justify-between items-center text-white">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all scale-100 flex flex-col max-h-[90vh]">
+          {/* Header */}
+          <div className="bg-blue-600 p-4 flex justify-between items-center text-white shrink-0">
             <h3 className="font-bold text-lg flex items-center gap-2">
-              <WordIcon /> Confirm Upload
+              <WordIcon /> Confirm Upload & Preview
             </h3>
             <button
               onClick={() => {
                 setShowPreviewModal(false);
-                setUploadedFile(null); // Reset file if cancelled
+                setUploadedFile(null);
                 setDeclarationAccepted(false);
+                setPreviewHtml("");
               }}
               className="text-white/80 hover:text-white"
             >
@@ -113,8 +117,9 @@ const ReviewInterface = ({
             </button>
           </div>
 
-          <div className="p-6">
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-6 flex items-center gap-3">
+          <div className="p-6 flex-1 overflow-y-auto">
+            {/* File Info */}
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-6 flex items-center gap-3 shrink-0">
               <div className="bg-white p-2 rounded-lg shadow-sm text-blue-600">
                 <WordIcon />
               </div>
@@ -124,7 +129,22 @@ const ReviewInterface = ({
               </div>
             </div>
 
-            <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition">
+            {/* DOCX CONTENT PREVIEW */}
+            <div className="mb-6">
+              <p className="text-xs font-bold text-gray-500 uppercase mb-2">Document Preview:</p>
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 min-h-[200px] max-h-[400px] overflow-y-auto prose prose-sm max-w-none">
+                {previewHtml ? (
+                  <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">
+                    <div className="animate-pulse">Loading preview...</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Checkbox */}
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition shrink-0">
               <input
                 type="checkbox"
                 className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
@@ -136,12 +156,14 @@ const ReviewInterface = ({
               </span>
             </label>
 
-            <div className="flex gap-3 mt-6">
+            {/* Actions */}
+            <div className="flex gap-3 mt-6 shrink-0">
               <button
                 onClick={() => {
                   setShowPreviewModal(false);
                   setUploadedFile(null);
                   setDeclarationAccepted(false);
+                  setPreviewHtml("");
                 }}
                 className="flex-1 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition"
               >
