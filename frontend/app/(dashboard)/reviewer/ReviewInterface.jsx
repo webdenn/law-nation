@@ -190,7 +190,9 @@ const ReviewInterface = ({
         ?.sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))[0];
 
     // 2. See if the latest change was made by a REVIEWER
-    const isLastActionByReviewer = latestLog?.changedBy?.role === "REVIEWER";
+    // Check both 'role' (direct) and 'changedBy.role' (nested) to be safe
+    const role = latestLog?.role || latestLog?.changedBy?.role || "";
+    const isLastActionByReviewer = role.toUpperCase() === "REVIEWER";
 
     // 3. Lock if the last action was by Reviewer OR if status is final
     // (This ensures Reviewer gets ONE shot after Editor's turn)
@@ -339,12 +341,28 @@ const ReviewInterface = ({
                             onClick={handleUploadCorrection}
                             disabled={!uploadedFile || isUploading || !declarationAccepted || isLocked} // isLocked check
                             className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${(!uploadedFile || isUploading || !declarationAccepted || isLocked)
-                                ? "bg-gray-300 cursor-not-allowed"
-                                : "bg-blue-600 hover:bg-blue-700 active:scale-95"
+                                    ? "bg-gray-300 cursor-not-allowed"
+                                    : "bg-blue-600 hover:bg-blue-700 active:scale-95"
                                 }`}
                         >
                             {isUploading ? "Processing Diff..." : "Upload & Generate Diff"}
                         </button>
+
+                        {/* ✅ VIEW DIFF BUTTON & STATS */}
+                        {currentDiffData && (
+                            <div className="mt-4 border-t pt-3">
+                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Changes Detected</h4>
+
+                                <button
+                                    onClick={handleViewVisualDiff}
+                                    className="w-full py-2 bg-purple-50 text-purple-700 border border-purple-200 text-xs font-bold rounded-lg hover:bg-purple-100 transition mb-2"
+                                >
+                                    👁️ View Visual Diff (PDF)
+                                </button>
+
+                                <DiffViewer diffData={currentDiffData} />
+                            </div>
+                        )}
                     </div>
                 </div>
 
