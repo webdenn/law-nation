@@ -217,8 +217,8 @@ const ReviewInterface = ({
             Upload Correction
           </h3>
 
-          {/* CHECK IF ALREADY UPLOADED - STRICT LOCK */}
-          {(selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED") ? (
+          {/* CHECK IF ALREADY UPLOADED */}
+          {(selectedArticle.status === "EDITOR_APPROVED") ? (
             <div className="bg-green-50 p-4 rounded-lg border border-green-200 text-center">
               <div className="mx-auto bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mb-2">
                 <CheckCircleIcon />
