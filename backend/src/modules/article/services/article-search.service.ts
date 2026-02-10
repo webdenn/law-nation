@@ -1,4 +1,4 @@
-import { Prisma } from "@/db/db.js";
+import { Prisma, prisma } from "@/db/db.js";
 
 //Article Search Service Handles full-text search with PostgreSQL
 
@@ -92,7 +92,7 @@ export class ArticleSearchService {
         break;
     }
 
-    const searchResults = await Prisma.$queryRaw<any[]>`
+    const searchResults = await prisma.$queryRaw<any[]>`
       SELECT 
         id, 
         title,
@@ -136,7 +136,7 @@ export class ArticleSearchService {
       OFFSET ${skip}
     `;
 
-    const countResult = await Prisma.$queryRaw<{ total: bigint }[]>`
+    const countResult = await prisma.$queryRaw<{ total: bigint }[]>`
       SELECT COUNT(*) as total
       FROM "Article"
       WHERE status = 'PUBLISHED'
