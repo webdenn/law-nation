@@ -196,87 +196,99 @@ const ReviewInterface = ({
           </h3>
 
           {/* CHECK IF ALREADY UPLOADED - STRICT LOCK ENABLED */}
-          {(selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED") ? (
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200 text-center">
-              <div className="mx-auto bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mb-2">
-                <CheckCircleIcon />
+          {/* We show the form ALWAYS, but disable it if uploaded */}
+          <div className="space-y-3">
+
+            {/* Success Message if Uploaded */}
+            {(selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED") && (
+              <div className="bg-green-50 p-3 rounded-lg border border-green-200 flex items-center gap-3 mb-2">
+                <div className="bg-green-100 p-1.5 rounded-full shrink-0">
+                  <CheckCircleIcon />
+                </div>
+                <div>
+                  <h4 className="text-green-800 font-bold text-xs">Correction Uploaded</h4>
+                  <p className="text-[10px] text-green-600">Re-uploads are disabled.</p>
+                </div>
               </div>
-              <h4 className="text-green-800 font-bold text-sm">Correction Uploaded</h4>
-              <p className="text-xs text-green-600 mt-1">
-                You have successfully uploaded the correction.
+            )}
+
+            {/* Corrected File Input */}
+            <div className={`border-2 border-dashed rounded-lg p-3 text-center relative transition 
+              ${(selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED")
+                ? "border-gray-200 bg-gray-100 cursor-not-allowed opacity-60"
+                : "border-gray-300 bg-gray-50 hover:bg-gray-100 cursor-pointer"}`}
+            >
+              <input
+                type="file"
+                accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                disabled={!!selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED"}
+                onChange={(e) => {
+                  // ... existing logic ...
+                  const file = e.target.files[0];
+                  if (file) {
+                    setUploadedFile(file);
+                    setDeclarationAccepted(false);
+                    setPreviewHtml(""); // Reset preview
+                    setShowPreviewModal(true); // OPEN MODAL
+
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                      try {
+                        const arrayBuffer = event.target.result;
+                        const result = await mammoth.convertToHtml({ arrayBuffer });
+                        setPreviewHtml(result.value);
+                      } catch (err) {
+                        console.error("Preview Generation Failed", err);
+                        setPreviewHtml("<p class='text-red-500'>Failed to generate preview.</p>");
+                      }
+                    };
+                    reader.readAsArrayBuffer(file);
+                  }
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+              />
+              <p className="text-[10px] font-bold text-gray-500 uppercase">
+                CORRECTED FILE (DOCX ONLY)
+              </p>
+              <p className="text-xs truncate font-medium text-gray-700">
+                {(selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED")
+                  ? "🔒 Upload Locked"
+                  : uploadedFile ? `📄 ${uploadedFile.name}` : "Click to Select File"
+                }
               </p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {/* Corrected File Input */}
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center bg-gray-50 relative hover:bg-gray-100 transition cursor-pointer">
-                <input
-                  type="file"
-                  accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  onChange={(e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      setUploadedFile(file);
-                      setDeclarationAccepted(false);
-                      setPreviewHtml(""); // Reset preview
-                      setShowPreviewModal(true); // OPEN MODAL
 
-                      // ✅ GENERATE PREVIEW USING MAMMOTH
-                      const reader = new FileReader();
-                      reader.onload = async (event) => {
-                        try {
-                          const arrayBuffer = event.target.result;
-                          const result = await mammoth.convertToHtml({ arrayBuffer });
-                          setPreviewHtml(result.value);
-                        } catch (err) {
-                          console.error("Preview Generation Failed", err);
-                          setPreviewHtml("<p class='text-red-500'>Failed to generate preview. The file might be corrupted or incompatible.</p>");
-                        }
-                      };
-                      reader.readAsArrayBuffer(file);
-                    }
-                  }}
-                  className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                />
-                <p className="text-[10px] font-bold text-gray-500 uppercase">
-                  CORRECTED FILE (DOCX ONLY)
-                </p>
-                <p className="text-xs truncate font-medium text-gray-700">
-                  {uploadedFile ? `📄 ${uploadedFile.name}` : "Click to Select File"}
-                </p>
+            {/* SELECTED FILE DISPLAY (Post-Modal) - Hide if locked to avoid clutter */}
+            {!selectedArticle.currentPdfUrl && uploadedFile && declarationAccepted && (
+              <div className="bg-blue-50 p-2 rounded border border-blue-100 flex items-center gap-2 text-xs text-blue-800">
+                <CheckCircleIcon />
+                <span className="font-bold">Ready to Upload:</span>
+                <span className="truncate">{uploadedFile.name}</span>
               </div>
+            )}
 
-              {/* SELECTED FILE DISPLAY (Post-Modal) */}
-              {uploadedFile && declarationAccepted && (
-                <div className="bg-blue-50 p-2 rounded border border-blue-100 flex items-center gap-2 text-xs text-blue-800">
-                  <CheckCircleIcon />
-                  <span className="font-bold">Ready to Upload:</span>
-                  <span className="truncate">{uploadedFile.name}</span>
-                </div>
-              )}
+            {/* Comment Input */}
+            <textarea
+              className="w-full p-2 text-sm border rounded bg-gray-50 focus:ring-2 ring-red-200 outline-none resize-none mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              rows="2"
+              placeholder="Describe changes (e.g. Fixed typos on pg 2)..."
+              value={uploadComment}
+              onChange={(e) => setUploadComment(e.target.value)}
+              disabled={!!selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED"}
+            />
 
-              {/* Comment Input */}
-              <textarea
-                className="w-full p-2 text-sm border rounded bg-gray-50 focus:ring-2 ring-red-200 outline-none resize-none mt-2"
-                rows="2"
-                placeholder="Describe changes (e.g. Fixed typos on pg 2)..."
-                value={uploadComment}
-                onChange={(e) => setUploadComment(e.target.value)}
-              />
-
-              {/* Upload Button */}
-              <button
-                onClick={handleUploadCorrection}
-                disabled={!uploadedFile || isUploading || !declarationAccepted}
-                className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${!uploadedFile || isUploading || !declarationAccepted
+            {/* Upload Button */}
+            <button
+              onClick={handleUploadCorrection}
+              disabled={!uploadedFile || isUploading || !declarationAccepted || !!selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED"}
+              className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${(!uploadedFile || isUploading || !declarationAccepted || !!selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED")
                   ? "bg-gray-300 cursor-not-allowed"
                   : "bg-blue-600 hover:bg-blue-700 active:scale-95"
-                  }`}
-              >
-                {isUploading ? "Uploading..." : "Upload Correction"}
-              </button>
-            </div>
-          )}
+                }`}
+            >
+              {isUploading ? "Uploading..." : "Upload Correction"}
+            </button>
+          </div>
         </div>
 
         {/* T&C Modal - Separated to avoid confusion */}
