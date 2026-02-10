@@ -200,7 +200,7 @@ const ReviewInterface = ({
           <div className="space-y-3">
 
             {/* Success Message if Uploaded */}
-            {(selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED") && (
+            {((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED") && (
               <div className="bg-green-50 p-3 rounded-lg border border-green-200 flex items-center gap-3 mb-2">
                 <div className="bg-green-100 p-1.5 rounded-full shrink-0">
                   <CheckCircleIcon />
@@ -214,14 +214,14 @@ const ReviewInterface = ({
 
             {/* Corrected File Input */}
             <div className={`border-2 border-dashed rounded-lg p-3 text-center relative transition 
-              ${(selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED")
+              ${((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED")
                 ? "border-gray-200 bg-gray-100 cursor-not-allowed opacity-60"
                 : "border-gray-300 bg-gray-50 hover:bg-gray-100 cursor-pointer"}`}
             >
               <input
                 type="file"
                 accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                disabled={!!selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED"}
+                disabled={!!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED"}
                 onChange={(e) => {
                   // ... existing logic ...
                   const file = e.target.files[0];
@@ -251,7 +251,7 @@ const ReviewInterface = ({
                 CORRECTED FILE (DOCX ONLY)
               </p>
               <p className="text-xs truncate font-medium text-gray-700">
-                {(selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED")
+                {((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED")
                   ? "🔒 Upload Locked"
                   : uploadedFile ? `📄 ${uploadedFile.name}` : "Click to Select File"
                 }
@@ -259,7 +259,7 @@ const ReviewInterface = ({
             </div>
 
             {/* SELECTED FILE DISPLAY (Post-Modal) - Hide if locked to avoid clutter */}
-            {!selectedArticle.currentPdfUrl && uploadedFile && declarationAccepted && (
+            {!((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl)) && uploadedFile && declarationAccepted && (
               <div className="bg-blue-50 p-2 rounded border border-blue-100 flex items-center gap-2 text-xs text-blue-800">
                 <CheckCircleIcon />
                 <span className="font-bold">Ready to Upload:</span>
@@ -274,14 +274,14 @@ const ReviewInterface = ({
               placeholder="Describe changes (e.g. Fixed typos on pg 2)..."
               value={uploadComment}
               onChange={(e) => setUploadComment(e.target.value)}
-              disabled={!!selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED"}
+              disabled={!!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED"}
             />
 
             {/* Upload Button */}
             <button
               onClick={handleUploadCorrection}
-              disabled={!uploadedFile || isUploading || !declarationAccepted || !!selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED"}
-              className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${(!uploadedFile || isUploading || !declarationAccepted || !!selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED")
+              disabled={!uploadedFile || isUploading || !declarationAccepted || !!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED"}
+              className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${(!uploadedFile || isUploading || !declarationAccepted || !!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED")
                   ? "bg-gray-300 cursor-not-allowed"
                   : "bg-blue-600 hover:bg-blue-700 active:scale-95"
                 }`}
