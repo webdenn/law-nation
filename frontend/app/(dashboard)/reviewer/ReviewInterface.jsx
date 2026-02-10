@@ -184,20 +184,17 @@ const ReviewInterface = ({
         );
     };
 
-    // ✅ DERIVE LAST EDITOR PDF (To distinguish Reviewer Upload from Editor Upload)
-    const lastEditorLog = changeHistory
-        ?.filter(log => log.changedBy?.role === "EDITOR")
-        .sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))[0];
+    // ✅ STRICT UPLOAD LOCK LOGIC (Role-Based)
+    // 1. Get the very latest change log
+    const latestLog = changeHistory
+        ?.sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))[0];
 
-    // The Editor's final PDF is either from the log, or the 'editorDocumentUrl' field, or fallback to original
-    const lastEditorPdf = lastEditorLog?.pdfUrl || selectedArticle?.editorDocumentUrl || selectedArticle?.originalPdfUrl;
+    // 2. See if the latest change was made by a REVIEWER
+    const isLastActionByReviewer = latestLog?.changedBy?.role === "REVIEWER";
 
-    // ✅ CHECK if Reviewer has uploaded
-    // If currentPdfUrl is DIFFERENT from the Editor's final PDF, then Reviewer has uploaded.
-    const hasReviewerUploaded = selectedArticle?.currentPdfUrl && selectedArticle.currentPdfUrl !== lastEditorPdf;
-
-    // Lock if Reviewer has uploaded OR status is approved/published
-    const isLocked = hasReviewerUploaded || selectedArticle?.status === "REVIEWER_APPROVED" || selectedArticle?.status === "PUBLISHED" || selectedArticle?.status === "APPROVED";
+    // 3. Lock if the last action was by Reviewer OR if status is final
+    // (This ensures Reviewer gets ONE shot after Editor's turn)
+    const isLocked = isLastActionByReviewer || selectedArticle?.status === "REVIEWER_APPROVED" || selectedArticle?.status === "PUBLISHED" || selectedArticle?.status === "APPROVED";
 
     if (!selectedArticle) return null;
 
