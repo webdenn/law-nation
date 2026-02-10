@@ -458,7 +458,11 @@ export default function EditorDashboard() {
       const a = document.createElement("a");
       a.href = url;
       const ext = type === "Word" ? "docx" : "pdf";
-      a.download = `${fileName}.${ext}`;
+      let safeName = fileName.replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
+      // ✅ Remove "lawnation" (case insensitive) from filename
+      safeName = safeName.replace(/lawnation/gi, "");
+      if (!safeName) safeName = "document"; // Fallback
+      a.download = `${safeName}.${ext}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
