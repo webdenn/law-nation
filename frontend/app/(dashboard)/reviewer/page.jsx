@@ -51,7 +51,7 @@ export default function ReviewerDashboard() {
         role: "Reviewer",
     });
 
-    const handleViewVisualDiff = useCallback(async (changeLogId) => {
+    const handleViewVisualDiff = useCallback(async (changeLogId = null) => {
         if (isGeneratingDiff) return;
 
         try {
@@ -63,8 +63,17 @@ export default function ReviewerDashboard() {
             const token = localStorage.getItem("reviewerToken");
             const articleId = selectedArticle?.id || selectedArticle?._id;
 
-            const changeLog = changeHistory.find(log => (log.id || log._id) === changeLogId);
-            if (!changeLog) throw new Error("Change log not found");
+            // ✅ Find Log: If no ID, find the LATEST Reviewer log
+            let changeLog;
+            if (changeLogId) {
+                changeLog = changeHistory.find(log => (log.id || log._id) === changeLogId);
+            } else {
+                changeLog = [...changeHistory]
+                    .sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))
+                    .find(log => (log.role?.toUpperCase() === "REVIEWER"));
+            }
+
+            if (!changeLog) throw new Error("No reviewer upload found to compare.");
 
             if (!selectedArticle?.originalPdfUrl) throw new Error("Original PDF URL not found");
 
@@ -259,12 +268,9 @@ export default function ReviewerDashboard() {
                     editorDocx = editorDocxLog.editorDocumentUrl || editorDocxLog.newFileUrl;
                 }
 
-                // Check if Reviewer has uploaded anything
-                const reviewerLog = logs.find(log => log.role?.toLowerCase() === "reviewer");
-                if (reviewerLog) reviewerUploaded = true;
-
-                setLastEditorPdf(editorPdf);
-                setHasReviewerUploaded(reviewerUploaded);
+                // Check if Reviewer has ever uploaded anything in logs
+                const reviewerLogExists = logs.some(log => (log.role || log.changedBy?.role || "").toUpperCase() === "REVIEWER");
+                setHasReviewerUploaded(reviewerLogExists);
                 // Also save editorDocx in state to pass down (we can piggyback on selectedArticle or new state)
                 if (editorDocx) {
                     setSelectedArticle(prev => ({ ...prev, editorCorrectedDocxUrl: editorDocx }));
@@ -664,6 +670,46 @@ export default function ReviewerDashboard() {
                             </button>
 
                             <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    // Validation: Only show if Reviewer has uploaded
+                                    const latestLog = changeHistory
+                                        ?.sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))[0];
+                                    const isLastActionByReviewer = (latestLog?.role || "").toUpperCase() === "REVIEWER";
+                                    const hasReviewerUploadedRefined = isLastActionByReviewer || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED" || selectedArticle.status === "APPROVED";
+
+                                    if (!hasReviewerUploadedRefined) {
+                                        toast.info("No reviewer upload found to generate diff.");
+                                        return;
+                                    }
+
+                                    handleViewVisualDiff(); // Calls with default latest
+                                    setIsMobileMenuOpen(false);
+                                }}
+                                disabled={isGeneratingDiff}
+                                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "visual-diff"
+                                    ? "bg-white text-red-700 shadow-lg"
+                                    : "hover:bg-red-800 text-white"
+                                    } ${isGeneratingDiff ? "opacity-50 cursor-not-allowed" : ""}`}
+                            >
+                                {isGeneratingDiff ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                        Generating...
+                                    </>
+                                ) : (
+                                    <>
+                                        View Track File
+                                        {pdfViewMode === "visual-diff" && (
+                                            <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
+                                        )}
+                                    </>
+                                )}
+                            </button>
+
+                            <button
                                 type="button" // ✅ Explicitly defined type
                                 onClick={(e) => {
                                     e.preventDefault();
@@ -848,6 +894,7 @@ export default function ReviewerDashboard() {
                                 handleDownloadFile={handleDownloadFile}
                                 currentDiffData={currentDiffData}
                                 isGeneratingDiff={isGeneratingDiff}
+                                isLocked={hasReviewerUploaded} // ✅ Passed Persistent Lock State
                                 isApproving={isApproving}
                             />
                         )
