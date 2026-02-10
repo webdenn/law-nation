@@ -21,51 +21,7 @@ const CheckCircleIcon = () => (
   </svg>
 );
 
-// ✅ 2. ENHANCED DIFF VIEWER COMPONENT (Always shows BACKEND data only)
-const DiffViewer = ({ diffData }) => {
-  // ✅ ALWAYS use backend diff data, ignore frontend data
-  if (!diffData || !diffData.summary)
-    return <p className="text-xs text-gray-400 italic">No diff data available.</p>;
 
-  return (
-    <div className="mt-3 bg-gray-50 rounded border border-gray-200 text-xs font-mono overflow-hidden">
-      {/* Summary Header */}
-      <div className="bg-gray-100 p-2 border-b flex gap-2 font-bold uppercase tracking-wider text-[10px]">
-        <span className="text-green-600">+{diffData.summary.totalAdded} Added</span>
-        <span className="text-red-600">-{diffData.summary.totalRemoved} Removed</span>
-        <span className="text-blue-600">~{diffData.summary.totalModified} Modified</span>
-      </div>
-
-      {/* Scrollable Diff Body */}
-      <div className="max-h-48 overflow-y-auto p-1 space-y-0.5">
-        {diffData.removed?.map((line, i) => (
-          <div key={`rem-${i}`} className="flex bg-red-50 text-red-700">
-            <span className="w-6 text-gray-400 border-r border-red-200 mr-2 text-right pr-1 select-none">
-              {line.oldLineNumber}
-            </span>
-            <span className="line-through decoration-red-300 opacity-75">- {line.content}</span>
-          </div>
-        ))}
-        {diffData.added?.map((line, i) => (
-          <div key={`add-${i}`} className="flex bg-green-50 text-green-700">
-            <span className="w-6 text-gray-400 border-r border-green-200 mr-2 text-right pr-1 select-none">
-              {line.newLineNumber}
-            </span>
-            <span>+ {line.content}</span>
-          </div>
-        ))}
-        {diffData.modified?.map((line, i) => (
-          <div key={`mod-${i}`} className="flex bg-blue-50 text-blue-700">
-            <span className="w-6 text-gray-400 border-r border-blue-200 mr-2 text-right pr-1 select-none">
-              {line.newLineNumber}
-            </span>
-            <span>~ {line.content}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 // ✅ 3. MAIN COMPONENT (Jo export hoga)
 const ReviewInterface = ({
@@ -239,8 +195,8 @@ const ReviewInterface = ({
             Upload Correction
           </h3>
 
-          {/* CHECK IF ALREADY UPLOADED */}
-          {(selectedArticle.status === "EDITOR_APPROVED") ? (
+          {/* CHECK IF ALREADY UPLOADED - STRICT LOCK ENABLED */}
+          {(selectedArticle.currentPdfUrl || selectedArticle.status === "EDITOR_APPROVED") ? (
             <div className="bg-green-50 p-4 rounded-lg border border-green-200 text-center">
               <div className="mx-auto bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mb-2">
                 <CheckCircleIcon />
@@ -317,7 +273,7 @@ const ReviewInterface = ({
                   : "bg-blue-600 hover:bg-blue-700 active:scale-95"
                   }`}
               >
-                {isUploading ? "Processing Diff..." : "Upload & Generate Diff"}
+                {isUploading ? "Uploading..." : "Upload Correction"}
               </button>
             </div>
           )}
