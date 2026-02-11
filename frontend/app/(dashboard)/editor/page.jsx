@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react"; // ✅ Combined Import
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-toastify";
 import Image from "next/image";
 import logoImg from "../../assets/logo.jpg";
@@ -79,6 +79,8 @@ const EditorStatCard = ({ title, count, color }) => (
 
 export default function EditorDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const articleIdFromUrl = searchParams.get("articleId");
 
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState(null);
@@ -239,11 +241,6 @@ export default function EditorDashboard() {
     }
 
     // 2. Agar Editor token nahi hai to Login bhej do
-    if (!token) {
-      router.push("/management-login/");
-      return;
-    }
-
     // 3. Agar Token + User data hai to Data Load kro
     if (token && userData) {
       try {
@@ -255,10 +252,25 @@ export default function EditorDashboard() {
       } catch (e) {
         console.error("Error parsing user data", e);
         localStorage.removeItem("editorUser"); // Corrupt data hatao
-        router.push("/management-login/");
+        const currentPath = window.location.pathname + window.location.search;
+        router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
       }
+    } else {
+      const currentPath = window.location.pathname + window.location.search;
+      router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
     }
   }, []); // 👈 Yahan [router] hata kar [] kar do (Sirf ek baar chalega)
+
+  // ✅ NEW: Auto-select article from URL
+  useEffect(() => {
+    if (articleIdFromUrl && articles.length > 0 && !selectedArticle) {
+      const art = articles.find(a => (a.id || a._id) === articleIdFromUrl);
+      if (art) {
+        setSelectedArticle(art);
+        setPdfViewMode("original");
+      }
+    }
+  }, [articleIdFromUrl, articles, selectedArticle]);
 
   const fetchChangeHistory = async (articleId) => {
     try {
