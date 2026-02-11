@@ -1,12 +1,12 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { toast, ToastContainer } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 import ReCAPTCHA from "react-google-recaptcha";
 
-export default function Adminlogin() {
+function AdminloginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const returnUrl = searchParams.get("returnUrl")
@@ -223,6 +223,18 @@ export default function Adminlogin() {
           </div>
         </div>
       </div>
-    </div>
+    </div >
+  )
+}
+
+export default function Adminlogin() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+      </div>
+    }>
+      <AdminloginContent />
+    </Suspense>
   )
 }

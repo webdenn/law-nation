@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react"; // ✅ Combined Import
+import React, { useState, useEffect, useCallback, Suspense } from "react"; // ✅ Combined Import
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-toastify";
 import Image from "next/image";
@@ -77,7 +77,7 @@ const EditorStatCard = ({ title, count, color }) => (
   </div>
 );
 
-export default function EditorDashboard() {
+function EditorDashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const articleIdFromUrl = searchParams.get("articleId");
@@ -872,5 +872,17 @@ export default function EditorDashboard() {
         </div >
       </main >
     </div >
+  );
+}
+
+export default function EditorDashboard() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+      </div>
+    }>
+      <EditorDashboardContent />
+    </Suspense>
   );
 }
