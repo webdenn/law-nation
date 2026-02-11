@@ -62,11 +62,31 @@ const MultiDiffViewer = ({
 
             setLoading(true);
             try {
+                // ✅ CLEAN URL UTILITY (Matching admin/page.jsx)
+                const cleanUrl = (url) => {
+                    if (!url) return null;
+                    let clean = url;
+                    if (clean.includes('_reviewer_watermarked.docx')) {
+                        return clean.replace(/\.docx$/i, '.pdf');
+                    } else if (clean.includes('_reviewer_watermarked.pdf')) {
+                        return clean;
+                    } else if (clean.endsWith('_watermarked.docx')) {
+                        clean = clean.replace(/_watermarked\.docx$/i, '_clean_watermarked.pdf');
+                        return clean.includes('/uploads/words/') ? clean.replace('/uploads/words/', '/uploads/pdfs/') : clean;
+                    } else if (clean.endsWith('.docx')) {
+                        clean = clean.replace(/\.docx$/i, '.pdf');
+                        return clean.includes('/uploads/words/') ? clean.replace('/uploads/words/', '/uploads/pdfs/') : clean;
+                    }
+                    return clean;
+                };
+
                 // ✅ Helper to fetch text from URL (Client-side)
                 const fetchText = async (url) => {
                     if (!url) return "";
                     try {
-                        const fullUrl = url.startsWith("http") ? url : `${NEXT_PUBLIC_BASE_URL}${url}`;
+                        const cleaned = cleanUrl(url);
+                        const fullUrl = cleaned.startsWith("http") ? cleaned : `${NEXT_PUBLIC_BASE_URL}${cleaned.startsWith('/') ? '' : '/'}${cleaned}`;
+
                         // Add cache-busting
                         const res = await fetch(`${fullUrl}${fullUrl.includes('?') ? '&' : '?'}t=${Date.now()}`, {
                             headers: { Authorization: `Bearer ${adminToken}` }
@@ -75,7 +95,7 @@ const MultiDiffViewer = ({
                         const blob = await res.blob();
                         const file = new File([blob], "doc.pdf", { type: "application/pdf" });
 
-                        // ✅ FIX IMPORT PATH (2 levels up, not 3)
+                        // ✅ FIX IMPORT PATH (Matches reviewer/page.jsx pattern)
                         const { extractTextFromPDF } = await import("../../utilis/pdfutils");
                         const textData = await extractTextFromPDF(file);
                         return textData.fullText || ""; // Ensure string
@@ -89,18 +109,27 @@ const MultiDiffViewer = ({
                 const originalText = await fetchText(selectedArticle.originalPdfUrl);
 
                 // 2. FIND VERSIONS from History
-                const sortedLogs = [...(changeHistory || [])].sort((a, b) => new Date(b.editedAt) - new Date(a.editedAt));
+                // Robust sorting: newest first
+                const sortedLogs = [...(changeHistory || [])].sort((a, b) => {
+                    const dateA = new Date(a.changedAt || a.createdAt || a.editedAt);
+                    const dateB = new Date(b.changedAt || b.createdAt || b.editedAt);
+                    return dateB - dateA;
+                });
 
                 // Find valid documents for each role
-                // Helper: prioritize PDF > DOCX > NewFile
                 const getDocUrl = (log) => log ? (log.pdfUrl || log.newFileUrl || log.documentUrl) : null;
 
-                const editorLog = sortedLogs.find(l => (l.role?.toLowerCase() === "editor" || l.editedBy?.role?.name?.toLowerCase() === "editor") && getDocUrl(l));
-                const reviewerLog = sortedLogs.find(l => (l.role?.toLowerCase() === "reviewer" || l.editedBy?.role?.name?.toLowerCase() === "reviewer") && getDocUrl(l));
-                const adminLog = sortedLogs.find(l => (l.role?.toLowerCase() === "admin" || l.editedBy?.role?.name?.toLowerCase() === "admin") && getDocUrl(l));
+                const findLogByRole = (roleName) => sortedLogs.find(l => {
+                    const role = (l.role || l.editedBy?.role?.name || l.changedBy?.role || "").toLowerCase();
+                    return role === roleName && getDocUrl(l);
+                });
 
-                // Also check article state if logs missing (Fallback)
-                const currentEditorUrl = editorLog ? getDocUrl(editorLog) : (selectedArticle.editorDocumentUrl || selectedArticle.latestEditorPdfUrl);
+                const editorLog = findLogByRole('editor');
+                const reviewerLog = findLogByRole('reviewer');
+                const adminLog = findLogByRole('admin');
+
+                // Fallbacks from selectedArticle
+                const currentEditorUrl = editorLog ? getDocUrl(editorLog) : (selectedArticle.latestEditorPdfUrl || selectedArticle.editorDocumentUrl);
                 const currentReviewerUrl = reviewerLog ? getDocUrl(reviewerLog) : selectedArticle.latestReviewerPdfUrl;
                 const currentAdminUrl = adminLog ? getDocUrl(adminLog) : selectedArticle.latestAdminPdfUrl;
 
