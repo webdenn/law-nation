@@ -182,7 +182,7 @@ const ReviewInterface = ({
                     </div>
                 </div>
             </div>
-            </div >
+
         );
     };
 
