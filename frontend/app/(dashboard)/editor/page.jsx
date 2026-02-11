@@ -99,6 +99,7 @@ export default function EditorDashboard() {
   const [currentDiffData, setCurrentDiffData] = useState(null);
   const [isApproving, setIsApproving] = useState(false); // ✅ NEW Appoving State
   const [pdfTimestamp, setPdfTimestamp] = useState(Date.now()); // ✅ Fix Jitter State
+  const [hasEditorUploaded, setHasEditorUploaded] = useState(false); // ✅ NEW: Track Editor activity
 
   const [profile, setProfile] = useState({
     id: "",
@@ -275,7 +276,12 @@ export default function EditorDashboard() {
       );
       if (res.ok) {
         const data = await res.json();
-        setChangeHistory(data.changeLogs || []);
+        const logs = data.changeLogs || [];
+        setChangeHistory(logs);
+
+        // ✅ Check if Editor has ever uploaded anything in logs
+        const editorLogExists = logs.some(log => (log.role || log.changedBy?.role || "").toLowerCase() === "editor");
+        setHasEditorUploaded(editorLogExists);
 
         if (
           data.article?.editorDocumentUrl &&
@@ -640,7 +646,7 @@ export default function EditorDashboard() {
 
               <button
                 onClick={() => {
-                  if (!selectedArticle.currentPdfUrl) {
+                  if (!hasEditorUploaded) {
                     return toast.error("Please upload a correction first to view the Edited PDF.");
                   }
                   setPdfViewMode("current");
@@ -648,8 +654,8 @@ export default function EditorDashboard() {
                 }}
                 className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "current"
                   ? "bg-white text-red-700 shadow-lg"
-                  : "hover:bg-red-800 text-white"
-                  } ${!selectedArticle.currentPdfUrl ? "opacity-50 cursor-not-allowed" : ""}`}
+                  : "hover:bg-red-600 text-white"
+                  } ${!hasEditorUploaded ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 View Edited PDF
                 {pdfViewMode === "current" && (
@@ -662,6 +668,11 @@ export default function EditorDashboard() {
                 onClick={(e) => {
                   e.preventDefault(); // ✅ Prevent any default behavior
                   e.stopPropagation(); // ✅ Stop event bubbling
+
+                  if (!hasEditorUploaded) {
+                    return toast.error("Please upload a correction first to view the Track File.");
+                  }
+
                   if (changeHistory && changeHistory.length > 0) {
                     const latestLog = changeHistory[0];
                     handleViewVisualDiff(latestLog.id || latestLog._id);
@@ -674,7 +685,7 @@ export default function EditorDashboard() {
                 className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "visual-diff"
                   ? "bg-white text-red-700 shadow-lg"
                   : "hover:bg-red-800 text-white"
-                  } ${isGeneratingDiff ? "opacity-50 cursor-not-allowed" : ""}`}
+                  } ${isGeneratingDiff || !hasEditorUploaded ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 {isGeneratingDiff ? (
                   <>
