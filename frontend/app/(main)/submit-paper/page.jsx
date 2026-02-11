@@ -428,7 +428,7 @@ export default function SubmitPaperPage() {
             <button
               onClick={() => {
                 setShowSuccessModal(false);
-                router.push("/home"); // 👈 Ye home ('/') par redirect kar dega
+                router.push("/"); // 👈 Ye home ('/') par redirect kar dega
               }}
               className="w-full py-3.5 px-6 bg-green-600 hover:bg-green-700 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
             >

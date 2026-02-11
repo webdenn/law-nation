@@ -710,26 +710,22 @@ function ReviewerDashboardContent() {
                                     setUploadedFile(null);
                                     setIsMobileMenuOpen(false);
                                 }}
-                                className="w-full text-left p-3 rounded-lg font-semibold bg-red-900 text-red-100 hover:bg-black hover:text-white transition-all flex items-center gap-2"
+                                className="w-full text-left p-3 rounded-lg font-semibold bg-red-900 text-red-100 hover:bg-black hover:text-white transition-all flex items-center gap-2 mt-4"
                             >
-                                ⬅ Back to Task List
+                                ⬅ Back to All Articles
                             </button>
                         </>
                     )}
                 </nav>
 
-                {
-                    !selectedArticle && (
-                        <div className="p-4 border-t border-red-800">
-                            <button
-                                onClick={handleLogout}
-                                className="w-full p-2 text-sm bg-red-900 rounded font-medium uppercase"
-                            >
-                                Logout
-                            </button>
-                        </div>
-                    )
-                }
+                <div className="p-4 border-t border-red-800">
+                    <button
+                        onClick={handleLogout}
+                        className="w-full p-2 text-sm bg-red-900 hover:bg-red-950 rounded font-medium uppercase transition-colors"
+                    >
+                        Logout
+                    </button>
+                </div>
             </aside >
 
             {/* MAIN CONTENT AREA */}
