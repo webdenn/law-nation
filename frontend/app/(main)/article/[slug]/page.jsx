@@ -251,36 +251,18 @@ export default function ArticlePage({ params }) {
   const guestContent = (() => {
     if (token || !article) return "";
 
-    // Helper to strip HTML tags via regex (SSR safe)
-    const stripHtml = (html) => {
-      let text = html.replace(/<br\s*\/?>/gi, '\n'); // Replace <br> with newline
-      text = text.replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|ul|ol)>/gi, '\n\n'); // Replace block closers with double newline
-      return text.replace(/<[^>]*>?/gm, ''); // Remove remaining tags
-    };
-
-    let textContent = article.content;
-    if (!textContent || textContent.includes("Text extraction failed")) {
-      textContent = article.contentHtml ? stripHtml(article.contentHtml) : (article.abstract || "");
+    // If backend already provided limited text, use it
+    if (article.isLimited && article.content) {
+      return article.content;
     }
 
-    if (!textContent) return "";
-
-    // Preserve structure: Take lines until word count > 250
-    const lines = textContent.split('\n');
-    let accumulatedText = "";
-    let wordCount = 0;
-
-    for (const line of lines) {
-      const words = line.trim().split(/\s+/).length;
-      if (line.trim() === "") continue; // Skip empty lines for count, but logic below handles formatting
-
-      wordCount += words;
-      accumulatedText += line + "\n";
-
-      if (wordCount > 250) break;
+    // Fallback logic (should not be reached if backend is working correctly)
+    const textContent = article.content || (article.contentHtml ? article.contentHtml.replace(/<[^>]*>?/gm, '') : (article.abstract || ""));
+    const words = textContent.split(/\s+/);
+    if (words.length > 250) {
+      return words.slice(0, 250).join(" ") + "...";
     }
-
-    return accumulatedText;
+    return textContent;
   })();
 
   if (error || !article)
@@ -403,7 +385,7 @@ export default function ArticlePage({ params }) {
                 <div className="absolute inset-x-0 bottom-0 h-48 bg-linear-to-t from-white via-white/95 to-transparent flex items-end justify-center pb-8 z-10">
                   <div className="text-center w-full px-4">
                     <Link
-                      href={`/login?redirect=${pathname}`}
+                      href={`/login?redirect=${encodeURIComponent(pathname)}`}
                       className="inline-flex items-center justify-center bg-red-600 text-white font-bold px-8 py-3.5 rounded-full hover:bg-red-700 transition-all shadow-lg hover:shadow-red-200 transform hover:-translate-y-0.5 group"
                     >
                       <LockIcon />

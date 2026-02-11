@@ -7,7 +7,7 @@ export function generateArticlePublishedHtml(data: {
   diffSummary?: string;
 }): { subject: string; html: string } {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-  const articleUrl = `${frontendUrl}/articles/${data.articleId}`;
+  const articleUrl = `${frontendUrl}/article/${data.articleId}`;
 
   const content = `
     <div style="padding: 30px;">
