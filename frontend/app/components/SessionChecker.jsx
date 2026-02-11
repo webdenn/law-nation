@@ -37,7 +37,8 @@ export default function SessionChecker() {
                             const path = window.location.pathname.toLowerCase();
                             if (!path.includes("/management-login")) {
                                 toast.error("Admin session expired. Please login again.");
-                                router.push("/management-login/");
+                                const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                                router.push(`/management-login/?returnUrl=${returnUrl}`);
                             }
                         } else {
                             const path = window.location.pathname.toLowerCase();
@@ -48,7 +49,8 @@ export default function SessionChecker() {
                                 !path.includes("/editor") &&
                                 !path.includes("/reviewer")) {
                                 toast.error("Session expired. Please login again.");
-                                router.push("/login");
+                                const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                                router.push(`/login?returnUrl=${returnUrl}`);
                             }
                         }
                     }
@@ -113,9 +115,11 @@ export default function SessionChecker() {
                             dispatch(logout());
 
                             if (isManagementRoute) {
-                                router.push("/management-login/");
+                                const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                                router.push(`/management-login/?returnUrl=${returnUrl}`);
                             } else {
-                                router.push("/login");
+                                const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                                router.push(`/login?returnUrl=${returnUrl}`);
                             }
                         }
                     }

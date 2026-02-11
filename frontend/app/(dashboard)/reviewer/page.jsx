@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-toastify";
 import Image from "next/image";
 import logoImg from "../../assets/logo.jpg";
@@ -23,6 +23,8 @@ const StatCard = ({ title, count, color }) => (
 
 export default function ReviewerDashboard() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const articleIdFromUrl = searchParams.get("articleId");
 
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [selectedArticle, setSelectedArticle] = useState(null);
@@ -207,10 +209,25 @@ export default function ReviewerDashboard() {
             } catch (e) {
                 console.error("Error parsing user data", e);
                 localStorage.removeItem("reviewerUser");
-                router.push("/management-login/");
+                const currentPath = window.location.pathname + window.location.search;
+                router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
             }
+        } else {
+            const currentPath = window.location.pathname + window.location.search;
+            router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
         }
     }, []);
+
+    // ✅ NEW: Auto-select article from URL
+    useEffect(() => {
+        if (articleIdFromUrl && articles.length > 0 && !selectedArticle) {
+            const art = articles.find(a => (a.id || a._id) === articleIdFromUrl);
+            if (art) {
+                setSelectedArticle(art);
+                setPdfViewMode("original");
+            }
+        }
+    }, [articleIdFromUrl, articles, selectedArticle]);
 
     const [lastEditorPdf, setLastEditorPdf] = useState(null); // ✅ NEW: Track Editor's PDF
     const [hasReviewerUploaded, setHasReviewerUploaded] = useState(false); // ✅ NEW: Track Reviewer activity
