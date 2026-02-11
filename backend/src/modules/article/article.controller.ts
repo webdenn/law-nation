@@ -154,13 +154,13 @@ export class ArticleController {
       const frontendHomeUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
       // Redirect user to home page with success message
-      return res.redirect(`${frontendHomeUrl}/law/home?verified=true`);
+      return res.redirect(`${frontendHomeUrl}/?verified=true`);
     } catch (error) {
       console.error("Verification Error:", error);
       const frontendHomeUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
       // On error, redirect to home with error message
-      return res.redirect(`${frontendHomeUrl}/law/home?error=verification-failed`);
+      return res.redirect(`${frontendHomeUrl}/?error=verification-failed`);
     }
   }
 

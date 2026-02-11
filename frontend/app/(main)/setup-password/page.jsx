@@ -78,7 +78,7 @@ function SetupForm() {
         // 👇 REDIRECT UPDATE: Redirects to User Home with hard reload to ensure path correctness
         setTimeout(() => {
           // Use exact path matching user requirement
-          window.location.replace("/law/management-login/");
+          window.location.replace("/management-login/");
         }, 2000);
 
       } else {

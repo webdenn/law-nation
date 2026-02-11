@@ -106,7 +106,7 @@ export async function generateComparisonPDF(differences) {
     /* 
     // Logo removed
     try {
-      const logoResponse = await fetch('/law/logo.jpg').catch(() => fetch('/logo.jpg'));
+      const logoResponse = await fetch('/logo.jpg').catch(() => fetch('/logo.jpg'));
       if (logoResponse.ok) {
         const logoBytes = await logoResponse.arrayBuffer();
         logoImage = await pdfDoc.embedJpg(logoBytes);
