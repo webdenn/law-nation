@@ -68,9 +68,10 @@ export default function ReviewerDashboard() {
             if (changeLogId) {
                 changeLog = changeHistory.find(log => (log.id || log._id) === changeLogId);
             } else {
+                // ✅ Consistent Search: Latest Reviewer log
                 changeLog = [...changeHistory]
                     .sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))
-                    .find(log => (log.role?.toUpperCase() === "REVIEWER"));
+                    .find(log => (log.role || log.changedBy?.role || "").toUpperCase() === "REVIEWER");
             }
 
             if (!changeLog) throw new Error("No reviewer upload found to compare.");
@@ -641,29 +642,14 @@ export default function ReviewerDashboard() {
 
                             <button
                                 onClick={() => {
-                                    // ✅ Validation: Only show if Reviewer has uploaded
-                                    // Logic: Check if LATEST change is by REVIEWER
-                                    const latestLog = changeHistory
-                                        ?.sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))[0];
-
-                                    const role = latestLog?.role || latestLog?.changedBy?.role || "";
-                                    const isLastActionByReviewer = role.toUpperCase() === "REVIEWER";
-
-                                    // Also allow if status is finalized (Reviewer Approved/Published)
-                                    const hasReviewerUploadedRefined = isLastActionByReviewer || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED" || selectedArticle.status === "APPROVED";
-
-                                    if (!hasReviewerUploadedRefined) {
-                                        toast.error("Please upload a correction first to view Reviewer PDF");
-                                        return;
-                                    }
-
                                     setPdfViewMode("current");
                                     setIsMobileMenuOpen(false);
                                 }}
+                                disabled={!hasReviewerUploaded}
                                 className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "current"
                                     ? "bg-white text-red-700 shadow-lg"
                                     : "hover:bg-red-800 text-white"
-                                    }`}
+                                    } ${!hasReviewerUploaded ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                                 View Reviewer PDF
                                 {pdfViewMode === "current" && (
@@ -676,27 +662,14 @@ export default function ReviewerDashboard() {
                                 onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-
-                                    const latestLog = changeHistory
-                                        ?.sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))[0];
-
-                                    const role = latestLog?.role || latestLog?.changedBy?.role || "";
-                                    const isLastActionByReviewer = role.toUpperCase() === "REVIEWER";
-                                    const hasReviewerUploadedRefined = isLastActionByReviewer || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED" || selectedArticle.status === "APPROVED";
-
-                                    if (!hasReviewerUploadedRefined) {
-                                        toast.info("No reviewer upload found to generate diff.");
-                                        return;
-                                    }
-
                                     handleViewVisualDiff(); // Calls with default latest
                                     setIsMobileMenuOpen(false);
                                 }}
-                                disabled={isGeneratingDiff}
+                                disabled={isGeneratingDiff || !hasReviewerUploaded}
                                 className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "visual-diff"
                                     ? "bg-white text-red-700 shadow-lg"
                                     : "hover:bg-red-800 text-white"
-                                    } ${isGeneratingDiff ? "opacity-50 cursor-not-allowed" : ""}`}
+                                    } ${isGeneratingDiff || !hasReviewerUploaded ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                                 {isGeneratingDiff ? (
                                     <>
