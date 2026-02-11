@@ -37,18 +37,20 @@ export default function SessionChecker() {
                             const path = window.location.pathname.toLowerCase();
                             if (!path.includes("/management-login")) {
                                 toast.error("Admin session expired. Please login again.");
-                                router.push("/management-login/");
+                                const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                                router.push(`/management-login/?returnUrl=${returnUrl}`);
                             }
                         } else {
                             const path = window.location.pathname.toLowerCase();
-                            // Update: Use includes to handle base paths like /law/admin and other roles
+                            // Update: Use includes to handle admin and other roles
                             if (!path.includes("/login") &&
                                 !path.includes("/management-login") &&
                                 !path.includes("/admin") &&
                                 !path.includes("/editor") &&
                                 !path.includes("/reviewer")) {
                                 toast.error("Session expired. Please login again.");
-                                router.push("/login");
+                                const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                                router.push(`/login?returnUrl=${returnUrl}`);
                             }
                         }
                     }
@@ -101,7 +103,7 @@ export default function SessionChecker() {
                             console.error("Unauthorized request detected. Logging out...");
 
                             // Check which token is relevant
-                            // Update: Use includes to handle /law/admin prefix and other roles
+                            // Update: Use includes to handle admin prefix and other roles
                             const path = window.location.pathname.toLowerCase();
                             const isManagementRoute = path.includes("/admin") || path.includes("/editor") || path.includes("/reviewer");
 
@@ -113,9 +115,11 @@ export default function SessionChecker() {
                             dispatch(logout());
 
                             if (isManagementRoute) {
-                                router.push("/management-login/");
+                                const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                                router.push(`/management-login/?returnUrl=${returnUrl}`);
                             } else {
-                                router.push("/login");
+                                const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                                router.push(`/login?returnUrl=${returnUrl}`);
                             }
                         }
                     }

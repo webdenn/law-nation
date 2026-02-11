@@ -290,7 +290,7 @@ export default function ArticlePage({ params }) {
           Article unavailable
         </h2>
         <Link
-          href="/law/home"
+          href="/"
           className="flex items-center text-sm font-medium text-gray-900 hover:underline"
         >
           <ArrowLeftIcon /> Back to Library

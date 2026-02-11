@@ -1,6 +1,6 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-toastify";
 import Image from "next/image";
 import logoImg from "../../assets/logo.jpg";
@@ -21,8 +21,10 @@ const StatCard = ({ title, count, color }) => (
     </div>
 );
 
-export default function ReviewerDashboard() {
+function ReviewerDashboardContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const articleIdFromUrl = searchParams.get("articleId");
 
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [selectedArticle, setSelectedArticle] = useState(null);
@@ -207,10 +209,25 @@ export default function ReviewerDashboard() {
             } catch (e) {
                 console.error("Error parsing user data", e);
                 localStorage.removeItem("reviewerUser");
-                router.push("/management-login/");
+                const currentPath = window.location.pathname + window.location.search;
+                router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
             }
+        } else {
+            const currentPath = window.location.pathname + window.location.search;
+            router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
         }
     }, []);
+
+    // ✅ NEW: Auto-select article from URL
+    useEffect(() => {
+        if (articleIdFromUrl && articles.length > 0 && !selectedArticle) {
+            const art = articles.find(a => (a.id || a._id) === articleIdFromUrl);
+            if (art) {
+                setSelectedArticle(art);
+                setPdfViewMode("original");
+            }
+        }
+    }, [articleIdFromUrl, articles, selectedArticle]);
 
     const [lastEditorPdf, setLastEditorPdf] = useState(null); // ✅ NEW: Track Editor's PDF
     const [hasReviewerUploaded, setHasReviewerUploaded] = useState(false); // ✅ NEW: Track Reviewer activity
@@ -693,26 +710,22 @@ export default function ReviewerDashboard() {
                                     setUploadedFile(null);
                                     setIsMobileMenuOpen(false);
                                 }}
-                                className="w-full text-left p-3 rounded-lg font-semibold bg-red-900 text-red-100 hover:bg-black hover:text-white transition-all flex items-center gap-2"
+                                className="w-full text-left p-3 rounded-lg font-semibold bg-red-900 text-red-100 hover:bg-black hover:text-white transition-all flex items-center gap-2 mt-4"
                             >
-                                ⬅ Back to Task List
+                                ⬅ Back to All Articles
                             </button>
                         </>
                     )}
                 </nav>
 
-                {
-                    !selectedArticle && (
-                        <div className="p-4 border-t border-red-800">
-                            <button
-                                onClick={handleLogout}
-                                className="w-full p-2 text-sm bg-red-900 rounded font-medium uppercase"
-                            >
-                                Logout
-                            </button>
-                        </div>
-                    )
-                }
+                <div className="p-4 border-t border-red-800">
+                    <button
+                        onClick={handleLogout}
+                        className="w-full p-2 text-sm bg-red-900 hover:bg-red-950 rounded font-medium uppercase transition-colors"
+                    >
+                        Logout
+                    </button>
+                </div>
             </aside >
 
             {/* MAIN CONTENT AREA */}
@@ -845,5 +858,17 @@ export default function ReviewerDashboard() {
                 </div >
             </main >
         </div >
+    );
+}
+
+export default function ReviewerDashboard() {
+    return (
+        <Suspense fallback={
+            <div className="h-screen flex items-center justify-center bg-gray-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+            </div>
+        }>
+            <ReviewerDashboardContent />
+        </Suspense>
     );
 }

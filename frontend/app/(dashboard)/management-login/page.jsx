@@ -1,13 +1,15 @@
 "use client"
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { toast, ToastContainer } from "react-toastify"
 import 'react-toastify/dist/ReactToastify.css';
 import ReCAPTCHA from "react-google-recaptcha";
 
-export default function Adminlogin() {
+function AdminloginContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const returnUrl = searchParams.get("returnUrl")
 
   // ✅ FIX 1: Sirf redirect logic ko handle kiya
   useEffect(() => {
@@ -108,7 +110,15 @@ export default function Adminlogin() {
       const tokenToSave = data.accessToken || data.token;
 
       setTimeout(() => {
-        if (isEditor) {
+        if (returnUrl) {
+          // ✅ Priority 1: Redirect to intended destination
+          if (isEditor) localStorage.setItem("editorToken", tokenToSave);
+          else if (isReviewer) localStorage.setItem("reviewerToken", tokenToSave);
+          else localStorage.setItem("adminToken", tokenToSave);
+
+          localStorage.setItem(isEditor ? "editorUser" : isReviewer ? "reviewerUser" : "adminUser", JSON.stringify(data.user));
+          router.push(returnUrl);
+        } else if (isEditor) {
           localStorage.setItem("editorToken", tokenToSave)
           localStorage.setItem("editorUser", JSON.stringify(data.user))
           router.push("/editor")
@@ -213,6 +223,18 @@ export default function Adminlogin() {
           </div>
         </div>
       </div>
-    </div>
+    </div >
+  )
+}
+
+export default function Adminlogin() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+      </div>
+    }>
+      <AdminloginContent />
+    </Suspense>
   )
 }

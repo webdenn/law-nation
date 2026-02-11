@@ -1,6 +1,6 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react"; // ✅ Combined Import
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback, Suspense } from "react"; // ✅ Combined Import
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-toastify";
 import Image from "next/image";
 import logoImg from "../../assets/logo.jpg";
@@ -77,8 +77,10 @@ const EditorStatCard = ({ title, count, color }) => (
   </div>
 );
 
-export default function EditorDashboard() {
+function EditorDashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const articleIdFromUrl = searchParams.get("articleId");
 
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState(null);
@@ -239,11 +241,6 @@ export default function EditorDashboard() {
     }
 
     // 2. Agar Editor token nahi hai to Login bhej do
-    if (!token) {
-      router.push("/management-login/");
-      return;
-    }
-
     // 3. Agar Token + User data hai to Data Load kro
     if (token && userData) {
       try {
@@ -255,10 +252,25 @@ export default function EditorDashboard() {
       } catch (e) {
         console.error("Error parsing user data", e);
         localStorage.removeItem("editorUser"); // Corrupt data hatao
-        router.push("/management-login/");
+        const currentPath = window.location.pathname + window.location.search;
+        router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
       }
+    } else {
+      const currentPath = window.location.pathname + window.location.search;
+      router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
     }
   }, []); // 👈 Yahan [router] hata kar [] kar do (Sirf ek baar chalega)
+
+  // ✅ NEW: Auto-select article from URL
+  useEffect(() => {
+    if (articleIdFromUrl && articles.length > 0 && !selectedArticle) {
+      const art = articles.find(a => (a.id || a._id) === articleIdFromUrl);
+      if (art) {
+        setSelectedArticle(art);
+        setPdfViewMode("original");
+      }
+    }
+  }, [articleIdFromUrl, articles, selectedArticle]);
 
   const fetchChangeHistory = async (articleId) => {
     try {
@@ -709,26 +721,22 @@ export default function EditorDashboard() {
                   setUploadedFile(null);
                   setIsMobileMenuOpen(false);
                 }}
-                className="w-full text-left p-3 rounded-lg font-semibold bg-red-900 text-red-100 hover:bg-black hover:text-white transition-all flex items-center gap-2"
+                className="w-full text-left p-3 rounded-lg font-semibold bg-red-900 text-red-100 hover:bg-black hover:text-white transition-all flex items-center gap-2 mt-4"
               >
-                ⬅ Back to Task List
+                ⬅ Back to All Articles
               </button>
             </>
           )}
         </nav>
 
-        {
-          !selectedArticle && (
-            <div className="p-4 border-t border-red-800">
-              <button
-                onClick={handleLogout}
-                className="w-full p-2 text-sm bg-red-900 rounded font-medium uppercase"
-              >
-                Logout
-              </button>
-            </div>
-          )
-        }
+        <div className="p-4 border-t border-red-800">
+          <button
+            onClick={handleLogout}
+            className="w-full p-2 text-sm bg-red-900 hover:bg-red-950 rounded font-medium uppercase transition-colors"
+          >
+            Logout
+          </button>
+        </div>
       </aside >
 
       {/* MAIN CONTENT AREA */}
@@ -860,5 +868,17 @@ export default function EditorDashboard() {
         </div >
       </main >
     </div >
+  );
+}
+
+export default function EditorDashboard() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+      </div>
+    }>
+      <EditorDashboardContent />
+    </Suspense>
   );
 }
