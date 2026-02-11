@@ -51,7 +51,7 @@ export default function ReviewerDashboard() {
         role: "Reviewer",
     });
 
-    const handleViewVisualDiff = useCallback(async (changeLogId) => {
+    const handleViewVisualDiff = useCallback(async (changeLogId = null) => {
         if (isGeneratingDiff) return;
 
         try {
@@ -63,18 +63,37 @@ export default function ReviewerDashboard() {
             const token = localStorage.getItem("reviewerToken");
             const articleId = selectedArticle?.id || selectedArticle?._id;
 
-            const changeLog = changeHistory.find(log => (log.id || log._id) === changeLogId);
-            if (!changeLog) throw new Error("Change log not found");
+            // ✅ Find Log: If no ID, find the LATEST Reviewer log
+            let changeLog;
+            if (changeLogId) {
+                changeLog = changeHistory.find(log => (log.id || log._id) === changeLogId);
+            } else {
+                // ✅ Consistent Search: Latest Reviewer log
+                changeLog = [...changeHistory]
+                    .sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))
+                    .find(log => (log.role || log.changedBy?.role || "").toUpperCase() === "REVIEWER");
+            }
+
+            if (!changeLog) throw new Error("No reviewer upload found to compare.");
 
             if (!selectedArticle?.originalPdfUrl) throw new Error("Original PDF URL not found");
 
-            const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
-            if (!editedPdfUrl) throw new Error("Edited PDF URL not found.");
+            // ✅ LOGIC: Compare Editor's Corrected Version (Old) vs Reviewer's Version (New)
 
-            // ✅ FIX: Define originalPdfUrl before using it
-            const originalPdfUrl = selectedArticle.originalPdfUrl.startsWith("http")
-                ? selectedArticle.originalPdfUrl
-                : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`;
+            // 1. "Old" Document = Editor's PDF (Previously approved by editor)
+            // Use lastEditorPdf found in fetchChangeHistory or from article field
+            let originalPdfUrl = lastEditorPdf || selectedArticle.editorDocumentUrl || selectedArticle.originalPdfUrl;
+
+            // 2. "New" Document = Reviewer's Upload (Current PDF) or the specific log's PDF
+            const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
+
+            if (!originalPdfUrl) throw new Error("Base PDF (Editor/Original) not found");
+            if (!editedPdfUrl) throw new Error("Comparison PDF (Reviewer) not found.");
+
+            // ✅ FIX: Process URL properly
+            originalPdfUrl = originalPdfUrl.startsWith("http")
+                ? originalPdfUrl
+                : `${NEXT_PUBLIC_BASE_URL}${originalPdfUrl}`;
 
             const originalIsS3 = originalPdfUrl.includes(".s3.") || originalPdfUrl.includes("amazonaws.com");
             const originalHeaders = originalIsS3 ? {} : { Authorization: `Bearer ${token}` };
@@ -250,12 +269,10 @@ export default function ReviewerDashboard() {
                     editorDocx = editorDocxLog.editorDocumentUrl || editorDocxLog.newFileUrl;
                 }
 
-                // Check if Reviewer has uploaded anything
-                const reviewerLog = logs.find(log => log.role?.toLowerCase() === "reviewer");
-                if (reviewerLog) reviewerUploaded = true;
-
-                setLastEditorPdf(editorPdf);
-                setHasReviewerUploaded(reviewerUploaded);
+                // Check if Reviewer has ever uploaded anything in logs
+                const reviewerLogExists = logs.some(log => (log.role || log.changedBy?.role || "").toUpperCase() === "REVIEWER");
+                setHasReviewerUploaded(reviewerLogExists); // ✅ Fixed: Use the correctly calculated variable
+                setLastEditorPdf(editorPdf); // ✅ Restore baseline for track file
                 // Also save editorDocx in state to pass down (we can piggyback on selectedArticle or new state)
                 if (editorDocx) {
                     setSelectedArticle(prev => ({ ...prev, editorCorrectedDocxUrl: editorDocx }));
@@ -345,6 +362,15 @@ export default function ReviewerDashboard() {
                     setSelectedArticle((prev) => ({ ...prev, ...data.article }));
                     setPdfViewMode("current");
                     setPdfTimestamp(Date.now());
+                }
+
+                // ✅ UPDATE DIFF DATA (If provided by backend)
+                if (data.diffResult || data.diffData) {
+                    setCurrentDiffData(data.diffResult || data.diffData);
+                } else {
+                    // Fallback: If not in response, maybe fetch latest log details?
+                    // For now, assume backend sends it or user can view visual diff.
+                    setCurrentDiffData(null);
                 }
             } else {
                 toast.update(toastId, {
@@ -616,19 +642,14 @@ export default function ReviewerDashboard() {
 
                             <button
                                 onClick={() => {
-                                    // ✅ Validation: Only show if Reviewer has uploaded
-                                    if (!hasReviewerUploaded) {
-                                        toast.warning("Please upload a file to view Reviewer PDF");
-                                        return;
-                                    }
-
                                     setPdfViewMode("current");
                                     setIsMobileMenuOpen(false);
                                 }}
+                                disabled={!hasReviewerUploaded}
                                 className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "current"
                                     ? "bg-white text-red-700 shadow-lg"
                                     : "hover:bg-red-800 text-white"
-                                    }`}
+                                    } ${!hasReviewerUploaded ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                                 View Reviewer PDF
                                 {pdfViewMode === "current" && (
@@ -637,23 +658,18 @@ export default function ReviewerDashboard() {
                             </button>
 
                             <button
-                                type="button" // ✅ Explicitly defined type
+                                type="button"
                                 onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    if (changeHistory && changeHistory.length > 0) {
-                                        const latestLog = changeHistory[0];
-                                        handleViewVisualDiff(latestLog.id || latestLog._id);
-                                        setIsMobileMenuOpen(false);
-                                    } else {
-                                        toast.info("No change history available to generate diff.");
-                                    }
+                                    handleViewVisualDiff(); // Calls with default latest
+                                    setIsMobileMenuOpen(false);
                                 }}
-                                disabled={isGeneratingDiff}
+                                disabled={isGeneratingDiff || !hasReviewerUploaded}
                                 className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "visual-diff"
                                     ? "bg-white text-red-700 shadow-lg"
                                     : "hover:bg-red-800 text-white"
-                                    } ${isGeneratingDiff ? "opacity-50 cursor-not-allowed" : ""}`}
+                                    } ${isGeneratingDiff || !hasReviewerUploaded ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                                 {isGeneratingDiff ? (
                                     <>
@@ -821,6 +837,7 @@ export default function ReviewerDashboard() {
                                 handleDownloadFile={handleDownloadFile}
                                 currentDiffData={currentDiffData}
                                 isGeneratingDiff={isGeneratingDiff}
+                                isLocked={hasReviewerUploaded} // ✅ Passed Persistent Lock State
                                 isApproving={isApproving}
                             />
                         )
