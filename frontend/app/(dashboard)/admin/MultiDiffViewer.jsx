@@ -62,9 +62,11 @@ const MultiDiffViewer = ({
 
             setLoading(true);
             try {
-                // ✅ CLEAN URL UTILITY (Matching admin/page.jsx)
+                // ✅ CLEAN URL UTILITY (Matching admin/page.jsx safety patterns)
                 const cleanUrl = (url) => {
                     if (!url) return null;
+                    if (url.startsWith('http')) return url; // 🛑 S3 Safety: Don't clean absolute URLs (Presigned)
+
                     let clean = url;
                     if (clean.includes('_reviewer_watermarked.docx')) {
                         return clean.replace(/\.docx$/i, '.pdf');
@@ -85,20 +87,38 @@ const MultiDiffViewer = ({
                     if (!url) return "";
                     try {
                         const cleaned = cleanUrl(url);
-                        const fullUrl = cleaned.startsWith("http") ? cleaned : `${NEXT_PUBLIC_BASE_URL}${cleaned.startsWith('/') ? '' : '/'}${cleaned}`;
+                        // ✅ Safer Join: Prevent double/missing slashes
+                        const fullUrl = cleaned.startsWith("http")
+                            ? cleaned
+                            : `${NEXT_PUBLIC_BASE_URL}/${cleaned.replace(/\\/g, "/").replace(/^\//, "")}`;
 
-                        // Add cache-busting
-                        const res = await fetch(`${fullUrl}${fullUrl.includes('?') ? '&' : '?'}t=${Date.now()}`, {
-                            headers: { Authorization: `Bearer ${adminToken}` }
-                        });
-                        if (!res.ok) throw new Error("Failed to fetch PDF");
+                        const isS3Url = fullUrl.includes('.s3.') || fullUrl.includes('amazonaws.com');
+
+                        // 🛑 S3 Safety: No Authorization header and no cache-busting for S3 Presigned URLs
+                        const headers = {};
+                        if (!isS3Url) {
+                            headers.Authorization = `Bearer ${adminToken}`;
+                        }
+
+                        let finalUrl = fullUrl;
+                        if (!isS3Url) {
+                            // Only add cache-busting for local backend files
+                            finalUrl += `${finalUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+                        }
+
+                        const res = await fetch(finalUrl, { headers });
+                        if (!res.ok) {
+                            console.warn(`Fetch Failed [${res.status}]:`, finalUrl);
+                            return ""; // Fallback to empty text instead of crashing
+                        }
+
                         const blob = await res.blob();
                         const file = new File([blob], "doc.pdf", { type: "application/pdf" });
 
-                        // ✅ FIX IMPORT PATH (Matches reviewer/page.jsx pattern)
+                        // ✅ Import Path
                         const { extractTextFromPDF } = await import("../../utilis/pdfutils");
                         const textData = await extractTextFromPDF(file);
-                        return textData.fullText || ""; // Ensure string
+                        return textData.fullText || "";
                     } catch (e) {
                         console.error("Text extraction failed for:", url, e);
                         return "";
@@ -109,18 +129,18 @@ const MultiDiffViewer = ({
                 const originalText = await fetchText(selectedArticle.originalPdfUrl);
 
                 // 2. FIND VERSIONS from History
-                // Robust sorting: newest first
                 const sortedLogs = [...(changeHistory || [])].sort((a, b) => {
-                    const dateA = new Date(a.changedAt || a.createdAt || a.editedAt);
-                    const dateB = new Date(b.changedAt || b.createdAt || b.editedAt);
+                    const dateA = new Date(a.changedAt || a.createdAt || a.editedAt || 0);
+                    const dateB = new Date(b.changedAt || b.createdAt || b.editedAt || 0);
                     return dateB - dateA;
                 });
 
-                // Find valid documents for each role
                 const getDocUrl = (log) => log ? (log.pdfUrl || log.newFileUrl || log.documentUrl) : null;
 
                 const findLogByRole = (roleName) => sortedLogs.find(l => {
-                    const role = (l.role || l.editedBy?.role?.name || l.changedBy?.role || "").toLowerCase();
+                    // ✅ Support string roles and nested object roles
+                    const roleField = l.role || l.editedBy?.role || l.changedBy?.role || "";
+                    const role = (typeof roleField === 'string' ? roleField : roleField.name || "").toLowerCase();
                     return role === roleName && getDocUrl(l);
                 });
 
@@ -129,7 +149,7 @@ const MultiDiffViewer = ({
                 const adminLog = findLogByRole('admin');
 
                 // Fallbacks from selectedArticle
-                const currentEditorUrl = editorLog ? getDocUrl(editorLog) : (selectedArticle.latestEditorPdfUrl || selectedArticle.editorDocumentUrl);
+                const currentEditorUrl = editorLog ? getDocUrl(editorLog) : (selectedArticle.editorDocumentUrl || selectedArticle.latestEditorPdfUrl);
                 const currentReviewerUrl = reviewerLog ? getDocUrl(reviewerLog) : selectedArticle.latestReviewerPdfUrl;
                 const currentAdminUrl = adminLog ? getDocUrl(adminLog) : selectedArticle.latestAdminPdfUrl;
 
