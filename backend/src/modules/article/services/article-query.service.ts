@@ -150,7 +150,7 @@ export class ArticleQueryService {
   //Get article by slug (SEO-friendly URL)
 
   async getArticleBySlug(slug: string) {
-    const article = await prisma.article.findUnique({
+    let article = await prisma.article.findUnique({
       where: {
         slug: slug,
         status: "PUBLISHED",
@@ -165,6 +165,25 @@ export class ArticleQueryService {
         },
       },
     });
+
+    // Fallback: If not found by slug, it might be an ID
+    if (!article) {
+      article = await prisma.article.findUnique({
+        where: {
+          id: slug,
+          status: "PUBLISHED",
+          isVisible: true,
+        },
+        include: {
+          assignedEditor: {
+            select: { id: true, name: true, email: true },
+          },
+          revisions: {
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      });
+    }
 
     if (!article) {
       throw new NotFoundError("Article not found or not published");
