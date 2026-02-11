@@ -5,8 +5,8 @@ export function generateReviewerInvitationHtml(data: {
   token: string;
   frontendUrl: string;
 }): { subject: string; html: string } {
-  const setupPasswordUrl = `${data.frontendUrl}/law/setup-password?token=${data.token}`;
-  
+  const setupPasswordUrl = `${data.frontendUrl}/setup-password?token=${data.token}`;
+
   const content = `
     <div style="padding: 40px 30px; color: #333; line-height: 1.8;">
       <h2 style="color: #d32f2f; font-size: 26px; margin-bottom: 20px; text-align: center;">Welcome to Law Nation!</h2>

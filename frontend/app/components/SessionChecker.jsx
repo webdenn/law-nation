@@ -42,7 +42,7 @@ export default function SessionChecker() {
                             }
                         } else {
                             const path = window.location.pathname.toLowerCase();
-                            // Update: Use includes to handle base paths like /law/admin and other roles
+                            // Update: Use includes to handle admin and other roles
                             if (!path.includes("/login") &&
                                 !path.includes("/management-login") &&
                                 !path.includes("/admin") &&
@@ -103,7 +103,7 @@ export default function SessionChecker() {
                             console.error("Unauthorized request detected. Logging out...");
 
                             // Check which token is relevant
-                            // Update: Use includes to handle /law/admin prefix and other roles
+                            // Update: Use includes to handle admin prefix and other roles
                             const path = window.location.pathname.toLowerCase();
                             const isManagementRoute = path.includes("/admin") || path.includes("/editor") || path.includes("/reviewer");
 
