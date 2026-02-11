@@ -270,7 +270,7 @@ export default function ReviewerDashboard() {
 
                 // Check if Reviewer has ever uploaded anything in logs
                 const reviewerLogExists = logs.some(log => (log.role || log.changedBy?.role || "").toUpperCase() === "REVIEWER");
-                setHasReviewerUploaded(reviewerLogExists);
+                setHasReviewerUploaded(reviewerLogExists); // ✅ Fixed: Use the correctly calculated variable
                 setLastEditorPdf(editorPdf); // ✅ Restore baseline for track file
                 // Also save editorDocx in state to pass down (we can piggyback on selectedArticle or new state)
                 if (editorDocx) {
