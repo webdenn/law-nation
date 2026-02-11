@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-toastify";
 import Image from "next/image";
@@ -21,7 +21,7 @@ const StatCard = ({ title, count, color }) => (
     </div>
 );
 
-export default function ReviewerDashboard() {
+function ReviewerDashboardContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const articleIdFromUrl = searchParams.get("articleId");
@@ -862,5 +862,17 @@ export default function ReviewerDashboard() {
                 </div >
             </main >
         </div >
+    );
+}
+
+export default function ReviewerDashboard() {
+    return (
+        <Suspense fallback={
+            <div className="h-screen flex items-center justify-center bg-gray-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+            </div>
+        }>
+            <ReviewerDashboardContent />
+        </Suspense>
     );
 }
