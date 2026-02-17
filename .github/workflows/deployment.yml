@@ -71,7 +71,7 @@ jobs:
       - name: Post Deploy Steps
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ github.ref_name == 'prod' && secrets.T24_HOST || secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
