@@ -76,7 +76,7 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             # Fix Permissions
-            sudo chown -R ubuntu:ubuntu /var/www/law-nation
+            sudo chown -R ubuntu:ubuntu /var/www/law-nation/*
 
             # --- FRONTEND SETUP ---
             APP_ROOT="/var/www/law-nation/frontend"
