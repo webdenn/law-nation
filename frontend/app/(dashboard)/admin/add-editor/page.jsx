@@ -26,13 +26,13 @@ export default function AddEditorPage() {
       toast.error("Session Expired. Please Login Again.");
       setLoading(false);
       setTimeout(() => {
-        router.push("/admin-login");
+        router.push("/management-login/");
       }, 1500);
       return;
     }
 
     try {
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/users/invite-editor`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/users/invite-editor`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

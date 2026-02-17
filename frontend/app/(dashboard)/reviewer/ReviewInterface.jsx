@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import mammoth from "mammoth";
 import TermsModal from "../../components/TermsModal";
 
 // ✅ 1. ICONS (Yahi define kar diye taaki import ki tension na ho)
@@ -84,15 +85,116 @@ const ReviewInterface = ({
     handleDownloadFile,
     currentDiffData,
     isGeneratingDiff,
+    isLocked, // ✅ Received from parent (Persistent)
     isApproving,
 }) => {
     const [showTermsModal, setShowTermsModal] = useState(false);
     const [declarationAccepted, setDeclarationAccepted] = useState(false);
+    const [showPreviewModal, setShowPreviewModal] = useState(false); // ✅ NEW
+    const [previewHtml, setPreviewHtml] = useState(""); // ✅ NEW
+
+    // ✅ PREVIEW MODAL COMPONENT (Copied from Editor)
+    const PreviewModal = () => {
+        if (!showPreviewModal || !uploadedFile) return null;
+
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all scale-100 flex flex-col max-h-[90vh]">
+                    {/* Header */}
+                    <div className="bg-blue-600 p-4 flex justify-between items-center text-white shrink-0">
+                        <h3 className="font-bold text-lg flex items-center gap-2">
+                            <WordIcon /> Confirm Upload & Preview
+                        </h3>
+                        <button
+                            onClick={() => {
+                                setShowPreviewModal(false);
+                                setUploadedFile(null);
+                                setDeclarationAccepted(false);
+                                setPreviewHtml("");
+                            }}
+                            className="text-white/80 hover:text-white"
+                        >
+                            ✕
+                        </button>
+                    </div>
+
+                    <div className="p-6 flex-1 overflow-y-auto">
+                        {/* File Info */}
+                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-6 flex items-center gap-3 shrink-0">
+                            <div className="bg-white p-2 rounded-lg shadow-sm text-blue-600">
+                                <WordIcon />
+                            </div>
+                            <div className="overflow-hidden">
+                                <p className="font-bold text-gray-800 truncate text-sm">{uploadedFile.name}</p>
+                                <p className="text-xs text-gray-500">{(uploadedFile.size / 1024).toFixed(1)} KB</p>
+                            </div>
+                        </div>
+
+                        {/* DOCX CONTENT PREVIEW */}
+                        <div className="mb-6">
+                            <p className="text-xs font-bold text-gray-500 uppercase mb-2">Document Preview:</p>
+                            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 min-h-[200px] max-h-[400px] overflow-y-auto prose prose-sm max-w-none">
+                                {previewHtml ? (
+                                    <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                                ) : (
+                                    <div className="flex items-center justify-center h-full text-gray-400">
+                                        <div className="animate-pulse">Loading preview...</div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Checkbox */}
+                        <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition shrink-0">
+                            <input
+                                type="checkbox"
+                                className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                                checked={declarationAccepted}
+                                onChange={(e) => setDeclarationAccepted(e.target.checked)}
+                            />
+                            <span className="text-sm text-gray-600">
+                                I have previewed this document and confirm it is the correct final version for upload.
+                            </span>
+                        </label>
+
+                        {/* Actions */}
+                        <div className="flex gap-3 mt-6 shrink-0">
+                            <button
+                                onClick={() => {
+                                    setShowPreviewModal(false);
+                                    setUploadedFile(null);
+                                    setDeclarationAccepted(false);
+                                    setPreviewHtml("");
+                                }}
+                                className="flex-1 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => setShowPreviewModal(false)}
+                                disabled={!declarationAccepted}
+                                className={`flex-1 py-2.5 text-white font-bold rounded-xl shadow-lg transition transform active:scale-95 ${declarationAccepted ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed'
+                                    }`}
+                            >
+                                Confirm Selection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        );
+    };
+
+    // ✅ MOVED TO PARENT (Prop isLocked is now used)
+    // Local calculation removed to ensure persistency after refresh
 
     if (!selectedArticle) return null;
 
     return (
         <div className="flex flex-col lg:flex-row gap-6 h-auto lg:h-full">
+            <PreviewModal />
+
             {/* ---------------- PDF VIEWER SECTION ---------------- */}
             <div className="flex-1 bg-gray-100 rounded-xl border border-gray-300 p-4 flex flex-col h-[500px] lg:h-auto min-h-[500px]">
                 <div className="flex justify-between items-center mb-4">
@@ -142,66 +244,102 @@ const ReviewInterface = ({
                         Upload Correction
                     </h3>
 
+                    {/* STRICT UPLOAD LOCK LOGIC */}
                     <div className="space-y-3">
+
+                        {/* Success Message if Uploaded */}
+                        {isLocked && (
+                            <div className="bg-green-50 p-3 rounded-lg border border-green-200 flex items-center gap-3 mb-2">
+                                <div className="bg-green-100 p-1.5 rounded-full shrink-0">
+                                    <CheckCircleIcon />
+                                </div>
+                                <div>
+                                    <h4 className="text-green-800 font-bold text-xs">Correction Uploaded</h4>
+                                    <p className="text-[10px] text-green-600">Re-uploads are disabled.</p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Corrected File Input */}
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center bg-gray-50 relative hover:bg-gray-100 transition cursor-pointer">
+                        <div className={`border-2 border-dashed rounded-lg p-3 text-center relative transition 
+                             ${isLocked
+                                ? "border-gray-200 bg-gray-100 cursor-not-allowed opacity-60"
+                                : "border-gray-300 bg-gray-50 hover:bg-gray-100 cursor-pointer"}`}
+                        >
                             <input
                                 type="file"
                                 accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                                onChange={(e) => setUploadedFile(e.target.files[0])}
-                                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                disabled={!!isLocked}
+                                onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    if (file) {
+                                        setUploadedFile(file);
+                                        setDeclarationAccepted(false); // Reset confirmation
+                                        setPreviewHtml(""); // Reset preview
+                                        setShowPreviewModal(true); // OPEN MODAL
+
+                                        // Generate Preview
+                                        const reader = new FileReader();
+                                        reader.onload = async (event) => {
+                                            try {
+                                                const arrayBuffer = event.target.result;
+                                                const result = await mammoth.convertToHtml({ arrayBuffer });
+                                                setPreviewHtml(result.value);
+                                            } catch (err) {
+                                                console.error("Preview Generation Failed", err);
+                                                setPreviewHtml("<p class='text-red-500'>Failed to generate preview.</p>");
+                                            }
+                                        };
+                                        reader.readAsArrayBuffer(file);
+                                    }
+                                }}
+                                className="absolute inset-0 opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
                             />
                             <p className="text-[10px] font-bold text-gray-500 uppercase">
                                 CORRECTED FILE (DOCX ONLY)
                             </p>
                             <p className="text-xs truncate font-medium text-gray-700">
-                                {uploadedFile ? `📄 ${uploadedFile.name}` : "Select Corrected DOCX"}
+                                {isLocked
+                                    ? "🔒 Upload Locked"
+                                    : uploadedFile ? `📄 ${uploadedFile.name}` : "Select Corrected DOCX"
+                                }
                             </p>
                         </div>
 
+                        {/* Selected File Display (Post-Modal) */}
+                        {!isLocked && uploadedFile && declarationAccepted && (
+                            <div className="bg-blue-50 p-2 rounded border border-blue-100 flex items-center gap-2 text-xs text-blue-800">
+                                <CheckCircleIcon />
+                                <span className="font-bold">Ready to Upload:</span>
+                                <span className="truncate">{uploadedFile.name}</span>
+                            </div>
+                        )}
+
                         {/* Comment Input */}
                         <textarea
-                            className="w-full p-2 text-sm border rounded bg-gray-50 focus:ring-2 ring-red-200 outline-none resize-none mt-2"
+                            className="w-full p-2 text-sm border rounded bg-gray-50 focus:ring-2 ring-red-200 outline-none resize-none mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             rows="2"
                             placeholder="Describe changes (e.g. Fixed typos on pg 2)..."
                             value={uploadComment}
                             onChange={(e) => setUploadComment(e.target.value)}
+                            disabled={!!isLocked}
                         />
 
-                        {/* T&C Checkbox */}
-                        <div className="flex items-start gap-2 py-2">
-                            <input
-                                type="checkbox"
-                                id="terms-acceptance"
-                                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                checked={declarationAccepted}
-                                onChange={(e) => {
-                                    if (e.target.checked) {
-                                        setShowTermsModal(true);
-                                    } else {
-                                        setDeclarationAccepted(false);
-                                    }
-                                }}
-                            />
-                            <label
-                                htmlFor="terms-acceptance"
-                                className="text-xs text-gray-600 leading-tight cursor-pointer hover:text-gray-800"
-                            >
-                                I agree to the <span className="text-blue-600 font-semibold underline">Terms and Conditions</span>
-                            </label>
-                        </div>
+                        {/* MOVED T&C TO MODAL - REMOVED FROM HERE */}
 
                         {/* Upload Button */}
                         <button
                             onClick={handleUploadCorrection}
-                            disabled={!uploadedFile || isUploading || !declarationAccepted}
-                            className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${!uploadedFile || isUploading || !declarationAccepted
+                            disabled={!uploadedFile || isUploading || !declarationAccepted || isLocked} // isLocked check
+                            className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${(!uploadedFile || isUploading || !declarationAccepted || isLocked)
                                 ? "bg-gray-300 cursor-not-allowed"
                                 : "bg-blue-600 hover:bg-blue-700 active:scale-95"
                                 }`}
                         >
                             {isUploading ? "Processing Diff..." : "Upload & Generate Diff"}
                         </button>
+
+                        {/* ✅ REMOVED: View Diff Button from here (Now in Sidebar like Editor) */}
                     </div>
                 </div>
 
@@ -233,16 +371,16 @@ const ReviewInterface = ({
                     )}
                 </button>
 
-                {/* 4. PREVIOUS VERSION (EDITOR) */}
+                {/* 4. EDITOR VERSION (SOURCE FOR REVIEWER) */}
                 <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h3 className="font-bold text-gray-800 mb-4">Previous Version (Editor)</h3>
+                    <h3 className="font-bold text-gray-800 mb-4">Editor Edited Document</h3>
                     <div className="flex flex-col gap-3">
                         {/* Prefer Editor's Corrected Word file */}
-                        {(selectedArticle.editorCorrectedDocxUrl || selectedArticle.editorDocumentUrl || selectedArticle.originalWordUrl) ? (
+                        {(selectedArticle.currentWordUrl || selectedArticle.editorCorrectedDocxUrl || selectedArticle.originalWordUrl) ? (
                             <button
                                 onClick={() =>
                                     handleDownloadFile(
-                                        selectedArticle.editorCorrectedDocxUrl || selectedArticle.editorDocumentUrl || selectedArticle.originalWordUrl,
+                                        selectedArticle.editorCorrectedDocxUrl || selectedArticle.currentWordUrl || selectedArticle.originalWordUrl,
                                         selectedArticle.title + "_editor_version",
                                         "Word"
                                     )
@@ -268,7 +406,7 @@ const ReviewInterface = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 

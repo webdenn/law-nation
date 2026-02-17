@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ArticleStatus } from "@prisma/client";
+import { ArticleStatus } from "@/db/db.js";
 
 export const articleSubmissionSchema = z.object({
   // Primary author (required)
@@ -10,9 +10,9 @@ export const articleSubmissionSchema = z.object({
       "Author name can only contain letters and spaces (no numbers, special characters, or punctuation allowed)"
     ),
   authorEmail: z.string().email("Valid email is required"),
-  authorPhone: z.string().optional(),
+  authorPhone: z.string().regex(/^(\d{10})?$/, "Phone number must be exactly 10 digits").optional(),
   authorOrganization: z.string().optional(),
-  
+
   // Second author (optional)
   secondAuthorName: z.string()
     .min(2, "Second author name must be at least 2 characters")
@@ -22,12 +22,12 @@ export const articleSubmissionSchema = z.object({
     )
     .optional(),
   secondAuthorEmail: z.string().email("Valid email is required for second author").optional(),
-  secondAuthorPhone: z.string().optional(),
+  secondAuthorPhone: z.string().regex(/^(\d{10})?$/, "Second author phone number must be exactly 10 digits").optional(),
   secondAuthorOrganization: z.string().optional(),
-  
+
   // Article details
   title: z.string()
-    .min(50, "Title must be at least 50 characters")
+    .min(10, "Title must be at least 10 characters")
     .max(100, "Title must not exceed 100 characters")
     .regex(
       /^[a-zA-Z\s\-:,.'&()]+$/,
@@ -35,14 +35,20 @@ export const articleSubmissionSchema = z.object({
     ),
   category: z.string().min(2, "Category is required"),
   abstract: z.string()
-    .min(50, "Abstract must be at least 50 characters")
-    .max(500, "Abstract must not exceed 500 characters"),
+    .refine((val) => {
+      const words = val.trim().split(/\s+/).filter(w => w.length > 0).length;
+      return words >= 50;
+    }, "Description (Abstract) must be at least 50 words")
+    .refine((val) => {
+      const words = val.trim().split(/\s+/).filter(w => w.length > 0).length;
+      return words <= 300;
+    }, "Description (Abstract) must not exceed 300 words"),
   keywords: z.string().optional(),
   coAuthors: z.string().optional(),
   remarksToEditor: z.string().optional(),
   thumbnailUrl: z.string().optional(),
   imageUrls: z.array(z.string()).optional(),
-  
+
   // reCAPTCHA token (required for bot protection)
   recaptchaToken: z.string().min(1, "reCAPTCHA verification is required"),
 }).refine(

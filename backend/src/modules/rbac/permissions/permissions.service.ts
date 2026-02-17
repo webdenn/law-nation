@@ -1,4 +1,8 @@
+// 1. Import the runtime DB client from your local fix (for database calls)
 import { prisma } from "@/db/db.js";
+
+// 2. Import the Namespace strictly as a TYPE (for TypeScript definitions)
+// 'import type' ensures this is removed at runtime, preventing crashes.
 import type { Prisma } from "@prisma/client";
 
 // src/modules/rbac/permissions/permission.service.ts

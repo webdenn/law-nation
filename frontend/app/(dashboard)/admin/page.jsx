@@ -45,7 +45,7 @@ export default function AdminDashboard() {
     const token = localStorage.getItem("adminToken");
     const adminData = localStorage.getItem("adminUser");
     if (!token) {
-      router.push("/management-login");
+      router.push("/management-login/");
     } else {
       try {
         if (adminData) {
@@ -54,7 +54,7 @@ export default function AdminDashboard() {
         setIsAuthorized(true);
       } catch (error) {
         localStorage.removeItem("adminToken");
-        router.push("/management-login");
+        router.push("/management-login/");
       }
     }
   }, [router]);
@@ -79,12 +79,161 @@ export default function AdminDashboard() {
   const [changeHistory, setChangeHistory] = useState([]);
 
   // History fetch karne ka function
+  // const fetchChangeHistory = async (articleId) => {
+  //   try {
+  //     const token = localStorage.getItem("adminToken");
+  //     const cb = Date.now(); // Unique timestamp
+  //     const res = await fetch(
+  //       `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/change-history?cb=${cb}`,
+  //       {
+  //         headers: {
+  //           Authorization: `Bearer ${token}`,
+  //           "Cache-Control": "no-cache, no-store, must-revalidate",
+  //           "Pragma": "no-cache"
+  //         },
+  //       }
+  //     );
+  //     if (res.ok) {
+  //       const data = await res.json();
+  //       setChangeHistory(data.changeLogs || []);
+
+  //       // ✅ Extract Latest Editor & Reviewer PDFs from logs
+  //       const logs = data.changeLogs || [];
+
+  //       let editorPdf = null;
+  //       let reviewerPdf = null;
+  //       let adminPdf = null;
+  //       let editorDocx = null;
+  //       let reviewerDocx = null;
+  //       let adminDocx = null;
+
+  //       // Iterate through all logs to find the latest for each role
+  //       logs.forEach(log => {
+  //         const role = log.role?.toLowerCase() || (log.editedBy?.role || "").toLowerCase();
+  //         const isNotOriginal = (url) => url && !url.includes(data.article.originalPdfUrl) && url !== data.article.originalPdfUrl;
+
+  //         if (role === 'editor' && (log.pdfUrl || log.newFileUrl)) {
+  //           const url = log.pdfUrl || log.newFileUrl;
+  //           if (isNotOriginal(url)) {
+  //             if (url.endsWith('.docx') || url.endsWith('.doc')) editorDocx = url;
+  //             editorPdf = url;
+  //           }
+  //         }
+  //         if (role === 'reviewer' && (log.pdfUrl || log.newFileUrl)) {
+  //           const url = log.pdfUrl || log.newFileUrl;
+  //           if (isNotOriginal(url)) {
+  //             if (url.endsWith('.docx') || url.endsWith('.doc')) reviewerDocx = url;
+  //             reviewerPdf = url;
+  //           }
+  //         }
+  //         if (role === 'admin' && (log.pdfUrl || log.newFileUrl)) {
+  //           const url = log.pdfUrl || log.newFileUrl;
+  //           if (isNotOriginal(url)) {
+  //             if (url.endsWith('.docx') || url.endsWith('.doc')) adminDocx = url;
+  //             adminPdf = url;
+  //           }
+  //         }
+  //       });
+
+  //       // Backend fixes for PDF URL (clean watermarked)
+  //       // ✅ FIXED: Match exact backend file generation patterns
+  //       const cleanUrl = (url) => {
+  //         if (!url) return null;
+  //         let clean = url;
+
+  //         // 🔧 FIX: Handle reviewer PDFs correctly (no extra "clean" in filename)
+  //         if (clean.includes('_reviewer_watermarked.docx')) {
+  //           // Backend creates: filename_reviewer_watermarked.pdf (no "clean")
+  //           clean = clean.replace(/\.docx$/i, '.pdf');
+  //           // Keep in /uploads/words/ directory - don't change directory
+  //           return clean;
+  //         }
+  //         // 🔧 ADDITIONAL FIX: Handle reviewer PDFs that are already .pdf
+  //         else if (clean.includes('_reviewer_watermarked.pdf')) {
+  //           // Already correct format, just return as-is
+  //           return clean;
+  //         }
+  //         // Handle editor PDFs (they have "clean" in the name)
+  //         else if (clean.endsWith('_watermarked.docx')) {
+  //           // Editor files have "clean" in the name
+  //           clean = clean.replace(/_watermarked\.docx$/i, '_clean_watermarked.pdf');
+  //           // Move editor PDFs to /pdfs/ directory
+  //           if (clean.includes('/uploads/words/')) {
+  //             clean = clean.replace('/uploads/words/', '/uploads/pdfs/');
+  //           }
+  //         }
+  //         // Handle other DOCX files
+  //         else if (clean.endsWith('.docx')) {
+  //           clean = clean.replace(/\.docx$/i, '.pdf');
+  //           // Move other PDFs to /pdfs/ directory
+  //           if (clean.includes('/uploads/words/')) {
+  //             clean = clean.replace('/uploads/words/', '/uploads/pdfs/');
+  //           }
+  //         }
+
+  //         return clean;
+  //       };
+
+  //       // 🔍 Debug logging for URL transformation
+  //       if (reviewerPdf) {
+  //         console.log('🔍 [URL Debug] Original reviewer PDF:', reviewerPdf);
+  //       }
+
+  //       // Other DOCX fallback logic
+  //       const deriveDocx = (pdfUrl) => {
+  //         if (!pdfUrl) return null;
+
+  //         let docxUrl = pdfUrl;
+
+  //         // 1. Convert extension
+  //         if (docxUrl.endsWith('.pdf')) {
+  //           docxUrl = docxUrl.replace('.pdf', '.docx');
+  //         }
+
+  //         // 3. Fix Filename discrepancy (Editor version)
+  //         // Pattern: filename_clean_watermarked.pdf -> filename_watermarked.docx
+  //         if (docxUrl.includes('_clean_watermarked.docx')) {
+  //           docxUrl = docxUrl.replace('_clean_watermarked.docx', '_watermarked.docx');
+  //         }
+
+  //         return docxUrl;
+  //       };
+
+  //       // If explicitly found DOCX is null, try to derive from PDF
+  //       if (!editorDocx && editorPdf) editorDocx = deriveDocx(editorPdf);
+  //       if (!reviewerDocx && reviewerPdf) reviewerDocx = deriveDocx(reviewerPdf);
+  //       if (!adminDocx && adminPdf) adminDocx = deriveDocx(adminPdf);
+
+  //       // Clean PDFs for viewing
+  //       if (editorPdf) editorPdf = cleanUrl(editorPdf);
+  //       if (reviewerPdf) {
+  //         reviewerPdf = cleanUrl(reviewerPdf);
+  //         console.log('🔍 [URL Debug] Cleaned reviewer PDF:', reviewerPdf);
+  //       }
+  //       if (adminPdf) adminPdf = cleanUrl(adminPdf);
+
+  //       setSelectedArticle((prev) => ({
+  //         ...prev,
+  //         editorDocumentUrl: data.article.editorDocumentUrl,
+  //         latestEditorPdfUrl: editorPdf,
+  //         latestEditorDocxUrl: editorDocx,
+  //         latestReviewerPdfUrl: reviewerPdf,
+  //         latestReviewerDocxUrl: reviewerDocx,
+  //         latestAdminPdfUrl: adminPdf,
+  //         latestAdminDocxUrl: adminDocx,
+  //       }));
+  //     }
+  //   } catch (err) {
+  //     console.error("Failed to fetch history", err);
+  //   }
+  // };
+
   const fetchChangeHistory = async (articleId) => {
     try {
       const token = localStorage.getItem("adminToken");
-      const cb = Date.now(); // Unique timestamp
+      const cb = Date.now();
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/change-history?cb=${cb}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -93,140 +242,84 @@ export default function AdminDashboard() {
           },
         }
       );
+
       if (res.ok) {
         const data = await res.json();
         setChangeHistory(data.changeLogs || []);
 
-        // ✅ Extract Latest Editor & Reviewer PDFs from logs
         const logs = data.changeLogs || [];
+        const originalPdf = data.article.originalPdfUrl;
 
-        let editorPdf = null;
-        let reviewerPdf = null;
-        let adminPdf = null;
-        let editorDocx = null;
-        let reviewerDocx = null;
-        let adminDocx = null;
+        let editorPdf = null, editorDocx = null;
+        let reviewerPdf = null, reviewerDocx = null;
+        let adminPdf = null, adminDocx = null;
 
-        // Iterate through all logs to find the latest for each role
+        // ✅ 1. STRICT LOG PARSING: Separate PDF and DOCX
         logs.forEach(log => {
           const role = log.role?.toLowerCase() || (log.editedBy?.role || "").toLowerCase();
-          const isNotOriginal = (url) => url && !url.includes(data.article.originalPdfUrl) && url !== data.article.originalPdfUrl;
+          const url = log.pdfUrl || log.newFileUrl;
 
-          if (role === 'editor' && (log.pdfUrl || log.newFileUrl)) {
-            const url = log.pdfUrl || log.newFileUrl;
-            if (isNotOriginal(url)) {
-              if (url.endsWith('.docx') || url.endsWith('.doc')) editorDocx = url;
-              editorPdf = url;
-            }
+          // Skip if no URL or if it's just the original file
+          if (!url || url === originalPdf) return;
+
+          // Helper to check extension ignoring query params
+          const checkExt = (u, ext) => u.split('?')[0].toLowerCase().endsWith(ext);
+
+          const isDoc = checkExt(url, '.docx') || checkExt(url, '.doc');
+          const isPdf = checkExt(url, '.pdf');
+
+          if (role === 'editor') {
+            if (isDoc) editorDocx = url;
+            if (isPdf) editorPdf = url;
           }
-          if (role === 'reviewer' && (log.pdfUrl || log.newFileUrl)) {
-            const url = log.pdfUrl || log.newFileUrl;
-            if (isNotOriginal(url)) {
-              if (url.endsWith('.docx') || url.endsWith('.doc')) reviewerDocx = url;
-              reviewerPdf = url;
-            }
+          if (role === 'reviewer') {
+            if (isDoc) reviewerDocx = url;
+            if (isPdf) reviewerPdf = url;
           }
-          if (role === 'admin' && (log.pdfUrl || log.newFileUrl)) {
-            const url = log.pdfUrl || log.newFileUrl;
-            if (isNotOriginal(url)) {
-              if (url.endsWith('.docx') || url.endsWith('.doc')) adminDocx = url;
-              adminPdf = url;
-            }
+          if (role === 'admin') {
+            if (isDoc) adminDocx = url;
+            if (isPdf) adminPdf = url;
           }
         });
 
-        // Backend fixes for PDF URL (clean watermarked)
-        // ✅ FIXED: Match exact backend file generation patterns
+        // ✅ 2. CLEAN URL UTILITY (Keep your existing transformation logic)
         const cleanUrl = (url) => {
           if (!url) return null;
           let clean = url;
-
-          // 🔧 FIX: Handle reviewer PDFs correctly (no extra "clean" in filename)
           if (clean.includes('_reviewer_watermarked.docx')) {
-            // Backend creates: filename_reviewer_watermarked.pdf (no "clean")
-            clean = clean.replace(/\.docx$/i, '.pdf');
-            // Keep in /uploads/words/ directory - don't change directory
+            return clean.replace(/\.docx$/i, '.pdf');
+          } else if (clean.includes('_reviewer_watermarked.pdf')) {
             return clean;
-          }
-          // 🔧 ADDITIONAL FIX: Handle reviewer PDFs that are already .pdf
-          else if (clean.includes('_reviewer_watermarked.pdf')) {
-            // Already correct format, just return as-is
-            return clean;
-          }
-          // Handle editor PDFs (they have "clean" in the name)
-          else if (clean.endsWith('_watermarked.docx')) {
-            // Editor files have "clean" in the name
+          } else if (clean.endsWith('_watermarked.docx')) {
             clean = clean.replace(/_watermarked\.docx$/i, '_clean_watermarked.pdf');
-            // Move editor PDFs to /pdfs/ directory
-            if (clean.includes('/uploads/words/')) {
-              clean = clean.replace('/uploads/words/', '/uploads/pdfs/');
-            }
-          }
-          // Handle other DOCX files
-          else if (clean.endsWith('.docx')) {
+            return clean.includes('/uploads/words/') ? clean.replace('/uploads/words/', '/uploads/pdfs/') : clean;
+          } else if (clean.endsWith('.docx')) {
             clean = clean.replace(/\.docx$/i, '.pdf');
-            // Move other PDFs to /pdfs/ directory
-            if (clean.includes('/uploads/words/')) {
-              clean = clean.replace('/uploads/words/', '/uploads/pdfs/');
-            }
+            return clean.includes('/uploads/words/') ? clean.replace('/uploads/words/', '/uploads/pdfs/') : clean;
           }
-
           return clean;
         };
 
-        // 🔍 Debug logging for URL transformation
-        if (reviewerPdf) {
-          console.log('🔍 [URL Debug] Original reviewer PDF:', reviewerPdf);
-        }
-
-        // Other DOCX fallback logic
-        const deriveDocx = (pdfUrl) => {
-          if (!pdfUrl) return null;
-
-          let docxUrl = pdfUrl;
-
-          // 1. Convert extension
-          if (docxUrl.endsWith('.pdf')) {
-            docxUrl = docxUrl.replace('.pdf', '.docx');
-          }
-
-          // 3. Fix Filename discrepancy (Editor version)
-          // Pattern: filename_clean_watermarked.pdf -> filename_watermarked.docx
-          if (docxUrl.includes('_clean_watermarked.docx')) {
-            docxUrl = docxUrl.replace('_clean_watermarked.docx', '_watermarked.docx');
-          }
-
-          return docxUrl;
-        };
-
-        // If explicitly found DOCX is null, try to derive from PDF
-        if (!editorDocx && editorPdf) editorDocx = deriveDocx(editorPdf);
-        if (!reviewerDocx && reviewerPdf) reviewerDocx = deriveDocx(reviewerPdf);
-        if (!adminDocx && adminPdf) adminDocx = deriveDocx(adminPdf);
-
-        // Clean PDFs for viewing
-        if (editorPdf) editorPdf = cleanUrl(editorPdf);
-        if (reviewerPdf) {
-          reviewerPdf = cleanUrl(reviewerPdf);
-          console.log('🔍 [URL Debug] Cleaned reviewer PDF:', reviewerPdf);
-        }
-        if (adminPdf) adminPdf = cleanUrl(adminPdf);
+        // ✅ 3. REMOVED "deriveDocx" Logic
+        // We no longer "guess" the .docx name from a .pdf. 
+        // If the admin didn't upload a DOCX, latestAdminDocxUrl will stay null.
 
         setSelectedArticle((prev) => ({
           ...prev,
           editorDocumentUrl: data.article.editorDocumentUrl,
-          latestEditorPdfUrl: editorPdf,
+          latestEditorPdfUrl: cleanUrl(editorPdf),
           latestEditorDocxUrl: editorDocx,
-          latestReviewerPdfUrl: reviewerPdf,
+          latestReviewerPdfUrl: cleanUrl(reviewerPdf),
           latestReviewerDocxUrl: reviewerDocx,
-          latestAdminPdfUrl: adminPdf,
-          latestAdminDocxUrl: adminDocx,
+          latestAdminPdfUrl: cleanUrl(adminPdf),
+          latestAdminDocxUrl: adminDocx, // Will be null if only PDF exists
         }));
       }
     } catch (err) {
       console.error("Failed to fetch history", err);
     }
   };
+
 
   const handleDownloadFile = async (fileUrl, fileName, type) => {
     if (!fileUrl) return toast.error("File not available");
@@ -237,9 +330,16 @@ export default function AdminDashboard() {
         ? fileUrl
         : `${NEXT_PUBLIC_BASE_URL}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
 
+      // ✅ FIX: Only send Authorization header to backend APIs, not S3 URLs
+      const isS3Url = fullUrl.includes('.s3.') || fullUrl.includes('amazonaws.com');
+      const headers = {};
+      if (!isS3Url) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const res = await fetch(fullUrl, {
         method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: headers,
       });
 
       if (!res.ok) throw new Error("Download failed");
@@ -303,7 +403,12 @@ export default function AdminDashboard() {
       ? path
       : `${NEXT_PUBLIC_BASE_URL}/${path.replace(/\\/g, "/").replace(/^\//, "")}`;
 
-    // Add timestamp to prevent PDF caching
+    // 🛑 STOP: Do NOT cache-bust S3 Presigned URLs (it breaks the signature)
+    if (cleanPath.includes('amazonaws.com') || cleanPath.includes('s3.')) {
+      return cleanPath;
+    }
+
+    // Add timestamp to prevent PDF caching for local files only
     return `${cleanPath}?cb=${Date.now()}`;
   };
   // ✅ FETCH DATA (Articles + Editors)
@@ -346,17 +451,23 @@ export default function AdminDashboard() {
       if (!targetPdfUrl) throw new Error("Target PDF for comparison missing");
 
       // 1. Fetch Original PDF
+      const originalIsS3 = selectedArticle.originalPdfUrl.includes(".s3.") || selectedArticle.originalPdfUrl.includes("amazonaws.com");
+      const originalHeaders = originalIsS3 ? {} : { Authorization: `Bearer ${token}` };
+
       const originalRes = await fetch(
         selectedArticle.originalPdfUrl.startsWith("http") ? selectedArticle.originalPdfUrl : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: originalHeaders }
       );
       const originalBlob = await originalRes.blob();
       const originalFile = new File([originalBlob], "original.pdf", { type: "application/pdf" });
 
       // 2. Fetch Current (Edited/Target) PDF
+      const targetIsS3 = targetPdfUrl.includes(".s3.") || targetPdfUrl.includes("amazonaws.com");
+      const targetHeaders = targetIsS3 ? {} : { Authorization: `Bearer ${token}` };
+
       const editedRes = await fetch(
         targetPdfUrl.startsWith("http") ? targetPdfUrl : `${NEXT_PUBLIC_BASE_URL}${targetPdfUrl}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: targetHeaders }
       );
       const editedBlob = await editedRes.blob();
       const editedFile = new File([editedBlob], "edited.pdf", { type: "application/pdf" });
@@ -405,12 +516,12 @@ export default function AdminDashboard() {
 
         const [summaryRes, metricsRes, statusRes, timelineRes, editorsRes, reviewersRes] =
           await Promise.all([
-            fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/summary?cb=${cb}`, { headers }),
-            fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/time-metrics?cb=${cb}`, { headers }),
-            fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/status-distribution?cb=${cb}`, { headers }),
-            fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/dashboard/articles-timeline?limit=50&cb=${cb}`, { headers }),
-            fetch(`${NEXT_PUBLIC_BASE_URL}/api/users/editors?cb=${cb}`, { headers }),
-            fetch(`${NEXT_PUBLIC_BASE_URL}/api/users/reviewers?cb=${cb}`, { headers }), // ✅ Fetch Reviewers
+            fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/summary?cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/time-metrics?cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/status-distribution?cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/articles-timeline?limit=50&cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/users/editors?cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/users/reviewers?cb=${cb}`, { headers }), // ✅ Fetch Reviewers
           ]);
 
         // 1. Summary Data
@@ -523,7 +634,7 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem("adminToken");
       const response = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/assign-editor`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/assign-editor`,
         {
           method: "PATCH",
           headers: {
@@ -567,7 +678,7 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem("adminToken");
       const response = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/assign-reviewer`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/assign-reviewer`,
         {
           method: "PATCH",
           headers: {
@@ -625,7 +736,7 @@ export default function AdminDashboard() {
       formData.append("document", uploadedFile);
       if (uploadComment) formData.append("comments", uploadComment);
 
-      const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id}/upload-corrected`, {
+      const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/articles/${selectedArticle.id}/upload-corrected`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}` },
         body: formData
@@ -675,7 +786,7 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${id}/admin-publish`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${id}/admin-publish`,
         {
           method: "PATCH",
           headers: {
@@ -725,7 +836,7 @@ export default function AdminDashboard() {
       const token = localStorage.getItem("adminToken");
       const newVisibility = !currentVisibility;
 
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/admin/articles/${id}/visibility`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/articles/${id}/visibility`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

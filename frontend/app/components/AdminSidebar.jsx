@@ -13,7 +13,7 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
     const handleLogout = () => {
         localStorage.clear();
         toast.info("Admin Logged Out");
-        router.push("/management-login");
+        router.push("/management-login/");
         window.location.reload();
     };
 
@@ -43,7 +43,8 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
         { name: "Add New Reviewer", path: "/admin/add-reviewer" },
         { name: "Editors & Reviewers", path: "/admin/staff" }, // New Item
         { name: "Concern", path: "/admin/concern" },
-        { name: "Upload Issue", path: "/admin/upload-issue" }, // New Item
+        { name: "Upload Issue", path: "/admin/upload-issue" },
+        { name: "Issue Details", path: "/admin/issue-details" }, // New Item
         { name: "Banner Management", path: "/admin/banners" },
         {
             name: "Site Settings",
@@ -58,7 +59,7 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
 
     return (
         <aside
-            className={`fixed md:sticky top-0 min-h-screen w-72 bg-red-700 text-white flex flex-col shadow-2xl z-50 transition-transform duration-300 ease-in-out
+            className={`fixed md:sticky top-0 h-screen w-72 bg-red-700 text-white flex flex-col shadow-2xl z-50 transition-transform duration-300 ease-in-out
         ${isMobileMenuOpen
                     ? "translate-x-0"
                     : "-translate-x-full md:translate-x-0"

@@ -1,6 +1,6 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react"; // ✅ Combined Import
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback, Suspense } from "react"; // ✅ Combined Import
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-toastify";
 import Image from "next/image";
 import logoImg from "../../assets/logo.jpg";
@@ -77,8 +77,10 @@ const EditorStatCard = ({ title, count, color }) => (
   </div>
 );
 
-export default function EditorDashboard() {
+function EditorDashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const articleIdFromUrl = searchParams.get("articleId");
 
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState(null);
@@ -99,6 +101,7 @@ export default function EditorDashboard() {
   const [currentDiffData, setCurrentDiffData] = useState(null);
   const [isApproving, setIsApproving] = useState(false); // ✅ NEW Appoving State
   const [pdfTimestamp, setPdfTimestamp] = useState(Date.now()); // ✅ Fix Jitter State
+  const [hasEditorUploaded, setHasEditorUploaded] = useState(false); // ✅ NEW: Track Editor activity
 
   const [profile, setProfile] = useState({
     id: "",
@@ -134,8 +137,11 @@ export default function EditorDashboard() {
         ? selectedArticle.originalPdfUrl
         : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`;
 
+      const originalIsS3 = originalPdfUrl.includes(".s3.") || originalPdfUrl.includes("amazonaws.com");
+      const originalHeaders = originalIsS3 ? {} : { Authorization: `Bearer ${token}` };
+
       const originalRes = await fetch(originalPdfUrl, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: originalHeaders
       });
       if (!originalRes.ok) throw new Error("Failed to fetch original PDF");
       const originalBlob = await originalRes.blob();
@@ -146,8 +152,11 @@ export default function EditorDashboard() {
         ? editedPdfUrl
         : `${NEXT_PUBLIC_BASE_URL}${editedPdfUrl}`;
 
+      const editedIsS3 = editedPdfFullUrl.includes(".s3.") || editedPdfFullUrl.includes("amazonaws.com");
+      const editedHeaders = editedIsS3 ? {} : { Authorization: `Bearer ${token}` };
+
       const editedRes = await fetch(editedPdfFullUrl, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: editedHeaders
       });
       if (!editedRes.ok) throw new Error("Failed to fetch edited PDF");
       const editedBlob = await editedRes.blob();
@@ -193,7 +202,7 @@ export default function EditorDashboard() {
       setIsLoading(true);
       const cb = Date.now();
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles?assignedEditorId=${editorId}&cb=${cb}`,
+        `${NEXT_PUBLIC_BASE_URL}/articles?assignedEditorId=${editorId}&cb=${cb}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -232,11 +241,6 @@ export default function EditorDashboard() {
     }
 
     // 2. Agar Editor token nahi hai to Login bhej do
-    if (!token) {
-      router.push("/management-login");
-      return;
-    }
-
     // 3. Agar Token + User data hai to Data Load kro
     if (token && userData) {
       try {
@@ -248,17 +252,32 @@ export default function EditorDashboard() {
       } catch (e) {
         console.error("Error parsing user data", e);
         localStorage.removeItem("editorUser"); // Corrupt data hatao
-        router.push("/management-login");
+        const currentPath = window.location.pathname + window.location.search;
+        router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
       }
+    } else {
+      const currentPath = window.location.pathname + window.location.search;
+      router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
     }
   }, []); // 👈 Yahan [router] hata kar [] kar do (Sirf ek baar chalega)
+
+  // ✅ NEW: Auto-select article from URL
+  useEffect(() => {
+    if (articleIdFromUrl && articles.length > 0 && !selectedArticle) {
+      const art = articles.find(a => (a.id || a._id) === articleIdFromUrl);
+      if (art) {
+        setSelectedArticle(art);
+        setPdfViewMode("original");
+      }
+    }
+  }, [articleIdFromUrl, articles, selectedArticle]);
 
   const fetchChangeHistory = async (articleId) => {
     try {
       const token = localStorage.getItem("editorToken");
       const cb = Date.now();
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/change-history?cb=${cb}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -269,7 +288,12 @@ export default function EditorDashboard() {
       );
       if (res.ok) {
         const data = await res.json();
-        setChangeHistory(data.changeLogs || []);
+        const logs = data.changeLogs || [];
+        setChangeHistory(logs);
+
+        // ✅ Check if Editor has ever uploaded anything in logs
+        const editorLogExists = logs.some(log => (log.role || log.changedBy?.role || "").toLowerCase() === "editor");
+        setHasEditorUploaded(editorLogExists);
 
         if (
           data.article?.editorDocumentUrl &&
@@ -322,7 +346,7 @@ export default function EditorDashboard() {
       }
 
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id
+        `${NEXT_PUBLIC_BASE_URL}/articles/${selectedArticle.id || selectedArticle._id
         }/upload-corrected`,
         {
           method: "PATCH",
@@ -386,7 +410,7 @@ export default function EditorDashboard() {
       setIsApproving(true); // ✅ Start Loading
       const token = localStorage.getItem("editorToken");
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id
+        `${NEXT_PUBLIC_BASE_URL}/articles/${selectedArticle.id || selectedArticle._id
         }/editor-approve`,
         {
           method: "PATCH",
@@ -415,7 +439,7 @@ export default function EditorDashboard() {
 
     localStorage.removeItem("editorToken");
     localStorage.removeItem("editorUser");
-    router.push("/management-login");
+    router.push("/management-login/");
   };
 
   const handleFileChange = (e) => {
@@ -433,9 +457,16 @@ export default function EditorDashboard() {
         ? fileUrl
         : `${NEXT_PUBLIC_BASE_URL}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
 
+      // ✅ FIX: Only send Authorization header to backend APIs, not S3 URLs
+      const isS3Url = fullUrl.includes('.s3.') || fullUrl.includes('amazonaws.com');
+      const headers = {};
+      if (!isS3Url) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const res = await fetch(fullUrl, {
         method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: headers,
       });
 
       if (!res.ok) throw new Error("Download failed");
@@ -445,7 +476,11 @@ export default function EditorDashboard() {
       const a = document.createElement("a");
       a.href = url;
       const ext = type === "Word" ? "docx" : "pdf";
-      a.download = `${fileName}.${ext}`;
+      let safeName = fileName.replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
+      // ✅ Remove "lawnation" (case insensitive) from filename
+      safeName = safeName.replace(/lawnation/gi, "");
+      if (!safeName) safeName = "document"; // Fallback
+      a.download = `${safeName}.${ext}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -466,7 +501,7 @@ export default function EditorDashboard() {
       const articleId = selectedArticle.id || selectedArticle._id;
 
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`,
         {
           method: "GET",
           headers: { Authorization: `Bearer ${token}` },
@@ -623,13 +658,16 @@ export default function EditorDashboard() {
 
               <button
                 onClick={() => {
+                  if (!hasEditorUploaded) {
+                    return toast.error("Please upload a correction first to view the Edited PDF.");
+                  }
                   setPdfViewMode("current");
                   setIsMobileMenuOpen(false);
                 }}
                 className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "current"
                   ? "bg-white text-red-700 shadow-lg"
-                  : "hover:bg-red-800 text-white"
-                  }`}
+                  : "hover:bg-red-600 text-white"
+                  } ${!hasEditorUploaded ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 View Edited PDF
                 {pdfViewMode === "current" && (
@@ -642,6 +680,11 @@ export default function EditorDashboard() {
                 onClick={(e) => {
                   e.preventDefault(); // ✅ Prevent any default behavior
                   e.stopPropagation(); // ✅ Stop event bubbling
+
+                  if (!hasEditorUploaded) {
+                    return toast.error("Please upload a correction first to view the Track File.");
+                  }
+
                   if (changeHistory && changeHistory.length > 0) {
                     const latestLog = changeHistory[0];
                     handleViewVisualDiff(latestLog.id || latestLog._id);
@@ -654,7 +697,7 @@ export default function EditorDashboard() {
                 className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "visual-diff"
                   ? "bg-white text-red-700 shadow-lg"
                   : "hover:bg-red-800 text-white"
-                  } ${isGeneratingDiff ? "opacity-50 cursor-not-allowed" : ""}`}
+                  } ${isGeneratingDiff || !hasEditorUploaded ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 {isGeneratingDiff ? (
                   <>
@@ -678,26 +721,22 @@ export default function EditorDashboard() {
                   setUploadedFile(null);
                   setIsMobileMenuOpen(false);
                 }}
-                className="w-full text-left p-3 rounded-lg font-semibold bg-red-900 text-red-100 hover:bg-black hover:text-white transition-all flex items-center gap-2"
+                className="w-full text-left p-3 rounded-lg font-semibold bg-red-900 text-red-100 hover:bg-black hover:text-white transition-all flex items-center gap-2 mt-4"
               >
-                ⬅ Back to Task List
+                ⬅ Back to All Articles
               </button>
             </>
           )}
         </nav>
 
-        {
-          !selectedArticle && (
-            <div className="p-4 border-t border-red-800">
-              <button
-                onClick={handleLogout}
-                className="w-full p-2 text-sm bg-red-900 rounded font-medium uppercase"
-              >
-                Logout
-              </button>
-            </div>
-          )
-        }
+        <div className="p-4 border-t border-red-800">
+          <button
+            onClick={handleLogout}
+            className="w-full p-2 text-sm bg-red-900 hover:bg-red-950 rounded font-medium uppercase transition-colors"
+          >
+            Logout
+          </button>
+        </div>
       </aside >
 
       {/* MAIN CONTENT AREA */}
@@ -829,5 +868,17 @@ export default function EditorDashboard() {
         </div >
       </main >
     </div >
+  );
+}
+
+export default function EditorDashboard() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+      </div>
+    }>
+      <EditorDashboardContent />
+    </Suspense>
   );
 }

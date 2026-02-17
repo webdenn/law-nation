@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ArticleStatus } from "@prisma/client";
+import { ArticleStatus } from "@/db/db.js";
 
 // Validate timeline query parameters
 export const timelineQuerySchema = z.object({

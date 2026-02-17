@@ -179,6 +179,7 @@ export class EmailService {
       authorName,
       category,
       articleId,
+      frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
     });
     await this.sendEmail(editorEmail, subject, html);
   }
@@ -328,6 +329,7 @@ export class EmailService {
       authorName,
       category,
       articleId,
+      frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
     });
     await this.sendEmail(reviewerEmail, subject, html);
   }

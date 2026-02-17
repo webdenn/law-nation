@@ -1,6 +1,6 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-toastify";
 import Image from "next/image";
 import logoImg from "../../assets/logo.jpg";
@@ -21,8 +21,10 @@ const StatCard = ({ title, count, color }) => (
     </div>
 );
 
-export default function ReviewerDashboard() {
+function ReviewerDashboardContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const articleIdFromUrl = searchParams.get("articleId");
 
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [selectedArticle, setSelectedArticle] = useState(null);
@@ -51,7 +53,7 @@ export default function ReviewerDashboard() {
         role: "Reviewer",
     });
 
-    const handleViewVisualDiff = useCallback(async (changeLogId) => {
+    const handleViewVisualDiff = useCallback(async (changeLogId = null) => {
         if (isGeneratingDiff) return;
 
         try {
@@ -63,20 +65,43 @@ export default function ReviewerDashboard() {
             const token = localStorage.getItem("reviewerToken");
             const articleId = selectedArticle?.id || selectedArticle?._id;
 
-            const changeLog = changeHistory.find(log => (log.id || log._id) === changeLogId);
-            if (!changeLog) throw new Error("Change log not found");
+            // ✅ Find Log: If no ID, find the LATEST Reviewer log
+            let changeLog;
+            if (changeLogId) {
+                changeLog = changeHistory.find(log => (log.id || log._id) === changeLogId);
+            } else {
+                // ✅ Consistent Search: Latest Reviewer log
+                changeLog = [...changeHistory]
+                    .sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))
+                    .find(log => (log.role || log.changedBy?.role || "").toUpperCase() === "REVIEWER");
+            }
+
+            if (!changeLog) throw new Error("No reviewer upload found to compare.");
 
             if (!selectedArticle?.originalPdfUrl) throw new Error("Original PDF URL not found");
 
-            const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
-            if (!editedPdfUrl) throw new Error("Edited PDF URL not found.");
+            // ✅ LOGIC: Compare Editor's Corrected Version (Old) vs Reviewer's Version (New)
 
-            const originalPdfUrl = selectedArticle.originalPdfUrl.startsWith("http")
-                ? selectedArticle.originalPdfUrl
-                : `${NEXT_PUBLIC_BASE_URL}${selectedArticle.originalPdfUrl}`;
+            // 1. "Old" Document = Editor's PDF (Previously approved by editor)
+            // Use lastEditorPdf found in fetchChangeHistory or from article field
+            let originalPdfUrl = lastEditorPdf || selectedArticle.editorDocumentUrl || selectedArticle.originalPdfUrl;
+
+            // 2. "New" Document = Reviewer's Upload (Current PDF) or the specific log's PDF
+            const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
+
+            if (!originalPdfUrl) throw new Error("Base PDF (Editor/Original) not found");
+            if (!editedPdfUrl) throw new Error("Comparison PDF (Reviewer) not found.");
+
+            // ✅ FIX: Process URL properly
+            originalPdfUrl = originalPdfUrl.startsWith("http")
+                ? originalPdfUrl
+                : `${NEXT_PUBLIC_BASE_URL}${originalPdfUrl}`;
+
+            const originalIsS3 = originalPdfUrl.includes(".s3.") || originalPdfUrl.includes("amazonaws.com");
+            const originalHeaders = originalIsS3 ? {} : { Authorization: `Bearer ${token}` };
 
             const originalRes = await fetch(originalPdfUrl, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: originalHeaders
             });
             if (!originalRes.ok) throw new Error("Failed to fetch original PDF");
             const originalBlob = await originalRes.blob();
@@ -86,8 +111,11 @@ export default function ReviewerDashboard() {
                 ? editedPdfUrl
                 : `${NEXT_PUBLIC_BASE_URL}${editedPdfUrl}`;
 
+            const editedIsS3 = editedPdfFullUrl.includes(".s3.") || editedPdfFullUrl.includes("amazonaws.com");
+            const editedHeaders = editedIsS3 ? {} : { Authorization: `Bearer ${token}` };
+
             const editedRes = await fetch(editedPdfFullUrl, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: editedHeaders
             });
             if (!editedRes.ok) throw new Error("Failed to fetch edited PDF");
             const editedBlob = await editedRes.blob();
@@ -131,7 +159,7 @@ export default function ReviewerDashboard() {
             const cb = Date.now();
             // ✅ CHANGED: assignedReviewerId instead of assignedEditorId
             const res = await fetch(
-                `${NEXT_PUBLIC_BASE_URL}/api/articles?assignedReviewerId=${reviewerId}&cb=${cb}`,
+                `${NEXT_PUBLIC_BASE_URL}/articles?assignedReviewerId=${reviewerId}&cb=${cb}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -168,7 +196,7 @@ export default function ReviewerDashboard() {
         }
 
         if (!token) {
-            router.push("/management-login");
+            router.push("/management-login/");
             return;
         }
 
@@ -181,10 +209,25 @@ export default function ReviewerDashboard() {
             } catch (e) {
                 console.error("Error parsing user data", e);
                 localStorage.removeItem("reviewerUser");
-                router.push("/management-login");
+                const currentPath = window.location.pathname + window.location.search;
+                router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
             }
+        } else {
+            const currentPath = window.location.pathname + window.location.search;
+            router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
         }
     }, []);
+
+    // ✅ NEW: Auto-select article from URL
+    useEffect(() => {
+        if (articleIdFromUrl && articles.length > 0 && !selectedArticle) {
+            const art = articles.find(a => (a.id || a._id) === articleIdFromUrl);
+            if (art) {
+                setSelectedArticle(art);
+                setPdfViewMode("original");
+            }
+        }
+    }, [articleIdFromUrl, articles, selectedArticle]);
 
     const [lastEditorPdf, setLastEditorPdf] = useState(null); // ✅ NEW: Track Editor's PDF
     const [hasReviewerUploaded, setHasReviewerUploaded] = useState(false); // ✅ NEW: Track Reviewer activity
@@ -195,7 +238,7 @@ export default function ReviewerDashboard() {
             const token = localStorage.getItem("reviewerToken");
             const cb = Date.now();
             const res = await fetch(
-                `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-history?cb=${cb}`,
+                `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/change-history?cb=${cb}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -243,12 +286,10 @@ export default function ReviewerDashboard() {
                     editorDocx = editorDocxLog.editorDocumentUrl || editorDocxLog.newFileUrl;
                 }
 
-                // Check if Reviewer has uploaded anything
-                const reviewerLog = logs.find(log => log.role?.toLowerCase() === "reviewer");
-                if (reviewerLog) reviewerUploaded = true;
-
-                setLastEditorPdf(editorPdf);
-                setHasReviewerUploaded(reviewerUploaded);
+                // Check if Reviewer has ever uploaded anything in logs
+                const reviewerLogExists = logs.some(log => (log.role || log.changedBy?.role || "").toUpperCase() === "REVIEWER");
+                setHasReviewerUploaded(reviewerLogExists); // ✅ Fixed: Use the correctly calculated variable
+                setLastEditorPdf(editorPdf); // ✅ Restore baseline for track file
                 // Also save editorDocx in state to pass down (we can piggyback on selectedArticle or new state)
                 if (editorDocx) {
                     setSelectedArticle(prev => ({ ...prev, editorCorrectedDocxUrl: editorDocx }));
@@ -306,7 +347,7 @@ export default function ReviewerDashboard() {
 
             // ✅ CHANGED: Using correct reviewer endpoint
             const res = await fetch(
-                `${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id
+                `${NEXT_PUBLIC_BASE_URL}/articles/${selectedArticle.id || selectedArticle._id
                 }/reviewer-upload`,
                 {
                     method: "PATCH",
@@ -338,6 +379,15 @@ export default function ReviewerDashboard() {
                     setSelectedArticle((prev) => ({ ...prev, ...data.article }));
                     setPdfViewMode("current");
                     setPdfTimestamp(Date.now());
+                }
+
+                // ✅ UPDATE DIFF DATA (If provided by backend)
+                if (data.diffResult || data.diffData) {
+                    setCurrentDiffData(data.diffResult || data.diffData);
+                } else {
+                    // Fallback: If not in response, maybe fetch latest log details?
+                    // For now, assume backend sends it or user can view visual diff.
+                    setCurrentDiffData(null);
                 }
             } else {
                 toast.update(toastId, {
@@ -372,7 +422,7 @@ export default function ReviewerDashboard() {
             const token = localStorage.getItem("reviewerToken");
             // ✅ CHANGED: Endpoint -> reviewer-approve
             const res = await fetch(
-                `${NEXT_PUBLIC_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id
+                `${NEXT_PUBLIC_BASE_URL}/articles/${selectedArticle.id || selectedArticle._id
                 }/reviewer-approve`,
                 {
                     method: "PATCH",
@@ -400,7 +450,7 @@ export default function ReviewerDashboard() {
         // ✅ CHANGED: removing reviewer tokens
         localStorage.removeItem("reviewerToken");
         localStorage.removeItem("reviewerUser");
-        router.push("/management-login");
+        router.push("/management-login/");
     };
 
     const handleDownloadFile = async (fileUrl, fileName, type) => {
@@ -413,9 +463,16 @@ export default function ReviewerDashboard() {
                 ? fileUrl
                 : `${NEXT_PUBLIC_BASE_URL}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
 
+            // ✅ FIX: Only send Authorization header to backend APIs, not S3 URLs
+            const isS3Url = fullUrl.includes('.s3.') || fullUrl.includes('amazonaws.com');
+            const headers = {};
+            if (!isS3Url) {
+                headers.Authorization = `Bearer ${token}`;
+            }
+
             const res = await fetch(fullUrl, {
                 method: "GET",
-                headers: { Authorization: `Bearer ${token}` },
+                headers: headers,
             });
 
             if (!res.ok) throw new Error("Download failed");
@@ -447,7 +504,7 @@ export default function ReviewerDashboard() {
             const articleId = selectedArticle.id || selectedArticle._id;
 
             const res = await fetch(
-                `${NEXT_PUBLIC_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`,
+                `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`,
                 {
                     method: "GET",
                     headers: { Authorization: `Bearer ${token}` },
@@ -503,6 +560,11 @@ export default function ReviewerDashboard() {
         const cleanUrl = path.startsWith("http")
             ? path
             : `${NEXT_PUBLIC_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+
+        // 🛑 STOP: Do NOT cache-bust S3 Presigned URLs (it breaks the signature)
+        if (cleanUrl.includes('amazonaws.com') || cleanUrl.includes('s3.')) {
+            return cleanUrl;
+        }
 
         return `${cleanUrl}?cb=${pdfTimestamp}`;
     };
@@ -597,19 +659,14 @@ export default function ReviewerDashboard() {
 
                             <button
                                 onClick={() => {
-                                    // ✅ Validation: Only show if Reviewer has uploaded
-                                    if (!hasReviewerUploaded) {
-                                        toast.warning("Please upload a file to view Reviewer PDF");
-                                        return;
-                                    }
-
                                     setPdfViewMode("current");
                                     setIsMobileMenuOpen(false);
                                 }}
+                                disabled={!hasReviewerUploaded}
                                 className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "current"
                                     ? "bg-white text-red-700 shadow-lg"
                                     : "hover:bg-red-800 text-white"
-                                    }`}
+                                    } ${!hasReviewerUploaded ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                                 View Reviewer PDF
                                 {pdfViewMode === "current" && (
@@ -618,23 +675,18 @@ export default function ReviewerDashboard() {
                             </button>
 
                             <button
-                                type="button" // ✅ Explicitly defined type
+                                type="button"
                                 onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    if (changeHistory && changeHistory.length > 0) {
-                                        const latestLog = changeHistory[0];
-                                        handleViewVisualDiff(latestLog.id || latestLog._id);
-                                        setIsMobileMenuOpen(false);
-                                    } else {
-                                        toast.info("No change history available to generate diff.");
-                                    }
+                                    handleViewVisualDiff(); // Calls with default latest
+                                    setIsMobileMenuOpen(false);
                                 }}
-                                disabled={isGeneratingDiff}
+                                disabled={isGeneratingDiff || !hasReviewerUploaded}
                                 className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === "visual-diff"
                                     ? "bg-white text-red-700 shadow-lg"
                                     : "hover:bg-red-800 text-white"
-                                    } ${isGeneratingDiff ? "opacity-50 cursor-not-allowed" : ""}`}
+                                    } ${isGeneratingDiff || !hasReviewerUploaded ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                                 {isGeneratingDiff ? (
                                     <>
@@ -658,26 +710,22 @@ export default function ReviewerDashboard() {
                                     setUploadedFile(null);
                                     setIsMobileMenuOpen(false);
                                 }}
-                                className="w-full text-left p-3 rounded-lg font-semibold bg-red-900 text-red-100 hover:bg-black hover:text-white transition-all flex items-center gap-2"
+                                className="w-full text-left p-3 rounded-lg font-semibold bg-red-900 text-red-100 hover:bg-black hover:text-white transition-all flex items-center gap-2 mt-4"
                             >
-                                ⬅ Back to Task List
+                                ⬅ Back to All Articles
                             </button>
                         </>
                     )}
                 </nav>
 
-                {
-                    !selectedArticle && (
-                        <div className="p-4 border-t border-red-800">
-                            <button
-                                onClick={handleLogout}
-                                className="w-full p-2 text-sm bg-red-900 rounded font-medium uppercase"
-                            >
-                                Logout
-                            </button>
-                        </div>
-                    )
-                }
+                <div className="p-4 border-t border-red-800">
+                    <button
+                        onClick={handleLogout}
+                        className="w-full p-2 text-sm bg-red-900 hover:bg-red-950 rounded font-medium uppercase transition-colors"
+                    >
+                        Logout
+                    </button>
+                </div>
             </aside >
 
             {/* MAIN CONTENT AREA */}
@@ -802,6 +850,7 @@ export default function ReviewerDashboard() {
                                 handleDownloadFile={handleDownloadFile}
                                 currentDiffData={currentDiffData}
                                 isGeneratingDiff={isGeneratingDiff}
+                                isLocked={hasReviewerUploaded} // ✅ Passed Persistent Lock State
                                 isApproving={isApproving}
                             />
                         )
@@ -809,5 +858,17 @@ export default function ReviewerDashboard() {
                 </div >
             </main >
         </div >
+    );
+}
+
+export default function ReviewerDashboard() {
+    return (
+        <Suspense fallback={
+            <div className="h-screen flex items-center justify-center bg-gray-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+            </div>
+        }>
+            <ReviewerDashboardContent />
+        </Suspense>
     );
 }

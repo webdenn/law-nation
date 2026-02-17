@@ -60,7 +60,7 @@ function SetupForm() {
 
     try {
       // 2. Backend API Call
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/auth/setup-password`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/auth/setup-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, password })
@@ -75,9 +75,10 @@ function SetupForm() {
         localStorage.clear();
         sessionStorage.clear();
 
-        // 👇 REDIRECT UPDATE: Redirects to User Home
+        // 👇 REDIRECT UPDATE: Redirects to User Home with hard reload to ensure path correctness
         setTimeout(() => {
-          window.location.href = "/law/home";
+          // Use exact path matching user requirement
+          window.location.replace("/management-login/");
         }, 2000);
 
       } else {

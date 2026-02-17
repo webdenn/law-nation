@@ -334,22 +334,7 @@ export default function DocumentViewer({
                                         Final Version (DOCX)
                                     </button>
 
-                                    <div className="border-t border-gray-100 my-2 pt-2"></div>
-                                    <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">
-                                        Review Versions (DOCX)
-                                    </h3>
-
-                                    {/* Admin Edited - Always Visible, Disabled if missing */}
-                                    <button
-                                        onClick={() => handleDownloadFile(selectedArticle.latestAdminDocxUrl, `Admin_Edited_${selectedArticle.title}`, "Word")}
-                                        disabled={!selectedArticle.latestAdminDocxUrl}
-                                        className={`w-full py-2 border rounded text-xs font-bold transition ${selectedArticle.latestAdminDocxUrl
-                                            ? "bg-gray-50 hover:bg-gray-100 text-red-700 border-gray-200"
-                                            : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                                            }`}
-                                    >
-                                        Admin Edited (DOCX)
-                                    </button>
+                                    {/* Removed Admin Edited DOCX Button as per request */}
 
                                     {selectedArticle.latestEditorDocxUrl && (
                                         <button

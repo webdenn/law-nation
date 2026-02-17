@@ -13,7 +13,7 @@ export function generateWelcomeEmailHtml(data: {
       </p>
       
       <div style="margin: 35px 0;">
-        <a href="${data.frontendUrl}/law/home" style="background-color: #d32f2f; color: #ffffff; padding: 15px 35px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">ACCESS PORTAL</a>
+        <a href="${data.frontendUrl}/" style="background-color: #d32f2f; color: #ffffff; padding: 15px 35px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">ACCESS PORTAL</a>
       </div>
       
       <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 30px 0;">

@@ -129,6 +129,12 @@ export default function SubmitPaperPage() {
     // ✅ Zod Schema: /^[a-zA-Z\s\-:,.'&()]+$/ (Letters, space, basic punctuation. NO NUMBERS)
     const titleRegex = /^[a-zA-Z\s\-:,.'&()]+$/;
 
+    // ✅ Strict Email Regex
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    // ✅ Phone Regex (Exactly 10 digits)
+    const phoneRegex = /^\d{10}$/;
+
     if (currentStep === 1) {
       // 1. Primary Author Check
       if (!formData.fullName || !formData.email) {
@@ -144,9 +150,17 @@ export default function SubmitPaperPage() {
         return;
       }
 
-      // Check if email contains @
-      if (!formData.email.includes("@")) {
-        toast.error("Please enter a valid email address (must contain '@').", {
+      // Check if email is valid
+      if (!emailRegex.test(formData.email)) {
+        toast.error("Please enter a valid email address (e.g., example@domain.com).", {
+          position: "top-center"
+        });
+        return;
+      }
+
+      // Check Primary Author Phone (if provided, must be 10 digits)
+      if (formData.phone && !phoneRegex.test(formData.phone)) {
+        toast.error("Primary Author phone number must be exactly 10 digits.", {
           position: "top-center"
         });
         return;
@@ -173,20 +187,23 @@ export default function SubmitPaperPage() {
       }
 
       // Check Second Author Email if exists
-      if (
-        formData.secondAuthorEmail &&
-        !formData.secondAuthorEmail.includes("@")
-      ) {
+      if (formData.secondAuthorEmail && !emailRegex.test(formData.secondAuthorEmail)) {
         toast.error("Second Author email must be a valid email address.");
+        return;
+      }
+
+      // Check Second Author Phone if exists
+      if (formData.secondAuthorPhone && !phoneRegex.test(formData.secondAuthorPhone)) {
+        toast.error("Second Author phone number must be exactly 10 digits.");
         return;
       }
     }
 
     if (currentStep === 2) {
-      // 1. Title Length Validation (Min 50, Max 100)
-      if (!formData.articleTitle || formData.articleTitle.length < 50) {
+      // 1. Title Length Validation (Min 10, Max 100)
+      if (!formData.articleTitle || formData.articleTitle.length < 10) {
         toast.error(
-          `Title is too short! Current: ${formData.articleTitle.length}. Minimum required: 50 characters.`
+          `Title is too short! Current: ${formData.articleTitle.length}. Minimum required: 10 characters.`
         );
         return;
       }
@@ -203,21 +220,19 @@ export default function SubmitPaperPage() {
         return;
       }
 
-      // 3. Abstract Validation (Min 50, Max 500)
-      if (
-        !formData.detailedDescription ||
-        formData.detailedDescription.length < 50
-      ) {
+      // 3. Abstract Word Count Validation (Min 50, Max 300 words)
+      const wordCount = getWordCount(formData.detailedDescription);
+      if (wordCount < 50) {
         toast.error(
-          `Abstract is too short! Current: ${formData.detailedDescription.length} chars. Minimum required: 50.`
+          `Abstract is too short! Current: ${wordCount} words. Minimum required: 50 words.`
         );
         return;
       }
-      // Max 500 is handled by HTML maxLength, but good to check logic
-      if (formData.detailedDescription.length > 500) {
-        toast.error("Abstract must not exceed 500 characters.");
+      if (wordCount > 300) {
+        toast.error(`Abstract is too long! Current: ${wordCount} words. Maximum allowed: 300 words.`);
         return;
       }
+      // Max check removed here as it is handled by word count above
     }
 
     if (currentStep < totalSteps) {
@@ -413,7 +428,7 @@ export default function SubmitPaperPage() {
             <button
               onClick={() => {
                 setShowSuccessModal(false);
-                router.push("/home"); // 👈 Ye home ('/') par redirect kar dega
+                router.push("/"); // 👈 Ye home ('/') par redirect kar dega
               }}
               className="w-full py-3.5 px-6 bg-green-600 hover:bg-green-700 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
             >
@@ -431,7 +446,7 @@ export default function SubmitPaperPage() {
             {/* Modal Header */}
             <div className="p-5 sm:p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
               <h3 className="text-xl font-bold text-gray-900">
-                Terms and Conditions
+                Terms of Submission
               </h3>
               <button
                 onClick={() => setShowTermsModal(false)}
@@ -464,59 +479,73 @@ export default function SubmitPaperPage() {
                 }
               }}
             >
-              <div className="space-y-4">
-                <p className="font-semibold text-gray-900">
-                  Please read the following terms carefully before submitting.
-                </p>
+              <div className="space-y-6">
+                <div className="text-center mb-6">
+                  <h4 className="text-lg font-bold text-gray-900 uppercase">Terms of Submission</h4>
+                </div>
+
                 <p>
-                  1. <strong>Originality:</strong> I/We declare that the manuscript is an
-                  original work and has not been published previously in any form. It is
-                  not currently under consideration for publication elsewhere.
+                  By submitting any material to this website, the Author agrees to be bound by the following Terms and Conditions. These terms constitute a legally binding agreement between the Author and Law Nation Prime Times Journal ("LN").
                 </p>
+
                 <p>
-                  2. <strong>Authorship:</strong> All authors have significantly contributed
-                  to the research and manuscript preparation. I confirm that I have the
-                  authority to submit this work on behalf of all co-authors.
+                  "Author's Submission" refers to all materials submitted by the Author to LN, including but not limited to research papers, articles, manuscripts, abstracts, figures, images, audio-visual materials, and/or any other accompanying data submitted by the Author.
                 </p>
-                <p>
-                  3. <strong>Copyright & Licensing:</strong> Upon acceptance, the copyright
-                  of the manuscript will be transferred to Law Nation Prime Times Journal.
-                  The journal reserves the right to distribute, publish, and reproduce the
-                  article.
-                </p>
-                <p>
-                  4. <strong>Liability:</strong> The authors bear full responsibility for
-                  the content. Law Nation Prime Times Journal is not liable for any claims
-                  related to plagiarism, defamation, or copyright infringement arising from
-                  the published work.
-                </p>
-                <p>
-                  5. <strong>Ethics:</strong> The research adheres to ethical standards. Any
-                  conflicts of interest have been disclosed.
-                </p>
-                <p>
-                  6. <strong>Review Process:</strong> I understand that the manuscript will
-                  undergo a peer-review process, and acceptance is subject to the reviewers'
-                  comments and editorial decision.
-                </p>
-                <p>
-                  7. <strong>Withdrawal Policy:</strong> Withdrawal of the manuscript after
-                  submission may be subject to the journal's withdrawal policy and potential
-                  fees if the review process has already commenced.
-                </p>
-                <p>
-                  8. <strong>Data Privacy:</strong> Personal data collected during submission
-                  will be used solely for the purpose of processing and publishing the article.
-                </p>
-                <p>
-                  9. <strong>Plagiarism Policy:</strong> I understand that my submission will
-                  be checked for plagiarism. If similarity counts exceed the permissible limit,
-                  the manuscript may be rejected immediately.
-                </p>
-                <p>
-                  10. <strong>Declaration:</strong> By clicking "I Accept", I confirm that all
-                  information provided is accurate and I agree to abide by the terms stated above.
-                </p>
+
+                <div>
+                  <h5 className="font-bold text-gray-900 mb-2">1. The Exclusivity Period:</h5>
+                  <p className="mb-2">To ensure the integrity of the review process, the Author agree to the following strict exclusivity terms:</p>
+                  <ul className="list-disc ml-6 space-y-2">
+                    <li>Upon submission, the Author grants LN an exclusive, irrevocable right to review the Author’s Submission for a period of sixty (60) days from the date of submission.</li>
+                    <li>The Author warrant that the Author’s Submission is not currently under review by any other publication, and the Author agree not to submit, publish, post, or license the Author’s Submission to any other third party during the said period.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900 mb-2">2. Transfer of Ownership and Copyright:</h5>
+                  <p className="mb-2">If, within the said period, LN (a) publishes the Author’s Submission, or (b) communicates acceptance of the Author’s Submission for future publication:</p>
+                  <ul className="list-disc ml-6 space-y-2">
+                    <li>The Author hereby assigns, transfers, and conveys all right, title, and interest in the Author’s Submission to LN, which shall include the copyright and intellectual property rights subject to the applicable laws.</li>
+                    <li>LN shall own the exclusive right to reproduce, distribute, display, perform, adapt, translate, and create derivative works of the Author’s Submission in any format now known or hereafter developed (including print, digital, and electronic databases).</li>
+                    <li>LN shall have all the rights in the Author’s Submission post publication which shall be valid for a full term of copyright and any extensions or renewals thereof. The Author retains no residual rights to the accepted/published work without the express written consent of LN.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900 mb-2">3. Editorial Discretion and Moral Rights:</h5>
+                  <p>LN reserves the absolute right to edit, redact, modify, shorten, or format the Author’s Submission as per editorial standards, clarity, or legal requirements.</p>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900 mb-2">4. Reversion of Rights (Rejection or Expiry):</h5>
+                  <ul className="list-disc ml-6 space-y-2 text-justify">
+                    <li>
+                      Ownership of the Author's Submission shall revert to the Author <strong>only if</strong>:
+                      <ul className="list-decimal ml-6 mt-1 space-y-1">
+                        <li>LN explicitly rejects the Author's Submission in writing; OR</li>
+                        <li>After expiry of sixty (60) days from the date of the Author’s Submission, <strong>without</strong> LN publishing the content or notifying the Author of acceptance/publication.</li>
+                      </ul>
+                    </li>
+                    <li>In any of aforementioned conditions in Clause 4(a) or 4(b), the Author’s Submission is no longer the property of LN, and the sixty (60) days is free to publish it elsewhere.</li>
+                    <li><strong>No Liability:</strong> LN shall not be liable for any loss of opportunity or damages resulting from the delay during the review period of sixty (60) days and/or subsequent rejection.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900 mb-2">5. Author Warranties and Strict Liability:</h5>
+                  <p className="mb-2">The Author represents and warrants that:</p>
+                  <ul className="list-disc ml-6 space-y-2">
+                    <li>The Author’s Submission is entirely original and is the Author’s own work.</li>
+                    <li>The Author’s Submission does not exceed the permissible limit of plagiarism i.e., 12 % and does not infringe upon the copyright, trademark, privacy, or any other rights of any third party.</li>
+                    <li>The Author’s Submission is not defamatory, libelous, obscene, or seditious, and does not violate the applicable laws.</li>
+                    <li>The Author agrees to indemnify, defend, and hold harmless LN, its publishers, editors, and agents from any and all claims, liabilities, legal fees, and damages arising from a breach of these warranties or any third-party claim regarding the Author’s Submission.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900 mb-2">6. Governing Law and Jurisdiction:</h5>
+                  <p>These Terms shall be governed by and construed in accordance with the laws of India. Any disputes regarding the ownership or publication of the Author’s Submission shall be subject to the exclusive jurisdiction of the courts located in New Delhi.</p>
+                </div>
                 {/* Extra spacer to ensure scrolling is needed on smaller screens */}
                 <div className="h-10"></div>
               </div>
@@ -941,12 +970,12 @@ export default function SubmitPaperPage() {
                         Article Title
                       </label>
                       <span
-                        className={`text-xs ${formData.articleTitle.length < 50
+                        className={`text-xs ${formData.articleTitle.length < 10
                           ? "text-red-500"
                           : "text-green-600"
                           }`}
                       >
-                        {formData.articleTitle.length}/100 chars (Min 50)
+                        {formData.articleTitle.length}/100 chars (Min 10)
                       </span>
                     </div>
                     <input
@@ -955,7 +984,7 @@ export default function SubmitPaperPage() {
                       value={formData.articleTitle}
                       onChange={handleInputChange}
                       maxLength={100} // Backend Max Limit
-                      placeholder="Enter a clear and concise title (Min 50 characters)"
+                      placeholder="Enter a clear and concise title (Min 10 characters)"
                       className="w-full text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-600"
                       required
                     />
@@ -971,12 +1000,12 @@ export default function SubmitPaperPage() {
                         Detailed Description
                       </label>
                       <span
-                        className={`text-xs sm:text-sm ${formData.detailedDescription.length < 50
+                        className={`text-xs sm:text-sm ${getWordCount(formData.detailedDescription) < 50 || getWordCount(formData.detailedDescription) > 300
                           ? "text-red-500"
-                          : "text-gray-500"
+                          : "text-green-600"
                           }`}
                       >
-                        {formData.detailedDescription.length}/500 characters
+                        {getWordCount(formData.detailedDescription)}/300 words
                         (Min 50)
                       </span>
                     </div>
@@ -985,9 +1014,8 @@ export default function SubmitPaperPage() {
                       name="detailedDescription"
                       value={formData.detailedDescription}
                       onChange={handleInputChange}
-                      placeholder="Provide a summary of your article (Max 500 characters)..."
-                      rows={6}
-                      maxLength={500} // ✅ LIMIT: User 500 se zyada type nahi kar payega
+                      placeholder="Provide a detailed summary of your article (50 - 300 words)..."
+                      rows={8}
                       className="w-full text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent resize-y"
                       required
                     />
@@ -1236,7 +1264,6 @@ export default function SubmitPaperPage() {
                       onChange={handleCaptchaChange}
                     />
                   </div>
-                  ``
                   <button
                     type="submit"
                     disabled={isLoading}

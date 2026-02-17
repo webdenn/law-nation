@@ -2,11 +2,24 @@ import path from 'path';
 import fs from 'fs';
 
 /**
+ * Check if a path is a URL
+ */
+function isUrl(filePath: string): boolean {
+  return filePath.startsWith('http://') || filePath.startsWith('https://');
+}
+
+/**
  * Resolve file path to absolute path
- * Handles web-style paths, relative paths, and absolute paths
+ * Handles URLs, web-style paths, relative paths, and absolute paths
  */
 export function resolveToAbsolutePath(filePath: string): string {
   console.log(`🔧 [Path Utils] Resolving: ${filePath}`);
+  
+  // Check if it's a URL (Supabase or other remote URLs)
+  if (isUrl(filePath)) {
+    console.log(`🌐 [Path Utils] URL detected, returning as-is: ${filePath}`);
+    return filePath; // Return URLs unchanged - they should be handled by download logic
+  }
   
   // Check if it's a Windows absolute path (C:\... or D:\...)
   const isWindowsAbsolute = /^[A-Za-z]:\\/.test(filePath);
@@ -34,8 +47,15 @@ export function resolveToAbsolutePath(filePath: string): string {
 
 /**
  * Check if file exists at the resolved absolute path
+ * For URLs, this will return false since they're not local files
  */
 export function fileExistsAtPath(filePath: string): boolean {
+  // If it's a URL, we can't check local file existence
+  if (isUrl(filePath)) {
+    console.log(`🌐 [Path Utils] URL detected, cannot check local existence: ${filePath}`);
+    return false; // URLs don't exist as local files
+  }
+  
   const absolutePath = resolveToAbsolutePath(filePath);
   const exists = fs.existsSync(absolutePath);
   console.log(`🔧 [Path Utils] File exists check: ${absolutePath} → ${exists ? '✅' : '❌'}`);
@@ -44,8 +64,15 @@ export function fileExistsAtPath(filePath: string): boolean {
 
 /**
  * Convert absolute path to web-style relative path
+ * URLs are returned as-is since they're already web-accessible
  */
 export function convertToWebPath(absolutePath: string): string {
+  // If it's a URL, return as-is (already web-accessible)
+  if (isUrl(absolutePath)) {
+    console.log(`🌐 [Path Utils] URL detected, returning as-is: ${absolutePath}`);
+    return absolutePath;
+  }
+  
   const workspaceRoot = process.cwd();
   
   // If it's already a web-style path (starts with /uploads, /temp, etc.), return as-is

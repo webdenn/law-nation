@@ -50,7 +50,7 @@
 //         recaptchaToken: captchaToken // 🔥 YAHAN ADD KARNA HAI
 //       };
 
-//       const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/auth/login`, {
+//       const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/auth/login`, {
 //         method: "POST",
 //         headers: { "Content-Type": "application/json" },
 //         body: JSON.stringify(payload), // Ab payload bhejo, sirf formData nahi
@@ -303,10 +303,10 @@ function LoginContent() {
     try {
       const payload = {
         ...formData,
-        recaptchaToken: captchaToken 
+        recaptchaToken: captchaToken
       };
 
-      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/auth/login`, {
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -332,7 +332,7 @@ function LoginContent() {
           if (redirectPath) {
             router.push(redirectPath);
           } else {
-            router.push("/home");
+            router.push("/");
           }
         }, 1500);
       } else {
@@ -486,9 +486,8 @@ function LoginContent() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className={`w-full px-6 py-2.5 bg-red-600 text-white rounded-lg font-semibold text-sm shadow-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-all duration-200 transform hover:scale-[1.02] ${
-                  isLoading ? "opacity-70 cursor-not-allowed" : ""
-                }`}
+                className={`w-full px-6 py-2.5 bg-red-600 text-white rounded-lg font-semibold text-sm shadow-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-all duration-200 transform hover:scale-[1.02] ${isLoading ? "opacity-70 cursor-not-allowed" : ""
+                  }`}
               >
                 {isLoading ? "Signing In..." : "Sign In"}
               </button>

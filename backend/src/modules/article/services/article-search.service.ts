@@ -1,5 +1,4 @@
-import { prisma } from "@/db/db.js";
-import { Prisma } from "@prisma/client";
+import { Prisma, prisma } from "@/db/db.js";
 
 //Article Search Service Handles full-text search with PostgreSQL
 

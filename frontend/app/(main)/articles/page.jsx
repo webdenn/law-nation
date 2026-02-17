@@ -55,10 +55,10 @@
 //         const params = new URLSearchParams();
 //         // Backend ko 'q' bhejo, wo title/author/keyword sab search karega
 //         params.append("q", query.trim());
-//         url = `${NEXT_PUBLIC_BASE_URL}/api/articles/search?${params.toString()}`;
+//         url = `${NEXT_PUBLIC_BASE_URL}/articles/search?${params.toString()}`;
 //       } else {
 //         // Warna saare published articles load karo
-//         url = `${NEXT_PUBLIC_BASE_URL}/api/articles/published`;
+//         url = `${NEXT_PUBLIC_BASE_URL}/articles/published`;
 //       }
 
 //       const res = await fetch(url);
@@ -286,7 +286,7 @@ function ArticlesContent() {
   // --- States ---
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Initialize from URL
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
 
@@ -305,14 +305,14 @@ function ArticlesContent() {
       if (query.trim()) {
         const params = new URLSearchParams();
         params.append("q", query.trim());
-        url = `${NEXT_PUBLIC_BASE_URL}/api/articles/search?${params.toString()}`;
+        url = `${NEXT_PUBLIC_BASE_URL}/articles/search?${params.toString()}`;
       } else {
-        url = `${NEXT_PUBLIC_BASE_URL}/api/articles/published`;
+        url = `${NEXT_PUBLIC_BASE_URL}/articles/published`;
       }
 
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch");
-      
+
       const data = await res.json();
       const list = data.results || data.articles || [];
       setArticles(list);
@@ -341,11 +341,11 @@ function ArticlesContent() {
       {/* --- Header Section --- */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          
+
           {/* Back Button */}
           <div className="mb-4">
-            <Link 
-              href="/law/home" 
+            <Link
+              href="/"
               className="inline-flex items-center text-gray-500 hover:text-red-700 font-medium transition-colors"
             >
               <ArrowLeftIcon /> Back to Home
@@ -353,7 +353,7 @@ function ArticlesContent() {
           </div>
 
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            
+
             {/* Title */}
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Research Library</h1>
@@ -378,8 +378,8 @@ function ArticlesContent() {
                   <button
                     type="button"
                     onClick={() => {
-                        setSearchTerm("");
-                        router.push("/articles");
+                      setSearchTerm("");
+                      router.push("/articles");
                     }}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                   >
@@ -431,8 +431,8 @@ function ArticlesContent() {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       loading="lazy"
                       onError={(e) => {
-                          e.target.onerror = null; 
-                          e.target.style.display = 'none'; 
+                        e.target.onerror = null;
+                        e.target.style.display = 'none';
                       }}
                     />
                   ) : (

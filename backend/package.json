@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@adobe/pdfservices-node-sdk": "^4.1.0",
+    "@aws-sdk/client-s3": "^3.984.0",
+    "@aws-sdk/s3-request-presigner": "^3.984.0",
     "@prisma/adapter-pg": "^7.1.0",
     "@prisma/client": "^7.2.0",
     "@supabase/supabase-js": "^2.88.0",

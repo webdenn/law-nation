@@ -79,7 +79,7 @@ const RecentArticlesWidget = ({ currentSlug }) => {
     const fetchRecents = async () => {
       try {
         // Fetch published articles (using the same endpoint as Home)
-        const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/articles/published`);
+        const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/articles/published`);
         if (res.ok) {
           const data = await res.json();
           const list = data.results || data.articles || [];
@@ -153,7 +153,7 @@ export default function ArticlePage({ params }) {
 
         // ✅ API URL Fix: Backend dev ke mutabiq '/content' hata diya
         const res = await fetch(
-          `${NEXT_PUBLIC_BASE_URL}/api/articles/slug/${slug}/content`,
+          `${NEXT_PUBLIC_BASE_URL}/articles/slug/${slug}/content`,
           {
             method: "GET",
             headers: headers,
@@ -194,7 +194,7 @@ export default function ArticlePage({ params }) {
 
       // ✅ Database ID use karein kyunki slug se download nahi hota
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${article.id || article._id}/${endpoint}`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${article.id || article._id}/${endpoint}`,
         {
           method: "GET",
           headers: {
@@ -236,114 +236,33 @@ export default function ArticlePage({ params }) {
     );
 
 
-  // Helper: Render text with Medium-style formatting (typography + lists)
+  // Helper: Render text preserving original formatting (whitespace, newlines)
   const renderMediumContent = (text) => {
     if (!text) return null;
 
-    // Pre-process: Ensure lists are on new lines if they're stuck in the middle of text
-    // 1. Numbered lists (e.g., "text. 1. Item") -> "text.\n1. Item"
-    // We look for a period/colon/newline, space, digit, dot, space.
-    let formattedText = text
-      .replace(/([.:?!])\s+(\d+\.\s+)/g, "$1\n$2")  // Fix stuck numbered lists
-      .replace(/([.:?!])\s+([•*-]\s+)/g, "$1\n$2"); // Fix stuck bullets
-
-    // Also handle cases where a list starts a paragraph without a preceding punctuation match if needed,
-    // but the above covers the "inline" case. 
-    // Additional cleanup for common patterns:
-    formattedText = formattedText.replace(/(\n|^)(\d+\.)([^\s])/g, "$1$2 $3"); // Ensure space after dot in "1.Text"
-
-    const lines = formattedText.split('\n');
-    const elements = [];
-    let currentList = null;
-
-    const renderList = (list, key) => {
-      const Tag = list.type;
-      const listClass = list.type === 'ul' ? 'list-disc' : 'list-decimal';
-      return (
-        <Tag key={key} className={`mb-6 pl-5 space-y-2 ${listClass} ml-2 text-[20px] text-[#292929] leading-[32px]`}>
-          {list.items.map((item, i) => (
-            <li key={i} className="pl-1" dangerouslySetInnerHTML={{ __html: item }} />
-          ))}
-        </Tag>
-      );
-    };
-
-    lines.forEach((line, index) => {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        if (currentList) {
-          elements.push(renderList(currentList, `list-${index}`));
-          currentList = null;
-        }
-        return;
-      }
-
-      // Check for list items
-      const isBullet = /^[-*•]\s/.test(trimmed);
-      const isNumber = /^\d+\.\s/.test(trimmed);
-
-      if (isBullet || isNumber) {
-        const listType = isBullet ? 'ul' : 'ol';
-        // If switching list types or just starting
-        if (!currentList || currentList.type !== listType) {
-          if (currentList) elements.push(renderList(currentList, `list-${index}-prev`));
-          currentList = { type: listType, items: [] };
-        }
-        // Remove the marker for display
-        const itemContent = trimmed.replace(/^([-*•]|\d+\.)\s/, '');
-        currentList.items.push(itemContent);
-      } else {
-        // Close list if open
-        if (currentList) {
-          elements.push(renderList(currentList, `list-${index}`));
-          currentList = null;
-        }
-        // Regular paragraph (Medium style)
-        elements.push(
-          <p key={`p-${index}`} className="mb-8 text-[20px] text-[#292929] leading-[32px] tracking-tight text-justify">
-            {trimmed}
-          </p>
-        );
-      }
-    });
-
-    if (currentList) {
-      elements.push(renderList(currentList, `list-end`));
-    }
-
-    return elements;
+    return (
+      <div className="whitespace-pre-wrap text-[16px] sm:text-[18px] text-[#292929] leading-[28px] tracking-tight text-justify font-serif">
+        {text}
+      </div>
+    );
   };
 
   // Calculate guest content preserving structure
   const guestContent = (() => {
     if (token || !article) return "";
 
-    // Helper to strip HTML tags via regex (SSR safe)
-    const stripHtml = (html) => html.replace(/<[^>]*>?/gm, '');
-
-    let textContent = article.content;
-    if (!textContent || textContent.includes("Text extraction failed")) {
-      textContent = article.contentHtml ? stripHtml(article.contentHtml) : (article.abstract || "");
+    // If backend already provided limited text, use it
+    if (article.isLimited && article.content) {
+      return article.content;
     }
 
-    if (!textContent) return "";
-
-    // Preserve structure: Take lines until word count > 250
-    const lines = textContent.split('\n');
-    let accumulatedText = "";
-    let wordCount = 0;
-
-    for (const line of lines) {
-      const words = line.trim().split(/\s+/).length;
-      if (line.trim() === "") continue; // Skip empty lines for count, but logic below handles formatting
-
-      wordCount += words;
-      accumulatedText += line + "\n";
-
-      if (wordCount > 250) break;
+    // Fallback logic (should not be reached if backend is working correctly)
+    const textContent = article.content || (article.contentHtml ? article.contentHtml.replace(/<[^>]*>?/gm, '') : (article.abstract || ""));
+    const words = textContent.split(/\s+/);
+    if (words.length > 250) {
+      return words.slice(0, 250).join(" ") + "...";
     }
-
-    return accumulatedText;
+    return textContent;
   })();
 
   if (error || !article)
@@ -353,7 +272,7 @@ export default function ArticlePage({ params }) {
           Article unavailable
         </h2>
         <Link
-          href="/law/home"
+          href="/"
           className="flex items-center text-sm font-medium text-gray-900 hover:underline"
         >
           <ArrowLeftIcon /> Back to Library
@@ -442,7 +361,10 @@ export default function ArticlePage({ params }) {
               {token ? (
                 // ✅ Logged In: Show Full Content (HTML or Text)
                 article.contentHtml ? (
-                  <div dangerouslySetInnerHTML={{ __html: article.contentHtml }} />
+                  <div
+                    className="whitespace-pre-wrap text-[16px] sm:text-[18px] text-[#292929] leading-[28px] tracking-tight text-justify font-serif [&_img]:max-h-[300px] [&_img]:w-auto [&_img]:mx-auto [&_img]:my-6"
+                    dangerouslySetInnerHTML={{ __html: article.contentHtml }}
+                  />
                 ) : article.content ? (
                   <div className="font-serif max-w-2xl mx-auto">
                     {renderMediumContent(article.content)}
@@ -463,7 +385,7 @@ export default function ArticlePage({ params }) {
                 <div className="absolute inset-x-0 bottom-0 h-48 bg-linear-to-t from-white via-white/95 to-transparent flex items-end justify-center pb-8 z-10">
                   <div className="text-center w-full px-4">
                     <Link
-                      href={`/login?redirect=${pathname}`}
+                      href={`/login?redirect=${encodeURIComponent(pathname)}`}
                       className="inline-flex items-center justify-center bg-red-600 text-white font-bold px-8 py-3.5 rounded-full hover:bg-red-700 transition-all shadow-lg hover:shadow-red-200 transform hover:-translate-y-0.5 group"
                     >
                       <LockIcon />

@@ -3,3 +3,4 @@ node_modules
 backend/prisma/migrations/
 dist
 next
+.next

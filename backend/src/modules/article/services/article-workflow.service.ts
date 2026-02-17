@@ -1,5 +1,6 @@
 import { prisma } from "@/db/db.js";
 import path from "path";
+import fs from "fs";
 import {
   NotFoundError,
   BadRequestError,
@@ -8,6 +9,7 @@ import {
 } from "@/utils/http-errors.util.js";
 import { resolveToAbsolutePath, fileExistsAtPath } from "@/utils/file-path.utils.js";
 import { extractPdfContent } from "@/utils/pdf-extract.utils.js";
+import { addWatermarkToPdf as addLocalWatermark } from "@/utils/pdf-watermark.utils.js";
 import {
   ensureBothFormats,
   getFileType,
@@ -206,16 +208,18 @@ export class ArticleWorkflowService {
     }
 
     // Validate uploaded file is DOCX
-    if (!data.pdfUrl.toLowerCase().endsWith('.docx')) {
+    if (!data.presignedUrl.toLowerCase().endsWith('.docx')) {
       throw new BadRequestError('Please upload a DOCX file');
     }
 
     try {
       // Step 1: Process clean DOCX (editor's upload)
-      const cleanDocxPath = resolveToAbsolutePath(data.pdfUrl);
+      // If it's a URL, we don't resolve to absolute local path - Adobe service will handle either
+      const isUrl = (path: string) => path.startsWith('http://') || path.startsWith('https://');
+      const cleanDocxPath = isUrl(data.presignedUrl) ? data.presignedUrl : resolveToAbsolutePath(data.presignedUrl);
       console.log(`📄 [Clean Process] Processing clean DOCX: ${cleanDocxPath}`);
 
-      if (!fileExistsAtPath(data.pdfUrl)) {
+      if (!isUrl(data.presignedUrl) && !fileExistsAtPath(data.presignedUrl)) {
         throw new Error(`DOCX file not found: ${cleanDocxPath}`);
       }
 
@@ -264,8 +268,24 @@ export class ArticleWorkflowService {
 
       // Create watermarked PDF (overlay/background style) - Apply to clean PDF directly
       const watermarkedPdfPath = cleanPdfPath.replace(/\.pdf$/i, '_watermarked.pdf');
-      console.log(`💧 [Watermark] Adding PDF-style watermark (overlay/background)`);
-      await adobeService.addWatermarkToPdf(cleanPdfPath, watermarkedPdfPath, watermarkData);
+      console.log(`💧 [Watermark] Adding Logo-style watermark (Local)`);
+
+      // Use local utils to add logo + role text (Editor)
+      const pdfBuffer = await addLocalWatermark(
+        cleanPdfPath,
+        {
+          userName: 'LAW NATION EDITOR',
+          downloadDate: watermarkData.downloadDate,
+          articleTitle: watermarkData.articleTitle,
+          articleId: watermarkData.articleId,
+          articleSlug: article.slug || undefined,
+          frontendUrl: watermarkData.frontendUrl
+        },
+        'EDITOR',   // Force EDITOR role
+        'DRAFT'     // Status
+      );
+      fs.writeFileSync(watermarkedPdfPath, pdfBuffer);
+      console.log(`✅ [Watermark] Editor watermark applied locally`);
 
       // Step 6: Convert paths to relative for database storage
       const { convertToWebPath } = await import('@/utils/file-path.utils.js');
@@ -501,7 +521,7 @@ export class ArticleWorkflowService {
     }
 
     // NEW: Use improved workflow for DOCX uploads
-    if (data.pdfUrl.toLowerCase().endsWith('.docx')) {
+    if (data.presignedUrl.toLowerCase().endsWith('.docx')) {
       console.log(`🚀 [Upload] Using improved workflow for DOCX upload`);
       return await this.uploadCorrectedDocxImproved(articleId, editorId, data, userRoles);
     }
@@ -519,10 +539,12 @@ export class ArticleWorkflowService {
     console.log(`📄 [Document Edit] Processing DOCX upload for document ${article.id}`);
 
     // For documents, the uploaded file should be DOCX
-    let docxPath = data.pdfUrl; // This is actually a DOCX file for documents
+    let docxPath = data.presignedUrl; // This is actually a DOCX file for documents
 
     // Fix path resolution - convert relative path to absolute if needed
-    if (docxPath.startsWith('/uploads/')) {
+    const isUrl = (path: string) => path.startsWith('http://') || path.startsWith('https://');
+
+    if (!isUrl(docxPath) && docxPath.startsWith('/uploads/')) {
       docxPath = docxPath.replace('/uploads/', 'uploads/');
       docxPath = path.join(process.cwd(), docxPath);
       console.log(`📂 [Document Edit] Resolved absolute path: ${docxPath}`);
@@ -533,9 +555,9 @@ export class ArticleWorkflowService {
       throw new Error('Document workflow requires DOCX files');
     }
 
-    // Verify file exists
+    // Verify file exists (only for local files)
     const fs = await import('fs');
-    if (!fs.existsSync(docxPath)) {
+    if (!isUrl(docxPath) && !fs.existsSync(docxPath)) {
       throw new Error(`DOCX file not found: ${docxPath}`);
     }
 
@@ -548,11 +570,22 @@ export class ArticleWorkflowService {
       frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
     };
 
-    const watermarkedDocxPath = docxPath.replace(/\.docx$/i, '_edited_watermarked.docx');
+    // Generate local output paths
+    // If input is a URL, we need a base local path for outputs
+    let baseLocalPath: string;
+    if (isUrl(docxPath)) {
+      const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      baseLocalPath = path.join(tempDir, `doc-edit-${Date.now()}.docx`);
+    } else {
+      baseLocalPath = docxPath;
+    }
+
+    const watermarkedDocxPath = baseLocalPath.replace(/\.docx$/i, '_edited_watermarked.docx');
     await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
 
     // Convert edited DOCX to PDF for preview using Adobe Services
-    const pdfPath = docxPath.replace(/\.docx$/i, '_edited.pdf');
+    const pdfPath = baseLocalPath.replace(/\.docx$/i, '_edited.pdf');
     console.log(`🔄 [Adobe] Converting DOCX to PDF for preview: ${watermarkedDocxPath} → ${pdfPath}`);
     await adobeService.convertDocxToPdf(watermarkedDocxPath, pdfPath);
 
@@ -597,7 +630,7 @@ export class ArticleWorkflowService {
   // Existing article editing logic - Enhanced to detect DOCX uploads
   private async handleArticleEdit(article: any, editorId: string, data: UploadCorrectedPdfData) {
     // Check if this is a DOCX upload - if so, treat as document workflow
-    const isDocxUpload = data.pdfUrl.toLowerCase().endsWith('.docx');
+    const isDocxUpload = data.presignedUrl.toLowerCase().endsWith('.docx');
 
     if (isDocxUpload) {
       console.log(`📄 [Article Edit] DOCX detected - switching to document workflow for ${article.id}`);
@@ -619,9 +652,9 @@ export class ArticleWorkflowService {
     }
 
     console.log(
-      `📄 [Editor Upload] Converting file to both formats: ${data.pdfUrl}`
+      `📄 [Editor Upload] Converting file to both formats: ${data.presignedUrl}`
     );
-    const { pdfPath, wordPath } = await ensureBothFormats(data.pdfUrl);
+    const { pdfPath, wordPath } = await ensureBothFormats(data.presignedUrl);
 
     const oldFilePath = article.currentPdfUrl;
     const newFilePath = pdfPath;
@@ -907,7 +940,15 @@ export class ArticleWorkflowService {
       throw new ForbiddenError("You are not assigned as reviewer to this article");
     }
 
-    const validStatuses = ["ASSIGNED_TO_REVIEWER", "REVIEWER_EDITING", "REVIEWER_IN_PROGRESS"];
+    const validStatuses = [
+      "ASSIGNED_TO_REVIEWER",
+      "REVIEWER_EDITING",
+      "REVIEWER_IN_PROGRESS",
+      "ASSIGNED_TO_EDITOR",
+      "EDITOR_IN_PROGRESS",
+      "EDITOR_EDITING",
+      "EDITOR_APPROVED"
+    ];
     if (!validStatuses.includes(article.status)) {
       throw new BadRequestError(
         `Cannot upload corrections in current status: ${article.status}`
@@ -915,21 +956,41 @@ export class ArticleWorkflowService {
     }
 
     // Validate uploaded file is DOCX (reviewers can only upload DOCX)
-    if (!data.pdfUrl.toLowerCase().endsWith('.docx')) {
+    if (!data.presignedUrl.toLowerCase().endsWith('.docx')) {
       throw new BadRequestError('Reviewers can only upload DOCX files');
     }
 
     try {
-      // Process reviewer's DOCX upload
-      const docxPath = resolveToAbsolutePath(data.pdfUrl);
+      // Process reviewer's DOCX upload (supports both local paths and S3 URLs)
+      const docxPath = data.presignedUrl;
       console.log(`📄 [Reviewer Upload] Processing DOCX: ${docxPath}`);
 
-      if (!fileExistsAtPath(data.pdfUrl)) {
-        throw new Error(`DOCX file not found: ${docxPath}`);
+      // Generate proper output paths
+      // For S3 URLs, we need to create temp paths; for local files, use the same directory
+      const isUrl = docxPath.startsWith('http://') || docxPath.startsWith('https://');
+      let pdfPath: string;
+      let watermarkedDocxPath: string;
+      let watermarkedPdfPath: string;
+
+      if (isUrl) {
+        // For S3 URLs, create temp file paths
+        const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        const timestamp = Date.now();
+        pdfPath = path.join(tempDir, `reviewer_${timestamp}.pdf`);
+        watermarkedDocxPath = path.join(tempDir, `reviewer_${timestamp}_watermarked.docx`);
+        watermarkedPdfPath = path.join(tempDir, `reviewer_${timestamp}_watermarked.pdf`);
+      } else {
+        // For local files, use the same directory structure
+        const absoluteDocxPath = resolveToAbsolutePath(docxPath);
+        pdfPath = absoluteDocxPath.replace(/\.docx$/i, '_reviewer.pdf');
+        watermarkedDocxPath = absoluteDocxPath.replace(/\.docx$/i, '_reviewer_watermarked.docx');
+        watermarkedPdfPath = pdfPath.replace(/\.pdf$/i, '_watermarked.pdf');
       }
 
       // Convert DOCX to PDF for preview
-      const pdfPath = docxPath.replace(/\.docx$/i, '_reviewer.pdf');
       console.log(`🔄 [Adobe] Converting reviewer DOCX to PDF`);
       await adobeService.convertDocxToPdf(docxPath, pdfPath);
 
@@ -957,17 +1018,80 @@ export class ArticleWorkflowService {
       };
 
       // Watermark DOCX
-      const watermarkedDocxPath = docxPath.replace(/\.docx$/i, '_reviewer_watermarked.docx');
       await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
 
-      // Watermark PDF
-      const watermarkedPdfPath = pdfPath.replace(/\.pdf$/i, '_watermarked.pdf');
-      await adobeService.addWatermarkToPdf(pdfPath, watermarkedPdfPath, watermarkData);
+      // Watermark PDF using Local Utils (Logo)
+      // await adobeService.addWatermarkToPdf(pdfPath, watermarkedPdfPath, watermarkData);
+      const pdfBuffer = await addLocalWatermark(
+        pdfPath,
+        {
+          userName: 'LAW NATION REVIEWER',
+          downloadDate: watermarkData.downloadDate,
+          articleTitle: watermarkData.articleTitle,
+          articleId: watermarkData.articleId,
+          articleSlug: article.slug || undefined,
+          frontendUrl: watermarkData.frontendUrl
+        },
+        'REVIEWER', // Force REVIEWER role
+        'DRAFT'     // Status
+      );
+      fs.writeFileSync(watermarkedPdfPath, pdfBuffer);
+      console.log(`✅ [Watermark] Reviewer watermark applied locally`);
 
-      // Convert paths to relative for database
-      const { convertToWebPath } = await import('@/utils/file-path.utils.js');
-      const relativeWatermarkedDocx = convertToWebPath(watermarkedDocxPath);
-      const relativeWatermarkedPdf = convertToWebPath(watermarkedPdfPath);
+      // Upload watermarked files to S3 if in production
+      let finalWatermarkedDocxUrl: string;
+      let finalWatermarkedPdfUrl: string;
+
+      if (isUrl) {
+        // Production: Upload watermarked files to S3
+        console.log(`☁️ [Reviewer Upload] Uploading watermarked files to S3...`);
+        const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+
+        const s3Client = new S3Client({
+          region: process.env.AWS_REGION || 'ap-south-1',
+          credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+          },
+        });
+
+        const bucketName = process.env.AWS_S3_BUCKET_ARTICLES || 'articles-bucket';
+        const timestamp = Date.now();
+
+        // Upload watermarked DOCX
+        const docxBuffer = fs.readFileSync(watermarkedDocxPath);
+        const docxKey = `articles/reviewer_${timestamp}_watermarked.docx`;
+        await s3Client.send(new PutObjectCommand({
+          Bucket: bucketName,
+          Key: docxKey,
+          Body: docxBuffer,
+          ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        }));
+        finalWatermarkedDocxUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || 'ap-south-1'}.amazonaws.com/${docxKey}`;
+
+        // Upload watermarked PDF
+        const pdfBuffer = fs.readFileSync(watermarkedPdfPath);
+        const pdfKey = `articles/reviewer_${timestamp}_watermarked.pdf`;
+        await s3Client.send(new PutObjectCommand({
+          Bucket: bucketName,
+          Key: pdfKey,
+          Body: pdfBuffer,
+          ContentType: 'application/pdf',
+        }));
+        finalWatermarkedPdfUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || 'ap-south-1'}.amazonaws.com/${pdfKey}`;
+
+        // Clean up temp files
+        fs.unlinkSync(watermarkedDocxPath);
+        fs.unlinkSync(watermarkedPdfPath);
+        fs.unlinkSync(pdfPath);
+
+        console.log(`✅ [Reviewer Upload] Uploaded to S3: DOCX=${finalWatermarkedDocxUrl}, PDF=${finalWatermarkedPdfUrl}`);
+      } else {
+        // Local: Use file paths as-is
+        const { convertToWebPath } = await import('@/utils/file-path.utils.js');
+        finalWatermarkedDocxUrl = convertToWebPath(watermarkedDocxPath);
+        finalWatermarkedPdfUrl = convertToWebPath(watermarkedPdfPath);
+      }
 
       // Update article with reviewer's version
       const updatedArticle = await prisma.article.update({
@@ -975,8 +1099,8 @@ export class ArticleWorkflowService {
         data: {
           content: extractedText,
           contentHtml: extractedText.replace(/\n/g, '<br>'),
-          currentPdfUrl: relativeWatermarkedPdf,
-          currentWordUrl: relativeWatermarkedDocx,
+          currentPdfUrl: finalWatermarkedPdfUrl,
+          currentWordUrl: finalWatermarkedDocxUrl,
           status: "REVIEWER_IN_PROGRESS",
           reviewedAt: new Date(),
         },
@@ -988,7 +1112,7 @@ export class ArticleWorkflowService {
           articleId: article.id,
           versionNumber: await this.getNextVersionNumber(articleId),
           oldFileUrl: article.currentWordUrl || "",
-          newFileUrl: relativeWatermarkedDocx,
+          newFileUrl: finalWatermarkedDocxUrl,
           fileType: "DOCX",
           diffData: {
             type: "reviewer_edit",
@@ -1008,8 +1132,8 @@ export class ArticleWorkflowService {
         article: updatedArticle,
         extractedTextLength: extractedText.length,
         files: {
-          watermarkedDocx: relativeWatermarkedDocx,
-          watermarkedPdf: relativeWatermarkedPdf,
+          watermarkedDocx: finalWatermarkedDocxUrl,
+          watermarkedPdf: finalWatermarkedPdfUrl,
         }
       };
 
@@ -1285,6 +1409,54 @@ export class ArticleWorkflowService {
       extractedText = 'Document not yet processed. Please contact administrator.';
     }
 
+    // NEW: Extract HTML from DOCX for better formatting if available
+    let contentHtml = '';
+    if (article.currentWordUrl) {
+      try {
+        console.log(`✨ [Document Publish] Attempting HTML extraction from DOCX...`);
+
+        // Try to find CLEAN docx first to avoid watermarks (logos) in HTML
+        let docxPath = article.currentWordUrl;
+        const cleanDocxPath = docxPath.replace(/_watermarked|_edited_watermarked|_edited/g, '').replace('.docx', '.docx'); // simple cleanup heuristic
+        // Proper heuristic: try removing suffixes
+        const potentialCleanPaths = [
+          docxPath.replace('_edited_watermarked.docx', '.docx'),
+          docxPath.replace('_watermarked.docx', '.docx'),
+          docxPath.replace('_edited.docx', '.docx')
+        ];
+
+        const fs = await import('fs');
+        const { resolveToAbsolutePath } = await import("@/utils/file-path.utils.js");
+
+        let foundClean = false;
+        for (const p of potentialCleanPaths) {
+          if (p !== docxPath && p.endsWith('.docx')) {
+            try {
+              const absPath = resolveToAbsolutePath(p);
+              if (fs.existsSync(absPath)) {
+                console.log(`✅ [Document Publish] Found clean DOCX for HTML extraction: ${p}`);
+                docxPath = p;
+                foundClean = true;
+                break;
+              }
+            } catch (e) { /* ignore */ }
+          }
+        }
+
+        if (!foundClean) console.log(`⚠️ [Document Publish] Clean DOCX not found, using current (may have watermark): ${docxPath}`);
+
+        contentHtml = await adobeService.extractHtmlFromDocxUsingMammoth(docxPath);
+        console.log(`✅ [Document Publish] Extracted HTML (${contentHtml.length} characters)`);
+      } catch (error) {
+        console.error('❌ [Document Publish] HTML extraction failed:', error);
+        // Fallback to text with line breaks
+        contentHtml = extractedText.replace(/\n/g, '<br>');
+      }
+    } else {
+      // Fallback
+      contentHtml = extractedText.replace(/\n/g, '<br>');
+    }
+
     // Update article with extracted text and published status
     const updatedArticle = await prisma.article.update({
       where: { id: article.id },
@@ -1292,6 +1464,7 @@ export class ArticleWorkflowService {
         status: "PUBLISHED",
         approvedAt: new Date(),
         content: extractedText, // Store text from final version for user display
+        contentHtml: contentHtml, // Store HTML for rich formatting
         finalPdfUrl: article.currentPdfUrl, // Set final published version
       },
     });
@@ -1379,16 +1552,67 @@ export class ArticleWorkflowService {
       if (extractedText.includes("Text could not be extracted") && article.currentWordUrl) {
         console.warn(`⚠️ [Article Publish] PDF extraction failed during publish, falling back to Mammoth for DOCX...`);
         try {
+          const resolveToAbsolutePath = (await import("@/utils/file-path.utils.js")).resolveToAbsolutePath;
           const docxPath = resolveToAbsolutePath(article.currentWordUrl);
           const mammothText = await adobeService.extractTextFromDocxUsingMammoth(docxPath);
           if (mammothText && mammothText.length > 0) {
             console.log(`✅ [Article Publish] Mammoth fallback successful (${mammothText.length} chars)`);
             extractedText = mammothText;
           }
-        } catch (mammothError) {
-          console.error("❌ [Article Publish] Mammoth fallback failed:", mammothError);
+        } catch (e) {
+          console.error(e);
         }
       }
+    }
+
+    // NEW: Extract HTML from DOCX for rich formatting
+    let contentHtml = '';
+    // Prefer currentWordUrl if available (most likely to have correct formatting)
+    // Or if originalWordUrl is available and no edits were made
+    const wordUrl = article.currentWordUrl || (article.originalPdfUrl === article.currentPdfUrl ? article.originalWordUrl : null);
+
+    if (wordUrl) {
+      try {
+        console.log(`✨ [Article Publish] Attempting HTML extraction from DOCX...`);
+
+        // Try to find CLEAN docx first to avoid watermarks (logos) in HTML
+        let docxPath = wordUrl;
+        const potentialCleanPaths = [
+          docxPath.replace(/_edited_watermarked\.docx$/i, '.docx'),
+          docxPath.replace(/_watermarked\.docx$/i, '.docx'),
+          docxPath.replace(/_edited\.docx$/i, '.docx')
+        ];
+
+        const fs = await import('fs');
+        const { resolveToAbsolutePath } = await import("@/utils/file-path.utils.js");
+
+        let foundClean = false;
+        for (const p of potentialCleanPaths) {
+          if (p !== docxPath && p.toLowerCase().endsWith('.docx')) {
+            try {
+              const absPath = resolveToAbsolutePath(p);
+              if (fs.existsSync(absPath)) {
+                console.log(`✅ [Article Publish] Found clean DOCX for HTML extraction: ${p}`);
+                docxPath = p;
+                foundClean = true;
+                break;
+              }
+            } catch (e) { /* ignore */ }
+          }
+        }
+
+        if (!foundClean) console.log(`⚠️ [Article Publish] Clean DOCX not found, using available (may have watermark): ${docxPath}`);
+
+        contentHtml = await adobeService.extractHtmlFromDocxUsingMammoth(docxPath);
+        console.log(`✅ [Article Publish] Extracted HTML (${contentHtml.length} characters)`);
+      } catch (error) {
+        console.error('❌ [Article Publish] HTML extraction failed:', error);
+        // Fallback to text with line breaks
+        contentHtml = extractedText ? extractedText.replace(/\n/g, '<br>') : '';
+      }
+    } else {
+      // Fallback
+      contentHtml = extractedText ? extractedText.replace(/\n/g, '<br>') : '';
     }
 
     const updatedArticle = await prisma.article.update({
@@ -1396,7 +1620,10 @@ export class ArticleWorkflowService {
       data: {
         status: "PUBLISHED",
         approvedAt: new Date(),
-        content: extractedText, // Store extracted text from final version
+        reviewedAt: new Date(),
+        // content: extractedText, // Don't overwrite existing text if it's there
+        ...(extractedText && { content: extractedText }),
+        contentHtml: contentHtml,
         finalPdfUrl: article.currentPdfUrl, // Set final published version
       },
     });

@@ -292,6 +292,14 @@ router.get(
   articleController.downloadEditorDocx.bind(articleController)
 );
 
+// NEW: Download admin's uploaded DOCX
+router.get(
+  "/:id/download/admin-docx",
+  requireAuth,
+  requirePermission("article", "read"),
+  articleController.downloadAdminDocx.bind(articleController)
+);
+
 
 
 // LEGACY: Keep old download route for backward compatibility (downloads PDF)

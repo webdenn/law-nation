@@ -26,13 +26,13 @@ export default function AddReviewerPage() {
             toast.error("Session Expired. Please Login Again.");
             setLoading(false);
             setTimeout(() => {
-                router.push("/management-login");
+                router.push("/management-login/");
             }, 1500);
             return;
         }
 
         try {
-            const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/users/invite-reviewer`, {
+            const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/users/invite-reviewer`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

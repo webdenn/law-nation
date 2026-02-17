@@ -313,7 +313,7 @@ export default function Navbar() {
   }
 
   const navItems = [
-    { name: "Home", link: "/home" },
+    { name: "Home", link: "/" },
     { name: "Submit a Paper", link: "/submit-paper" },
     { name: "Recent Issues ", link: "/recent-issues" },
     { name: " Law Nation Prime Talks ", link: "/ Law-Nation-Prime-Talks" },
@@ -331,8 +331,8 @@ export default function Navbar() {
     <>
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${scrolled
-            ? "bg-white/90 backdrop-blur-md shadow-sm border-gray-200 py-2"
-            : "bg-white border-transparent py-4"
+          ? "bg-white/90 backdrop-blur-md shadow-sm border-gray-200 py-2"
+          : "bg-white border-transparent py-4"
           }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -362,8 +362,8 @@ export default function Navbar() {
                     key={item.name}
                     href={item.link}
                     className={`relative text-sm font-medium transition-colors duration-200 py-2 ${isActive
-                        ? "text-red-600"
-                        : "text-gray-600 hover:text-red-600"
+                      ? "text-red-600"
+                      : "text-gray-600 hover:text-red-600"
                       }`}
                   >
                     {item.name}
@@ -459,8 +459,8 @@ export default function Navbar() {
                   href={item.link}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`block px-4 py-3 rounded-lg text-base font-medium transition-all ${isActive
-                      ? "bg-red-50 text-red-600 shadow-sm"
-                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                    ? "bg-red-50 text-red-600 shadow-sm"
+                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                     }`}
                 >
                   {item.name}
