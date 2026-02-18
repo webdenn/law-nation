@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import mammoth from "mammoth";
-import TermsModal from "../../components/TermsModal";
+import ReviewerTermsModal from "../../components/ReviewerTermsModal";
 
 // ✅ 1. ICONS (Yahi define kar diye taaki import ki tension na ho)
 const DownloadIcon = () => (
@@ -324,6 +324,18 @@ const ReviewInterface = ({
                             onChange={(e) => setUploadComment(e.target.value)}
                             disabled={!!isLocked}
                         />
+                        {/* T&C Section (Modified to show Modal) */}
+                        {!isLocked && (
+                            <div className="mt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowTermsModal(true)}
+                                    className={`text-xs flex items-center gap-1 hover:underline ${declarationAccepted ? "text-green-600" : "text-blue-600"}`}
+                                >
+                                    {declarationAccepted ? "✓ Terms Accepted" : "View & Accept Terms and Conditions"}
+                                </button>
+                            </div>
+                        )}
 
                         {/* MOVED T&C TO MODAL - REMOVED FROM HERE */}
 
@@ -343,8 +355,8 @@ const ReviewInterface = ({
                     </div>
                 </div>
 
-                {/* T&C Modal */}
-                <TermsModal
+                {/* Reviewer Specific T&C Modal */}
+                <ReviewerTermsModal
                     isOpen={showTermsModal}
                     onClose={() => setShowTermsModal(false)}
                     onAccept={() => setDeclarationAccepted(true)}
