@@ -32,34 +32,53 @@ export class AdminEditorService {
             }
           ]
         },
-        include: {
-          _count: {
-            select: {
-              assignedArticles: true,
-              // We'll need to add completed articles count logic
-            }
-          }
-        },
         orderBy: {
           createdAt: 'desc'
         }
       });
 
-      const editors: Editor[] = users.map(user => ({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        title: user.title,
-        designation: user.designation,
-        specialization: user.specialization || [],
-        experience: user.experience,
-        bio: user.bio,
-        assignedArticles: user._count.assignedArticles,
-        completedArticles: 0, // TODO: Calculate from article status
-        status: user.isActive ? 'ACTIVE' : 'INACTIVE',
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt
-      }));
+      // Calculate stats for each editor
+      const editors: Editor[] = await Promise.all(
+        users.map(async (user) => {
+          const [totalAssigned, pending, completed] = await Promise.all([
+            // Total assigned articles
+            prisma.article.count({
+              where: { assignedEditorId: user.id }
+            }),
+            // Pending articles (in progress)
+            prisma.article.count({
+              where: {
+                assignedEditorId: user.id,
+                status: { in: ['ASSIGNED_TO_EDITOR', 'EDITOR_IN_PROGRESS', 'EDITOR_EDITING'] }
+              }
+            }),
+            // Completed articles
+            prisma.article.count({
+              where: {
+                assignedEditorId: user.id,
+                status: { in: ['EDITOR_APPROVED', 'PUBLISHED'] }
+              }
+            })
+          ]);
+
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            title: user.title,
+            designation: user.designation,
+            specialization: user.specialization || [],
+            experience: user.experience,
+            bio: user.bio,
+            assignedArticles: totalAssigned,
+            completedArticles: completed,
+            pendingArticles: pending,
+            status: user.isActive ? 'ACTIVE' : 'INACTIVE',
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
+          };
+        })
+      );
 
       console.log(`✅ [Admin Editor] Found ${editors.length} editors`);
       return editors;

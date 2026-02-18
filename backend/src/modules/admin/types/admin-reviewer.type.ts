@@ -8,6 +8,7 @@ export interface Reviewer {
   bio: string | null; // professional background
   assignedReviews: number;
   completedReviews: number;
+  pendingReviews?: number; // Reviews currently in progress
   averageReviewTime: number; // in days
   status: 'ACTIVE' | 'INACTIVE';
   createdAt: Date;
