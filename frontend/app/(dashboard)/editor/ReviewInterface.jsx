@@ -277,16 +277,26 @@ const ReviewInterface = ({
               disabled={!!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED"}
             />
 
-            {/* T&C Section (Modified to show Modal) */}
+            {/* T&C Section (Modified to use Checkbox) */}
             {!((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED") && (
-              <div className="mt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowTermsModal(true)}
-                  className={`text-xs flex items-center gap-1 hover:underline ${declarationAccepted ? "text-green-600" : "text-blue-600"}`}
-                >
-                  {declarationAccepted ? "✓ Terms Accepted" : "View & Accept Terms and Conditions"}
-                </button>
+              <div className="mt-4">
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition group">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                    checked={declarationAccepted}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setShowTermsModal(true);
+                      } else {
+                        setDeclarationAccepted(false);
+                      }
+                    }}
+                  />
+                  <span className={`text-xs font-medium transition-colors ${declarationAccepted ? "text-green-700" : "text-gray-600 group-hover:text-blue-600"}`}>
+                    I agree to the <span className="underline decoration-dotted underline-offset-2">Terms and Conditions</span>
+                  </span>
+                </label>
               </div>
             )}
 
