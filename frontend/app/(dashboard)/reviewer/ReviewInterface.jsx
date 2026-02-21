@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import mammoth from "mammoth";
-import TermsModal from "../../components/TermsModal";
+import ReviewerTermsModal from "../../components/ReviewerTermsModal";
 
 // ✅ 1. ICONS (Yahi define kar diye taaki import ki tension na ho)
 const DownloadIcon = () => (
@@ -324,8 +324,28 @@ const ReviewInterface = ({
                             onChange={(e) => setUploadComment(e.target.value)}
                             disabled={!!isLocked}
                         />
-
-                        {/* MOVED T&C TO MODAL - REMOVED FROM HERE */}
+                        {/* T&C Section (Modified to use Checkbox) */}
+                        {!isLocked && (
+                            <div className="mt-4">
+                                <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition group">
+                                    <input
+                                        type="checkbox"
+                                        className="mt-0.5 w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                                        checked={declarationAccepted}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                setShowTermsModal(true);
+                                            } else {
+                                                setDeclarationAccepted(false);
+                                            }
+                                        }}
+                                    />
+                                    <span className={`text-xs font-medium transition-colors ${declarationAccepted ? "text-green-700" : "text-gray-600 group-hover:text-blue-600"}`}>
+                                        I agree to the <span className="underline decoration-dotted underline-offset-2">Terms and Conditions</span>
+                                    </span>
+                                </label>
+                            </div>
+                        )}
 
                         {/* Upload Button */}
                         <button
@@ -343,8 +363,8 @@ const ReviewInterface = ({
                     </div>
                 </div>
 
-                {/* T&C Modal */}
-                <TermsModal
+                {/* Reviewer Specific T&C Modal */}
+                <ReviewerTermsModal
                     isOpen={showTermsModal}
                     onClose={() => setShowTermsModal(false)}
                     onAccept={() => setDeclarationAccepted(true)}

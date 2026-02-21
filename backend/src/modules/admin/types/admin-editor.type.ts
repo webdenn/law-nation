@@ -9,6 +9,7 @@ export interface Editor {
   bio: string | null; // professional background
   assignedArticles: number;
   completedArticles: number;
+  pendingArticles?: number; // Articles currently in progress
   status: 'ACTIVE' | 'INACTIVE';
   createdAt: Date;
   updatedAt: Date;

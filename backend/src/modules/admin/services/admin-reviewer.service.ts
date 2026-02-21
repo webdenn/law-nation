@@ -32,33 +32,53 @@ export class AdminReviewerService {
             }
           ]
         },
-        include: {
-          _count: {
-            select: {
-              reviewedArticles: true
-            }
-          }
-        },
         orderBy: {
           createdAt: 'desc'
         }
       });
 
-      const reviewers: Reviewer[] = users.map(user => ({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        expertise: user.expertise || [],
-        qualification: user.qualification,
-        experience: user.experience,
-        bio: user.bio,
-        assignedReviews: 0, // TODO: Calculate current assigned reviews
-        completedReviews: user._count.reviewedArticles,
-        averageReviewTime: 0, // TODO: Calculate from review history
-        status: user.isActive ? 'ACTIVE' : 'INACTIVE',
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt
-      }));
+      // Calculate stats for each reviewer
+      const reviewers: Reviewer[] = await Promise.all(
+        users.map(async (user) => {
+          const [totalAssigned, pending, completed] = await Promise.all([
+            // Total assigned reviews
+            prisma.article.count({
+              where: { assignedReviewerId: user.id }
+            }),
+            // Pending reviews (in progress)
+            prisma.article.count({
+              where: {
+                assignedReviewerId: user.id,
+                status: { in: ['ASSIGNED_TO_REVIEWER', 'REVIEWER_IN_PROGRESS', 'REVIEWER_EDITING'] }
+              }
+            }),
+            // Completed reviews
+            prisma.article.count({
+              where: {
+                assignedReviewerId: user.id,
+                status: { in: ['REVIEWER_APPROVED', 'PUBLISHED'] }
+              }
+            })
+          ]);
+
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            expertise: user.expertise || [],
+            qualification: user.qualification,
+            experience: user.experience,
+            bio: user.bio,
+            assignedReviews: totalAssigned,
+            completedReviews: completed,
+            pendingReviews: pending,
+            averageReviewTime: 0, // Can be calculated separately if needed
+            status: user.isActive ? 'ACTIVE' : 'INACTIVE',
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
+          };
+        })
+      );
 
       console.log(`✅ [Admin Reviewer] Found ${reviewers.length} reviewers`);
       return reviewers;
