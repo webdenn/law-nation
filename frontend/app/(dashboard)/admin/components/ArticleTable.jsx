@@ -27,6 +27,16 @@ export default function ArticleTable({
 
     toggleVisibility
 }) {
+    const statusMap = {
+        ASSIGNED_TO_EDITOR: "Stage 1 Reviewer Assigned",
+        EDITOR_EDITING: "Stage 1 Reviewer Editing",
+        EDITOR_IN_PROGRESS: "Stage 1 Reviewer In Progress",
+        EDITOR_APPROVED: "Stage 1 Reviewer Approved",
+        ASSIGNED_TO_REVIEWER: "Stage 2 Reviewer Assigned",
+        REVIEWER_EDITING: "Stage 2 Reviewer Editing",
+        REVIEWER_IN_PROGRESS: "Stage 2 Reviewer In Progress",
+        REVIEWER_APPROVED: "Stage 2 Reviewer Approved",
+    };
     const [publishingId, setPublishingId] = useState(null);
 
     const handlePublish = async (id) => {
@@ -126,7 +136,7 @@ export default function ArticleTable({
                                                     : "bg-yellow-100 text-yellow-700"
                                                 }`}
                                         >
-                                            {art.status === "EDITOR_EDITING" ? "Stage 1 Reviewer" : art.status === "REVIEWER_EDITING" ? "Stage 2 Reviewer" : art.status}
+                                            {statusMap[art.status] || art.status}
                                         </span>
                                     </td>
                                     {/* 4. Assign Editor Dropdown */}
@@ -224,7 +234,7 @@ export default function ArticleTable({
                                             : "bg-yellow-100 text-yellow-700"
                                         }`}
                                 >
-                                    {art.status === "EDITOR_EDITING" ? "Stage 1 Reviewer" : art.status === "REVIEWER_EDITING" ? "Stage 2 Reviewer" : art.status}
+                                    {statusMap[art.status] || art.status}
                                 </span>
                             </div>
 
