@@ -155,7 +155,7 @@ function AdminloginContent() {
           <h1 className="text-4xl xl:text-5xl font-bold mb-3 leading-tight">Welcome Back</h1>
           <div className="w-16 h-1 bg-white mb-4"></div>
           <p className="text-lg xl:text-xl text-white/90 font-light leading-relaxed max-w-md">
-            Sign in to access the Admin Panel and manage Law Nation submissions securely.
+            Sign in to access the Admin Panel and manage Law Nation submissions securely. (Stage 1 & Stage 2 Reviewers permitted)
           </p>
         </div>
       </div>
