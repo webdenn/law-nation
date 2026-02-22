@@ -77,6 +77,18 @@ const EditorStatCard = ({ title, count, color }) => (
   </div>
 );
 
+// Status Mapping Utility
+const statusMap = {
+  ASSIGNED_TO_EDITOR: "Stage 1 Reviewer Assigned",
+  EDITOR_EDITING: "Stage 1 Reviewer Editing",
+  EDITOR_IN_PROGRESS: "Stage 1 Reviewer In Progress",
+  EDITOR_APPROVED: "Stage 1 Reviewer Approved",
+  ASSIGNED_TO_REVIEWER: "Stage 2 Reviewer Assigned",
+  REVIEWER_EDITING: "Stage 2 Reviewer Editing",
+  REVIEWER_IN_PROGRESS: "Stage 2 Reviewer In Progress",
+  REVIEWER_APPROVED: "Stage 2 Reviewer Approved",
+};
+
 function EditorDashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -817,7 +829,7 @@ function EditorDashboardContent() {
                             <td className="p-5 text-sm">{art.authorName}</td>
                             <td className="p-5">
                               <span className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded-full">
-                                {art.status === "EDITOR_EDITING" ? "Stage 1 Reviewer" : art.status === "REVIEWER_EDITING" ? "Stage 2 Reviewer" : art.status}
+                                {statusMap[art.status] || art.status}
                               </span>
                             </td>
                             <td className="p-5 text-right">
