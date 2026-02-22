@@ -817,7 +817,7 @@ function EditorDashboardContent() {
                             <td className="p-5 text-sm">{art.authorName}</td>
                             <td className="p-5">
                               <span className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded-full">
-                                {art.status}
+                                {art.status === "EDITOR_EDITING" ? "Stage 1 Reviewer" : art.status === "REVIEWER_EDITING" ? "Stage 2 Reviewer" : art.status}
                               </span>
                             </td>
                             <td className="p-5 text-right">

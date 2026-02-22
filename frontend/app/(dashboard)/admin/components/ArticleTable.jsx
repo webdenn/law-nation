@@ -126,7 +126,7 @@ export default function ArticleTable({
                                                     : "bg-yellow-100 text-yellow-700"
                                                 }`}
                                         >
-                                            {art.status}
+                                            {art.status === "EDITOR_EDITING" ? "Stage 1 Reviewer" : art.status === "REVIEWER_EDITING" ? "Stage 2 Reviewer" : art.status}
                                         </span>
                                     </td>
                                     {/* 4. Assign Editor Dropdown */}
@@ -224,7 +224,7 @@ export default function ArticleTable({
                                             : "bg-yellow-100 text-yellow-700"
                                         }`}
                                 >
-                                    {art.status}
+                                    {art.status === "EDITOR_EDITING" ? "Stage 1 Reviewer" : art.status === "REVIEWER_EDITING" ? "Stage 2 Reviewer" : art.status}
                                 </span>
                             </div>
 
