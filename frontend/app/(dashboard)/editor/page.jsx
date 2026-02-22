@@ -87,6 +87,7 @@ const statusMap = {
   REVIEWER_EDITING: "Stage 2 Review Editing",
   REVIEWER_IN_PROGRESS: "Stage 2 Review In Progress",
   REVIEWER_APPROVED: "Stage 2 Review Approved",
+  PUBLISHED: "Published",
 };
 
 function EditorDashboardContent() {
@@ -793,12 +794,12 @@ function EditorDashboardContent() {
                 />
                 <EditorStatCard
                   title="Pending"
-                  count={articles.filter((a) => a.status !== "Published").length}
+                  count={articles.filter((a) => a.status !== "PUBLISHED").length}
                   color="border-yellow-500"
                 />
                 <EditorStatCard
                   title="Approved"
-                  count={articles.filter((a) => a.status === "Published").length}
+                  count={articles.filter((a) => a.status === "PUBLISHED").length}
                   color="border-green-600"
                 />
               </div>

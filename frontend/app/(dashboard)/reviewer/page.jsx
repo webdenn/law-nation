@@ -20,6 +20,8 @@ const statusMap = {
     REVIEWER_EDITING: "Stage 2 Review Editing",
     REVIEWER_IN_PROGRESS: "Stage 2 Review In Progress",
     REVIEWER_APPROVED: "Stage 2 Review Approved",
+    PUBLISHED: "Published",
+    APPROVED: "Approved",
 };
 
 const StatCard = ({ title, count, color }) => (
@@ -782,12 +784,12 @@ function ReviewerDashboardContent() {
                                 />
                                 <StatCard
                                     title="Pending"
-                                    count={articles.filter((a) => a.status !== "Published" && a.status !== "Approved").length} // ✅ Adjusted Status Check
+                                    count={articles.filter((a) => a.status !== "PUBLISHED" && a.status !== "APPROVED").length} // ✅ Adjusted Status Check
                                     color="border-yellow-500"
                                 />
                                 <StatCard
                                     title="Completed"
-                                    count={articles.filter((a) => a.status === "Published" || a.status === "Approved").length} // ✅ Adjusted Status Check
+                                    count={articles.filter((a) => a.status === "PUBLISHED" || a.status === "APPROVED").length} // ✅ Adjusted Status Check
                                     color="border-green-600"
                                 />
                             </div>
