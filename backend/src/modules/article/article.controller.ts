@@ -264,8 +264,8 @@ export class ArticleController {
 
       res.json({
         message: result.isReassignment
-          ? `Editor reassigned successfully from ${result.oldEditor?.name} to ${result.newEditor.name}`
-          : `Editor ${result.newEditor.name} assigned successfully`,
+          ? `Stage 1 Reviewer reassigned successfully from ${result.oldEditor?.name} to ${result.newEditor.name}`
+          : `Stage 1 Reviewer ${result.newEditor.name} assigned successfully`,
         article: result.article,
         isReassignment: result.isReassignment,
         oldEditor: result.oldEditor,
@@ -1593,8 +1593,8 @@ export class ArticleController {
 
       res.json({
         message: result.isReassignment
-          ? `Reviewer reassigned successfully from ${result.oldReviewer?.name} to ${result.newReviewer.name}`
-          : `Reviewer ${result.newReviewer.name} assigned successfully`,
+          ? `Stage 2 Reviewer reassigned successfully from ${result.oldReviewer?.name} to ${result.newReviewer.name}`
+          : `Stage 2 Reviewer ${result.newReviewer.name} assigned successfully`,
         article: result.article,
         isReassignment: result.isReassignment,
         oldReviewer: result.oldReviewer,
