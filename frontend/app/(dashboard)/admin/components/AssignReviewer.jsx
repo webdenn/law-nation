@@ -16,7 +16,7 @@ export default function AssignReviewer({ article, reviewers, assignReviewer }) {
                 value={article.assignedReviewer || ""}
                 onChange={(e) => assignReviewer(article.id, e.target.value)}
             >
-                <option value="">Assign Stage 2 Reviewer</option>
+                <option value="">Assign Stage 2 Review</option>
                 {reviewers.map((r) => (
                     <option key={r._id || r.id} value={r._id || r.id}>
                         {r.name || r.email}

@@ -47,7 +47,7 @@ export default function AddEditorPage() {
         toast.success(`Invite sent to ${formData.email} successfully!`);
         setFormData({ name: '', email: '' });
       } else {
-        toast.error(data.message || "Failed to invite Stage 1 Reviewer.");
+        toast.error(data.message || "Failed to invite Stage 1 Review.");
       }
 
     } catch (error) {
@@ -86,7 +86,7 @@ export default function AddEditorPage() {
         {/* Page Title & Breadcrumb */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-800 uppercase tracking-tight">Team Management</h2>
-          <p className="text-gray-500 text-sm mt-1">Dashboard / Invite Stage 1 Reviewer</p>
+          <p className="text-gray-500 text-sm mt-1">Dashboard / Invite Stage 1 Review</p>
         </div>
 
         {/* WIDER SECTION CONTAINER */}
@@ -95,7 +95,7 @@ export default function AddEditorPage() {
           {/* Header Strip */}
           <div className="bg-red-700 p-5 border-b border-red-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-bold text-white uppercase tracking-wide">Invite Stage 1 Reviewer</h3>
+              <h3 className="text-lg font-bold text-white uppercase tracking-wide">Invite Stage 1 Review</h3>
               <p className="text-red-100 text-xs mt-0.5">Fill in the details to send an invitation link.</p>
             </div>
             {/* Optional Icon decoration */}

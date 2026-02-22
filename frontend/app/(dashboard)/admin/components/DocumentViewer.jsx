@@ -155,13 +155,13 @@ export default function DocumentViewer({
                                             : !selectedArticle.latestEditorPdfUrl ? "text-gray-300 cursor-not-allowed" : "text-gray-500 hover:text-blue-700"
                                             }`}
                                     >
-                                        Stage 1 Reviewer
+                                        Stage 1 Review
                                     </button>
                                     {selectedArticle.latestEditorPdfUrl && (
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleDownloadFile(selectedArticle.latestEditorPdfUrl, `Stage_1_Reviewer_Version_${selectedArticle.title}`, "PDF");
+                                                handleDownloadFile(selectedArticle.latestEditorPdfUrl, `Stage_1_Review_Version_${selectedArticle.title}`, "PDF");
                                             }}
                                             className="p-3 text-gray-400 hover:text-blue-700 transition"
                                             title="Download Editor Version"
@@ -186,13 +186,13 @@ export default function DocumentViewer({
                                                 : "text-gray-500 hover:text-purple-700"
                                             }`}
                                     >
-                                        Stage 2 Reviewer
+                                        Stage 2 Review
                                     </button>
                                     {selectedArticle.latestReviewerPdfUrl && (
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleDownloadFile(selectedArticle.latestReviewerPdfUrl, `Stage_2_Reviewer_Version_${selectedArticle.title}`, "PDF");
+                                                handleDownloadFile(selectedArticle.latestReviewerPdfUrl, `Stage_2_Review_Version_${selectedArticle.title}`, "PDF");
                                             }}
                                             className="p-3 text-gray-400 hover:text-purple-700 transition"
                                             title="Download Reviewer Version"
