@@ -117,7 +117,7 @@ function EditorDashboardContent() {
 
   const [profile, setProfile] = useState({
     id: "",
-    name: "Stage 1 Reviewer Name",
+    name: "Stage 1 Review Name",
     email: "",
     role: "Stage 1 Review",
   });

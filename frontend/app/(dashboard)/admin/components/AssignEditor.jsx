@@ -18,7 +18,7 @@ export default function AssignEditor({ article, editors, assignArticle }) {
                 value={article.assignedTo || ""}
                 onChange={(e) => assignArticle(article.id, e.target.value)}
             >
-                <option value="">Assign Stage 1 Reviewer</option>
+                <option value="">Assign Stage 1 Review</option>
                 {editors.map((e) => (
                     <option key={e._id || e.id} value={e._id || e.id}>
                         {e.name || e.email}

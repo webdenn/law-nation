@@ -39,8 +39,8 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
                 { name: "Stage 2 Review History", path: "/admin/audit/reviewers" },
             ]
         },
-        { name: "Add Stage 1 Reviewer", path: "/admin/add-editor" },
-        { name: "Add Stage 2 Reviewer", path: "/admin/add-reviewer" },
+        { name: "Add Stage 1 Review", path: "/admin/add-editor" },
+        { name: "Add Stage 2 Review", path: "/admin/add-reviewer" },
         { name: "All Staff", path: "/admin/staff" }, // New Item
         { name: "Concern", path: "/admin/concern" },
         { name: "Upload Issue", path: "/admin/upload-issue" },

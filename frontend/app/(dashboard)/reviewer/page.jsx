@@ -60,7 +60,7 @@ function ReviewerDashboardContent() {
 
     const [profile, setProfile] = useState({
         id: "",
-        name: "Stage 2 Reviewer Name",
+        name: "Stage 2 Review Name",
         email: "",
         role: "Stage 2 Review",
     });
@@ -663,7 +663,7 @@ function ReviewerDashboardContent() {
                                     : "hover:bg-red-800 text-white"
                                     }`}
                             >
-                                View Stage 1 Reviewer PDF
+                                View Stage 1 Review PDF
                                 {pdfViewMode === "original" && (
                                     <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
                                 )}
@@ -680,7 +680,7 @@ function ReviewerDashboardContent() {
                                     : "hover:bg-red-800 text-white"
                                     } ${!hasReviewerUploaded ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
-                                View Stage 2 Reviewer PDF
+                                View Stage 2 Review PDF
                                 {pdfViewMode === "current" && (
                                     <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
                                 )}
@@ -758,7 +758,7 @@ function ReviewerDashboardContent() {
                             {selectedArticle
                                 ? `Reviewing: ${selectedArticle.title.substring(0, 30)}...`
                                 : activeTab === "tasks"
-                                    ? "Stage 2 Reviewer" // ✅ CHANGED TITLE
+                                    ? "Stage 2 Review" // ✅ CHANGED TITLE
                                     : "Profile"}
                         </h2>
                     </div>
