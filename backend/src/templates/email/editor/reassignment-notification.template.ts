@@ -37,7 +37,7 @@ export function generateEditorReassignmentNotificationHtml(data: {
       
       <div style="font-size: 13px; color: #777;">
         <p style="margin: 0;">Best regards,</p>
-        <p style="margin: 5px 0; font-weight: bold; color: #d32f2f;">Editorial Team, Law Nation</p>
+        <p style="margin: 5px 0; font-weight: bold; color: #d32f2f;">Stage 1 Review Team, Law Nation</p>
       </div>
     </div>
   `;

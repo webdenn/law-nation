@@ -160,22 +160,22 @@ export async function addWatermarkToPdf(
       }
 
       // Top-right watermark (Role-based text) - on ALL pages
-      page.drawText(roleText, {
-        x: width - 120,
-        y: height - 30,
-        size: 12,
-        color: rgb(0.7, 0, 0),  // Red color
-        opacity: 0.5,
-      });
+      // page.drawText(roleText, {
+      //   x: width - 120,
+      //   y: height - 30,
+      //   size: 12,
+      //   color: rgb(0.7, 0, 0),  // Red color
+      //   opacity: 0.5,
+      // });
 
-      // Bottom-left watermark - Download info - on ALL pages
-      page.drawText(watermarkText, {
-        x: 50,
-        y: 45,
-        size: 10,
-        color: rgb(0.5, 0.5, 0.5),  // Gray color
-        opacity: 0.7,
-      });
+      // // Bottom-left watermark - Download info - on ALL pages
+      // page.drawText(watermarkText, {
+      //   x: 50,
+      //   y: 45,
+      //   size: 10,
+      //   color: rgb(0.5, 0.5, 0.5),  // Gray color
+      //   opacity: 0.7,
+      // });
 
       // Add clickable link ONLY for users with published articles on FIRST page
       if (includeUrl) {
