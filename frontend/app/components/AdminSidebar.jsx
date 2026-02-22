@@ -35,13 +35,13 @@ export default function AdminSidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) 
             path: "#",
             children: [
                 { name: "User Audit", path: "/admin/audit/users" },
-                { name: "Stage 1 Review ", path: "/admin/audit/editors" },
-                { name: "Stage 2 Review ", path: "/admin/audit/reviewers" },
+                { name: "Stage 1 Review History", path: "/admin/audit/editors" },
+                { name: "Stage 2 Review History", path: "/admin/audit/reviewers" },
             ]
         },
-        { name: "Add Stage 1 Review ", path: "/admin/add-editor" },
-        { name: "Add Stage 2 Review ", path: "/admin/add-reviewer" },
-        { name: "All Reviewers", path: "/admin/staff" }, // New Item
+        { name: "Add Stage 1 Reviewer", path: "/admin/add-editor" },
+        { name: "Add Stage 2 Reviewer", path: "/admin/add-reviewer" },
+        { name: "All Staff", path: "/admin/staff" }, // New Item
         { name: "Concern", path: "/admin/concern" },
         { name: "Upload Issue", path: "/admin/upload-issue" },
         { name: "Issue Details", path: "/admin/issue-details" }, // New Item

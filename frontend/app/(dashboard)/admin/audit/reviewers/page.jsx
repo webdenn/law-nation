@@ -116,7 +116,7 @@ export default function ReviewerAuditPage() {
                                 <span className="font-black italic text-red-700">LAW NATION</span>
                             </div>
                             <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter text-gray-900 uppercase">
-                                Reviewer Activity Log
+                                Stage 2 Reviewer Activity Log
                             </h1>
                             <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mt-1">Audit Log / Reviewer Events</p>
                         </div>
