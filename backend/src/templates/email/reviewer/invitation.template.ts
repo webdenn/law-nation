@@ -62,7 +62,7 @@ export function generateReviewerInvitationHtml(data: {
   `;
 
   return {
-    subject: "You're Invited to Join Law Nation as a Reviewer! ⚖️",
+    subject: "You're Invited to Join Law Nation as a Stage 2 Review ⚖️",
     html: wrapInRedLayout(content)
   };
 }

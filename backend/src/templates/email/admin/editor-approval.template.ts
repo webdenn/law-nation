@@ -26,7 +26,7 @@ export function generateEditorApprovalNotificationHtml(data: {
       
       <p><strong>Next Steps:</strong></p>
       <ul style="color: #555; line-height: 1.8;">
-        <li>Review the article and changes made by the editor</li>
+        <li>Review the article and changes made by the Stage 1 Review </li>
         <li>View the change history to see what was modified</li>
         <li>Publish the article when ready</li>
       </ul>

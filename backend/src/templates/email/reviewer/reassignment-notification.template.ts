@@ -29,7 +29,7 @@ export function generateReviewerReassignmentNotificationHtml(data: {
   `;
 
   return {
-    subject: `Review Assignment Update - ${data.articleTitle}`,
+    subject: `Stage 2 Review Assignment Update - ${data.articleTitle}`,
     html: wrapInSimpleRedLayout(content)
   };
 }
