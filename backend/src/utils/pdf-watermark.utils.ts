@@ -106,7 +106,7 @@ export async function addWatermarkToPdf(
       articleUrl = options.articleSlug
         ? `${options.frontendUrl}/article/${options.articleSlug}`
         : `${options.frontendUrl}/articles/${options.articleId}`;
-      linkText = `Link: ${articleUrl}`;
+      linkText = `Download From: ${articleUrl}`;
       noteText = `(Login required for full article)`;
 
       console.log('[Watermark] User download - URL included');
