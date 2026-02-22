@@ -155,7 +155,7 @@ export default function DocumentViewer({
                                             : !selectedArticle.latestEditorPdfUrl ? "text-gray-300 cursor-not-allowed" : "text-gray-500 hover:text-blue-700"
                                             }`}
                                     >
-                                        Editor Version
+                                        Stage 1 Reviewer
                                     </button>
                                     {selectedArticle.latestEditorPdfUrl && (
                                         <button
@@ -186,7 +186,7 @@ export default function DocumentViewer({
                                                 : "text-gray-500 hover:text-purple-700"
                                             }`}
                                     >
-                                        Reviewer Version
+                                        Stage 2 Reviewer
                                     </button>
                                     {selectedArticle.latestReviewerPdfUrl && (
                                         <button

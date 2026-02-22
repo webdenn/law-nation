@@ -757,7 +757,7 @@ function EditorDashboardContent() {
               {selectedArticle
                 ? `Reviewing: ${selectedArticle.title.substring(0, 30)}...`
                 : activeTab === "tasks"
-                  ? "Editor Workspace"
+                  ? "Stage 1 Reviewer"
                   : "Profile"}
             </h2>
           </div>
