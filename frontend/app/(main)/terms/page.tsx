@@ -30,7 +30,7 @@ export default function TermsPage() {
                         </a>
                         <a href="#reviewer-terms" className="text-slate-600 hover:text-red-700 transition-colors flex items-center gap-2">
                             <span className="w-1.5 h-1.5 bg-red-700 rounded-full"></span>
-                            Reviewer Terms & Ethical Guidelines
+                            Stage 2 Reviewer Terms & Ethical Guidelines
                         </a>
                     </div>
                 </div>
@@ -108,14 +108,14 @@ export default function TermsPage() {
                             <div>
                                 <h3 className="text-xl font-bold text-slate-900 mb-4 text-justify">Limitation of Liability</h3>
                                 <p>
-                                    To the extent permitted by applicable law, LN and its affiliates (including but not limited to editors, reviewers, employees, and agents) shall not be liable for any direct, indirect, special, or consequential loss; or for any business losses, loss of revenue, income, profits, or anticipated savings, loss of contracts or business relationships, loss of reputation or goodwill, or loss or corruption of information or data in connection with the use of this Site.
+                                    To the extent permitted by applicable law, LN and its affiliates (including but not limited to Stage 1 Reviewers, Stage 2 Reviewers, employees, and agents) shall not be liable for any direct, indirect, special, or consequential loss; or for any business losses, loss of revenue, income, profits, or anticipated savings, loss of contracts or business relationships, loss of reputation or goodwill, or loss or corruption of information or data in connection with the use of this Site.
                                 </p>
                             </div>
 
                             <div>
                                 <h3 className="text-xl font-bold text-slate-900 mb-4">Indemnification</h3>
                                 <p>
-                                    You agree to indemnify, defend, and hold harmless LN and its affiliates (including but not limited to editors, reviewers, employees, and agents) against any losses, damages, costs, liabilities, and expenses (including legal fees) arising out of any breach by you of these Terms or your violation of any law or the rights of a third party.
+                                    You agree to indemnify, defend, and hold harmless LN and its affiliates (including but not limited to Stage 1 Reviewers, Stage 2 Reviewers, employees, and agents) against any losses, damages, costs, liabilities, and expenses (including legal fees) arising out of any breach by you of these Terms or your violation of any law or the rights of a third party.
                                 </p>
                             </div>
 
@@ -134,22 +134,22 @@ export default function TermsPage() {
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden text-justify">
                         <div className="bg-red-700 px-8 py-6">
                             <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                                <UserCheck size={24} />
-                                Reviewer Terms & Ethical Guidelines
+                                <ShieldCheck size={24} />
+                                Stage 2 Reviewer Terms & Ethical Guidelines
                             </h2>
                         </div>
                         <div className="p-8 space-y-8 text-slate-700 leading-relaxed">
                             <div>
                                 <h3 className="text-xl font-bold text-slate-900 mb-4">Acceptance of Role and Agreement</h3>
                                 <p>
-                                    By accepting an invitation to review an article, analysis, and/or any other material for Law Nation Prime Times Journal (“<strong>LN</strong>”), or by accessing the reviewer portal, you (“<strong>the Reviewer</strong>”) unequivocally agree to be bound by these Terms and Conditions. These terms are intended to protect the integrity of the double-blind peer review process, the intellectual property of the authors, and the reputation of LN.
+                                    By accepting an invitation to review an article, analysis, and/or any other material for Law Nation Prime Times Journal (“<strong>LN</strong>”), or by accessing the Stage 2 Reviewer portal, you (“<strong>the Stage 2 Reviewer</strong>”) unequivocally agree to be bound by these Terms and Conditions. These terms are intended to protect the integrity of the double-blind peer review process, the intellectual property of the authors, and the reputation of LN.
                                 </p>
                             </div>
 
                             <div>
                                 <h3 className="text-xl font-bold text-slate-900 mb-4">Confidentiality and Non-Disclosure</h3>
                                 <p className="mb-4">
-                                    The peer review process is confidential and privileged. As a Reviewer, you acknowledge that the article, analysis, and/or any other material provided to you are the exclusive intellectual property of the author(s) until published.
+                                    The peer review process is confidential and privileged. As a Stage 2 Reviewer, you acknowledge that the article, analysis, and/or any other material provided to you are the exclusive intellectual property of the author(s) until published.
                                 </p>
                                 <ul className="space-y-3 list-disc pl-6">
                                     <li>You unequivocally agree to treat the article, analysis, or any other material and your feedback as strictly confidential. You shall not discuss the article, analysis, and/or any other material with colleagues, students, or third parties without the prior written consent of the LN Editorial Board.</li>
@@ -188,7 +188,7 @@ export default function TermsPage() {
                             <div>
                                 <h3 className="text-xl font-bold text-slate-900 mb-4">Ethical Responsibilities</h3>
                                 <ul className="space-y-3 list-disc pl-6">
-                                    <li>If you suspect plagiarism, simultaneous submission to another journal, duplicate publication, or data fabrication, you must report this to the LN Editor in strict confidence. Do not investigate the issue personally.</li>
+                                    <li>If you suspect plagiarism, simultaneous submission to another journal, duplicate publication, or data fabrication, you must report this to the LN Stage 1 Reviewer in strict confidence. Do not investigate the issue personally.</li>
                                     <li>You agree not to upload the article, analysis, and/or any other material into generative AI tools (e.g., ChatGPT, Claude) for the purpose of generating a review or summary, as this violates confidentiality and data privacy terms.</li>
                                 </ul>
                             </div>
@@ -196,15 +196,15 @@ export default function TermsPage() {
                             <div>
                                 <h3 className="text-xl font-bold text-slate-900 mb-4">Limitation of Liability & Indemnity</h3>
                                 <ul className="space-y-3 list-disc pl-6">
-                                    <li>You acknowledge that, unless otherwise agreed in writing, the role of Reviewer is voluntary and uncompensated.</li>
+                                    <li>You acknowledge that, unless otherwise agreed in writing, the role of Stage 2 Reviewer is voluntary and uncompensated.</li>
                                     <li>You hereby indemnify LN against any losses, damages, or legal costs arising out of your breach of confidentiality, violation of intellectual property rights, or professional misconduct during the review process.</li>
                                 </ul>
                             </div>
 
                             <div>
-                                <h3 className="text-xl font-bold text-slate-900 mb-4">Termination of Reviewer Status</h3>
+                                <h3 className="text-xl font-bold text-slate-900 mb-4">Termination of Stage 2 Reviewer Status</h3>
                                 <p>
-                                    LN reserves the right to remove a Reviewer from its panel at its sole discretion, without notice, for failure to meet deadlines, producing poor-quality reviews, or breaching these Terms and Conditions.
+                                    LN reserves the right to remove a Stage 2 Reviewer from its panel at its sole discretion, without notice, for failure to meet deadlines, producing poor-quality reviews, or breaching these Terms and Conditions.
                                 </p>
                             </div>
                         </div>

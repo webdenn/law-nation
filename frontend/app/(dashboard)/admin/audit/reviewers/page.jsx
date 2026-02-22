@@ -26,11 +26,11 @@ export default function ReviewerAuditPage() {
             if (data.success) {
                 setEvents(data.data.events);
             } else {
-                toast.error(data.message || "Failed to fetch audit reviewer history");
+                toast.error(data.message || "Failed to fetch Stage 2 Reviewer history");
             }
         } catch (error) {
             console.error(error);
-            toast.error("Error fetching audit reviewer history");
+            toast.error("Error fetching Stage 2 Reviewer history");
         } finally {
             setLoading(false);
         }
@@ -116,7 +116,7 @@ export default function ReviewerAuditPage() {
                                 <span className="font-black italic text-red-700">LAW NATION</span>
                             </div>
                             <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter text-gray-900 uppercase">
-                                Stage 2 Reviewer Activity Log
+                                Stage 2 Review Activity Log
                             </h1>
                             <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mt-1">Audit Log / Reviewer Events</p>
                         </div>

@@ -47,7 +47,7 @@ export default function AddReviewerPage() {
                 toast.success(`Invite sent to ${formData.email} successfully!`);
                 setFormData({ name: '', email: '' });
             } else {
-                toast.error(data.message || "Failed to invite stage 2 reviewer.");
+                toast.error(data.message || "Failed to invite Stage 2 Reviewer.");
             }
 
         } catch (error) {

@@ -200,7 +200,7 @@ const ReviewInterface = ({
           <div className="space-y-3">
 
             {/* Success Message if Uploaded */}
-            {((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "Stage 1 Stage 2 Reviewer_APPROVED") && (
+            {((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED") && (
               <div className="bg-green-50 p-3 rounded-lg border border-green-200 flex items-center gap-3 mb-2">
                 <div className="bg-green-100 p-1.5 rounded-full shrink-0">
                   <CheckCircleIcon />
@@ -214,14 +214,14 @@ const ReviewInterface = ({
 
             {/* Corrected File Input */}
             <div className={`border-2 border-dashed rounded-lg p-3 text-center relative transition 
-              ${((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "Stage 1 Stage 2 Reviewer_APPROVED")
+              ${((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED")
                 ? "border-gray-200 bg-gray-100 cursor-not-allowed opacity-60"
                 : "border-gray-300 bg-gray-50 hover:bg-gray-100 cursor-pointer"}`}
             >
               <input
                 type="file"
                 accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                disabled={!!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "Stage 1 Stage 2 Reviewer_APPROVED"}
+                disabled={!!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED"}
                 onChange={(e) => {
                   // ... existing logic ...
                   const file = e.target.files[0];
@@ -251,7 +251,7 @@ const ReviewInterface = ({
                 CORRECTED FILE (DOCX ONLY)
               </p>
               <p className="text-xs truncate font-medium text-gray-700">
-                {((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "Stage 1 Stage 2 Reviewer_APPROVED")
+                {((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED")
                   ? "🔒 Upload Locked"
                   : uploadedFile ? `📄 ${uploadedFile.name}` : "Click to Select File"
                 }
@@ -274,11 +274,11 @@ const ReviewInterface = ({
               placeholder="Describe changes (e.g. Fixed typos on pg 2)..."
               value={uploadComment}
               onChange={(e) => setUploadComment(e.target.value)}
-              disabled={!!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "Stage 1 Stage 2 Reviewer_APPROVED"}
+              disabled={!!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED"}
             />
 
             {/* T&C Section (Modified to use Checkbox) */}
-            {!((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "Stage 1 Stage 2 Reviewer_APPROVED") && (
+            {!((selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED") && (
               <div className="mt-4">
                 <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition group">
                   <input
@@ -303,8 +303,8 @@ const ReviewInterface = ({
             {/* Upload Button */}
             <button
               onClick={handleUploadCorrection}
-              disabled={!uploadedFile || isUploading || !declarationAccepted || !!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "Stage 1 Stage 2 Reviewer_APPROVED"}
-              className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${(!uploadedFile || isUploading || !declarationAccepted || !!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "Stage 1 Stage 2 Reviewer_APPROVED")
+              disabled={!uploadedFile || isUploading || !declarationAccepted || !!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED"}
+              className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-1 ${(!uploadedFile || isUploading || !declarationAccepted || !!(selectedArticle.currentPdfUrl && selectedArticle.currentPdfUrl !== selectedArticle.originalPdfUrl) || selectedArticle.status === "EDITOR_APPROVED")
                 ? "bg-gray-300 cursor-not-allowed"
                 : "bg-blue-600 hover:bg-blue-700 active:scale-95"
                 }`}
@@ -324,8 +324,8 @@ const ReviewInterface = ({
         {/* 2. APPROVE BUTTON */}
         <button
           onClick={handleEditorApprove}
-          disabled={isApproving || selectedArticle.status === "Stage 1 Stage 2 Reviewer_APPROVED" || selectedArticle.status === "ASSIGNED_TO_Stage 2 Reviewer" || selectedArticle.status === "Stage 2 Reviewer_IN_PROGRESS" || selectedArticle.status === "Stage 2 Reviewer_APPROVED" || selectedArticle.status === "PUBLISHED"}
-          className={`w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl transition-all flex items-center justify-center gap-2 transform active:scale-95 ${isApproving || selectedArticle.status === "Stage 1 Stage 2 Reviewer_APPROVED" || selectedArticle.status === "ASSIGNED_TO_Stage 2 Reviewer" || selectedArticle.status === "Stage 2 Reviewer_IN_PROGRESS" || selectedArticle.status === "Stage 2 Reviewer_APPROVED" || selectedArticle.status === "PUBLISHED"
+          disabled={isApproving || selectedArticle.status === "EDITOR_APPROVED" || selectedArticle.status === "ASSIGNED_TO_REVIEWER" || selectedArticle.status === "REVIEWER_EDITING" || selectedArticle.status === "REVIEWER_IN_PROGRESS" || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED"}
+          className={`w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl transition-all flex items-center justify-center gap-2 transform active:scale-95 ${isApproving || selectedArticle.status === "EDITOR_APPROVED" || selectedArticle.status === "ASSIGNED_TO_REVIEWER" || selectedArticle.status === "REVIEWER_EDITING" || selectedArticle.status === "REVIEWER_IN_PROGRESS" || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED"
             ? "bg-gray-400 text-white cursor-not-allowed"
             : "bg-green-600 hover:bg-green-700 text-white hover:shadow-green-200"
             }`}
