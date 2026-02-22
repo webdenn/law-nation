@@ -18,7 +18,7 @@ export function reviewerAssignmentTemplate(
       </p>
       
       <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
-        A reviewer has been assigned to review an article after editor approval.
+        Stage 2 Review has been assigned to review an article after Stage 1 Review approval.
       </p>
       
       <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -30,7 +30,7 @@ export function reviewerAssignmentTemplate(
       
       <div style="background-color: #e8f4fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 0; color: #1e40af;">
-          <strong>Next Steps:</strong> The reviewer will now review the editor's work and may make additional corrections before final approval.
+          <strong>Next Steps:</strong> The Stage 2 Review will now review the Stage 2 Review work and may make additional corrections before final approval.
         </p>
       </div>
       

@@ -16,13 +16,13 @@ export function generateReviewerInvitationHtml(data: {
       </p>
       
       <p style="font-size: 16px; color: #555; line-height: 1.8;">
-        You have been invited to join <strong>Law Nation</strong> as a <strong style="color: #d32f2f;">Reviewer</strong>. 
+        You have been invited to join <strong>Law Nation</strong> as a <strong style="color: #d32f2f;">Stage 2 Review </strong>. 
         We are excited to have you on our team to review and evaluate scholarly legal articles for publication.
       </p>
       
       <div style="background-color: #f5f5f5; border-left: 4px solid #d32f2f; padding: 20px; margin: 25px 0;">
         <p style="margin: 0; font-size: 15px; color: #333;">
-          <strong>Next Step:</strong> Click the button below to set up your password and activate your reviewer account.
+          <strong>Next Step:</strong> Click the button below to set up your password and activate your Stage 2 Review account.
         </p>
       </div>
       

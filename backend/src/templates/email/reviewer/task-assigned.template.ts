@@ -39,7 +39,7 @@ export function generateReviewerTaskAssignedHtml(data: {
       </div>
       
       <p style="font-size: 13px; color: #777; margin-top: 20px;">
-        Click the button above to access your reviewer dashboard and review this article. If you're already logged in, you'll be taken directly to the article.
+        Click the button above to access your  dashboard and review this article. If you're already logged in, you'll be taken directly to the article.
       </p>
       
       <p style="font-size: 11px; color: #999; margin-top: 15px;">

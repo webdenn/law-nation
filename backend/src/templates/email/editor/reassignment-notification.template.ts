@@ -15,7 +15,7 @@ export function generateEditorReassignmentNotificationHtml(data: {
       
       <p style="font-size: 16px; color: #555; line-height: 1.8;">
         We would like to inform you that the article <strong>"${data.articleTitle}"</strong> 
-        has been reassigned to another editor.
+        has been reassigned to another Stage 1 Review .
       </p>
       
       <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 25px 0; border-radius: 4px;">

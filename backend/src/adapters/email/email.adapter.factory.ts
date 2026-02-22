@@ -1,11 +1,13 @@
+
+
 // src/adapters/email/email.adapter.factory.ts
 
 import type { IEmailAdapter } from "./interfaces/email-adapter.interface.js";
-import { ResendEmailAdapter } from "./implementations/resend.email.adapter.js";
+import { NodemailerEmailAdapter } from "./implementations/nodemailer.email.adapter.js";
 
 /**
  * Email Adapter Factory
- * Creates and returns the Resend email adapter
+ * Creates and returns the Nodemailer email adapter (AWS SES optimized)
  */
 export class EmailAdapterFactory {
   private static instance: IEmailAdapter | null = null;
@@ -21,18 +23,47 @@ export class EmailAdapterFactory {
   }
 
   /**
-   * Create Resend email adapter
+   * Create Nodemailer email adapter (AWS SES configuration)
    */
   private static createAdapter(): IEmailAdapter {
-    const apiKey = process.env.RESEND_API_KEY;
-    const defaultFrom = process.env.SMTP_FROM || "Law Nation <onboarding@resend.dev>";
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = parseInt(process.env.SMTP_PORT || "587", 10);
+    const smtpSecure = process.env.SMTP_SECURE === "true";
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const defaultFrom = process.env.SMTP_FROM || "Law Nation <noreply@law-nation.com>";
 
-    if (!apiKey) {
-      throw new Error("RESEND_API_KEY is required in environment variables");
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      throw new Error(
+        "SMTP configuration is incomplete. Required: SMTP_HOST, SMTP_USER, SMTP_PASS"
+      );
     }
 
-    console.log(`✅ [Factory] Resend adapter created with from: ${defaultFrom}`);
-    return new ResendEmailAdapter(apiKey, defaultFrom);
+    // Detect if using AWS SES
+    const isAwsSes = smtpHost.includes("amazonaws.com");
+
+    console.log(`✅ [Factory] Email adapter initialization`);
+    console.log(`📧 [Factory] Provider: ${isAwsSes ? 'AWS SES' : 'Generic SMTP'}`);
+    console.log(`📧 [Factory] SMTP Host: ${smtpHost}:${smtpPort}`);
+    console.log(`📧 [Factory] SMTP User: ${smtpUser}`);
+    console.log(`📧 [Factory] Default From: ${defaultFrom}`);
+
+    if (isAwsSes) {
+      const region = smtpHost.split(".")[1]; // Extract region from hostname
+      console.log(` [Factory] AWS Region: ${region}`);
+      console.log(` [Factory] Ensure your SES account is out of sandbox mode for production`);
+    }
+
+    return new NodemailerEmailAdapter({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+      defaultFrom,
+    });
   }
 
   /**
