@@ -657,13 +657,13 @@ export default function AdminDashboard() {
               : a
           )
         );
-        toast.success(data.message || "Stage 1 Reviewer assigned successfully!");
+        toast.success(data.message || "Stage 1 Review assigned successfully!");
       } else {
         // 🛑 2. BACKEND CHECK: Agar backend bole "Already Assigned"
         if (response.status === 409 || data.message?.toLowerCase().includes("already")) {
           toast.warning("Article Already Assigned!");
         } else {
-          toast.error(data.message || "Failed to assign Stage 1 Reviewer");
+          toast.error(data.message || "Failed to assign Stage 1 Review");
         }
       }
     } catch (error) {
@@ -700,12 +700,12 @@ export default function AdminDashboard() {
               : a
           )
         );
-        toast.success(data.message || "Stage 2 Reviewer assigned successfully!");
+        toast.success(data.message || "Stage 2 Review assigned successfully!");
       } else {
         if (response.status === 409 || data.message?.toLowerCase().includes("already")) {
           toast.warning("Article Already Assigned!");
         } else {
-          toast.error(data.message || "Failed to assign Stage 2 Reviewer");
+          toast.error(data.message || "Failed to assign Stage 2 Review");
         }
       }
     } catch (error) {

@@ -769,7 +769,7 @@ function EditorDashboardContent() {
               {selectedArticle
                 ? `Reviewing: ${selectedArticle.title.substring(0, 30)}...`
                 : activeTab === "tasks"
-                  ? "Stage 1 Reviewer"
+                  ? "Stage 1 Review"
                   : "Profile"}
             </h2>
           </div>
