@@ -10,6 +10,18 @@ import { compareTexts, getChangeStats, formatDifferences } from "../../utilis/di
 const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
 // Helper Component for Stats
+// Status Mapping Utility
+const statusMap = {
+    ASSIGNED_TO_EDITOR: "Stage 1 Reviewer Assigned",
+    EDITOR_EDITING: "Stage 1 Reviewer Editing",
+    EDITOR_IN_PROGRESS: "Stage 1 Reviewer In Progress",
+    EDITOR_APPROVED: "Stage 1 Reviewer Approved",
+    ASSIGNED_TO_REVIEWER: "Stage 2 Reviewer Assigned",
+    REVIEWER_EDITING: "Stage 2 Reviewer Editing",
+    REVIEWER_IN_PROGRESS: "Stage 2 Reviewer In Progress",
+    REVIEWER_APPROVED: "Stage 2 Reviewer Approved",
+};
+
 const StatCard = ({ title, count, color }) => (
     <div className={`bg-white p-6 rounded-xl border-l-4 ${color} shadow-md`}>
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -50,7 +62,7 @@ function ReviewerDashboardContent() {
         id: "",
         name: "Reviewer Name",
         email: "",
-        role: "Reviewer",
+        role: "Stage 2 Reviewer",
     });
 
     const handleViewVisualDiff = useCallback(async (changeLogId = null) => {
@@ -608,7 +620,7 @@ function ReviewerDashboardContent() {
                         </div>
                     </div>
                     <span className="text-[9px] bg-red-900/50 text-white/90 px-4 py-0.5 rounded-full font-black uppercase tracking-[0.2em] border border-red-800/50 shadow-sm">
-                        {selectedArticle ? "Review Mode" : "Reviewer Panel"}
+                        {selectedArticle ? "Review Mode" : "Stage 2 Reviewer"}
                     </span>
 
                     {/* Close Button Mobile - Absolute Positioning */}
@@ -651,7 +663,7 @@ function ReviewerDashboardContent() {
                                     : "hover:bg-red-800 text-white"
                                     }`}
                             >
-                                View Editor PDF
+                                View Stage 1 Reviewer PDF
                                 {pdfViewMode === "original" && (
                                     <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
                                 )}
@@ -668,7 +680,7 @@ function ReviewerDashboardContent() {
                                     : "hover:bg-red-800 text-white"
                                     } ${!hasReviewerUploaded ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
-                                View Reviewer PDF
+                                View Stage 2 Reviewer PDF
                                 {pdfViewMode === "current" && (
                                     <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
                                 )}
@@ -746,7 +758,7 @@ function ReviewerDashboardContent() {
                             {selectedArticle
                                 ? `Reviewing: ${selectedArticle.title.substring(0, 30)}...`
                                 : activeTab === "tasks"
-                                    ? "Reviewer Workspace" // ✅ CHANGED TITLE
+                                    ? "Stage 2 Reviewer" // ✅ CHANGED TITLE
                                     : "Profile"}
                         </h2>
                     </div>
@@ -806,7 +818,7 @@ function ReviewerDashboardContent() {
                                                         <td className="p-5 text-sm">{art.authorName}</td>
                                                         <td className="p-5">
                                                             <span className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded-full">
-                                                                {art.status}
+                                                                {statusMap[art.status] || art.status}
                                                             </span>
                                                         </td>
                                                         <td className="p-5 text-right">

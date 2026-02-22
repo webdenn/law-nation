@@ -12,7 +12,7 @@ const ReviewerTermsModal = ({ isOpen, onClose, onAccept }) => {
                 {/* Modal Header */}
                 <div className="p-5 sm:p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
                     <h3 className="text-xl font-bold text-gray-900">
-                        Reviewer Terms & Ethical Guidelines
+                        Stage 2 Reviewer Terms & Ethical Guidelines
                     </h3>
                     <button
                         onClick={onClose}
@@ -46,13 +46,13 @@ const ReviewerTermsModal = ({ isOpen, onClose, onAccept }) => {
                 >
                     <div className="space-y-6">
                         <div className="text-center mb-6">
-                            <h4 className="text-lg font-bold text-gray-900 uppercase">Reviewer Terms and Conditions & Ethical Guidelines</h4>
+                            <h4 className="text-lg font-bold text-gray-900 uppercase">Stage 2 Reviewer Terms and Conditions & Ethical Guidelines</h4>
                         </div>
 
                         <div>
                             <h5 className="font-bold text-gray-900 mb-2">Acceptance of Role and Agreement</h5>
                             <p>
-                                By accepting an invitation to review an article, analysis, and/or any other material for Law Nation Prime Times Journal (“LN”), or by accessing the reviewer portal, you (“the Reviewer”) unequivocally agree to be bound by these Terms and Conditions. These terms are intended to protect the integrity of the double-blind peer review process, the intellectual property of the authors, and the reputation of LN.
+                                By accepting an invitation to review an article, analysis, and/or any other material for Law Nation Prime Times Journal (“LN”), or by accessing the stage 2 reviewer portal, you (“the Stage 2 Reviewer”) unequivocally agree to be bound by these Terms and Conditions. These terms are intended to protect the integrity of the double-blind peer review process, the intellectual property of the authors, and the reputation of LN.
                             </p>
                         </div>
 
