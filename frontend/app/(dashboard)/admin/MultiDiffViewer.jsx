@@ -241,7 +241,7 @@ const MultiDiffViewer = ({
                                 <StatsBadge s={stats.editor} />
                             </div>
                             <div className="flex-1 bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden relative">
-                                <InlineDiffRenderer diffArray={diffs.editor} emptyMessage="No changes by Editor or text not found" />
+                                <InlineDiffRenderer diffArray={diffs.editor} emptyMessage="No changes by Stage 1 Reviewer or text not found" />
                             </div>
                         </div>
 
@@ -252,7 +252,7 @@ const MultiDiffViewer = ({
                                 <StatsBadge s={stats.reviewer} />
                             </div>
                             <div className="flex-1 bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden relative">
-                                <InlineDiffRenderer diffArray={diffs.reviewer} emptyMessage="No changes by Reviewer or document missing" />
+                                <InlineDiffRenderer diffArray={diffs.reviewer} emptyMessage="No changes by Stage 2 Reviewer or document missing" />
                             </div>
                         </div>
                     </div>

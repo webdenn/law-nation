@@ -161,7 +161,7 @@ export default function DocumentViewer({
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleDownloadFile(selectedArticle.latestEditorPdfUrl, `Editor_Version_${selectedArticle.title}`, "PDF");
+                                                handleDownloadFile(selectedArticle.latestEditorPdfUrl, `Stage_1_Reviewer_Version_${selectedArticle.title}`, "PDF");
                                             }}
                                             className="p-3 text-gray-400 hover:text-blue-700 transition"
                                             title="Download Editor Version"
@@ -192,7 +192,7 @@ export default function DocumentViewer({
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleDownloadFile(selectedArticle.latestReviewerPdfUrl, `Reviewer_Version_${selectedArticle.title}`, "PDF");
+                                                handleDownloadFile(selectedArticle.latestReviewerPdfUrl, `Stage_2_Reviewer_Version_${selectedArticle.title}`, "PDF");
                                             }}
                                             className="p-3 text-gray-400 hover:text-purple-700 transition"
                                             title="Download Reviewer Version"
@@ -338,18 +338,18 @@ export default function DocumentViewer({
 
                                     {selectedArticle.latestEditorDocxUrl && (
                                         <button
-                                            onClick={() => handleDownloadFile(selectedArticle.latestEditorDocxUrl, `Editor_Version_${selectedArticle.title}`, "Word")}
+                                            onClick={() => handleDownloadFile(selectedArticle.latestEditorDocxUrl, `Stage_1_Reviewer_Version_${selectedArticle.title}`, "Word")}
                                             className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-blue-700 border border-gray-200 rounded text-xs font-bold transition"
                                         >
-                                            Editor Version (DOCX)
+                                            Stage 1 Reviewer Version (DOCX)
                                         </button>
                                     )}
                                     {selectedArticle.latestReviewerDocxUrl && (
                                         <button
-                                            onClick={() => handleDownloadFile(selectedArticle.latestReviewerDocxUrl, `Reviewer_Version_${selectedArticle.title}`, "Word")}
+                                            onClick={() => handleDownloadFile(selectedArticle.latestReviewerDocxUrl, `Stage_2_Reviewer_Version_${selectedArticle.title}`, "Word")}
                                             className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-purple-700 border border-gray-200 rounded text-xs font-bold transition"
                                         >
-                                            Reviewer Version (DOCX)
+                                            Stage 2 Reviewer Version (DOCX)
                                         </button>
                                     )}
                                 </div>

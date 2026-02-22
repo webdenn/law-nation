@@ -52,13 +52,13 @@ const ReviewerTermsModal = ({ isOpen, onClose, onAccept }) => {
                         <div>
                             <h5 className="font-bold text-gray-900 mb-2">Acceptance of Role and Agreement</h5>
                             <p>
-                                By accepting an invitation to review an article, analysis, and/or any other material for Law Nation Prime Times Journal (“LN”), or by accessing the stage 2 reviewer portal, you (“the Stage 2 Reviewer”) unequivocally agree to be bound by these Terms and Conditions. These terms are intended to protect the integrity of the double-blind peer review process, the intellectual property of the authors, and the reputation of LN.
+                                By accepting an invitation to review an article, analysis, and/or any other material for Law Nation Prime Times Journal (“LN”), or by accessing the Stage 2 Reviewer portal, you (“the Stage 2 Reviewer”) unequivocally agree to be bound by these Terms and Conditions. These terms are intended to protect the integrity of the double-blind peer review process, the intellectual property of the authors, and the reputation of LN.
                             </p>
                         </div>
 
                         <div>
                             <h5 className="font-bold text-gray-900 mb-2">Confidentiality and Non-Disclosure</h5>
-                            <p className="mb-2">The peer review process is confidential and privileged. As a Reviewer, you acknowledge that the article, analysis, and/or any other material provided to you are the exclusive intellectual property of the author(s) until published.</p>
+                            <p className="mb-2">The peer review process is confidential and privileged. As a Stage 2 Reviewer, you acknowledge that the article, analysis, and/or any other material provided to you are the exclusive intellectual property of the author(s) until published.</p>
                             <ul className="list-disc ml-6 space-y-2">
                                 <li>You unequivocally agree to treat the article, analysis, or any other material and your feedback as strictly confidential. You shall not discuss the article, analysis, and/or any other material with colleagues, students, or third parties without the prior written consent of the LN Editorial Board.</li>
                                 <li>You are strictly prohibited from using, copying, quoting, or circulating the article, analysis, and/or any other material, for your own research, teaching, or any other personal or professional purpose prior to its publication.</li>
@@ -104,15 +104,15 @@ const ReviewerTermsModal = ({ isOpen, onClose, onAccept }) => {
                         <div>
                             <h5 className="font-bold text-gray-900 mb-2">Limitation of Liability & Indemnity</h5>
                             <ul className="list-disc ml-6 space-y-2 text-justify">
-                                <li>You acknowledge that, unless otherwise agreed in writing, the role of Reviewer is voluntary and uncompensated.</li>
+                                <li>You acknowledge that, unless otherwise agreed in writing, the role of Stage 2 Reviewer is voluntary and uncompensated.</li>
                                 <li>You hereby indemnify LN against any losses, damages, or legal costs arising out of your breach of confidentiality, violation of intellectual property rights, or professional misconduct during the review process.</li>
                             </ul>
                         </div>
 
                         <div>
-                            <h5 className="font-bold text-gray-900 mb-2">Termination of Reviewer Status</h5>
+                            <h5 className="font-bold text-gray-900 mb-2">Termination of Stage 2 Reviewer Status</h5>
                             <p>
-                                LN reserves the right to remove a Reviewer from its panel at its sole discretion, without notice, for failure to meet deadlines, producing poor-quality reviews, or breaching these Terms and Conditions.
+                                LN reserves the right to remove a Stage 2 Reviewer from its panel at its sole discretion, without notice, for failure to meet deadlines, producing poor-quality reviews, or breaching these Terms and Conditions.
                             </p>
                         </div>
 

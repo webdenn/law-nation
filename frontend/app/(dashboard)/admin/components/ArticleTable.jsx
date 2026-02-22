@@ -28,14 +28,14 @@ export default function ArticleTable({
     toggleVisibility
 }) {
     const statusMap = {
-        ASSIGNED_TO_EDITOR: "Stage 1 Reviewer Assigned",
-        EDITOR_EDITING: "Stage 1 Reviewer Editing",
-        EDITOR_IN_PROGRESS: "Stage 1 Reviewer In Progress",
-        EDITOR_APPROVED: "Stage 1 Reviewer Approved",
-        ASSIGNED_TO_REVIEWER: "Stage 2 Reviewer Assigned",
-        REVIEWER_EDITING: "Stage 2 Reviewer Editing",
-        REVIEWER_IN_PROGRESS: "Stage 2 Reviewer In Progress",
-        REVIEWER_APPROVED: "Stage 2 Reviewer Approved",
+        ASSIGNED_TO_EDITOR: "Stage 1 Review Assigned",
+        EDITOR_EDITING: "Stage 1 Review Editing",
+        EDITOR_IN_PROGRESS: "Stage 1 Review In Progress",
+        EDITOR_APPROVED: "Stage 1 Review Approved",
+        ASSIGNED_TO_REVIEWER: "Stage 2 Review Assigned",
+        REVIEWER_EDITING: "Stage 2 Review Editing",
+        REVIEWER_IN_PROGRESS: "Stage 2 Review In Progress",
+        REVIEWER_APPROVED: "Stage 2 Review Approved",
     };
     const [publishingId, setPublishingId] = useState(null);
 
@@ -249,7 +249,7 @@ export default function ArticleTable({
                             {/* Assignments */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
                                 <div>
-                                    <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Editor</p>
+                                    <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Stage 1 Reviewer</p>
                                     <AssignEditor
                                         article={art}
                                         editors={editors}
@@ -257,7 +257,7 @@ export default function ArticleTable({
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Reviewer</p>
+                                    <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Stage 2 Reviewer</p>
                                     <AssignReviewer
                                         article={art}
                                         reviewers={reviewers}

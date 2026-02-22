@@ -12,14 +12,14 @@ const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 // Helper Component for Stats
 // Status Mapping Utility
 const statusMap = {
-    ASSIGNED_TO_EDITOR: "Stage 1 Reviewer Assigned",
-    EDITOR_EDITING: "Stage 1 Reviewer Editing",
-    EDITOR_IN_PROGRESS: "Stage 1 Reviewer In Progress",
-    EDITOR_APPROVED: "Stage 1 Reviewer Approved",
-    ASSIGNED_TO_REVIEWER: "Stage 2 Reviewer Assigned",
-    REVIEWER_EDITING: "Stage 2 Reviewer Editing",
-    REVIEWER_IN_PROGRESS: "Stage 2 Reviewer In Progress",
-    REVIEWER_APPROVED: "Stage 2 Reviewer Approved",
+    ASSIGNED_TO_EDITOR: "Stage 1 Review Assigned",
+    EDITOR_EDITING: "Stage 1 Review Editing",
+    EDITOR_IN_PROGRESS: "Stage 1 Review In Progress",
+    EDITOR_APPROVED: "Stage 1 Review Approved",
+    ASSIGNED_TO_REVIEWER: "Stage 2 Review Assigned",
+    REVIEWER_EDITING: "Stage 2 Review Editing",
+    REVIEWER_IN_PROGRESS: "Stage 2 Review In Progress",
+    REVIEWER_APPROVED: "Stage 2 Review Approved",
 };
 
 const StatCard = ({ title, count, color }) => (
@@ -60,9 +60,9 @@ function ReviewerDashboardContent() {
 
     const [profile, setProfile] = useState({
         id: "",
-        name: "Reviewer Name",
+        name: "Stage 2 Reviewer Name",
         email: "",
-        role: "Stage 2 Reviewer",
+        role: "Stage 2 Review",
     });
 
     const handleViewVisualDiff = useCallback(async (changeLogId = null) => {
@@ -620,7 +620,7 @@ function ReviewerDashboardContent() {
                         </div>
                     </div>
                     <span className="text-[9px] bg-red-900/50 text-white/90 px-4 py-0.5 rounded-full font-black uppercase tracking-[0.2em] border border-red-800/50 shadow-sm">
-                        {selectedArticle ? "Review Mode" : "Stage 2 Reviewer"}
+                        {selectedArticle ? "Review Mode" : "Stage 2 Review"}
                     </span>
 
                     {/* Close Button Mobile - Absolute Positioning */}

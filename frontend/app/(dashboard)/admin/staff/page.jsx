@@ -44,7 +44,7 @@ export default function StaffPage() {
                     // New API returns data.data.editors
                     setEditors(data.data?.editors || []);
                 } else {
-                    toast.error("Failed to fetch stage 1 reviewers");
+                    toast.error("Failed to fetch Stage 1 Reviewers");
                 }
             } else {
                 const res = await fetch(`${NEXT_PUBLIC_BASE_URL}/admin/access-management/reviewers`, {
@@ -55,7 +55,7 @@ export default function StaffPage() {
                     // New API returns data.data.reviewers
                     setReviewers(data.data?.reviewers || []);
                 } else {
-                    toast.error("Failed to fetch stage 2 reviewers");
+                    toast.error("Failed to fetch Stage 2 Reviewers");
                 }
             }
         } catch (error) {
@@ -172,7 +172,7 @@ export default function StaffPage() {
                                 : "text-gray-500 hover:text-gray-700"
                                 }`}
                         >
-                            Stage 1 Reviewers ({editors.length})
+                            Stage 1 Review ({editors.length})
                         </button>
                         <button
                             onClick={() => setActiveTab("reviewers")}
@@ -181,7 +181,7 @@ export default function StaffPage() {
                                 : "text-gray-500 hover:text-gray-700"
                                 }`}
                         >
-                            Stage 2 Reviewers ({reviewers.length})
+                            Stage 2 Review ({reviewers.length})
                         </button>
                     </div>
 
@@ -205,7 +205,7 @@ export default function StaffPage() {
                                         </tr>
                                     ) : (activeTab === "editors" ? editors : reviewers).length === 0 ? (
                                         <tr>
-                                            <td colSpan="6" className="p-10 text-center font-bold text-gray-500">No {activeTab === "editors" ? "stage 1 reviewers" : "stage 2 reviewers"} found.</td>
+                                            <td colSpan="6" className="p-10 text-center font-bold text-gray-500">No {activeTab === "editors" ? "Stage 1 Review" : "Stage 2 Review"} found.</td>
                                         </tr>
                                     ) : (
                                         (activeTab === "editors" ? editors : reviewers).map((user) => (
@@ -258,7 +258,7 @@ export default function StaffPage() {
                             {isLoading ? (
                                 <div className="text-center text-gray-400 py-10">Loading...</div>
                             ) : (activeTab === "editors" ? editors : reviewers).length === 0 ? (
-                                <div className="text-center text-gray-400 py-10">No {activeTab === "editors" ? "stage 1 reviewers" : "stage 2 reviewers"} found.</div>
+                                <div className="text-center text-gray-400 py-10">No {activeTab === "editors" ? "Stage 1 Review" : "Stage 2 Review"} found.</div>
                             ) : (
                                 (activeTab === "editors" ? editors : reviewers).map(user => (
                                     <div key={user.id} className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col gap-3">
