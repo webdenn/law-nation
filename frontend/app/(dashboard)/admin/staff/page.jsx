@@ -145,7 +145,7 @@ export default function StaffPage() {
                             </svg>
                         </button>
                         <h2 className="text-lg md:text-xl font-black text-gray-700 uppercase">
-                            Editors & Reviewers
+                            All Reviewers
                         </h2>
                     </div>
 
@@ -172,7 +172,7 @@ export default function StaffPage() {
                                 : "text-gray-500 hover:text-gray-700"
                                 }`}
                         >
-                            Editors ({editors.length})
+                            Stage 1 Reviewers ({editors.length})
                         </button>
                         <button
                             onClick={() => setActiveTab("reviewers")}
@@ -181,7 +181,7 @@ export default function StaffPage() {
                                 : "text-gray-500 hover:text-gray-700"
                                 }`}
                         >
-                            Reviewers ({reviewers.length})
+                            Stage 2 Reviewers ({reviewers.length})
                         </button>
                     </div>
 

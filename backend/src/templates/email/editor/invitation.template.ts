@@ -16,13 +16,13 @@ export function generateEditorInvitationHtml(data: {
       </p>
       
       <p style="font-size: 16px; color: #555; line-height: 1.8;">
-        You have been invited to join <strong>Law Nation</strong> as an <strong style="color: #d32f2f;">Editor</strong>. 
+        You have been invited to join <strong>Law Nation</strong> as an <strong style="color: #d32f2f;">Stage 1 Review</strong>. 
         We are excited to have you on our team to review and approve scholarly legal articles.
       </p>
       
       <div style="background-color: #f5f5f5; border-left: 4px solid #d32f2f; padding: 20px; margin: 25px 0;">
         <p style="margin: 0; font-size: 15px; color: #333;">
-          <strong>Next Step:</strong> Click the button below to set up your password and activate your editor account.
+          <strong>Next Step:</strong> Click the button below to set up your password and activate your Stage 1 Review  account.
         </p>
       </div>
       
@@ -62,7 +62,7 @@ export function generateEditorInvitationHtml(data: {
   `;
 
   return {
-    subject: "You're Invited to Join Law Nation as an Editor! ⚖️",
+    subject: "You're Invited to Join Law Nation as an Stage 1 Review ! ⚖️",
     html: wrapInRedLayout(content)
   };
 }

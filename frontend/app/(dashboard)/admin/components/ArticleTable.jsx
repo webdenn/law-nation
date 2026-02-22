@@ -75,8 +75,8 @@ export default function ArticleTable({
                             <th className="p-5">PDF Document & Abstract</th>
                             <th className="p-5">Author</th>
                             <th className="p-5">Status</th>
-                            <th className="p-5 text-center">Assign Editor</th>
-                            <th className="p-5 text-center">Assign Reviewer</th>
+                            <th className="p-5 text-center">Stage 1 Review </th>
+                            <th className="p-5 text-center">Stage 2 Review </th>
                             <th className="p-5 text-right">Actions</th>
                         </tr>
                     </thead>
