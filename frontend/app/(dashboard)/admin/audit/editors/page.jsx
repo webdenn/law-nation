@@ -48,7 +48,7 @@ export default function EditorAuditPage() {
     };
 
     const formatEventType = (type) => {
-        return type.replace(/_/g, " ");
+        return type.replace("EDITOR_", "STAGE 1 REVIEW ").replace("REVIEWER_", "STAGE 2 REVIEW ").replace(/_/g, " ");
     };
 
     const downloadCSV = () => {
@@ -59,10 +59,10 @@ export default function EditorAuditPage() {
 
         events.forEach(event => {
             let details = "";
-            if (event.eventType === 'EDITOR_ASSIGN') details = `Assigned to ${event.targetEditorName}`;
-            else if (event.eventType === 'EDITOR_REASSIGN') details = `Reassigned to ${event.targetEditorName}`;
-            else if (event.eventType === 'EDITOR_UPLOAD') details = `Editing Duration: ${event.editingDuration || '-'}`;
-            else if (event.eventType === 'FINAL_DECISION') details = `Decision: ${event.decisionOutcome}`;
+            if (event.eventType === 'EDITOR_ASSIGN') details = `Stage 1 Review Assigned to ${event.targetEditorName}`;
+            else if (event.eventType === 'EDITOR_REASSIGN') details = `Stage 1 Review Reassigned to ${event.targetEditorName}`;
+            else if (event.eventType === 'EDITOR_UPLOAD') details = `Stage 1 Review Upload (Duration: ${event.editingDuration || '-'})`;
+            else if (event.eventType === 'FINAL_DECISION') details = `Final Decision: ${event.decisionOutcome}`;
 
             const row = [
                 `\t${new Date(event.eventDate).toLocaleDateString('en-GB')}`,
@@ -79,7 +79,7 @@ export default function EditorAuditPage() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `editor_audit_activities_${new Date().toISOString().split('T')[0]}.csv`;
+        a.download = `stage1_review_audit_activities_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
     };
@@ -163,7 +163,7 @@ export default function EditorAuditPage() {
                                                     </span>
                                                 </td>
                                                 <td className="p-6 text-gray-900 font-bold">
-                                                    {event.userName}
+                                                    {event.userName === "Editor" ? "Stage 1 Review" : event.userName}
                                                 </td>
                                                 <td className="p-6 text-gray-800 font-bold max-w-[200px] truncate">
                                                     {event.articleTitle}
@@ -172,11 +172,11 @@ export default function EditorAuditPage() {
                                                     {(() => {
                                                         switch (event.eventType) {
                                                             case 'EDITOR_ASSIGN':
-                                                                return <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Assigned: {event.targetEditorName}</span>;
+                                                                return <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Stage 1 Review Assigned: {event.targetEditorName}</span>;
                                                             case 'EDITOR_REASSIGN':
-                                                                return <span className="bg-orange-50 text-orange-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Reassigned to: {event.targetEditorName}</span>;
+                                                                return <span className="bg-orange-50 text-orange-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Stage 1 Review Reassigned to: {event.targetEditorName}</span>;
                                                             case 'EDITOR_UPLOAD':
-                                                                return <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Duration: {(event.editingDuration && event.editingDuration !== 'N/A') ? event.editingDuration : '-'}</span>;
+                                                                return <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Stage 1 Review Upload Duration: {(event.editingDuration && event.editingDuration !== 'N/A') ? event.editingDuration : '-'}</span>;
                                                             case 'FINAL_DECISION':
                                                                 return (
                                                                     <span className={`px-2 py-1 rounded font-black uppercase text-[9px] ${event.decisionOutcome === 'PUBLISHED' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
