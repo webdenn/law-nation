@@ -45,6 +45,15 @@ export class ArticleQueryService {
     if (assignedEditorId) where.assignedEditorId = assignedEditorId;
     if (assignedReviewerId) where.assignedReviewerId = assignedReviewerId;
 
+    // ✅ Handle search
+    if (filters.search) {
+      where.OR = [
+        { title: { contains: filters.search, mode: 'insensitive' } },
+        { authorName: { contains: filters.search, mode: 'insensitive' } },
+        { category: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
+
     const skip = (page - 1) * limit;
 
     // Fetch data first to free up connection
