@@ -111,7 +111,7 @@ export default function EditorAuditPage() {
                             <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter text-gray-900 uppercase">
                                 Stage 1 Review Activity Log
                             </h1>
-                            <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mt-1">Audit Log / Editorial Events</p>
+                            <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mt-1">Audit Log / Stage 1 reviewe Events</p>
                         </div>
                     </div>
 
