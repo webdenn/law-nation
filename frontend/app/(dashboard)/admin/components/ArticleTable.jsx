@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import AssignEditor from "./AssignEditor";
 import AssignReviewer from "./AssignReviewer";
-import Pagination from "../../components/Pagination";
+import Pagination from "../../../components/Pagination";
 // We don't need toast here unless we add interactions that use it directly, 
 // but most interactions are passed down props.
 
