@@ -47,7 +47,7 @@ export default function ReviewerAuditPage() {
     };
 
     const formatEventType = (type) => {
-        return type.replace(/_/g, " ");
+        return type.replace("REVIEWER_", "STAGE 2 REVIEW ").replace("EDITOR_", "STAGE 1 REVIEW ").replace(/_/g, " ");
     };
 
     const formatDuration = (event) => {
@@ -66,10 +66,10 @@ export default function ReviewerAuditPage() {
 
         events.forEach(event => {
             let details = "";
-            if (event.eventType === 'REVIEWER_ASSIGN') details = `Assigned to ${event.targetEditorName || 'Reviewer'}`;
-            else if (event.eventType === 'REVIEWER_REASSIGN') details = `Reassigned to ${event.targetEditorName || 'New'}`;
-            else if (event.eventType === 'REVIEWER_UPLOAD') details = `Review Uploaded (Duration: ${formatDuration(event)})`;
-            else if (event.eventType === 'REVIEWER_DOWNLOAD') details = `Reviewer Downloaded Document`;
+            if (event.eventType === 'REVIEWER_ASSIGN') details = `Stage 2 Review Assigned to ${event.targetEditorName || 'Stage 2 Review'}`;
+            else if (event.eventType === 'REVIEWER_REASSIGN') details = `Stage 2 Review Reassigned to ${event.targetEditorName || 'New'}`;
+            else if (event.eventType === 'REVIEWER_UPLOAD') details = `Stage 2 Review Uploaded (Duration: ${formatDuration(event)})`;
+            else if (event.eventType === 'REVIEWER_DOWNLOAD') details = `Stage 2 Review Downloaded Document`;
 
             const row = [
                 `\t${new Date(event.eventDate).toLocaleDateString('en-GB')}`,
@@ -86,7 +86,7 @@ export default function ReviewerAuditPage() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `reviewer_audit_activities_${new Date().toISOString().split('T')[0]}.csv`;
+        a.download = `stage2_review_audit_activities_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
     };
@@ -170,7 +170,9 @@ export default function ReviewerAuditPage() {
                                                     </span>
                                                 </td>
                                                 <td className="p-6 text-gray-900 font-bold">
-                                                    {event.userName}
+                                                    {event.userName === "Reviewer" ? "Stage 2 Review" :
+                                                        event.userName === "Editor" ? "Stage 1 Review" :
+                                                            event.userName}
                                                 </td>
                                                 <td className="p-6 text-gray-800 font-bold max-w-[200px] truncate">
                                                     {event.articleTitle}
@@ -179,13 +181,13 @@ export default function ReviewerAuditPage() {
                                                     {(() => {
                                                         switch (event.eventType) {
                                                             case 'REVIEWER_ASSIGN':
-                                                                return <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Assigned: {event.targetEditorName}</span>;
+                                                                return <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Stage 2 Review Assigned: {event.targetEditorName}</span>;
                                                             case 'REVIEWER_REASSIGN':
-                                                                return <span className="bg-orange-50 text-orange-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Reassigned to: {event.targetEditorName}</span>;
+                                                                return <span className="bg-orange-50 text-orange-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Stage 2 Review Reassigned to: {event.targetEditorName}</span>;
                                                             case 'REVIEWER_UPLOAD':
-                                                                return <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Review Uploaded (Duration: {formatDuration(event)})</span>;
+                                                                return <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Stage 2 Review Uploaded (Duration: {formatDuration(event)})</span>;
                                                             case 'REVIEWER_DOWNLOAD':
-                                                                return <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Downloaded Document</span>;
+                                                                return <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded font-bold uppercase text-[9px]">Stage 2 Review Downloaded Document</span>;
                                                             default:
                                                                 return <span>-</span>;
                                                         }
