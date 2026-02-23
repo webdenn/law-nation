@@ -130,6 +130,10 @@ function EditorDashboardContent() {
     role: "Stage 1 Review",
   });
 
+  // ✅ SEARCH & FILTER STATE
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+
   // ✅ FIX: handleViewVisualDiff with useCallback and clean dependencies
   const handleViewVisualDiff = useCallback(async (changeLogId) => {
     // Agar already generate ho raha hai to rok do
@@ -221,15 +225,24 @@ function EditorDashboardContent() {
     try {
       setIsLoading(true);
       const cb = Date.now();
-      const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/articles?assignedEditorId=${editorId}&page=${currentPage}&limit=${pageSize}&cb=${cb}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache"
-          },
-        }
+
+      let url = `${NEXT_PUBLIC_BASE_URL}/articles?assignedEditorId=${editorId}&page=${currentPage}&limit=${pageSize}&cb=${cb}`;
+
+      if (searchTerm) {
+        url += `&search=${encodeURIComponent(searchTerm)}`;
+      }
+
+      if (statusFilter !== "All") {
+        url += `&status=${statusFilter}`;
+      }
+
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache"
+        },
+      }
       );
 
       if (res.ok) {
@@ -285,7 +298,7 @@ function EditorDashboardContent() {
       const currentPath = window.location.pathname + window.location.search;
       router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
     }
-  }, [currentPage, pageSize]); // Add pagination to dependencies
+  }, [currentPage, pageSize, searchTerm, statusFilter]); // Add filters to dependencies
 
   // ✅ NEW: Auto-select article from URL
   useEffect(() => {
@@ -802,12 +815,12 @@ function EditorDashboardContent() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-8">
                 <EditorStatCard
                   title="Total Assigned"
-                  count={articles.length}
+                  count={totalItems} // ✅ Use total from server
                   color="border-red-600"
                 />
                 <EditorStatCard
                   title="Pending"
-                  count={articles.filter((a) => a.status !== "PUBLISHED").length}
+                  count={totalItems - articles.filter(a => a.status === "PUBLISHED").length} // Rough estimate, ideally backend should provide these counts
                   color="border-yellow-500"
                 />
                 <EditorStatCard
@@ -818,8 +831,31 @@ function EditorDashboardContent() {
               </div>
 
               <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                <div className="bg-red-50 p-5 border-b border-red-100">
+                <div className="bg-red-50 p-5 border-b border-red-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <h3 className="font-bold text-red-800 text-lg">My Tasks</h3>
+
+                  {/* Search & Filter Bar */}
+                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <input
+                      type="text"
+                      placeholder="Search tasks..."
+                      className="p-2 border rounded-lg text-xs outline-none focus:border-red-600 w-full sm:w-auto"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <select
+                      className="p-2 border rounded-lg text-xs font-bold outline-none cursor-pointer w-full sm:w-auto"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="All">All Status</option>
+                      <option value="ASSIGNED_TO_EDITOR">Assigned</option>
+                      <option value="EDITOR_EDITING">Editing</option>
+                      <option value="EDITOR_IN_PROGRESS">In Progress</option>
+                      <option value="EDITOR_APPROVED">Approved</option>
+                      <option value="PUBLISHED">Published</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left whitespace-nowrap">

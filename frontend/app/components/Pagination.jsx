@@ -16,7 +16,7 @@ export default function Pagination({
     totalItems,
     itemsPerPage,
 }) {
-    if (totalPages <= 1) return null;
+    if (!totalItems || totalItems === 0) return null;
 
     // Generate page numbers to show
     const getPageNumbers = () => {

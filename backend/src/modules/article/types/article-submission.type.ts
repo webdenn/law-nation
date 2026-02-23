@@ -33,6 +33,7 @@ export interface ArticleListFilters {
   assignedReviewerId?: string;
   page?: number;
   limit?: number;
+  search?: string;
 }
 
 export interface AssignEditorData {
