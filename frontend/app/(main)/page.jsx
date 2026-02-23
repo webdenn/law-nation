@@ -234,7 +234,7 @@ export default function HomePage() {
                         </h2>
                     </div>
 
-                    <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 items-start">
                         {isLoading ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 col-span-full w-full">
                                 {[1, 2, 3].map((n) => (
@@ -253,7 +253,7 @@ export default function HomePage() {
                             publishedArticles.map((item) => (
                                 <article
                                     key={item.slug || item.id || item._id}
-                                    className="bg-white border border-gray-200 rounded-lg p-8 flex flex-col h-full overflow-hidden"
+                                    className="bg-white border border-gray-200 rounded-lg p-8 flex flex-col overflow-hidden"
                                 >
                                     {item.thumbnailUrl &&
                                         item.thumbnailUrl !== "null" &&
@@ -284,7 +284,7 @@ export default function HomePage() {
                                         </p>
                                     </div>
 
-                                    <div className="mt-auto pt-6 flex items-center justify-between border-t border-gray-100">
+                                    <div className="mt-6 pt-6 flex items-center justify-between border-t border-gray-100">
                                         <span className="text-sm font-semibold text-black truncate max-w-[140px]">
                                             {item.authorName || "Anonymous"}
                                         </span>
