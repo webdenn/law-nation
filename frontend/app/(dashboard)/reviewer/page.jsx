@@ -820,31 +820,8 @@ function ReviewerDashboardContent() {
                             </div>
 
                             <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                                <div className="bg-red-50 p-5 border-b border-red-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div className="bg-red-50 p-5 border-b border-red-100">
                                     <h3 className="font-bold text-red-800 text-lg">My Tasks</h3>
-
-                                    {/* Search & Filter Bar */}
-                                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                                        <input
-                                            type="text"
-                                            placeholder="Search tasks..."
-                                            className="p-2 border rounded-lg text-xs outline-none focus:border-red-600 w-full sm:w-auto"
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                        />
-                                        <select
-                                            className="p-2 border rounded-lg text-xs font-bold outline-none cursor-pointer w-full sm:w-auto"
-                                            value={statusFilter}
-                                            onChange={(e) => setStatusFilter(e.target.value)}
-                                        >
-                                            <option value="All">All Status</option>
-                                            <option value="ASSIGNED_TO_REVIEWER">Assigned</option>
-                                            <option value="REVIEWER_EDITING">Editing</option>
-                                            <option value="REVIEWER_IN_PROGRESS">In Progress</option>
-                                            <option value="REVIEWER_APPROVED">Approved</option>
-                                            <option value="PUBLISHED">Published</option>
-                                        </select>
-                                    </div>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left whitespace-nowrap">
