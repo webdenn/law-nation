@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import Image from "next/image";
 import logoImg from "../../assets/logo.jpg";
 import ReviewInterface from "./ReviewInterface";
+import Pagination from "../../components/Pagination";
 import { compareTexts, getChangeStats, formatDifferences } from "../../utilis/diffutilis";
 
 const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
@@ -59,6 +60,12 @@ function ReviewerDashboardContent() {
     const [currentDiffData, setCurrentDiffData] = useState(null);
     const [isApproving, setIsApproving] = useState(false);
     const [pdfTimestamp, setPdfTimestamp] = useState(Date.now());
+
+    // ✅ PAGINATION STATE
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
 
     const [profile, setProfile] = useState({
         id: "",
@@ -173,7 +180,7 @@ function ReviewerDashboardContent() {
             const cb = Date.now();
             // ✅ CHANGED: assignedReviewerId instead of assignedEditorId
             const res = await fetch(
-                `${NEXT_PUBLIC_BASE_URL}/articles?assignedReviewerId=${reviewerId}&cb=${cb}`,
+                `${NEXT_PUBLIC_BASE_URL}/articles?assignedReviewerId=${reviewerId}&page=${currentPage}&limit=${pageSize}&cb=${cb}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -187,6 +194,12 @@ function ReviewerDashboardContent() {
                 const data = await res.json();
                 const list = data.articles || (Array.isArray(data) ? data : []);
                 setArticles(list);
+
+                // Update pagination from response
+                if (data.pagination) {
+                    setTotalPages(data.pagination.totalPages || 1);
+                    setTotalItems(data.pagination.total || 0);
+                }
             } else {
                 toast.error("Unauthorized or session expired");
             }
@@ -230,7 +243,7 @@ function ReviewerDashboardContent() {
             const currentPath = window.location.pathname + window.location.search;
             router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
         }
-    }, []);
+    }, [currentPage, pageSize]);
 
     // ✅ NEW: Auto-select article from URL
     useEffect(() => {
@@ -841,6 +854,15 @@ function ReviewerDashboardContent() {
                                     </table>
                                 </div>
                             </div>
+
+                            {/* Pagination */}
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={setCurrentPage}
+                                totalItems={totalItems}
+                                itemsPerPage={pageSize}
+                            />
                         </>
                     )
                     }

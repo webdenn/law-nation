@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import AssignEditor from "./AssignEditor";
 import AssignReviewer from "./AssignReviewer";
+import Pagination from "../../components/Pagination";
 // We don't need toast here unless we add interactions that use it directly, 
 // but most interactions are passed down props.
 
@@ -25,7 +26,14 @@ export default function ArticleTable({
     setPdfViewMode,
     overrideAndPublish,
 
-    toggleVisibility
+    toggleVisibility,
+
+    // Pagination Props
+    currentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    onPageChange
 }) {
     const statusMap = {
         ASSIGNED_TO_EDITOR: "Stage 1 Review Assigned",
@@ -335,6 +343,15 @@ export default function ArticleTable({
                     </div>
                 </div>
             )}
+
+            {/* Pagination Controls */}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={onPageChange}
+                totalItems={totalItems}
+                itemsPerPage={pageSize}
+            />
         </div>
     );
 }

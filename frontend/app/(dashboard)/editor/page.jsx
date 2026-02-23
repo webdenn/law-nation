@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import Image from "next/image";
 import logoImg from "../../assets/logo.jpg";
 import ReviewInterface from "./ReviewInterface";
+import Pagination from "../../components/Pagination";
 import { compareTexts, getChangeStats, formatDifferences } from "../../utilis/diffutilis";
 
 // ✅ LOOP FIX: NEXT_PUBLIC_BASE_URL ko component ke bahar nikala taki ye baar-baar recreate na ho
@@ -116,6 +117,12 @@ function EditorDashboardContent() {
   const [pdfTimestamp, setPdfTimestamp] = useState(Date.now()); // ✅ Fix Jitter State
   const [hasEditorUploaded, setHasEditorUploaded] = useState(false); // ✅ NEW: Track Editor activity
 
+  // ✅ PAGINATION STATE
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
   const [profile, setProfile] = useState({
     id: "",
     name: "Stage 1 Review Name",
@@ -215,7 +222,7 @@ function EditorDashboardContent() {
       setIsLoading(true);
       const cb = Date.now();
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/articles?assignedEditorId=${editorId}&cb=${cb}`,
+        `${NEXT_PUBLIC_BASE_URL}/articles?assignedEditorId=${editorId}&page=${currentPage}&limit=${pageSize}&cb=${cb}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -229,6 +236,12 @@ function EditorDashboardContent() {
         const data = await res.json();
         const list = data.articles || (Array.isArray(data) ? data : []);
         setArticles(list);
+
+        // Update pagination from response
+        if (data.pagination) {
+          setTotalPages(data.pagination.totalPages || 1);
+          setTotalItems(data.pagination.total || 0);
+        }
       } else {
         toast.error("Unauthorized or session expired");
       }
@@ -272,7 +285,7 @@ function EditorDashboardContent() {
       const currentPath = window.location.pathname + window.location.search;
       router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
     }
-  }, []); // 👈 Yahan [router] hata kar [] kar do (Sirf ek baar chalega)
+  }, [currentPage, pageSize]); // Add pagination to dependencies
 
   // ✅ NEW: Auto-select article from URL
   useEffect(() => {
@@ -850,6 +863,15 @@ function EditorDashboardContent() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination */}
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalItems={totalItems}
+                  itemsPerPage={pageSize}
+                />
               </div>
             </>
           )

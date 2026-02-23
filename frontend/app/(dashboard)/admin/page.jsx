@@ -78,6 +78,12 @@ export default function AdminDashboard() {
   const [pdfViewMode, setPdfViewMode] = useState("original");
   const [changeHistory, setChangeHistory] = useState([]);
 
+  // ✅ 3. PAGINATION STATE
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
   // History fetch karne ka function
   // const fetchChangeHistory = async (articleId) => {
   //   try {
@@ -519,7 +525,7 @@ export default function AdminDashboard() {
             fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/summary?cb=${cb}`, { headers }),
             fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/time-metrics?cb=${cb}`, { headers }),
             fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/status-distribution?cb=${cb}`, { headers }),
-            fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/articles-timeline?limit=50&cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/articles-timeline?page=${currentPage}&limit=${pageSize}&cb=${cb}`, { headers }),
             fetch(`${NEXT_PUBLIC_BASE_URL}/users/editors?cb=${cb}`, { headers }),
             fetch(`${NEXT_PUBLIC_BASE_URL}/users/reviewers?cb=${cb}`, { headers }), // ✅ Fetch Reviewers
           ]);
@@ -582,6 +588,12 @@ export default function AdminDashboard() {
             isVisible: item.isVisible !== undefined ? item.isVisible : true, // ✅ Map visibility status
           }));
           setArticles(formatted);
+
+          // Update pagination state
+          if (data.pagination) {
+            setTotalPages(data.pagination.totalPages || 1);
+            setTotalItems(data.pagination.total || 0);
+          }
         }
 
         // 5. Editors List
@@ -605,7 +617,7 @@ export default function AdminDashboard() {
     };
 
     fetchDashboardData();
-  }, [isAuthorized]);
+  }, [isAuthorized, currentPage, pageSize]);
 
   const handlePdfClick = (relativeUrl) => {
     if (!relativeUrl) {
@@ -623,6 +635,11 @@ export default function AdminDashboard() {
     console.log("Opening Fresh URL:", fullUrl);
     window.open(fullUrl, "_blank");
   };
+  // Reset to page 1 on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchTerm]);
+
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -947,7 +964,7 @@ export default function AdminDashboard() {
           <ArticleTable
             isLoading={isLoading}
             articles={articles}
-            filteredArticles={filteredArticles}
+            filteredArticles={articles} // Pagination backend se handle ho rahi hai
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
             statusFilter={statusFilter}
@@ -963,6 +980,11 @@ export default function AdminDashboard() {
             setPdfViewMode={setPdfViewMode}
             overrideAndPublish={overrideAndPublish}
             toggleVisibility={toggleVisibility}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
           />
         </div>
       </main>
