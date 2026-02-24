@@ -372,7 +372,7 @@ export default function AdminDashboard() {
             fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/summary?cb=${cb}`, { headers }),
             fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/time-metrics?cb=${cb}`, { headers }),
             fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/status-distribution?cb=${cb}`, { headers }),
-            fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/articles-timeline?page=${currentPage}&limit=${pageSize}&cb=${cb}`, { headers }),
+            fetch(`${NEXT_PUBLIC_BASE_URL}/admin/dashboard/articles-timeline?page=${currentPage}&limit=${pageSize}&status=${statusFilter}&search=${searchTerm}&cb=${cb}`, { headers }),
             fetch(`${NEXT_PUBLIC_BASE_URL}/users/editors?cb=${cb}`, { headers }),
             fetch(`${NEXT_PUBLIC_BASE_URL}/users/reviewers?cb=${cb}`, { headers }), // ✅ Fetch Reviewers
           ]);
@@ -464,7 +464,7 @@ export default function AdminDashboard() {
     };
 
     fetchDashboardData();
-  }, [isAuthorized, currentPage, pageSize]);
+  }, [isAuthorized, currentPage, pageSize, statusFilter, searchTerm]);
 
   const handlePdfClick = (relativeUrl) => {
     if (!relativeUrl) {
