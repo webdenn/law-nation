@@ -1,25 +1,24 @@
-import crypto from 'crypto';
-import { prisma } from '@/db/db.js';
-import fs from 'fs/promises';
-import path from 'path';
+import crypto from "crypto";
+import { prisma } from "@/db/db.js";
+import fs from "fs/promises";
+import path from "path";
 
 // Default TTL: 48 hours
-const DEFAULT_TTL_HOURS = parseInt(process.env.VERIFICATION_TTL_HOURS || '48');
+const DEFAULT_TTL_HOURS = parseInt(process.env.VERIFICATION_TTL_HOURS || "48");
 
 export class VerificationService {
-  
   /**
    * Generate a secure verification token
    */
   static generateVerificationToken(): string {
-    return crypto.randomBytes(32).toString('hex');
+    return crypto.randomBytes(32).toString("hex");
   }
 
   /**
    * Generate a 6-digit verification code
    */
   static generateVerificationCode(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return crypto.randomInt(100000, 1000000).toString();
   }
 
   /**
@@ -30,12 +29,14 @@ export class VerificationService {
     resourceType: string,
     metadata: any,
     ttlHours: number = DEFAULT_TTL_HOURS,
-    includeCode: boolean = false
+    includeCode: boolean = false,
   ) {
     const token = this.generateVerificationToken();
     const resourceId = crypto.randomUUID();
-    const verificationCode = includeCode ? this.generateVerificationCode() : null;
-    
+    const verificationCode = includeCode
+      ? this.generateVerificationCode()
+      : null;
+
     // Calculate expiration: current time + 48 hours
     const ttl = new Date();
     ttl.setHours(ttl.getHours() + ttlHours);
@@ -52,11 +53,11 @@ export class VerificationService {
       },
     });
 
-    return { 
-      token, 
-      code: verificationCode, 
-      verificationId: verification.id, 
-      expiresAt: ttl 
+    return {
+      token,
+      code: verificationCode,
+      verificationId: verification.id,
+      expiresAt: ttl,
     };
   }
 
@@ -69,16 +70,19 @@ export class VerificationService {
     });
 
     if (!verification) {
-      return { valid: false, error: 'Invalid verification token' };
+      return { valid: false, error: "Invalid verification token" };
     }
 
     if (verification.isVerified) {
-      return { valid: false, error: 'Token already used' };
+      return { valid: false, error: "Token already used" };
     }
 
     // Check if token expired (after 48 hours)
     if (new Date() > verification.ttl) {
-      return { valid: false, error: 'Verification link expired (48 hours passed)' };
+      return {
+        valid: false,
+        error: "Verification link expired (48 hours passed)",
+      };
     }
 
     return { valid: true, data: verification.metadata, verification };
@@ -97,12 +101,15 @@ export class VerificationService {
     });
 
     if (!verification) {
-      return { valid: false, error: 'Invalid verification code' };
+      return { valid: false, error: "Invalid verification code" };
     }
 
     // Check if code expired (after 48 hours)
     if (new Date() > verification.ttl) {
-      return { valid: false, error: 'Verification code expired (48 hours passed)' };
+      return {
+        valid: false,
+        error: "Verification code expired (48 hours passed)",
+      };
     }
 
     return { valid: true, data: verification.metadata, verification };
@@ -134,7 +141,7 @@ export class VerificationService {
     });
 
     if (!verification) {
-      throw new Error('Verification not found');
+      throw new Error("Verification not found");
     }
 
     await prisma.emailVerification.update({
@@ -180,7 +187,7 @@ export class VerificationService {
    */
   static async cleanupExpiredVerifications() {
     const now = new Date();
-    
+
     // Find all unverified records where TTL has passed
     const expiredRecords = await prisma.emailVerification.findMany({
       where: {
@@ -195,31 +202,34 @@ export class VerificationService {
     for (const record of expiredRecords) {
       try {
         // Delete temporary files if they exist
-        if (record.resourceType === 'ARTICLE' && record.metadata) {
+        if (record.resourceType === "ARTICLE" && record.metadata) {
           const metadata = record.metadata as any;
-          
+
           // Delete temp PDF
           if (metadata.tempPdfPath) {
             await this.deleteTempFile(metadata.tempPdfPath);
             filesDeleted++;
           }
-          
+
           // ✅ NEW: Delete temp Word file
           if (metadata.tempWordPath) {
             await this.deleteTempFile(metadata.tempWordPath);
             filesDeleted++;
           }
-          
+
           // ✅ Delete temp thumbnail
-          if (metadata.thumbnailUrl && metadata.thumbnailUrl.includes('/temp/')) {
+          if (
+            metadata.thumbnailUrl &&
+            metadata.thumbnailUrl.includes("/temp/")
+          ) {
             await this.deleteTempFile(metadata.thumbnailUrl);
             filesDeleted++;
           }
-          
+
           // ✅ Delete temp images
           if (metadata.imageUrls && Array.isArray(metadata.imageUrls)) {
             for (const imageUrl of metadata.imageUrls) {
-              if (imageUrl.includes('/temp/')) {
+              if (imageUrl.includes("/temp/")) {
                 await this.deleteTempFile(imageUrl);
                 filesDeleted++;
               }
@@ -231,7 +241,7 @@ export class VerificationService {
         await prisma.emailVerification.delete({
           where: { id: record.id },
         });
-        
+
         deletedCount++;
       } catch (error) {
         console.error(`Failed to cleanup verification ${record.id}:`, error);
@@ -247,7 +257,7 @@ export class VerificationService {
   private static async deleteTempFile(filePath: string) {
     try {
       const fullPath = path.join(process.cwd(), filePath);
-      
+
       // Check if file exists before trying to delete
       try {
         await fs.access(fullPath);
@@ -256,7 +266,7 @@ export class VerificationService {
         console.log(`⚠️  Temp file already deleted: ${filePath}`);
         return;
       }
-      
+
       await fs.unlink(fullPath);
       console.log(`🗑️  Deleted temp file: ${filePath}`);
     } catch (error) {
@@ -269,12 +279,14 @@ export class VerificationService {
    */
   static async moveTempFile(tempPath: string): Promise<string> {
     const filename = path.basename(tempPath);
-    
+
     // Determine if it's a PDF or image based on path
-    const isPdf = tempPath.includes('/pdfs/') || tempPath.includes('uploads/temp/') && !tempPath.includes('/images/');
-    const permanentDir = isPdf ? 'uploads/pdfs/' : 'uploads/images/';
+    const isPdf =
+      tempPath.includes("/pdfs/") ||
+      (tempPath.includes("uploads/temp/") && !tempPath.includes("/images/"));
+    const permanentDir = isPdf ? "uploads/pdfs/" : "uploads/images/";
     const permanentPath = `${permanentDir}${filename}`;
-    
+
     const tempFullPath = path.join(process.cwd(), tempPath);
     const permanentFullPath = path.join(process.cwd(), permanentPath);
 
@@ -282,12 +294,15 @@ export class VerificationService {
       // Ensure permanent directory exists
       const permanentDirPath = path.join(process.cwd(), permanentDir);
       await fs.mkdir(permanentDirPath, { recursive: true });
-      
+
       await fs.rename(tempFullPath, permanentFullPath);
       console.log(`Moved file from ${tempPath} to ${permanentPath}`);
       return permanentPath;
     } catch (error) {
-      console.error(`Failed to move file from ${tempPath} to ${permanentPath}:`, error);
+      console.error(
+        `Failed to move file from ${tempPath} to ${permanentPath}:`,
+        error,
+      );
       throw error;
     }
   }
