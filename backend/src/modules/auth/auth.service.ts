@@ -13,7 +13,7 @@ import {
   BadRequestError,
 } from "@/utils/http-errors.util.js";
 import { sendOtpEmail, sendPasswordResetEmail } from "@/utils/email.utils.js";
-import { randomUUID } from "crypto";
+import { randomUUID, randomInt } from "crypto";
 
 const SALT = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
 
@@ -270,7 +270,7 @@ async function sendVerificationOtp(email: string) {
   }
 
   // Generate 6-digit OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+ const otp = randomInt(100000, 1000000).toString();
 
   // Set expiration to 10 minutes from now
   const ttl = new Date();
