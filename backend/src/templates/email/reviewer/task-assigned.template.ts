@@ -12,7 +12,7 @@ export function generateReviewerTaskAssignedHtml(data: {
   
   const content = `
     <div style="padding: 30px;">
-      <h3 style="color: #d32f2f;">New Review Task Assigned</h3>
+      <h3 style="color: #d32f2f;">New Stage 2 Review Task Assigned</h3>
       <p>Dear ${data.reviewerName},</p>
       <p>A new article has been assigned to you for review and evaluation.</p>
       
@@ -39,7 +39,7 @@ export function generateReviewerTaskAssignedHtml(data: {
       </div>
       
       <p style="font-size: 13px; color: #777; margin-top: 20px;">
-        Click the button above to access your reviewer dashboard and review this article. If you're already logged in, you'll be taken directly to the article.
+        Click the button above to access your  dashboard and review this article. If you're already logged in, you'll be taken directly to the article.
       </p>
       
       <p style="font-size: 11px; color: #999; margin-top: 15px;">
@@ -56,7 +56,7 @@ export function generateReviewerTaskAssignedHtml(data: {
   `;
 
   return {
-    subject: "New Review Task Assigned - Law Nation",
+    subject: "New Stage 2 Review task Assigned - Law Nation",
     html: wrapInSimpleRedLayout(content)
   };
 }

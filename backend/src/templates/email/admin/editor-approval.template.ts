@@ -18,7 +18,7 @@ export function generateEditorApprovalNotificationHtml(data: {
       
       <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
         <p style="margin: 0; font-weight: bold; color: #856404;">
-          Editor <strong>${data.editorName}</strong> has approved the article <strong>"${data.articleTitle}"</strong>.
+          Stage 1 Review <strong>${data.editorName}</strong> has approved the article <strong>"${data.articleTitle}"</strong>.
         </p>
       </div>
       
@@ -26,7 +26,7 @@ export function generateEditorApprovalNotificationHtml(data: {
       
       <p><strong>Next Steps:</strong></p>
       <ul style="color: #555; line-height: 1.8;">
-        <li>Review the article and changes made by the editor</li>
+        <li>Review the article and changes made by the Stage 1 Review </li>
         <li>View the change history to see what was modified</li>
         <li>Publish the article when ready</li>
       </ul>

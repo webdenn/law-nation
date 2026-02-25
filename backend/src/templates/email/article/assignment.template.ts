@@ -9,9 +9,9 @@ export function generateAuthorAssignmentHtml(data: {
         <h1 style="color: #d4af37; margin: 0; font-size: 22px;">LAW NATION</h1>
       </div>
       <div style="padding: 30px; text-align: center;">
-        <h2 style="color: #1a1a1a;">Editor Assigned</h2>
+        <h2 style="color: #1a1a1a;">Stage 1 Review </h2>
         <p style="font-size: 16px;">Dear ${data.authorName},</p>
-        <p style="font-size: 16px;">Your article <b>"${data.articleTitle}"</b> has been successfully assigned to an editor for formal review.</p>
+        <p style="font-size: 16px;">Your article <b>"${data.articleTitle}"</b> has been successfully assigned to an Stage 1 Review  for formal review.</p>
         <p style="color: #555;">You will be notified once the review process is complete.</p>
       </div>
     </div>
