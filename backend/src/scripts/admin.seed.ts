@@ -197,23 +197,22 @@ async function main() {
 
   // 6. Create Admin User
   console.log("Creating admin user...");
-  const adminPassword = "Admin@123"; // CHANGE THIS IN PRODUCTION!
+  const adminPassword = "LawNationAdmin@#$2026"; // CHANGE THIS IN PRODUCTION!
   const passwordHash = await bcrypt.hash(adminPassword, 10);
 
   const adminUser = await prisma.user.upsert({
-    where: { email: "admin@lawnation.com" },
+    where: { email: "admin@lawnation.co.in" },
     update: {},
     create: {
       name: "System Administrator",
-      email: "admin@lawnation.com",
+      email: "admin@lawnation.co.in",
       passwordHash: passwordHash,
-      phone: "+1234567890",
       isActive: true,
     },
   });
 
   console.log("Admin user created");
-  console.log(`   Email: admin@lawnation.com`);
+  
   // console.log(`   Password: ${adminPassword}`);
 
   // 7. Assign Admin Role to Admin User

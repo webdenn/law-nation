@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import AssignEditor from "./AssignEditor";
 import AssignReviewer from "./AssignReviewer";
+import Pagination from "../../../components/Pagination";
 // We don't need toast here unless we add interactions that use it directly, 
 // but most interactions are passed down props.
 
@@ -25,8 +26,25 @@ export default function ArticleTable({
     setPdfViewMode,
     overrideAndPublish,
 
-    toggleVisibility
+    toggleVisibility,
+
+    // Pagination Props
+    currentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    onPageChange
 }) {
+    const statusMap = {
+        ASSIGNED_TO_EDITOR: "Stage 1 Review Assigned",
+        EDITOR_EDITING: "Stage 1 Review Editing",
+        EDITOR_IN_PROGRESS: "Stage 1 Review In Progress",
+        EDITOR_APPROVED: "Stage 1 Review Approved",
+        ASSIGNED_TO_REVIEWER: "Stage 2 Review Assigned",
+        REVIEWER_EDITING: "Stage 2 Review Editing",
+        REVIEWER_IN_PROGRESS: "Stage 2 Review In Progress",
+        REVIEWER_APPROVED: "Stage 2 Review Approved",
+    };
     const [publishingId, setPublishingId] = useState(null);
 
     const handlePublish = async (id) => {
@@ -75,8 +93,8 @@ export default function ArticleTable({
                             <th className="p-5">PDF Document & Abstract</th>
                             <th className="p-5">Author</th>
                             <th className="p-5">Status</th>
-                            <th className="p-5 text-center">Assign Editor</th>
-                            <th className="p-5 text-center">Assign Reviewer</th>
+                            <th className="p-5 text-center">Stage 1 Review </th>
+                            <th className="p-5 text-center">Stage 2 Review </th>
                             <th className="p-5 text-right">Actions</th>
                         </tr>
                     </thead>
@@ -126,7 +144,7 @@ export default function ArticleTable({
                                                     : "bg-yellow-100 text-yellow-700"
                                                 }`}
                                         >
-                                            {art.status}
+                                            {statusMap[art.status] || art.status}
                                         </span>
                                     </td>
                                     {/* 4. Assign Editor Dropdown */}
@@ -224,7 +242,7 @@ export default function ArticleTable({
                                             : "bg-yellow-100 text-yellow-700"
                                         }`}
                                 >
-                                    {art.status}
+                                    {statusMap[art.status] || art.status}
                                 </span>
                             </div>
 
@@ -239,7 +257,7 @@ export default function ArticleTable({
                             {/* Assignments */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
                                 <div>
-                                    <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Editor</p>
+                                    <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Stage 1 Reviewer</p>
                                     <AssignEditor
                                         article={art}
                                         editors={editors}
@@ -247,7 +265,7 @@ export default function ArticleTable({
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Reviewer</p>
+                                    <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Stage 2 Reviewer</p>
                                     <AssignReviewer
                                         article={art}
                                         reviewers={reviewers}
@@ -325,6 +343,15 @@ export default function ArticleTable({
                     </div>
                 </div>
             )}
+
+            {/* Pagination Controls */}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={onPageChange}
+                totalItems={totalItems}
+                itemsPerPage={pageSize}
+            />
         </div>
     );
 }

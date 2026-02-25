@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import mammoth from "mammoth";
-import TermsModal from "../../components/TermsModal";
+import ReviewerTermsModal from "../../components/ReviewerTermsModal";
 
 // ✅ 1. ICONS (Yahi define kar diye taaki import ki tension na ho)
 const DownloadIcon = () => (
@@ -199,7 +199,7 @@ const ReviewInterface = ({
             <div className="flex-1 bg-gray-100 rounded-xl border border-gray-300 p-4 flex flex-col h-[500px] lg:h-auto min-h-[500px]">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bold text-gray-700 uppercase text-sm md:text-base">
-                        {pdfViewMode === "original" ? " Editor PDF" : " Reviewer PDF"}
+                        {pdfViewMode === "original" ? " Stage 1 Review PDF" : " Stage 2 Review PDF"}
                     </h3>
                     {getPdfUrlToView() && (
                         <a
@@ -324,8 +324,28 @@ const ReviewInterface = ({
                             onChange={(e) => setUploadComment(e.target.value)}
                             disabled={!!isLocked}
                         />
-
-                        {/* MOVED T&C TO MODAL - REMOVED FROM HERE */}
+                        {/* T&C Section (Modified to use Checkbox) */}
+                        {!isLocked && (
+                            <div className="mt-4">
+                                <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition group">
+                                    <input
+                                        type="checkbox"
+                                        className="mt-0.5 w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                                        checked={declarationAccepted}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                setShowTermsModal(true);
+                                            } else {
+                                                setDeclarationAccepted(false);
+                                            }
+                                        }}
+                                    />
+                                    <span className={`text-xs font-medium transition-colors ${declarationAccepted ? "text-green-700" : "text-gray-600 group-hover:text-blue-600"}`}>
+                                        I agree to the <span className="underline decoration-dotted underline-offset-2">Terms and Conditions</span>
+                                    </span>
+                                </label>
+                            </div>
+                        )}
 
                         {/* Upload Button */}
                         <button
@@ -343,8 +363,8 @@ const ReviewInterface = ({
                     </div>
                 </div>
 
-                {/* T&C Modal */}
-                <TermsModal
+                {/* Reviewer Specific T&C Modal */}
+                <ReviewerTermsModal
                     isOpen={showTermsModal}
                     onClose={() => setShowTermsModal(false)}
                     onAccept={() => setDeclarationAccepted(true)}
@@ -373,7 +393,7 @@ const ReviewInterface = ({
 
                 {/* 4. EDITOR VERSION (SOURCE FOR REVIEWER) */}
                 <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h3 className="font-bold text-gray-800 mb-4">Editor Edited Document</h3>
+                    <h3 className="font-bold text-gray-800 mb-4">Stage 1 Review Document</h3>
                     <div className="flex flex-col gap-3">
                         {/* Prefer Editor's Corrected Word file */}
                         {(selectedArticle.currentWordUrl || selectedArticle.editorCorrectedDocxUrl || selectedArticle.originalWordUrl) ? (
@@ -381,7 +401,7 @@ const ReviewInterface = ({
                                 onClick={() =>
                                     handleDownloadFile(
                                         selectedArticle.editorCorrectedDocxUrl || selectedArticle.currentWordUrl || selectedArticle.originalWordUrl,
-                                        selectedArticle.title + "_editor_version",
+                                        selectedArticle.title + "_stage_1_review_version",
                                         "Word"
                                     )
                                 }

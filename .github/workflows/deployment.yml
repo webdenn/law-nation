@@ -2,7 +2,7 @@ name: Deploy to AWS
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, prod ]
 
 jobs:
   deploy:
@@ -59,7 +59,7 @@ jobs:
         uses: easingthemes/ssh-deploy@main
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_KEY }}
-          REMOTE_HOST: ${{ secrets.EC2_HOST }}
+          REMOTE_HOST: ${{ github.ref_name == 'prod' && secrets.T24_HOST || secrets.EC2_HOST }}
           REMOTE_USER: ${{ secrets.EC2_USER }}
           TARGET: "/var/www/law-nation/"
           SOURCE: "./"
@@ -71,12 +71,12 @@ jobs:
       - name: Post Deploy Steps
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ github.ref_name == 'prod' && secrets.T24_HOST || secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
             # Fix Permissions
-            sudo chown -R ubuntu:ubuntu /var/www/law-nation
+            sudo chown -R ubuntu:ubuntu /var/www/law-nation/*
 
             # --- FRONTEND SETUP ---
             APP_ROOT="/var/www/law-nation/frontend"

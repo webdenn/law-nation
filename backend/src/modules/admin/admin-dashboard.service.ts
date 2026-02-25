@@ -227,14 +227,43 @@ class AdminDashboardService {
    */
   async getArticlesTimeline(query: TimelineQuery): Promise<ArticlesTimelineResponse> {
     try {
-      const { page, limit, status, startDate, endDate } = query;
+      const { page, limit, status, search, startDate, endDate } = query;
       const skip = (page - 1) * limit;
 
       const whereClause: any = {};
 
-      if (status) {
-        whereClause.status = status;
+      if (status && status !== "All") {
+        if (status === "In Review") {
+          whereClause.status = {
+            in: [
+              "ASSIGNED_TO_EDITOR",
+              "EDITOR_EDITING",
+              "EDITOR_IN_PROGRESS",
+              "EDITOR_APPROVED",
+              "ASSIGNED_TO_REVIEWER",
+              "REVIEWER_EDITING",
+              "REVIEWER_IN_PROGRESS",
+              "REVIEWER_APPROVED",
+            ],
+          };
+        } else if (status === "Pending") {
+          whereClause.status = "PENDING_ADMIN_REVIEW";
+        } else if (status === "Published") {
+          whereClause.status = {
+            in: ["PUBLISHED", "APPROVED"],
+          };
+        } else {
+          whereClause.status = status;
+        }
       }
+
+      if (search) {
+        whereClause.OR = [
+          { title: { contains: search, mode: "insensitive" } },
+          { authorName: { contains: search, mode: "insensitive" } },
+        ];
+      }
+
       if (startDate) {
         whereClause.submittedAt = { gte: startDate };
       }

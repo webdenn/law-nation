@@ -6,7 +6,13 @@ import jwt, { type SignOptions, type Secret } from "jsonwebtoken";
 // /src/utils/jwt.utils.ts
 
 // Environment variables (type-safe defaults)
-const JWT_SECRET = (process.env.JWT_SECRET as Secret) ?? "dev_secret";
+// Validate JWT_SECRET at module load time
+if (!process.env.JWT_SECRET) {
+  throw new Error(
+    "FATAL ERROR: JWT_SECRET is not defined in environment variables",
+  );
+}
+const JWT_SECRET = process.env.JWT_SECRET as Secret;
 const ACCESS_TOKEN_EXPIRY =
   (process.env.ACCESS_TOKEN_EXPIRY as
     | "15m"

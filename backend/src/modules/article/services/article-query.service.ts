@@ -22,24 +22,44 @@ export class ArticleQueryService {
       category,
       authorEmail,
       assignedEditorId,
-      assignedReviewerId, // ✅ Use destructuring to capture it
-      page = 1,
-      limit = 20,
+      assignedReviewerId,
     } = filters;
 
+    // ✅ Sanitize pagination (ensure they are numbers)
+    const page = filters.page ? Math.max(1, parseInt(filters.page as any, 10) || 1) : 1;
+    const limit = filters.limit ? Math.max(1, parseInt(filters.limit as any, 10) || 20) : 20;
+
     const where: any = {};
-    if (status) where.status = status;
+
+    // ✅ Handle multi-status filter (comma-separated string)
+    if (status) {
+      if (typeof status === 'string' && status.includes(',')) {
+        where.status = { in: status.split(',').map(s => s.trim()) };
+      } else {
+        where.status = status;
+      }
+    }
+
     if (category) where.category = category;
     if (authorEmail) where.authorEmail = authorEmail;
     if (assignedEditorId) where.assignedEditorId = assignedEditorId;
-    if (assignedReviewerId) where.assignedReviewerId = assignedReviewerId; // ✅ Apply filter
+    if (assignedReviewerId) where.assignedReviewerId = assignedReviewerId;
+
+    // ✅ Handle search
+    if (filters.search) {
+      where.OR = [
+        { title: { contains: filters.search, mode: 'insensitive' } },
+        { authorName: { contains: filters.search, mode: 'insensitive' } },
+        { category: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
 
     const skip = (page - 1) * limit;
 
     // Fetch data first to free up connection
     const articles = await prisma.article.findMany({
       where,
-      skip,
+      skip: skip,
       take: limit,
       include: {
         assignedEditor: {

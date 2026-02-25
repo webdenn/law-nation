@@ -5,11 +5,26 @@ import { toast } from "react-toastify";
 import Image from "next/image";
 import logoImg from "../../assets/logo.jpg";
 import ReviewInterface from "./ReviewInterface";
+import Pagination from "../../components/Pagination";
 import { compareTexts, getChangeStats, formatDifferences } from "../../utilis/diffutilis";
 
 const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
 // Helper Component for Stats
+// Status Mapping Utility
+const statusMap = {
+    ASSIGNED_TO_EDITOR: "Stage 1 Review Assigned",
+    EDITOR_EDITING: "Stage 1 Review Editing",
+    EDITOR_IN_PROGRESS: "Stage 1 Review In Progress",
+    EDITOR_APPROVED: "Stage 1 Review Approved",
+    ASSIGNED_TO_REVIEWER: "Stage 2 Review Assigned",
+    REVIEWER_EDITING: "Stage 2 Review Editing",
+    REVIEWER_IN_PROGRESS: "Stage 2 Review In Progress",
+    REVIEWER_APPROVED: "Stage 2 Review Approved",
+    PUBLISHED: "Published",
+    APPROVED: "Approved",
+};
+
 const StatCard = ({ title, count, color }) => (
     <div className={`bg-white p-6 rounded-xl border-l-4 ${color} shadow-md`}>
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -46,12 +61,22 @@ function ReviewerDashboardContent() {
     const [isApproving, setIsApproving] = useState(false);
     const [pdfTimestamp, setPdfTimestamp] = useState(Date.now());
 
+    // ✅ PAGINATION STATE
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
+
     const [profile, setProfile] = useState({
         id: "",
-        name: "Reviewer Name",
+        name: "Stage 2 Review Name",
         email: "",
-        role: "Reviewer",
+        role: "Stage 2 Review",
     });
+
+    // ✅ SEARCH & FILTER STATE
+    const [searchTerm, setSearchTerm] = useState("");
+    const [statusFilter, setStatusFilter] = useState("All");
 
     const handleViewVisualDiff = useCallback(async (changeLogId = null) => {
         if (isGeneratingDiff) return;
@@ -157,22 +182,36 @@ function ReviewerDashboardContent() {
         try {
             setIsLoading(true);
             const cb = Date.now();
-            // ✅ CHANGED: assignedReviewerId instead of assignedEditorId
-            const res = await fetch(
-                `${NEXT_PUBLIC_BASE_URL}/articles?assignedReviewerId=${reviewerId}&cb=${cb}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        "Cache-Control": "no-cache, no-store, must-revalidate",
-                        "Pragma": "no-cache"
-                    },
-                }
+
+            let url = `${NEXT_PUBLIC_BASE_URL}/articles?assignedReviewerId=${reviewerId}&page=${currentPage}&limit=${pageSize}&cb=${cb}`;
+
+            if (searchTerm) {
+                url += `&search=${encodeURIComponent(searchTerm)}`;
+            }
+
+            if (statusFilter !== "All") {
+                url += `&status=${statusFilter}`;
+            }
+
+            const res = await fetch(url, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache"
+                },
+            }
             );
 
             if (res.ok) {
                 const data = await res.json();
                 const list = data.articles || (Array.isArray(data) ? data : []);
                 setArticles(list);
+
+                // Update pagination from response
+                if (data.pagination) {
+                    setTotalPages(data.pagination.totalPages || 1);
+                    setTotalItems(data.pagination.total || 0);
+                }
             } else {
                 toast.error("Unauthorized or session expired");
             }
@@ -216,7 +255,7 @@ function ReviewerDashboardContent() {
             const currentPath = window.location.pathname + window.location.search;
             router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
         }
-    }, []);
+    }, [currentPage, pageSize, searchTerm, statusFilter]);
 
     // ✅ NEW: Auto-select article from URL
     useEffect(() => {
@@ -608,7 +647,7 @@ function ReviewerDashboardContent() {
                         </div>
                     </div>
                     <span className="text-[9px] bg-red-900/50 text-white/90 px-4 py-0.5 rounded-full font-black uppercase tracking-[0.2em] border border-red-800/50 shadow-sm">
-                        {selectedArticle ? "Review Mode" : "Reviewer Panel"}
+                        {selectedArticle ? "Review Mode" : "Stage 2 Review"}
                     </span>
 
                     {/* Close Button Mobile - Absolute Positioning */}
@@ -651,7 +690,7 @@ function ReviewerDashboardContent() {
                                     : "hover:bg-red-800 text-white"
                                     }`}
                             >
-                                View Editor PDF
+                                View Stage 1 Review PDF
                                 {pdfViewMode === "original" && (
                                     <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
                                 )}
@@ -668,7 +707,7 @@ function ReviewerDashboardContent() {
                                     : "hover:bg-red-800 text-white"
                                     } ${!hasReviewerUploaded ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
-                                View Reviewer PDF
+                                View Stage 2 Review PDF
                                 {pdfViewMode === "current" && (
                                     <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>
                                 )}
@@ -746,7 +785,7 @@ function ReviewerDashboardContent() {
                             {selectedArticle
                                 ? `Reviewing: ${selectedArticle.title.substring(0, 30)}...`
                                 : activeTab === "tasks"
-                                    ? "Reviewer Workspace" // ✅ CHANGED TITLE
+                                    ? "Stage 2 Review" // ✅ CHANGED TITLE
                                     : "Profile"}
                         </h2>
                     </div>
@@ -765,17 +804,17 @@ function ReviewerDashboardContent() {
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-8">
                                 <StatCard
                                     title="Total Assigned"
-                                    count={articles.length}
+                                    count={totalItems} // ✅ Use total from server
                                     color="border-red-600"
                                 />
                                 <StatCard
                                     title="Pending"
-                                    count={articles.filter((a) => a.status !== "Published" && a.status !== "Approved").length} // ✅ Adjusted Status Check
+                                    count={totalItems - articles.filter(a => a.status === "PUBLISHED" || a.status === "APPROVED").length}
                                     color="border-yellow-500"
                                 />
                                 <StatCard
                                     title="Completed"
-                                    count={articles.filter((a) => a.status === "Published" || a.status === "Approved").length} // ✅ Adjusted Status Check
+                                    count={articles.filter((a) => a.status === "PUBLISHED" || a.status === "APPROVED").length} // ✅ Adjusted Status Check
                                     color="border-green-600"
                                 />
                             </div>
@@ -806,7 +845,7 @@ function ReviewerDashboardContent() {
                                                         <td className="p-5 text-sm">{art.authorName}</td>
                                                         <td className="p-5">
                                                             <span className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded-full">
-                                                                {art.status}
+                                                                {statusMap[art.status] || art.status}
                                                             </span>
                                                         </td>
                                                         <td className="p-5 text-right">
@@ -827,6 +866,15 @@ function ReviewerDashboardContent() {
                                     </table>
                                 </div>
                             </div>
+
+                            {/* Pagination */}
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={setCurrentPage}
+                                totalItems={totalItems}
+                                itemsPerPage={pageSize}
+                            />
                         </>
                     )
                     }
