@@ -240,14 +240,9 @@ export default function AdminDashboard() {
   useEffect(() => {
     const articleId = selectedArticle?.id || selectedArticle?._id;
     if (articleId) {
-      const currentLoadedId = changeHistory.length > 0
-        ? changeHistory[0].articleId || changeHistory[0]._id
-        : null;
-      if (articleId !== currentLoadedId) {
-        fetchChangeHistory(articleId);
-      }
+      fetchChangeHistory(articleId);
     }
-  }, [selectedArticle?.id, selectedArticle?._id, fetchChangeHistory, changeHistory]);
+  }, [selectedArticle?.id, selectedArticle?._id, fetchChangeHistory]);
 
   // PDF URL Fix Logic (Isse "PDF Not Found" khatam ho jayega)
   // ✅ Corrected Function
@@ -270,9 +265,7 @@ export default function AdminDashboard() {
       ? path
       : `${NEXT_PUBLIC_BASE_URL}/${path.replace(/\\/g, "/").replace(/^\//, "")}`;
 
-    if (cleanPath.includes('amazonaws.com') || cleanPath.includes('s3.')) return cleanPath;
-
-    return `${cleanPath}?cb=${Date.now()}`;
+    return cleanPath;
   };
 
   // ✅ VISUAL DIFF FUNCTION

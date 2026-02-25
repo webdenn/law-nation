@@ -336,22 +336,7 @@ export default function DocumentViewer({
 
                                     {/* Removed Admin Edited DOCX Button as per request */}
 
-                                    {selectedArticle.latestEditorDocxUrl && (
-                                        <button
-                                            onClick={() => handleDownloadFile(selectedArticle.latestEditorDocxUrl, `Stage_1_Reviewer_Version_${selectedArticle.title}`, "Word")}
-                                            className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-blue-700 border border-gray-200 rounded text-xs font-bold transition"
-                                        >
-                                            Stage 1 Reviewer Version (DOCX)
-                                        </button>
-                                    )}
-                                    {selectedArticle.latestReviewerDocxUrl && (
-                                        <button
-                                            onClick={() => handleDownloadFile(selectedArticle.latestReviewerDocxUrl, `Stage_2_Reviewer_Version_${selectedArticle.title}`, "Word")}
-                                            className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-purple-700 border border-gray-200 rounded text-xs font-bold transition"
-                                        >
-                                            Stage 2 Reviewer Version (DOCX)
-                                        </button>
-                                    )}
+                                    {/* Removed Admin Edited DOCX Button as per request */}
                                 </div>
 
                             </div>
