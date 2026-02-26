@@ -69,7 +69,7 @@ export async function addWatermarkToPdf(
     // 3. Load logo image
     let logoImage: Awaited<ReturnType<typeof pdfDoc.embedPng>> | undefined;
     try {
-      const logoPath = path.join(process.cwd(), 'src', 'assests', 'img', 'Screenshot 2026-01-09 204120.png');
+      const logoPath = path.join(process.cwd(), 'src', 'assests', 'img', 'logo-bg.png');
       console.log('🖼️ [Watermark] Loading logo from:', logoPath);
 
       if (fs.existsSync(logoPath)) {
@@ -142,7 +142,7 @@ export async function addWatermarkToPdf(
 
       // Add logo in center of page (if loaded)
       if (logoImage) {
-        const logoScale = 0.3; // Scale logo to 30% of original size
+        const logoScale = 0.5; // Scale logo to 50% of original size (increased from 30%)
         const logoDims = logoImage.scale(logoScale);
 
         // Calculate center position
@@ -155,7 +155,26 @@ export async function addWatermarkToPdf(
           y: logoY,
           width: logoDims.width,
           height: logoDims.height,
-          opacity: 0.15, // 15% opacity - very light
+          opacity: 0.09, // 9% opacity - very light (reduced from 15%)
+        });
+      }
+
+      // Add logo at bottom-right of page for USER role only
+      if (logoImage && userRole === 'USER') {
+        const bottomLogoScale = 0.15; // Smaller logo for bottom
+        const bottomLogoDims = logoImage.scale(bottomLogoScale);
+
+        // Calculate bottom-right position (with 20px margin from bottom and right)
+        const bottomLogoX = width - bottomLogoDims.width - 20;
+        const bottomLogoY = 20;
+
+        // Draw bottom-right logo
+        page.drawImage(logoImage, {
+          x: bottomLogoX,
+          y: bottomLogoY,
+          width: bottomLogoDims.width,
+          height: bottomLogoDims.height,
+          opacity: 0.5, // More visible at bottom
         });
       }
 

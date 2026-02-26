@@ -7,7 +7,7 @@ import path from 'path';
 export function loadCompanyLogo(): { found: boolean; path?: string; size?: number } {
   try {
     // Your specific logo file
-    const logoPath = path.join(process.cwd(), 'src', 'assests', 'img', 'Screenshot 2026-01-09 204120.png');
+    const logoPath = path.join(process.cwd(), 'src', 'assests', 'img', 'logo-bg.png');
     
     console.log(`🔍 [Logo Loader] Checking for logo at: ${logoPath}`);
     

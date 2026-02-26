@@ -148,7 +148,7 @@ export async function addSimpleWatermarkToWord(
         "src",
         "assests",
         "img",
-        "Screenshot 2026-01-09 204120.png"
+        "logo-bg.png"
       );
       console.log(`🖼️ [Word Watermark] Loading logo from: ${logoPath}`);
 
