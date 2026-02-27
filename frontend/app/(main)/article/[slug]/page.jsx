@@ -392,13 +392,23 @@ export default function ArticlePage({ params }) {
             )}
 
             <div
-              className={`prose prose-lg prose-slate max-w-none prose-headings:font-bold prose-headings:font-sans prose-p:font-serif prose-a:text-red-700 hover:prose-a:text-red-800 prose-img:rounded-xl wrap-break-word overflow-hidden ${
+              className={`overflow-hidden ${
                 !token || isLimited ? "relative" : ""
               }`}
             >
               {token ? (
-                // ✅ Logged In: Show Full Content (HTML or Text)
-                article.contentHtml ? (
+                // ✅ Logged In: Show PDF Viewer (100% formatting match)
+                article.currentPdfUrl ? (
+                  <div className="w-full rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+                    <iframe
+                      src={`${getPdfUrl(article.currentPdfUrl)}#toolbar=1&navpanes=0&scrollbar=1`}
+                      className="w-full"
+                      style={{ height: "900px" }}
+                      title={article.title}
+                      loading="lazy"
+                    />
+                  </div>
+                ) : article.contentHtml ? (
                   <div
                     className="whitespace-pre-wrap text-[16px] sm:text-[18px] text-[#292929] leading-[28px] tracking-tight text-justify font-serif [&_img]:max-h-[300px] [&_img]:w-auto [&_img]:mx-auto [&_img]:my-6"
                     dangerouslySetInnerHTML={{ __html: article.contentHtml }}
