@@ -5,6 +5,17 @@ import { useParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
+import dynamic from "next/dynamic";
+
+const PdfViewer = dynamic(() => import("../../components/PdfViewer"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
+      <div className="w-6 h-6 border-2 border-red-600 border-t-transparent rounded-full animate-spin mr-3" />
+      Loading PDF viewer...
+    </div>
+  ),
+});
 
 // Simple Icons
 const ArrowLeftIcon = () => (
@@ -397,17 +408,9 @@ export default function ArticlePage({ params }) {
               }`}
             >
               {token ? (
-                // ✅ Logged In: Show PDF Viewer (100% formatting match)
+                // ✅ Logged In: Show PDF.js Viewer (100% formatting match)
                 article.currentPdfUrl ? (
-                  <div className="w-full rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
-                    <iframe
-                      src={`${getPdfUrl(article.currentPdfUrl)}#toolbar=1&navpanes=0&scrollbar=1`}
-                      className="w-full"
-                      style={{ height: "900px" }}
-                      title={article.title}
-                      loading="lazy"
-                    />
-                  </div>
+                  <PdfViewer pdfUrl={getPdfUrl(article.currentPdfUrl)} />
                 ) : article.contentHtml ? (
                   <div
                     className="whitespace-pre-wrap text-[16px] sm:text-[18px] text-[#292929] leading-[28px] tracking-tight text-justify font-serif [&_img]:max-h-[300px] [&_img]:w-auto [&_img]:mx-auto [&_img]:my-6"
