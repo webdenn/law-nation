@@ -194,6 +194,28 @@ export async function addWatermarkToPdf(
         });
       }
 
+      // Add copyright watermark at bottom center for USER role only
+      if (userRole === 'USER') {
+        const copyrightText = '© Law Nation Prime Times Journal. All rights reserved.';
+        const copyrightFontSize = 8;
+        
+        // Calculate text width to center it
+        const textWidth = copyrightText.length * (copyrightFontSize * 0.5);
+        const copyrightX = (width - textWidth) / 2;
+        
+        page.drawText(copyrightText, {
+          x: copyrightX,
+          y: 10, // 10px from bottom
+          size: copyrightFontSize,
+          color: rgb(0.4, 0.4, 0.4), // Dark gray color
+          opacity: 0.8,
+        });
+        
+        if (index === 0) {
+          console.log(`© [Watermark] Added copyright notice to all pages`);
+        }
+      }
+
       // Top-right watermark (Role-based text) - on ALL pages
       // page.drawText(roleText, {
       //   x: width - 120,
