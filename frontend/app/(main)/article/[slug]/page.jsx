@@ -7,7 +7,7 @@ import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import dynamic from "next/dynamic";
 
-const PdfViewer = dynamic(() => import("../../components/PdfViewer"), {
+const PdfViewer = dynamic(() => import("../../../components/PdfViewer"), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
