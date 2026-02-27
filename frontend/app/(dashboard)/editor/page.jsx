@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import Image from "next/image";
 import logoImg from "../../assets/logo.jpg";
 import ReviewInterface from "./ReviewInterface";
+import Pagination from "../../components/Pagination";
 import { compareTexts, getChangeStats, formatDifferences } from "../../utilis/diffutilis";
 
 // ✅ LOOP FIX: NEXT_PUBLIC_BASE_URL ko component ke bahar nikala taki ye baar-baar recreate na ho
@@ -77,6 +78,19 @@ const EditorStatCard = ({ title, count, color }) => (
   </div>
 );
 
+// Status Mapping Utility
+const statusMap = {
+  ASSIGNED_TO_EDITOR: "Stage 1 Review Assigned",
+  EDITOR_EDITING: "Stage 1 Review Editing",
+  EDITOR_IN_PROGRESS: "Stage 1 Review In Progress",
+  EDITOR_APPROVED: "Stage 1 Review Approved",
+  ASSIGNED_TO_REVIEWER: "Stage 2 Review Assigned",
+  REVIEWER_EDITING: "Stage 2 Review Editing",
+  REVIEWER_IN_PROGRESS: "Stage 2 Review In Progress",
+  REVIEWER_APPROVED: "Stage 2 Review Approved",
+  PUBLISHED: "Published",
+};
+
 function EditorDashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -103,12 +117,22 @@ function EditorDashboardContent() {
   const [pdfTimestamp, setPdfTimestamp] = useState(Date.now()); // ✅ Fix Jitter State
   const [hasEditorUploaded, setHasEditorUploaded] = useState(false); // ✅ NEW: Track Editor activity
 
+  // ✅ PAGINATION STATE
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
   const [profile, setProfile] = useState({
     id: "",
-    name: "Editor Name",
+    name: "Stage 1 Review Name",
     email: "",
-    role: "Editor",
+    role: "Stage 1 Review",
   });
+
+  // ✅ SEARCH & FILTER STATE
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   // ✅ FIX: handleViewVisualDiff with useCallback and clean dependencies
   const handleViewVisualDiff = useCallback(async (changeLogId) => {
@@ -201,21 +225,36 @@ function EditorDashboardContent() {
     try {
       setIsLoading(true);
       const cb = Date.now();
-      const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/articles?assignedEditorId=${editorId}&cb=${cb}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache"
-          },
-        }
+
+      let url = `${NEXT_PUBLIC_BASE_URL}/articles?assignedEditorId=${editorId}&page=${currentPage}&limit=${pageSize}&cb=${cb}`;
+
+      if (searchTerm) {
+        url += `&search=${encodeURIComponent(searchTerm)}`;
+      }
+
+      if (statusFilter !== "All") {
+        url += `&status=${statusFilter}`;
+      }
+
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache"
+        },
+      }
       );
 
       if (res.ok) {
         const data = await res.json();
         const list = data.articles || (Array.isArray(data) ? data : []);
         setArticles(list);
+
+        // Update pagination from response
+        if (data.pagination) {
+          setTotalPages(data.pagination.totalPages || 1);
+          setTotalItems(data.pagination.total || 0);
+        }
       } else {
         toast.error("Unauthorized or session expired");
       }
@@ -259,7 +298,7 @@ function EditorDashboardContent() {
       const currentPath = window.location.pathname + window.location.search;
       router.push(`/management-login/?returnUrl=${encodeURIComponent(currentPath)}`);
     }
-  }, []); // 👈 Yahan [router] hata kar [] kar do (Sirf ek baar chalega)
+  }, [currentPage, pageSize, searchTerm, statusFilter]); // Add filters to dependencies
 
   // ✅ NEW: Auto-select article from URL
   useEffect(() => {
@@ -597,7 +636,7 @@ function EditorDashboardContent() {
             </div>
           </div>
           <span className="text-[9px] bg-red-900/50 text-white/90 px-4 py-0.5 rounded-full font-black uppercase tracking-[0.2em] border border-red-800/50 shadow-sm">
-            {selectedArticle ? "Review Mode" : "Editor Panel"}
+            {selectedArticle ? "Review Mode" : "Stage 1 Review Panel"}
           </span>
 
           {/* Close Button Mobile - Absolute Positioning */}
@@ -757,7 +796,7 @@ function EditorDashboardContent() {
               {selectedArticle
                 ? `Reviewing: ${selectedArticle.title.substring(0, 30)}...`
                 : activeTab === "tasks"
-                  ? "Editor Workspace"
+                  ? "Stage 1 Review"
                   : "Profile"}
             </h2>
           </div>
@@ -776,17 +815,17 @@ function EditorDashboardContent() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-8">
                 <EditorStatCard
                   title="Total Assigned"
-                  count={articles.length}
+                  count={totalItems} // ✅ Use total from server
                   color="border-red-600"
                 />
                 <EditorStatCard
                   title="Pending"
-                  count={articles.filter((a) => a.status !== "Published").length}
+                  count={articles.filter(a => ['ASSIGNED_TO_EDITOR', 'EDITOR_IN_PROGRESS', 'EDITOR_EDITING'].includes(a.status)).length} // ✅ Fixed: Count only pending statuses
                   color="border-yellow-500"
                 />
                 <EditorStatCard
                   title="Approved"
-                  count={articles.filter((a) => a.status === "Published").length}
+                  count={articles.filter((a) => a.status === "EDITOR_APPROVED").length} // ✅ Fixed: Count only EDITOR_APPROVED
                   color="border-green-600"
                 />
               </div>
@@ -817,7 +856,7 @@ function EditorDashboardContent() {
                             <td className="p-5 text-sm">{art.authorName}</td>
                             <td className="p-5">
                               <span className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded-full">
-                                {art.status}
+                                {statusMap[art.status] || art.status}
                               </span>
                             </td>
                             <td className="p-5 text-right">
@@ -837,6 +876,15 @@ function EditorDashboardContent() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination */}
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalItems={totalItems}
+                  itemsPerPage={pageSize}
+                />
               </div>
             </>
           )

@@ -416,7 +416,7 @@ function ArticlesContent() {
           </div>
         ) : articles.length > 0 ? (
           // Article Cards
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
             {articles.map((item) => (
               <Link
                 href={`/article/${item.slug || item._id}`}
@@ -448,14 +448,14 @@ function ArticlesContent() {
                   )}
                 </div>
 
-                <div className="flex flex-col grow p-6">
+                <div className="flex flex-col p-6">
                   <h3 className="text-xl font-bold text-gray-900 mb-3 leading-snug line-clamp-2 group-hover:text-red-700 transition-colors">
                     {item.title}
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed mb-6 line-clamp-3">
                     {item.abstract || "No description available for this article."}
                   </p>
-                  <div className="mt-auto pt-5 border-t border-gray-100 flex items-center justify-between">
+                  <div className="mt-6 pt-5 border-t border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-bold uppercase">
                         {item.authorName?.charAt(0) || "A"}

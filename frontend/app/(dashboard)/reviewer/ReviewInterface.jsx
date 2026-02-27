@@ -199,7 +199,7 @@ const ReviewInterface = ({
             <div className="flex-1 bg-gray-100 rounded-xl border border-gray-300 p-4 flex flex-col h-[500px] lg:h-auto min-h-[500px]">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bold text-gray-700 uppercase text-sm md:text-base">
-                        {pdfViewMode === "original" ? " Editor PDF" : " Reviewer PDF"}
+                        {pdfViewMode === "original" ? " Stage 1 Review PDF" : " Stage 2 Review PDF"}
                     </h3>
                     {getPdfUrlToView() && (
                         <a
@@ -393,7 +393,7 @@ const ReviewInterface = ({
 
                 {/* 4. EDITOR VERSION (SOURCE FOR REVIEWER) */}
                 <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h3 className="font-bold text-gray-800 mb-4">Editor Edited Document</h3>
+                    <h3 className="font-bold text-gray-800 mb-4">Stage 1 Review Document</h3>
                     <div className="flex flex-col gap-3">
                         {/* Prefer Editor's Corrected Word file */}
                         {(selectedArticle.currentWordUrl || selectedArticle.editorCorrectedDocxUrl || selectedArticle.originalWordUrl) ? (
@@ -401,7 +401,7 @@ const ReviewInterface = ({
                                 onClick={() =>
                                     handleDownloadFile(
                                         selectedArticle.editorCorrectedDocxUrl || selectedArticle.currentWordUrl || selectedArticle.originalWordUrl,
-                                        selectedArticle.title + "_editor_version",
+                                        selectedArticle.title + "_stage_1_review_version",
                                         "Word"
                                     )
                                 }

@@ -12,7 +12,7 @@ const EditorTermsModal = ({ isOpen, onClose, onAccept }) => {
                 {/* Modal Header */}
                 <div className="p-5 sm:p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
                     <h3 className="text-xl font-bold text-gray-900">
-                        Editor Terms & Ethical Guidelines
+                        Stage 1 Review Terms & Ethical Guidelines
                     </h3>
                     <button
                         onClick={onClose}
@@ -46,22 +46,22 @@ const EditorTermsModal = ({ isOpen, onClose, onAccept }) => {
                 >
                     <div className="space-y-6">
                         <div className="text-center mb-6">
-                            <h4 className="text-lg font-bold text-gray-900 uppercase">Editor Terms and Conditions & Ethical Guidelines</h4>
+                            <h4 className="text-lg font-bold text-gray-900 uppercase">Stage 1 Review Terms and Conditions & Ethical Guidelines</h4>
                         </div>
 
                         <div>
                             <h5 className="font-bold text-gray-900 mb-2">1. Acceptance of Role and Agreement</h5>
                             <p>
-                                By accepting the appointment as an Editor for Law Nation Prime Times Journal (“LN”), the Editor (“You”) unequivocally agree to be bound by these Terms and Conditions. The Editor serves as the primary custodian of the journal’s integrity, ensuring a fair, objective, and timely publication process.
+                                By accepting the appointment as a Stage 1 Review for Law Nation Prime Times Journal (“LN”), the Stage 1 Review (“You”) unequivocally agree to be bound by these Terms and Conditions. The Stage 1 Review serves as the primary custodian of the journal’s integrity, ensuring a fair, objective, and timely publication process.
                             </p>
                         </div>
 
                         <div>
                             <h5 className="font-bold text-gray-900 mb-2">2. Fiduciary Duty and Confidentiality</h5>
                             <ul className="list-lower-alpha ml-6 space-y-2">
-                                <li><strong>Privileged Information:</strong> You must treat all manuscripts, reviewer reports, and editorial discussions as strictly confidential.</li>
+                                <li><strong>Privileged Information:</strong> You must treat all manuscripts, review reports, and editorial discussions as strictly confidential.</li>
                                 <li><strong>Non-Disclosure:</strong> You shall not disclose the status of a manuscript or its contents to anyone other than the authors and the assigned reviewers.</li>
-                                <li><strong>Author Privacy:</strong> You must protect the identity of authors during the double-blind review process and ensure that reviewer identities are never disclosed to authors.</li>
+                                <li><strong>Author Privacy:</strong> You must protect the identity of authors during the double-blind review process and ensure that review identities are never disclosed to authors.</li>
                             </ul>
                         </div>
 
@@ -85,7 +85,7 @@ const EditorTermsModal = ({ isOpen, onClose, onAccept }) => {
                         <div>
                             <h5 className="font-bold text-gray-900 mb-2">5. Standards of Process</h5>
                             <ul className="list-lower-alpha ml-6 space-y-2">
-                                <li><strong>Reviewer Management:</strong> You are responsible for selecting qualified reviewers and ensuring they adhere to the LN Reviewer Guidelines.</li>
+                                <li><strong>Review Management:</strong> You are responsible for selecting qualified Stage 2 Reviews and ensuring they adhere to the LN Stage 2 Review Guidelines.</li>
                                 <li><strong>Timeliness:</strong> You agree to facilitate the editorial process efficiently to meet publication schedules. Delays in decision-making must be communicated to the Editor-in-Chief or the Board.</li>
                                 <li><strong>Clarity of Communication:</strong> Feedback provided to authors must be constructive, professional, and supported by the reviewers' findings and your own expert analysis.</li>
                             </ul>
@@ -94,7 +94,7 @@ const EditorTermsModal = ({ isOpen, onClose, onAccept }) => {
                         <div>
                             <h5 className="font-bold text-gray-900 mb-2">6. Limitation of Liability & Indemnity</h5>
                             <ul className="list-lower-alpha ml-6 space-y-2">
-                                <li><strong>Voluntary Nature:</strong> Unless otherwise agreed in writing, the role of Editor is a professional appointment and does not constitute an employment contract.</li>
+                                <li><strong>Voluntary Nature:</strong> Unless otherwise agreed in writing, the role of Stage 1 Review is a professional appointment and does not constitute an employment contract.</li>
                                 <li><strong>Indemnity:</strong> You hereby indemnify LN against any legal costs or damages arising from a proven breach of editorial ethics, violation of copyright, or professional negligence in the handling of manuscripts.</li>
                             </ul>
                         </div>
@@ -102,7 +102,7 @@ const EditorTermsModal = ({ isOpen, onClose, onAccept }) => {
                         <div>
                             <h5 className="font-bold text-gray-900 mb-2">7. Termination</h5>
                             <p>
-                                LN reserves the right to terminate your editorial status at its sole discretion for reasons including, but not limited to, breach of confidentiality, failure to manage the peer-review process effectively, or actions that bring the journal into disrepute.
+                                LN reserves the right to terminate your Stage 1 Review status at its sole discretion for reasons including, but not limited to, breach of confidentiality, failure to manage the peer-review process effectively, or actions that bring the journal into disrepute.
                             </p>
                         </div>
 

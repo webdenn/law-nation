@@ -324,8 +324,8 @@ const ReviewInterface = ({
         {/* 2. APPROVE BUTTON */}
         <button
           onClick={handleEditorApprove}
-          disabled={isApproving || selectedArticle.status === "EDITOR_APPROVED" || selectedArticle.status === "ASSIGNED_TO_REVIEWER" || selectedArticle.status === "REVIEWER_IN_PROGRESS" || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED"}
-          className={`w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl transition-all flex items-center justify-center gap-2 transform active:scale-95 ${isApproving || selectedArticle.status === "EDITOR_APPROVED" || selectedArticle.status === "ASSIGNED_TO_REVIEWER" || selectedArticle.status === "REVIEWER_IN_PROGRESS" || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED"
+          disabled={isApproving || selectedArticle.status === "EDITOR_APPROVED" || selectedArticle.status === "ASSIGNED_TO_REVIEWER" || selectedArticle.status === "REVIEWER_EDITING" || selectedArticle.status === "REVIEWER_IN_PROGRESS" || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED"}
+          className={`w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl transition-all flex items-center justify-center gap-2 transform active:scale-95 ${isApproving || selectedArticle.status === "EDITOR_APPROVED" || selectedArticle.status === "ASSIGNED_TO_REVIEWER" || selectedArticle.status === "REVIEWER_EDITING" || selectedArticle.status === "REVIEWER_IN_PROGRESS" || selectedArticle.status === "REVIEWER_APPROVED" || selectedArticle.status === "PUBLISHED"
             ? "bg-gray-400 text-white cursor-not-allowed"
             : "bg-green-600 hover:bg-green-700 text-white hover:shadow-green-200"
             }`}

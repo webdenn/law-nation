@@ -15,7 +15,7 @@ export function generateEditorReassignmentNotificationHtml(data: {
       
       <p style="font-size: 16px; color: #555; line-height: 1.8;">
         We would like to inform you that the article <strong>"${data.articleTitle}"</strong> 
-        has been reassigned to another editor.
+        has been reassigned to another Stage 1 Review .
       </p>
       
       <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 25px 0; border-radius: 4px;">
@@ -37,7 +37,7 @@ export function generateEditorReassignmentNotificationHtml(data: {
       
       <div style="font-size: 13px; color: #777;">
         <p style="margin: 0;">Best regards,</p>
-        <p style="margin: 5px 0; font-weight: bold; color: #d32f2f;">Editorial Team, Law Nation</p>
+        <p style="margin: 5px 0; font-weight: bold; color: #d32f2f;">Stage 1 Review Team, Law Nation</p>
       </div>
     </div>
   `;

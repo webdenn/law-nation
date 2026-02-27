@@ -15,7 +15,7 @@ export function generateArticleCorrectionHtml(data: {
       
       ${data.editorComments ? `
       <div style="background-color: #fff3cd; border-left: 3px solid #ffc107; padding: 15px; margin: 20px 0;">
-        <p style="margin: 0; font-weight: bold; color: #856404;">Editor's Comments:</p>
+        <p style="margin: 0; font-weight: bold; color: #856404;">Stage 1 Review :</p>
         <p style="margin: 10px 0 0 0; color: #856404;">${data.editorComments}</p>
       </div>
       ` : ''}

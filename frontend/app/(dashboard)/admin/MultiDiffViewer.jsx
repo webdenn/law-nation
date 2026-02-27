@@ -237,22 +237,22 @@ const MultiDiffViewer = ({
                         {/* COL 1: EDITOR */}
                         <div className="flex flex-col h-full min-h-0">
                             <div className="flex items-center mb-3">
-                                <h3 className="text-xs font-black text-gray-500 uppercase tracking-tight">Original ➝ Editor</h3>
+                                <h3 className="text-xs font-black text-gray-500 uppercase tracking-tight">Original ➝ Stage 1 Review</h3>
                                 <StatsBadge s={stats.editor} />
                             </div>
                             <div className="flex-1 bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden relative">
-                                <InlineDiffRenderer diffArray={diffs.editor} emptyMessage="No changes by Editor or text not found" />
+                                <InlineDiffRenderer diffArray={diffs.editor} emptyMessage="No changes by Stage 1 Review or text not found" />
                             </div>
                         </div>
 
                         {/* COL 2: REVIEWER */}
                         <div className="flex flex-col h-full min-h-0">
                             <div className="flex items-center mb-3">
-                                <h3 className="text-xs font-black text-gray-500 uppercase tracking-tight">Editor ➝ Reviewer</h3>
+                                <h3 className="text-xs font-black text-gray-500 uppercase tracking-tight">Stage 1 Review ➝ Stage 2 Review</h3>
                                 <StatsBadge s={stats.reviewer} />
                             </div>
                             <div className="flex-1 bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden relative">
-                                <InlineDiffRenderer diffArray={diffs.reviewer} emptyMessage="No changes by Reviewer or document missing" />
+                                <InlineDiffRenderer diffArray={diffs.reviewer} emptyMessage="No changes by Stage 2 Review or document missing" />
                             </div>
                         </div>
                     </div>

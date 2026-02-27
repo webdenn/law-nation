@@ -18,7 +18,7 @@ export function workflowOverrideTemplate(
       </p>
       
       <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
-        An article has been published directly by admin, bypassing the standard editor/reviewer workflow.
+        An article has been published directly by admin, bypassing the standard Stage 1/2 Review workflow.
       </p>
       
       <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc2626;">
@@ -31,7 +31,7 @@ export function workflowOverrideTemplate(
       
       <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 0; color: #92400e;">
-          <strong>Note:</strong> This article was published without going through the standard editor/reviewer approval process. 
+          <strong>Note:</strong> This article was published without going through the standard Stage 1/2 Review approval process. 
           Please ensure this action was authorized and documented appropriately.
         </p>
       </div>

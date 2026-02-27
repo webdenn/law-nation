@@ -4,7 +4,7 @@ import { requirePermission } from "@/middlewares/require-premission.middleware.j
 import { validateRecaptcha } from "@/middlewares/recaptcha.middleware.js";
 import { uploadDocument, uploadPdfOnly, uploadOptionalPdf, uploadImage, uploadMultipleImages, uploadArticleFiles, uploadEditorFiles, uploadDocxOnly } from "@/middlewares/upload.middleware.js";
 import { articleController } from "./article.controller.js";
-
+import { userPdfDownloadLimiter } from "@/middlewares/rate-limit.middleware.js";
 const router = Router();
 
 // Public/Optional Auth routes - Works for both guest and logged-in users
@@ -266,6 +266,7 @@ router.get(
 router.get(
   "/:id/download/pdf",
   requireAuth,
+  userPdfDownloadLimiter,  // ← Add this line
   articleController.downloadArticlePdf.bind(articleController)
 );
 
@@ -273,6 +274,7 @@ router.get(
 router.get(
   "/:id/download/word",
   requireAuth,
+  userPdfDownloadLimiter,  // ← Add this line
   articleController.downloadArticleWord.bind(articleController)
 );
 
@@ -306,6 +308,7 @@ router.get(
 router.get(
   "/:id/download",
   requireAuth,
+  userPdfDownloadLimiter,  // ← Add this line
   articleController.downloadArticlePdf.bind(articleController)
 );
 

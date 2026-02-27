@@ -37,7 +37,7 @@ export function generateArticleUploadNotificationHtml(data: {
       
       <div style="background-color: #e8f4fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 0; color: #1e40af;">
-          <strong>Next Steps:</strong> Please review the article and assign an editor to begin the editorial process.
+          <strong>Next Steps:</strong> Please review the article and assign an Stage 1 Review to begin the Stage 1 Review  process.
         </p>
       </div>
       
