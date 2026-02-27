@@ -2,15 +2,16 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: false,
-  // output: 'export',          // Enables static export
-  trailingSlash: true,       // Avoids 404 issues on Hostinger
+  trailingSlash: true,
   images: {
-    unoptimized: true,       // Needed for static export if using next/image
+    unoptimized: true,
   },
-
-  // ✅ Empty turbopack config to silence the warning
   turbopack: {},
   output: "standalone",
+  webpack: (config) => {
+    config.resolve.alias.canvas = false;
+    return config;
+  },
 };
 
 export default nextConfig;
