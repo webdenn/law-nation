@@ -820,12 +820,12 @@ function EditorDashboardContent() {
                 />
                 <EditorStatCard
                   title="Pending"
-                  count={totalItems - articles.filter(a => a.status === "PUBLISHED").length} // Rough estimate, ideally backend should provide these counts
+                  count={articles.filter(a => ['ASSIGNED_TO_EDITOR', 'EDITOR_IN_PROGRESS', 'EDITOR_EDITING'].includes(a.status)).length} // ✅ Fixed: Count only pending statuses
                   color="border-yellow-500"
                 />
                 <EditorStatCard
                   title="Approved"
-                  count={articles.filter((a) => a.status === "PUBLISHED").length}
+                  count={articles.filter((a) => a.status === "EDITOR_APPROVED").length} // ✅ Fixed: Count only EDITOR_APPROVED
                   color="border-green-600"
                 />
               </div>
