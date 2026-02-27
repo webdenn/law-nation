@@ -31,7 +31,7 @@ const ZoomOut = () => (
 export default function PdfViewer({ pdfUrl }) {
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
-  const [scale, setScale] = useState(1.5);
+  const [scale, setScale] = useState(1.6);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
