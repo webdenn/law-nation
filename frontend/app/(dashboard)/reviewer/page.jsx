@@ -809,12 +809,12 @@ function ReviewerDashboardContent() {
                                 />
                                 <StatCard
                                     title="Pending"
-                                    count={totalItems - articles.filter(a => a.status === "PUBLISHED" || a.status === "APPROVED").length}
+                                    count={articles.filter(a => ['ASSIGNED_TO_REVIEWER', 'REVIEWER_IN_PROGRESS', 'REVIEWER_EDITING'].includes(a.status)).length} // ✅ Fixed: Count only pending statuses
                                     color="border-yellow-500"
                                 />
                                 <StatCard
-                                    title="Completed"
-                                    count={articles.filter((a) => a.status === "PUBLISHED" || a.status === "APPROVED").length} // ✅ Adjusted Status Check
+                                    title="Approved"
+                                    count={articles.filter((a) => a.status === "REVIEWER_APPROVED").length} // ✅ Fixed: Count only REVIEWER_APPROVED
                                     color="border-green-600"
                                 />
                             </div>

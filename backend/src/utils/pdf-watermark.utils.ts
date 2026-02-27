@@ -9,6 +9,7 @@ import { downloadFileToBuffer } from './pdf-extract.utils.js';
  * @param options - Watermark options
  * @param userRole - User role (USER, EDITOR, REVIEWER, ADMIN)
  * @param articleStatus - Article status (PUBLISHED, DRAFT, etc.)
+ * @param citationNumber - Citation number to display at top of each page (USER only)
  * @returns Watermarked PDF as Buffer
  */
 export async function addWatermarkToPdf(
@@ -22,12 +23,14 @@ export async function addWatermarkToPdf(
     frontendUrl: string;
   },
   userRole: 'USER' | 'EDITOR' | 'REVIEWER' | 'ADMIN' = 'USER',
-  articleStatus: string = 'PUBLISHED'
+  articleStatus: string = 'PUBLISHED',
+  citationNumber?: string
 ): Promise<Buffer> {
   console.log('\n[Watermark] Starting watermarking process...');
   console.log('[Watermark] PDF path:', pdfPath);
   console.log('[Watermark] User role:', userRole);
   console.log('[Watermark] Article status:', articleStatus);
+  console.log('[Watermark] Citation number:', citationNumber || 'None');
   console.log('[Watermark] Include URL:', userRole === 'USER' && articleStatus === 'PUBLISHED');
 
   try {
@@ -139,6 +142,19 @@ export async function addWatermarkToPdf(
 
     pages.forEach((page, index) => {
       const { width, height } = page.getSize();
+
+      // ✅ Add citation number at top of page for USER role only (in red color)
+      if (citationNumber && userRole === 'USER') {
+        page.drawText(citationNumber, {
+          x: 50,
+          y: height - 30, // 30px from top
+          size: 12,
+          color: rgb(0.8, 0, 0), // Red color
+          opacity: 1, // Fully visible
+        });
+        
+        console.log(`📋 [Watermark] Added citation "${citationNumber}" to page ${index + 1}`);
+      }
 
       // Add logo in center of page (if loaded)
       if (logoImage) {

@@ -1325,7 +1325,7 @@ export class ArticleWorkflowService {
 
   //Admin publishes article (NEW WORKFLOW: handles editor-only, reviewer, or admin override)
 
-  async adminPublishArticle(articleId: string, adminId: string) {
+  async adminPublishArticle(articleId: string, adminId: string, citationNumber: string) {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
       include: { assignedEditor: true, assignedReviewer: true },
@@ -1353,6 +1353,12 @@ export class ArticleWorkflowService {
       );
     }
 
+    // ✅ NEW: Validate citation number before publishing
+    const { CitationValidator } = await import('@/validators/citation.validator.js');
+    const validatedCitation = await CitationValidator.validate(citationNumber, articleId);
+    
+    console.log(`📋 [Citation] Validated citation number: ${validatedCitation}`);
+
     // Determine which version to publish based on workflow
     let publishingMessage = "";
     if (article.status === "REVIEWER_APPROVED") {
@@ -1367,14 +1373,14 @@ export class ArticleWorkflowService {
 
     // NEW: Handle document vs article publishing differently
     if (article.contentType === 'DOCUMENT') {
-      return await this.publishDocument(article, adminId, publishingMessage);
+      return await this.publishDocument(article, adminId, publishingMessage, validatedCitation);
     } else {
-      return await this.publishArticle(article, adminId, publishingMessage);
+      return await this.publishArticle(article, adminId, publishingMessage, validatedCitation);
     }
   }
 
   // NEW: Publish document with Adobe text extraction from final version
-  private async publishDocument(article: any, adminId: string, publishingMessage?: string) {
+  private async publishDocument(article: any, adminId: string, publishingMessage?: string, citationNumber?: string) {
     console.log(`📄 [Document Publish] ${publishingMessage || 'Publishing document'} ${article.id}`);
 
     let extractedText = '';
@@ -1463,7 +1469,7 @@ export class ArticleWorkflowService {
       contentHtml = extractedText.replace(/\n/g, '<br>');
     }
 
-    // Update article with extracted text and published status
+    // Update article with extracted text, citation, and published status
     const updatedArticle = await prisma.article.update({
       where: { id: article.id },
       data: {
@@ -1472,8 +1478,11 @@ export class ArticleWorkflowService {
         content: extractedText, // Store text from final version for user display
         contentHtml: contentHtml, // Store HTML for rich formatting
         finalPdfUrl: article.currentPdfUrl, // Set final published version
+        citationNumber: citationNumber, // ✅ Store citation number
       },
     });
+
+    console.log(`📋 [Citation] Saved citation number: ${citationNumber}`);
 
     // Mark all change logs as published
     await prisma.articleChangeLog.updateMany({
@@ -1510,7 +1519,7 @@ export class ArticleWorkflowService {
   }
 
   // Enhanced article publishing logic with new workflow support
-  private async publishArticle(article: any, adminId: string, publishingMessage?: string) {
+  private async publishArticle(article: any, adminId: string, publishingMessage?: string, citationNumber?: string) {
     let finalDiffSummary = "No changes made";
 
     if (article.originalPdfUrl !== article.currentPdfUrl) {
@@ -1631,8 +1640,11 @@ export class ArticleWorkflowService {
         ...(extractedText && { content: extractedText }),
         contentHtml: contentHtml,
         finalPdfUrl: article.currentPdfUrl, // Set final published version
+        citationNumber: citationNumber, // ✅ Store citation number
       },
     });
+
+    console.log(`📋 [Citation] Saved citation number: ${citationNumber}`);
 
     await prisma.articleChangeLog.updateMany({
       where: { articleId: article.id, status: "approved" },

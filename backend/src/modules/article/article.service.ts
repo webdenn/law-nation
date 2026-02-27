@@ -307,8 +307,8 @@ export class ArticleService {
       newPdfUrl
     );
   }
-  async adminPublishArticle(articleId: string, adminId: string) {
-    return articleWorkflowService.adminPublishArticle(articleId, adminId);
+  async adminPublishArticle(articleId: string, adminId: string, citationNumber: string) {
+    return articleWorkflowService.adminPublishArticle(articleId, adminId, citationNumber);
   }
   async deleteArticle(articleId: string) {
     return articleWorkflowService.deleteArticle(articleId);
@@ -463,6 +463,10 @@ export class ArticleService {
   }
   async uploadImages(articleId: string, imageUrls: string[]) {
     return articleMediaService.uploadImages(articleId, imageUrls);
+  }
+
+  async searchByCitation(citationNumber: string) {
+    return articleQueryService.searchByCitation(citationNumber);
   }
 }
 export const articleService = new ArticleService();

@@ -104,13 +104,15 @@ export class ArticleSearchService {
         "authorOrganization", 
         "submittedAt",
         "approvedAt",
+        "citationNumber",
         ts_rank(
           to_tsvector('english', 
             coalesce(title, '') || ' ' || 
             coalesce(abstract, '') || ' ' || 
             coalesce(keywords, '') || ' ' ||
             coalesce(category, '') || ' ' ||
-            coalesce("authorName", '')
+            coalesce("authorName", '') || ' ' ||
+            coalesce("citationNumber", '')
           ),
           plainto_tsquery('english', ${searchQuery})
         ) as relevance
@@ -122,7 +124,8 @@ export class ArticleSearchService {
           coalesce(abstract, '') || ' ' || 
           coalesce(keywords, '') || ' ' ||
           coalesce(category, '') || ' ' ||
-          coalesce("authorName", '')
+          coalesce("authorName", '') || ' ' ||
+          coalesce("citationNumber", '')
         ) @@ plainto_tsquery('english', ${searchQuery})
         ${categoryFilter}
         ${authorFilter}
@@ -146,7 +149,8 @@ export class ArticleSearchService {
           coalesce(abstract, '') || ' ' || 
           coalesce(keywords, '') || ' ' ||
           coalesce(category, '') || ' ' ||
-          coalesce("authorName", '')
+          coalesce("authorName", '') || ' ' ||
+          coalesce("citationNumber", '')
         ) @@ plainto_tsquery('english', ${searchQuery})
         ${categoryFilter}
         ${authorFilter}
