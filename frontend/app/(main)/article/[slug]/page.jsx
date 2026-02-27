@@ -348,7 +348,7 @@ export default function ArticlePage({ params }) {
               )}
 
               <div className="flex items-center justify-between border-b border-gray-100 pb-8">
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-row flex-wrap gap-6">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-lg font-bold text-red-700 border border-red-100">
                       {article.authorName?.charAt(0) || "A"}
