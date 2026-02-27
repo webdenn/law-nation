@@ -84,7 +84,9 @@ const RecentArticlesWidget = ({ currentSlug }) => {
           const data = await res.json();
           const list = data.results || data.articles || [];
           // Filter out current article and take top 5
-          const filtered = list.filter(a => a.slug !== currentSlug && a.id !== currentSlug).slice(0, 5);
+          const filtered = list
+            .filter((a) => a.slug !== currentSlug && a.id !== currentSlug)
+            .slice(0, 5);
           setRecents(filtered);
         }
       } catch (e) {
@@ -96,20 +98,29 @@ const RecentArticlesWidget = ({ currentSlug }) => {
     fetchRecents();
   }, [currentSlug, NEXT_PUBLIC_BASE_URL]);
 
-  if (loading) return <div className="animate-pulse space-y-4">
-    {[1, 2, 3].map(i => <div key={i} className="h-16 bg-gray-100 rounded-lg"></div>)}
-  </div>;
+  if (loading)
+    return (
+      <div className="animate-pulse space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-16 bg-gray-100 rounded-lg"></div>
+        ))}
+      </div>
+    );
 
-  if (recents.length === 0) return <p className="text-sm text-gray-400">No other articles yet.</p>;
+  if (recents.length === 0)
+    return <p className="text-sm text-gray-400">No other articles yet.</p>;
 
   return (
     <div className="flex flex-col gap-5">
       {recents.map((art) => (
-        <div key={art.id} className="group cursor-pointer" onClick={() => router.push(`/article/${art.slug || art.id}`)}>
+        <div
+          key={art.id}
+          className="group cursor-pointer"
+          onClick={() => router.push(`/article/${art.slug || art.id}`)}
+        >
           <h4 className="text-sm font-bold text-gray-900 leading-snug group-hover:text-red-700 transition-colors line-clamp-2 mb-1">
             {art.title}
           </h4>
-
         </div>
       ))}
     </div>
@@ -124,7 +135,7 @@ export default function ArticlePage({ params }) {
   const unwrappedParams = use(params);
   const slug = unwrappedParams?.slug;
 
-  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
+  const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
   const { token } = useSelector((state) => state.auth);
 
   const [article, setArticle] = useState(null);
@@ -157,7 +168,7 @@ export default function ArticlePage({ params }) {
           {
             method: "GET",
             headers: headers,
-          }
+          },
         );
 
         const data = await res.json();
@@ -200,7 +211,7 @@ export default function ArticlePage({ params }) {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (!res.ok) throw new Error("Download failed");
@@ -235,7 +246,6 @@ export default function ArticlePage({ params }) {
       </div>
     );
 
-
   // Helper: Render text preserving original formatting (whitespace, newlines)
   const renderMediumContent = (text) => {
     if (!text) return null;
@@ -257,7 +267,11 @@ export default function ArticlePage({ params }) {
     }
 
     // Fallback logic (should not be reached if backend is working correctly)
-    const textContent = article.content || (article.contentHtml ? article.contentHtml.replace(/<[^>]*>?/gm, '') : (article.abstract || ""));
+    const textContent =
+      article.content ||
+      (article.contentHtml
+        ? article.contentHtml.replace(/<[^>]*>?/gm, "")
+        : article.abstract || "");
     const words = textContent.split(/\s+/);
     if (words.length > 250) {
       return words.slice(0, 250).join(" ") + "...";
@@ -288,7 +302,9 @@ export default function ArticlePage({ params }) {
           className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-red-700 mb-8 transition-colors group"
         >
           <ArrowLeftIcon />
-          <span className="group-hover:translate-x-1 transition-transform">Back to Library</span>
+          <span className="group-hover:translate-x-1 transition-transform">
+            Back to Library
+          </span>
         </button>
 
         <div className="flex flex-col lg:flex-row gap-12">
@@ -299,7 +315,6 @@ export default function ArticlePage({ params }) {
                 <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold tracking-wider uppercase">
                   {article.category || "General"}
                 </span>
-
               </div>
 
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-[1.1] mb-8 text-gray-900 wrap-break-word font-serif">
@@ -322,16 +337,36 @@ export default function ArticlePage({ params }) {
               )}
 
               <div className="flex items-center justify-between border-b border-gray-100 pb-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-lg font-bold text-red-700 border border-red-100">
-                    {article.authorName?.charAt(0) || "A"}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-lg font-bold text-red-700 border border-red-100">
+                      {article.authorName?.charAt(0) || "A"}
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-gray-900">
+                        {article.authorName}
+                      </p>
+                      <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+                        Author
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-base font-bold text-gray-900">
-                      {article.authorName}
-                    </p>
-                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Author</p>
-                  </div>
+
+                  {article.secondAuthorName && (
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-lg font-bold text-blue-700 border border-blue-100">
+                        {article.secondAuthorName.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-base font-bold text-gray-900">
+                          {article.secondAuthorName}
+                        </p>
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+                          Co-Author
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {!isLimited && article.currentPdfUrl && (
@@ -347,7 +382,9 @@ export default function ArticlePage({ params }) {
 
             {token && article.abstract && (
               <div className="p-8 bg-gray-50 rounded-2xl border border-gray-100 mb-12">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Abstract</h3>
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
+                  Abstract
+                </h3>
                 <div className="text-lg md:text-xl text-gray-700 leading-relaxed font-serif italic">
                   {article.abstract}
                 </div>
@@ -355,8 +392,9 @@ export default function ArticlePage({ params }) {
             )}
 
             <div
-              className={`prose prose-lg prose-slate max-w-none prose-headings:font-bold prose-headings:font-sans prose-p:font-serif prose-a:text-red-700 hover:prose-a:text-red-800 prose-img:rounded-xl wrap-break-word overflow-hidden ${(!token || isLimited) ? "relative" : ""
-                }`}
+              className={`prose prose-lg prose-slate max-w-none prose-headings:font-bold prose-headings:font-sans prose-p:font-serif prose-a:text-red-700 hover:prose-a:text-red-800 prose-img:rounded-xl wrap-break-word overflow-hidden ${
+                !token || isLimited ? "relative" : ""
+              }`}
             >
               {token ? (
                 // ✅ Logged In: Show Full Content (HTML or Text)
@@ -389,7 +427,9 @@ export default function ArticlePage({ params }) {
                       className="inline-flex items-center justify-center bg-red-600 text-white font-bold px-8 py-3.5 rounded-full hover:bg-red-700 transition-all shadow-lg hover:shadow-red-200 transform hover:-translate-y-0.5 group"
                     >
                       <LockIcon />
-                      <span className="ml-2 text-sm uppercase tracking-wider">Login to Read Full Article</span>
+                      <span className="ml-2 text-sm uppercase tracking-wider">
+                        Login to Read Full Article
+                      </span>
                     </Link>
                   </div>
                 </div>
@@ -423,7 +463,10 @@ export default function ArticlePage({ params }) {
                   <RecentArticlesWidget currentSlug={slug} />
                 </div>
                 <div className="mt-8 pt-6 border-t border-gray-50 text-center">
-                  <Link href="/articles" className="text-xs font-bold text-red-600 hover:text-red-700 uppercase tracking-widest hover:underline">
+                  <Link
+                    href="/articles"
+                    className="text-xs font-bold text-red-600 hover:text-red-700 uppercase tracking-widest hover:underline"
+                  >
                     View All Articles
                   </Link>
                 </div>
@@ -431,11 +474,17 @@ export default function ArticlePage({ params }) {
 
               {/* Newsletter / Call to Action (Optional Future use) */}
               <div className="mt-8 bg-red-50 rounded-2xl p-6 border border-red-100 hidden md:block">
-                <h4 className="font-bold text-red-900 mb-2">Submit your work</h4>
+                <h4 className="font-bold text-red-900 mb-2">
+                  Submit your work
+                </h4>
                 <p className="text-sm text-red-700 mb-4 leading-relaxed">
-                  Contributing to Law Nation Prime Times Journal allows you to reach a global audience.
+                  Contributing to Law Nation Prime Times Journal allows you to
+                  reach a global audience.
                 </p>
-                <Link href="/submit-paper" className="text-xs font-bold bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition block text-center">
+                <Link
+                  href="/submit-paper"
+                  className="text-xs font-bold bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition block text-center"
+                >
                   Submit Manuscript
                 </Link>
               </div>
