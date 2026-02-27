@@ -5,7 +5,6 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
-// Set up PDF.js worker from CDN
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 const ChevronLeft = () => (
@@ -54,7 +53,7 @@ export default function PdfViewer({ pdfUrl }) {
 
   if (error) {
     return (
-      <div className="p-10 text-center text-gray-500 bg-gray-50 rounded-xl border border-gray-100 text-sm italic">
+      <div className="py-6 text-center text-gray-400 text-sm italic">
         PDF preview unavailable.
       </div>
     );
@@ -62,55 +61,46 @@ export default function PdfViewer({ pdfUrl }) {
 
   return (
     <div className="w-full">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between bg-gray-900 text-white px-5 py-3 rounded-t-2xl">
-        {/* Page Navigation */}
-        <div className="flex items-center gap-3">
+
+      {/* Minimal inline controls — blends with page */}
+      <div className="flex items-center justify-between py-3 mb-4 border-b border-gray-100">
+        <div className="flex items-center gap-2 text-gray-500">
           <button
             onClick={goToPrevPage}
             disabled={pageNumber <= 1}
-            className="p-1.5 rounded-lg hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="p-1 rounded hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition"
           >
             <ChevronLeft />
           </button>
-          <span className="text-sm font-medium tabular-nums">
-            {pageNumber} / {numPages ?? "—"}
+          <span className="text-xs font-medium tabular-nums">
+            Page {pageNumber} of {numPages ?? "…"}
           </span>
           <button
             onClick={goToNextPage}
             disabled={!numPages || pageNumber >= numPages}
-            className="p-1.5 rounded-lg hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="p-1 rounded hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition"
           >
             <ChevronRight />
           </button>
         </div>
 
-        {/* Zoom Controls */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={zoomOut}
-            className="p-1.5 rounded-lg hover:bg-white/10 transition"
-          >
+        <div className="flex items-center gap-2 text-gray-500">
+          <button onClick={zoomOut} className="p-1 rounded hover:text-gray-900 transition">
             <ZoomOut />
           </button>
-          <span className="text-sm font-medium tabular-nums w-12 text-center">
-            {Math.round(scale * 100)}%
-          </span>
-          <button
-            onClick={zoomIn}
-            className="p-1.5 rounded-lg hover:bg-white/10 transition"
-          >
+          <span className="text-xs font-medium tabular-nums">{Math.round(scale * 100)}%</span>
+          <button onClick={zoomIn} className="p-1 rounded hover:text-gray-900 transition">
             <ZoomIn />
           </button>
         </div>
       </div>
 
-      {/* PDF Render Area */}
-      <div className="overflow-auto bg-gray-100 flex justify-center py-8 min-h-[700px] rounded-b-2xl border border-t-0 border-gray-200">
+      {/* PDF content — no bg, no border, just the page */}
+      <div className="overflow-auto flex justify-center">
         {loading && (
-          <div className="flex flex-col items-center justify-center gap-3 text-gray-400 absolute">
-            <div className="w-8 h-8 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-            <span className="text-sm">Loading PDF...</span>
+          <div className="flex items-center gap-2 py-10 text-gray-400 text-sm">
+            <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+            Loading...
           </div>
         )}
         <Document
@@ -124,10 +114,30 @@ export default function PdfViewer({ pdfUrl }) {
             scale={scale}
             renderTextLayer={true}
             renderAnnotationLayer={true}
-            className="shadow-xl"
           />
         </Document>
       </div>
+
+      {/* Bottom page nav */}
+      {numPages && numPages > 1 && (
+        <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-gray-100 text-gray-500">
+          <button
+            onClick={goToPrevPage}
+            disabled={pageNumber <= 1}
+            className="flex items-center gap-1 text-xs font-medium hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition"
+          >
+            <ChevronLeft /> Previous
+          </button>
+          <span className="text-xs tabular-nums">{pageNumber} / {numPages}</span>
+          <button
+            onClick={goToNextPage}
+            disabled={pageNumber >= numPages}
+            className="flex items-center gap-1 text-xs font-medium hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition"
+          >
+            Next <ChevronRight />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
