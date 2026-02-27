@@ -40,7 +40,7 @@ export class AdminReviewerService {
       // Calculate stats for each reviewer
       const reviewers: Reviewer[] = await Promise.all(
         users.map(async (user) => {
-          const [totalAssigned, pending, completed] = await Promise.all([
+          const [totalAssigned, pending, approved] = await Promise.all([
             // Total assigned reviews
             prisma.article.count({
               where: { assignedReviewerId: user.id }
@@ -52,11 +52,11 @@ export class AdminReviewerService {
                 status: { in: ['ASSIGNED_TO_REVIEWER', 'REVIEWER_IN_PROGRESS', 'REVIEWER_EDITING'] }
               }
             }),
-            // Completed reviews
+            // Approved reviews (waiting for admin to publish) - FIXED: Only REVIEWER_APPROVED
             prisma.article.count({
               where: {
                 assignedReviewerId: user.id,
-                status: { in: ['REVIEWER_APPROVED', 'PUBLISHED'] }
+                status: 'REVIEWER_APPROVED'  // ✅ Only approved, not published
               }
             })
           ]);
@@ -70,7 +70,7 @@ export class AdminReviewerService {
             experience: user.experience,
             bio: user.bio,
             assignedReviews: totalAssigned,
-            completedReviews: completed,
+            completedReviews: approved,  // ✅ Only approved reviews (not published)
             pendingReviews: pending,
             averageReviewTime: 0, // Can be calculated separately if needed
             status: user.isActive ? 'ACTIVE' : 'INACTIVE',
@@ -297,7 +297,7 @@ export class AdminReviewerService {
 
       const totalAssigned = articles.length;
       const totalCompleted = articles.filter(a =>
-        ['REVIEWER_APPROVED', 'PUBLISHED'].includes(a.status)
+        a.status === 'REVIEWER_APPROVED'  // ✅ Only approved, not published
       ).length;
       const inProgress = articles.filter(a =>
         ['ASSIGNED_TO_REVIEWER', 'REVIEWER_IN_PROGRESS'].includes(a.status)
@@ -305,7 +305,7 @@ export class AdminReviewerService {
 
       // Calculate average review time (simplified)
       const completedReviews = articles.filter(a =>
-        ['REVIEWER_APPROVED', 'PUBLISHED'].includes(a.status)
+        a.status === 'REVIEWER_APPROVED'  // ✅ Only approved, not published
       );
       const averageReviewTime = completedReviews.length > 0
         ? completedReviews.reduce((sum, article) => {
