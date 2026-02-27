@@ -254,6 +254,8 @@ export class ArticleQueryService {
         keywords: true,
         authorName: true,
         authorOrganization: true,
+        secondAuthorName: true,
+        secondAuthorEmail: true,
         content: true,
         contentHtml: true,
         currentPdfUrl: true,
