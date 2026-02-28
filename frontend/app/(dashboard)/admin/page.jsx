@@ -712,6 +712,28 @@ export default function AdminDashboard() {
     }
   };
 
+  // ✅ DELETE ARTICLE
+  const deleteArticle = async (articleId, articleTitle) => {
+    if (!confirm(`Are you sure you want to delete "${articleTitle}"? This action cannot be undone.`)) return;
+    try {
+      const token = localStorage.getItem("adminToken");
+      const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/articles/${articleId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        toast.success("Article deleted successfully!");
+        setArticles((prev) => prev.filter((a) => a.id !== articleId));
+      } else {
+        const data = await response.json();
+        toast.error(data.message || "Failed to delete article.");
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+      toast.error("Server error while deleting article.");
+    }
+  };
+
   const toggleVisibility = async (id, currentVisibility) => {
     try {
       const token = localStorage.getItem("adminToken");
@@ -845,6 +867,7 @@ export default function AdminDashboard() {
             overrideAndPublish={overrideAndPublish}
             toggleVisibility={toggleVisibility}
             saveCiteNumber={saveCiteNumber}
+            deleteArticle={deleteArticle}
             currentPage={currentPage}
             totalPages={totalPages}
             totalItems={totalItems}
