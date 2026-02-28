@@ -51,6 +51,7 @@ export class ArticleQueryService {
         { title: { contains: filters.search, mode: 'insensitive' } },
         { authorName: { contains: filters.search, mode: 'insensitive' } },
         { category: { contains: filters.search, mode: 'insensitive' } },
+        { citationNumber: { contains: filters.search, mode: 'insensitive' } }, // ✅ Search by citation
       ];
     }
 
@@ -904,6 +905,48 @@ export class ArticleQueryService {
       history,
       totalAssignments: history.length,
     };
+  }
+
+  /**
+   * Search article by citation number
+   * @param citationNumber - Citation number to search for
+   * @returns Article with matching citation number
+   */
+  async searchByCitation(citationNumber: string) {
+    if (!citationNumber || citationNumber.trim() === '') {
+      throw new NotFoundError('Citation number is required');
+    }
+
+    const article = await prisma.article.findUnique({
+      where: { 
+        citationNumber: citationNumber.trim(),
+        status: 'PUBLISHED' // Only search published articles
+      },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        authorName: true,
+        category: true,
+        abstract: true,
+        citationNumber: true,
+        currentPdfUrl: true,
+        thumbnailUrl: true,
+        approvedAt: true,
+        submittedAt: true,
+        isVisible: true,
+      }
+    });
+
+    if (!article) {
+      throw new NotFoundError(`No published article found with citation number: ${citationNumber}`);
+    }
+
+    if (!article.isVisible) {
+      throw new ForbiddenError('This article is currently not visible');
+    }
+
+    return article;
   }
 }
 

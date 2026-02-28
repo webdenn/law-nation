@@ -55,6 +55,12 @@ router.get(
   articleController.searchArticles.bind(articleController)
 );
 
+// PUBLIC: Search article by citation number (no auth required)
+router.get(
+  "/search/citation/:citationNumber",
+  articleController.searchByCitation.bind(articleController)
+);
+
 // PUBLIC: Get article preview (no auth required)
 router.get(
   "/:id/preview",

@@ -556,7 +556,8 @@ export class ArticleController {
           frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
         },
         watermarkRole,    // Pass dynamic role so "LAW NATION REVIEWER" text appears
-        article.status    // Article status - URL only for PUBLISHED
+        article.status,   // Article status - URL only for PUBLISHED
+        article.citationNumber // ✅ Pass citation number for USER PDFs
       );
 
       // Send watermarked PDF
@@ -1017,10 +1018,19 @@ export class ArticleController {
   async adminPublishArticle(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = getStringParam(req.params.id, "Article ID");
-
       const adminId = req.user!.id;
+      
+      // ✅ Get citation number from request body
+      const { citationNumber } = req.body;
+      
+      if (!citationNumber || citationNumber.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'Citation number is required to publish an article'
+        });
+      }
 
-      const result = await articleService.adminPublishArticle(articleId, adminId);
+      const result = await articleService.adminPublishArticle(articleId, adminId, citationNumber);
 
       // 🔥 AUDIT: Record final decision
       try {
@@ -1170,7 +1180,8 @@ export class ArticleController {
               frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
             },
             userRole as 'USER' | 'EDITOR' | 'REVIEWER' | 'ADMIN',
-            changeLog?.article.status || 'DRAFT'
+            changeLog?.article.status || 'DRAFT',
+            changeLog?.article.citationNumber // ✅ Pass citation number
           );
 
           // Clean up temp file
@@ -1290,7 +1301,8 @@ export class ArticleController {
             frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
           },
           userRole as 'USER' | 'EDITOR' | 'REVIEWER' | 'ADMIN',
-          changeLog?.article.status || 'DRAFT'
+          changeLog?.article.status || 'DRAFT',
+          changeLog?.article.citationNumber // ✅ Pass citation number
         );
       } else {
         // Add text watermark to Word (no URLs in DOCX)
@@ -1793,6 +1805,25 @@ export class ArticleController {
     } catch (error) {
       console.error('Failed to parse editing duration:', error);
       return defaultDuration;
+    }
+  }
+
+  /**
+   * Search article by citation number
+   * GET /api/articles/search/citation/:citationNumber
+   */
+  async searchByCitation(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const citationNumber = req.params.citationNumber as string;
+      
+      const article = await articleService.searchByCitation(citationNumber);
+      
+      res.json({
+        success: true,
+        data: article
+      });
+    } catch (error) {
+      next(error);
     }
   }
 }

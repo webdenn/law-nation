@@ -9,6 +9,7 @@ import { downloadFileToBuffer } from './pdf-extract.utils.js';
  * @param options - Watermark options
  * @param userRole - User role (USER, EDITOR, REVIEWER, ADMIN)
  * @param articleStatus - Article status (PUBLISHED, DRAFT, etc.)
+ * @param citationNumber - Citation number to display at top of each page (USER only)
  * @returns Watermarked PDF as Buffer
  */
 export async function addWatermarkToPdf(
@@ -22,12 +23,14 @@ export async function addWatermarkToPdf(
     frontendUrl: string;
   },
   userRole: 'USER' | 'EDITOR' | 'REVIEWER' | 'ADMIN' = 'USER',
-  articleStatus: string = 'PUBLISHED'
+  articleStatus: string = 'PUBLISHED',
+  citationNumber?: string
 ): Promise<Buffer> {
   console.log('\n[Watermark] Starting watermarking process...');
   console.log('[Watermark] PDF path:', pdfPath);
   console.log('[Watermark] User role:', userRole);
   console.log('[Watermark] Article status:', articleStatus);
+  console.log('[Watermark] Citation number:', citationNumber || 'None');
   console.log('[Watermark] Include URL:', userRole === 'USER' && articleStatus === 'PUBLISHED');
 
   try {
@@ -69,7 +72,7 @@ export async function addWatermarkToPdf(
     // 3. Load logo image
     let logoImage: Awaited<ReturnType<typeof pdfDoc.embedPng>> | undefined;
     try {
-      const logoPath = path.join(process.cwd(), 'src', 'assests', 'img', 'Screenshot 2026-01-09 204120.png');
+      const logoPath = path.join(process.cwd(), 'src', 'assests', 'img', 'logo-bg.png');
       console.log('🖼️ [Watermark] Loading logo from:', logoPath);
 
       if (fs.existsSync(logoPath)) {
@@ -140,9 +143,22 @@ export async function addWatermarkToPdf(
     pages.forEach((page, index) => {
       const { width, height } = page.getSize();
 
+      // ✅ Add citation number at top of page for USER role only (in red color)
+      if (citationNumber && userRole === 'USER') {
+        page.drawText(citationNumber, {
+          x: 50,
+          y: height - 30, // 30px from top
+          size: 12,
+          color: rgb(0.8, 0, 0), // Red color
+          opacity: 1, // Fully visible
+        });
+        
+        console.log(`📋 [Watermark] Added citation "${citationNumber}" to page ${index + 1}`);
+      }
+
       // Add logo in center of page (if loaded)
       if (logoImage) {
-        const logoScale = 0.3; // Scale logo to 30% of original size
+        const logoScale = 0.5; // Scale logo to 50% of original size (increased from 30%)
         const logoDims = logoImage.scale(logoScale);
 
         // Calculate center position
@@ -155,8 +171,49 @@ export async function addWatermarkToPdf(
           y: logoY,
           width: logoDims.width,
           height: logoDims.height,
-          opacity: 0.15, // 15% opacity - very light
+          opacity: 0.09, // 9% opacity - very light (reduced from 15%)
         });
+      }
+
+      // Add logo at bottom-right of page for USER role only
+      if (logoImage && userRole === 'USER') {
+        const bottomLogoScale = 0.15; // Smaller logo for bottom
+        const bottomLogoDims = logoImage.scale(bottomLogoScale);
+
+        // Calculate bottom-right position (with 20px margin from bottom and right)
+        const bottomLogoX = width - bottomLogoDims.width - 20;
+        const bottomLogoY = 20;
+
+        // Draw bottom-right logo
+        page.drawImage(logoImage, {
+          x: bottomLogoX,
+          y: bottomLogoY,
+          width: bottomLogoDims.width,
+          height: bottomLogoDims.height,
+          opacity: 0.5, // More visible at bottom
+        });
+      }
+
+      // Add copyright watermark at bottom center for USER role only
+      if (userRole === 'USER') {
+        const copyrightText = '© Law Nation Prime Times Journal. All rights reserved.';
+        const copyrightFontSize = 8;
+        
+        // Calculate text width to center it
+        const textWidth = copyrightText.length * (copyrightFontSize * 0.5);
+        const copyrightX = (width - textWidth) / 2;
+        
+        page.drawText(copyrightText, {
+          x: copyrightX,
+          y: 10, // 10px from bottom
+          size: copyrightFontSize,
+          color: rgb(0.4, 0.4, 0.4), // Dark gray color
+          opacity: 0.8,
+        });
+        
+        if (index === 0) {
+          console.log(`© [Watermark] Added copyright notice to all pages`);
+        }
       }
 
       // Top-right watermark (Role-based text) - on ALL pages

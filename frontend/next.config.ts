@@ -2,7 +2,9 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: false,
-  trailingSlash: true,
+  // output: 'export',          // Enables static export
+  poweredByHeader: false,
+  trailingSlash: true,       // Avoids 404 issues on Hostinger
   images: {
     unoptimized: true,
   },

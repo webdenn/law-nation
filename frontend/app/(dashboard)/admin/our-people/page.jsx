@@ -69,7 +69,7 @@ export default function OurPeopleSettingsPage() {
                 body: JSON.stringify({
                     teamMembers: updatedTeam,
                     // We don't modify reviewers here, we can keep the existing ones or send current reviewers if we had them.
-                    // But the requirement says "remove reviewers वाला code", so let's send what the backend has for reviewers
+                    // But the requirement says "remove reviewers code", so let's send what the backend has for reviewers
                     // OR if the user wants to remove the DATA too, we send empty.
                     // For now, I'll fetch them once to preserve them, or just send the current ones if I had them.
                     // Wait, if I'm removing the UI, I should probably just fetch the existing ones and re-send them to avoid accidental deletion of data.

@@ -446,7 +446,7 @@ export class ArticleWorkflowService {
     // Fallback to existing content if available and not corrupted
     if (article.content && article.content.trim().length > 0) {
       // Check if existing content looks corrupted
-      const hasCorruptedData = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|PKx|��|AEstructuredData/.test(article.content);
+      const hasCorruptedData = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|PKx|  |AEstructuredData/.test(article.content);
 
       if (!hasCorruptedData) {
         console.log(`ℹ️ [Text Extract] Using existing clean content as fallback (${article.content.length} characters)`);
@@ -1008,7 +1008,7 @@ export class ArticleWorkflowService {
         }
       }
 
-      // Create watermarked versions
+      // Create watermarked versions using the SAME utilities as editor workflow
       const watermarkData = {
         userName: 'LAW NATION REVIEWER',
         downloadDate: new Date(),
@@ -1017,8 +1017,14 @@ export class ArticleWorkflowService {
         frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
       };
 
-      // Watermark DOCX
-      await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
+      // Import proper watermark utilities (same as editor uses)
+      const { addWatermarkToPdf } = await import('@/utils/pdf-watermark.utils.js');
+      const { addSimpleWatermarkToWord } = await import('@/utils/word-watermark.utils.js');
+
+      // Watermark DOCX using proper utility
+      console.log(`💧 [Reviewer] Adding proper watermark to DOCX`);
+      const watermarkedDocxBuffer = await addSimpleWatermarkToWord(docxPath, watermarkData);
+      fs.writeFileSync(watermarkedDocxPath, watermarkedDocxBuffer);
 
       // Watermark PDF using Local Utils (Logo)
       // await adobeService.addWatermarkToPdf(pdfPath, watermarkedPdfPath, watermarkData);
@@ -1319,7 +1325,7 @@ export class ArticleWorkflowService {
 
   //Admin publishes article (NEW WORKFLOW: handles editor-only, reviewer, or admin override)
 
-  async adminPublishArticle(articleId: string, adminId: string) {
+  async adminPublishArticle(articleId: string, adminId: string, citationNumber: string) {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
       include: { assignedEditor: true, assignedReviewer: true },
@@ -1347,6 +1353,12 @@ export class ArticleWorkflowService {
       );
     }
 
+    // ✅ NEW: Validate citation number before publishing
+    const { CitationValidator } = await import('@/validators/citation.validator.js');
+    const validatedCitation = await CitationValidator.validate(citationNumber, articleId);
+    
+    console.log(`📋 [Citation] Validated citation number: ${validatedCitation}`);
+
     // Determine which version to publish based on workflow
     let publishingMessage = "";
     if (article.status === "REVIEWER_APPROVED") {
@@ -1361,14 +1373,14 @@ export class ArticleWorkflowService {
 
     // NEW: Handle document vs article publishing differently
     if (article.contentType === 'DOCUMENT') {
-      return await this.publishDocument(article, adminId, publishingMessage);
+      return await this.publishDocument(article, adminId, publishingMessage, validatedCitation);
     } else {
-      return await this.publishArticle(article, adminId, publishingMessage);
+      return await this.publishArticle(article, adminId, publishingMessage, validatedCitation);
     }
   }
 
   // NEW: Publish document with Adobe text extraction from final version
-  private async publishDocument(article: any, adminId: string, publishingMessage?: string) {
+  private async publishDocument(article: any, adminId: string, publishingMessage?: string, citationNumber?: string) {
     console.log(`📄 [Document Publish] ${publishingMessage || 'Publishing document'} ${article.id}`);
 
     let extractedText = '';
@@ -1457,7 +1469,7 @@ export class ArticleWorkflowService {
       contentHtml = extractedText.replace(/\n/g, '<br>');
     }
 
-    // Update article with extracted text and published status
+    // Update article with extracted text, citation, and published status
     const updatedArticle = await prisma.article.update({
       where: { id: article.id },
       data: {
@@ -1466,8 +1478,11 @@ export class ArticleWorkflowService {
         content: extractedText, // Store text from final version for user display
         contentHtml: contentHtml, // Store HTML for rich formatting
         finalPdfUrl: article.currentPdfUrl, // Set final published version
+        citationNumber: citationNumber, // ✅ Store citation number
       },
     });
+
+    console.log(`📋 [Citation] Saved citation number: ${citationNumber}`);
 
     // Mark all change logs as published
     await prisma.articleChangeLog.updateMany({
@@ -1504,7 +1519,7 @@ export class ArticleWorkflowService {
   }
 
   // Enhanced article publishing logic with new workflow support
-  private async publishArticle(article: any, adminId: string, publishingMessage?: string) {
+  private async publishArticle(article: any, adminId: string, publishingMessage?: string, citationNumber?: string) {
     let finalDiffSummary = "No changes made";
 
     if (article.originalPdfUrl !== article.currentPdfUrl) {
@@ -1535,7 +1550,7 @@ export class ArticleWorkflowService {
     // First, check if we already have clean extracted text
     if (article.content && article.content.trim().length > 0) {
       // Check if the content looks clean (not corrupted binary data)
-      const hasCorruptedData = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|PKx|��|AEstructuredData/.test(article.content);
+      const hasCorruptedData = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|PKx|  |AEstructuredData/.test(article.content);
 
       if (!hasCorruptedData && !article.content.includes("PDF file is corrupted") && !article.content.includes("Text could not be extracted")) {
         console.log(`✅ [Article Publish] Using existing clean content (${article.content.length} characters)`);
@@ -1625,8 +1640,11 @@ export class ArticleWorkflowService {
         ...(extractedText && { content: extractedText }),
         contentHtml: contentHtml,
         finalPdfUrl: article.currentPdfUrl, // Set final published version
+        citationNumber: citationNumber, // ✅ Store citation number
       },
     });
+
+    console.log(`📋 [Citation] Saved citation number: ${citationNumber}`);
 
     await prisma.articleChangeLog.updateMany({
       where: { articleId: article.id, status: "approved" },

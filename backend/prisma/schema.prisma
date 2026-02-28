@@ -147,6 +147,9 @@ model Article {
   status             ArticleStatus           @default(PENDING_ADMIN_REVIEW)
   assignedEditorId   String?
   
+  // Citation number for published articles
+  citationNumber     String?                 @unique
+  
   // NEW REVIEWER RELATION
   assignedReviewerId String?
   
@@ -195,6 +198,7 @@ model Article {
   @@index([secondAuthorEmail])
   @@index([slug])
   @@index([contentType])
+  @@index([citationNumber])
 }
 
 model ArticleRevision {
