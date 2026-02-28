@@ -295,6 +295,7 @@ class AdminDashboardService {
             createdAt: true,
             updatedAt: true,
             isVisible: true, // ✅ Added visibility status
+            citationNumber: true, // ✅ Added citation number
           },
           orderBy: { submittedAt: 'desc' },
           skip,
@@ -315,6 +316,7 @@ class AdminDashboardService {
         currentPdfUrl: article.currentPdfUrl,
         originalWordUrl: article.originalWordUrl, // ✅ Added
         currentWordUrl: article.currentWordUrl, // ✅ Added
+        citationNumber: article.citationNumber, // ✅ Added citation number
         timeline: {
           submittedAt: article.submittedAt,
           assignedAt: article.createdAt, // Using createdAt as proxy

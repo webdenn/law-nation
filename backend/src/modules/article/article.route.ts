@@ -253,6 +253,13 @@ router.patch(
   articleController.reviewerApproveArticle.bind(articleController)
 );
 
+// NEW: Admin sets citation number (only after Stage 2 review approved)
+router.patch(
+  "/:id/set-citation",
+  requirePermission("article", "write"),
+  articleController.setCitationNumber.bind(articleController)
+);
+
 // NEW: Reviewer downloads editor's document
 router.get(
   "/:id/download/editor-document-for-reviewer",

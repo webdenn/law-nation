@@ -1826,6 +1826,86 @@ export class ArticleController {
       next(error);
     }
   }
+
+  /**
+   * Admin sets citation number on an article
+   * PATCH /api/articles/:id/set-citation
+   * Only allowed when status is REVIEWER_APPROVED
+   * Format: YYYY LN(NN)ANNNNN  e.g. 2026 LN(53)A1234
+   */
+  async setCitationNumber(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+      const { citationNumber } = req.body;
+
+      if (!citationNumber || typeof citationNumber !== 'string') {
+        throw new BadRequestError("citationNumber is required");
+      }
+
+      // Validate format: YYYY LN(NN...)ANNN...
+      const citationRegex = /^\d{4} LN\(\d+\)A\d+$/;
+      if (!citationRegex.test(citationNumber.trim())) {
+        throw new BadRequestError(
+          "Invalid citation format. Expected format: YYYY LN(NN)ANNNNN e.g. 2026 LN(53)A1234"
+        );
+      }
+
+      // Fetch article
+      const article = await prisma.article.findUnique({
+        where: { id: articleId },
+        select: { id: true, status: true, title: true, citationNumber: true },
+      });
+
+      if (!article) {
+        throw new BadRequestError("Article not found");
+      }
+
+      // Only allow when REVIEWER_APPROVED
+      const allowedStatuses = ['REVIEWER_APPROVED', 'PUBLISHED', 'APPROVED'];
+      if (!allowedStatuses.includes(article.status)) {
+        throw new BadRequestError(
+          `Citation can only be set when Stage 2 review is approved (current status: ${article.status})`
+        );
+      }
+
+      // Check for duplicates (unique constraint will catch it, but give better message)
+      const existing = await prisma.article.findUnique({
+        where: { citationNumber: citationNumber.trim() },
+        select: { id: true, title: true },
+      });
+
+      if (existing && existing.id !== articleId) {
+        return res.status(409).json({
+          success: false,
+          message: `This citation number already exists. Use a different one. (Used by: "${existing.title}")`,
+        });
+      }
+
+      // Save citation number
+      const updated = await prisma.article.update({
+        where: { id: articleId },
+        data: { citationNumber: citationNumber.trim() },
+        select: { id: true, title: true, citationNumber: true, status: true },
+      });
+
+      console.log(`✅ [Citation] Set citation "${citationNumber}" for article "${article.title}"`);
+
+      return res.json({
+        success: true,
+        message: "Citation number saved successfully",
+        article: updated,
+      });
+    } catch (error: any) {
+      // Handle Prisma unique constraint error
+      if (error?.code === 'P2002' && error?.meta?.target?.includes('citationNumber')) {
+        return res.status(409).json({
+          success: false,
+          message: "This citation number already exists. Use a different one.",
+        });
+      }
+      next(error);
+    }
+  }
 }
 
 export const articleController = new ArticleController();

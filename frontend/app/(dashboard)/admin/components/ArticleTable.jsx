@@ -4,8 +4,98 @@ import Link from "next/link";
 import AssignEditor from "./AssignEditor";
 import AssignReviewer from "./AssignReviewer";
 import Pagination from "../../../components/Pagination";
-// We don't need toast here unless we add interactions that use it directly, 
-// but most interactions are passed down props.
+
+// ✅ Cite Number Input Component
+function CiteNumberField({ art, saveCiteNumber }) {
+    const currentYear = new Date().getFullYear();
+    const [issueNo, setIssueNo] = useState("");
+    const [serialNo, setSerialNo] = useState("");
+    const [isSaving, setIsSaving] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+
+    // If already saved and not editing
+    if (art.citationNumber && !isEditing) {
+        return (
+            <div className="flex flex-col items-start gap-1">
+                <span className="text-xs font-black text-green-700 bg-green-100 border border-green-300 px-2 py-1 rounded-lg tracking-tight">
+                    {art.citationNumber}
+                </span>
+                <button
+                    onClick={() => {
+                        // Pre-fill from saved value: "2026 LN(53)A1234"
+                        const match = art.citationNumber.match(/^(\d{4}) LN\((\d+)\)A(\d+)$/);
+                        if (match) {
+                            setIssueNo(match[2] || "");
+                            setSerialNo(match[3] || "");
+                        }
+                        setIsEditing(true);
+                    }}
+                    className="text-[9px] text-blue-600 hover:underline font-bold uppercase"
+                >
+                    Edit
+                </button>
+            </div>
+        );
+    }
+
+    const previewNumber = issueNo && serialNo
+        ? `${currentYear} LN(${issueNo})A${serialNo}`
+        : null;
+
+    const handleSave = async () => {
+        if (!issueNo.trim() || !serialNo.trim()) return;
+        setIsSaving(true);
+        await saveCiteNumber(art.id, previewNumber);
+        setIsSaving(false);
+        setIsEditing(false);
+    };
+
+    return (
+        <div className="flex flex-col gap-1 min-w-[180px]">
+            <div className="flex items-center gap-1 text-[10px] text-gray-500 font-bold">
+                <span className="bg-gray-100 px-1 py-0.5 rounded">{currentYear}</span>
+                <span>LN(</span>
+                <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="53"
+                    value={issueNo}
+                    onChange={(e) => setIssueNo(e.target.value.replace(/\D/g, ""))}
+                    className="w-10 border border-gray-300 rounded px-1 py-0.5 text-center text-[10px] outline-none focus:border-red-500"
+                />
+                <span>)A</span>
+                <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="1234"
+                    value={serialNo}
+                    onChange={(e) => setSerialNo(e.target.value.replace(/\D/g, ""))}
+                    className="w-14 border border-gray-300 rounded px-1 py-0.5 text-center text-[10px] outline-none focus:border-red-500"
+                />
+            </div>
+            {previewNumber && (
+                <p className="text-[9px] text-gray-400 italic">Preview: <strong className="text-gray-700">{previewNumber}</strong></p>
+            )}
+            <div className="flex gap-1 mt-0.5">
+                <button
+                    onClick={handleSave}
+                    disabled={!issueNo || !serialNo || isSaving}
+                    className="bg-red-600 disabled:bg-gray-300 text-white text-[9px] font-black px-2 py-1 rounded uppercase hover:bg-red-800 transition"
+                >
+                    {isSaving ? "Saving..." : "Save"}
+                </button>
+                {(isEditing || art.citationNumber) && (
+                    <button
+                        onClick={() => setIsEditing(false)}
+                        className="text-[9px] text-gray-500 hover:underline font-bold uppercase"
+                    >
+                        Cancel
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
 
 export default function ArticleTable({
     isLoading,
@@ -25,9 +115,8 @@ export default function ArticleTable({
     setSelectedArticle,
     setPdfViewMode,
     overrideAndPublish,
-
     toggleVisibility,
-
+    saveCiteNumber,
     // Pagination Props
     currentPage,
     totalPages,
@@ -58,11 +147,19 @@ export default function ArticleTable({
         }
     };
 
+    // ✅ Show cite field only when stage 2 approved (or already has citation)
+    const showCiteField = (art) => {
+        return art.backendStatus === "REVIEWER_APPROVED" ||
+            art.backendStatus === "PUBLISHED" ||
+            art.backendStatus === "APPROVED" ||
+            !!art.citationNumber;
+    };
+
     return (
         <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
             <div className="bg-gray-50 p-5 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="font-black text-gray-700 uppercase tracking-tighter text-base md:text-lg">
-                    Monitor & Assign Articles
+                    Monitor &amp; Assign Articles
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                     <input
@@ -85,42 +182,34 @@ export default function ArticleTable({
                     </select>
                 </div>
             </div>
-            {/* Desktop Table View */}
+
+            {/* Desktop Table View — horizontally scrollable */}
             <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[900px]">
+                <table className="w-full text-left border-collapse min-w-[1100px]">
                     <thead className="bg-gray-100 text-[10px] uppercase text-gray-400 font-bold">
                         <tr>
-                            <th className="p-5">PDF Document & Abstract</th>
-                            <th className="p-5">Author</th>
-                            <th className="p-5">Status</th>
-                            <th className="p-5 text-center">Stage 1 Review </th>
-                            <th className="p-5 text-center">Stage 2 Review </th>
-                            <th className="p-5 text-right">Actions</th>
+                            <th className="p-4">PDF Document &amp; Abstract</th>
+                            <th className="p-4">Author</th>
+                            <th className="p-4">Status</th>
+                            <th className="p-4 text-center">Stage 1 Review</th>
+                            <th className="p-4 text-center">Stage 2 Review</th>
+                            <th className="p-4 text-center">Cite Number</th>
+                            <th className="p-4 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
                         {isLoading ? (
                             <tr>
-                                <td
-                                    colSpan="6"
-                                    className="p-10 text-center font-bold text-gray-500"
-                                >
+                                <td colSpan="7" className="p-10 text-center font-bold text-gray-500">
                                     Loading articles...
                                 </td>
                             </tr>
                         ) : (
                             filteredArticles.map((art) => (
-                                <tr
-                                    key={art.id}
-                                    className="hover:bg-red-50/30 transition-all"
-                                >
+                                <tr key={art.id} className="hover:bg-red-50/30 transition-all">
                                     {/* 1. PDF & Abstract */}
-                                    <td className="p-5">
-                                        <p
-                                            className="font-bold text-gray-800"
-                                        >
-                                            {art.title}
-                                        </p>
+                                    <td className="p-4">
+                                        <p className="font-bold text-gray-800 text-sm">{art.title}</p>
                                         <button
                                             onClick={() => setShowAbstract(art)}
                                             className="text-[10px] text-red-600 font-bold uppercase mt-1 hover:underline"
@@ -128,43 +217,50 @@ export default function ArticleTable({
                                             View Abstract
                                         </button>
                                     </td>
-                                    {/* 2. Author & Date */}
-                                    <td className="p-5">
-                                        <p className="text-sm text-gray-800 font-bold">
-                                            {art.author}
-                                        </p>
+                                    {/* 2. Author */}
+                                    <td className="p-4">
+                                        <p className="text-sm text-gray-800 font-bold">{art.author}</p>
                                     </td>
                                     {/* 3. Status Badge */}
-                                    <td className="p-5">
+                                    <td className="p-4">
                                         <span
-                                            className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${art.status === "Published"
-                                                ? "bg-green-100 text-green-700"
-                                                : art.status === "In Review"
+                                            className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${
+                                                art.status === "Published"
+                                                    ? "bg-green-100 text-green-700"
+                                                    : art.status === "In Review"
                                                     ? "bg-blue-100 text-blue-700"
                                                     : "bg-yellow-100 text-yellow-700"
-                                                }`}
+                                            }`}
                                         >
                                             {statusMap[art.status] || art.status}
                                         </span>
                                     </td>
-                                    {/* 4. Assign Editor Dropdown */}
-                                    <td className="p-5 text-center">
+                                    {/* 4. Assign Stage 1 */}
+                                    <td className="p-4 text-center">
                                         <AssignEditor
                                             article={art}
                                             editors={editors}
                                             assignArticle={assignArticle}
                                         />
                                     </td>
-                                    {/* 4.5 Assign Reviewer Dropdown */}
-                                    <td className="p-5 text-center">
+                                    {/* 5. Assign Stage 2 */}
+                                    <td className="p-4 text-center">
                                         <AssignReviewer
                                             article={art}
                                             reviewers={reviewers}
                                             assignReviewer={assignReviewer}
                                         />
                                     </td>
-                                    {/* 5. Combined Actions (Publish + Delete) */}
-                                    <td className="p-5 text-right flex justify-end gap-3 items-center">
+                                    {/* 6. ✅ CITE NUMBER — only when REVIEWER_APPROVED */}
+                                    <td className="p-4 text-center">
+                                        {showCiteField(art) ? (
+                                            <CiteNumberField art={art} saveCiteNumber={saveCiteNumber} />
+                                        ) : (
+                                            <span className="text-[10px] text-gray-300 italic">—</span>
+                                        )}
+                                    </td>
+                                    {/* 7. Actions */}
+                                    <td className="p-4 text-right flex justify-end gap-3 items-center">
                                         <button
                                             onClick={() => {
                                                 setSelectedArticle(art);
@@ -177,23 +273,25 @@ export default function ArticleTable({
                                         <button
                                             onClick={() => handlePublish(art.id)}
                                             disabled={art.status === "Published" || publishingId === art.id}
-                                            className={`w-[90px] py-2 rounded text-[10px] font-black transition-colors uppercase text-center ${art.status === "Published"
-                                                ? "bg-gray-400 cursor-not-allowed text-gray-200"
-                                                : publishingId === art.id
+                                            className={`w-[90px] py-2 rounded text-[10px] font-black transition-colors uppercase text-center ${
+                                                art.status === "Published"
+                                                    ? "bg-gray-400 cursor-not-allowed text-gray-200"
+                                                    : publishingId === art.id
                                                     ? "bg-gray-800 text-white cursor-wait"
                                                     : "bg-black text-white hover:bg-green-600"
-                                                }`}
+                                            }`}
                                         >
                                             {art.status === "Published"
                                                 ? "Published"
                                                 : publishingId === art.id
-                                                    ? "Wait..."
-                                                    : "Publish"}
+                                                ? "Wait..."
+                                                : "Publish"}
                                         </button>
                                         <button
                                             onClick={() => toggleVisibility(art.id, art.isVisible)}
-                                            className={`p-2 rounded hover:bg-gray-100 transition-all shrink-0 ${art.isVisible === false ? "text-gray-400" : "text-green-600"
-                                                }`}
+                                            className={`p-2 rounded hover:bg-gray-100 transition-all shrink-0 ${
+                                                art.isVisible === false ? "text-gray-400" : "text-green-600"
+                                            }`}
                                             title={art.isVisible === false ? "Show Article" : "Hide Article"}
                                         >
                                             {art.isVisible === false ? (
@@ -225,9 +323,7 @@ export default function ArticleTable({
                             {/* Header: Title & Status */}
                             <div className="flex justify-between items-start gap-3">
                                 <div className="flex-1">
-                                    <p
-                                        className="font-bold text-gray-900 text-lg leading-snug mb-1"
-                                    >
+                                    <p className="font-bold text-gray-900 text-lg leading-snug mb-1">
                                         {art.title}
                                     </p>
                                     <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
@@ -235,12 +331,13 @@ export default function ArticleTable({
                                     </div>
                                 </div>
                                 <span
-                                    className={`shrink-0 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wide ${art.status === "Published"
-                                        ? "bg-green-100 text-green-700"
-                                        : art.status === "In Review"
+                                    className={`shrink-0 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wide ${
+                                        art.status === "Published"
+                                            ? "bg-green-100 text-green-700"
+                                            : art.status === "In Review"
                                             ? "bg-blue-100 text-blue-700"
                                             : "bg-yellow-100 text-yellow-700"
-                                        }`}
+                                    }`}
                                 >
                                     {statusMap[art.status] || art.status}
                                 </span>
@@ -258,21 +355,21 @@ export default function ArticleTable({
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
                                 <div>
                                     <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Stage 1 Reviewer</p>
-                                    <AssignEditor
-                                        article={art}
-                                        editors={editors}
-                                        assignArticle={assignArticle}
-                                    />
+                                    <AssignEditor article={art} editors={editors} assignArticle={assignArticle} />
                                 </div>
                                 <div>
                                     <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Stage 2 Reviewer</p>
-                                    <AssignReviewer
-                                        article={art}
-                                        reviewers={reviewers}
-                                        assignReviewer={assignReviewer}
-                                    />
+                                    <AssignReviewer article={art} reviewers={reviewers} assignReviewer={assignReviewer} />
                                 </div>
                             </div>
+
+                            {/* ✅ Cite Number — Mobile */}
+                            {showCiteField(art) && (
+                                <div className="bg-red-50 border border-red-100 rounded-lg p-3">
+                                    <p className="text-[10px] uppercase text-red-600 font-black mb-2">📌 Cite Number</p>
+                                    <CiteNumberField art={art} saveCiteNumber={saveCiteNumber} />
+                                </div>
+                            )}
 
                             {/* Actions */}
                             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
@@ -289,20 +386,22 @@ export default function ArticleTable({
                                     <button
                                         onClick={() => handlePublish(art.id)}
                                         disabled={art.status === "Published" || publishingId === art.id}
-                                        className={`flex-1 sm:flex-none py-2 px-4 rounded text-xs font-bold transition shadow-sm uppercase ${art.status === "Published"
-                                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                            : publishingId === art.id
+                                        className={`flex-1 sm:flex-none py-2 px-4 rounded text-xs font-bold transition shadow-sm uppercase ${
+                                            art.status === "Published"
+                                                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                                : publishingId === art.id
                                                 ? "bg-gray-800 text-white cursor-wait"
                                                 : "bg-black text-white hover:bg-gray-900"
-                                            }`}
+                                        }`}
                                     >
                                         {art.status === "Published" ? "Published" : publishingId === art.id ? "Wait..." : "Publish"}
                                     </button>
                                 </div>
                                 <button
                                     onClick={() => toggleVisibility(art.id, art.isVisible)}
-                                    className={`p-2 rounded-lg transition shrink-0 ${art.isVisible === false ? "text-gray-400 bg-gray-100" : "text-green-600 bg-green-50"
-                                        }`}
+                                    className={`p-2 rounded-lg transition shrink-0 ${
+                                        art.isVisible === false ? "text-gray-400 bg-gray-100" : "text-green-600 bg-green-50"
+                                    }`}
                                     title={art.isVisible === false ? "Show Article" : "Hide Article"}
                                 >
                                     {art.isVisible === false ? (

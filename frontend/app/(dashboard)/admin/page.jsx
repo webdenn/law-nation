@@ -414,18 +414,19 @@ export default function AdminDashboard() {
             id: item._id || item.id,
             title: item.title,
             author: item.authorName || "Unknown",
-            status: mapBackendStatus(item.status), // ✅ Ab ye sahi chalega
+            status: mapBackendStatus(item.status),
+            backendStatus: item.status, // ✅ Raw backend status for conditional UI
             assignedTo: item.assignedEditor?.id || item.assignedEditorId || "",
-            assignedReviewer: item.assignedReviewer?.id || item.assignedReviewerId || "", // ✅ Added Reviewer Mapping
-            // ✅ Is line ko dhundo aur replace karo:
+            assignedReviewer: item.assignedReviewer?.id || item.assignedReviewerId || "",
             date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "",
             abstract: item.abstract,
             originalPdfUrl: item.originalPdfUrl,
             currentPdfUrl: item.currentPdfUrl,
-            originalWordUrl: item.originalWordUrl, // ✅ Added for Download Original
-            currentWordUrl: item.currentWordUrl,   // ✅ Added for Download Final
+            originalWordUrl: item.originalWordUrl,
+            currentWordUrl: item.currentWordUrl,
             pdfUrl: item.currentPdfUrl || item.originalPdfUrl,
-            isVisible: item.isVisible !== undefined ? item.isVisible : true, // ✅ Map visibility status
+            isVisible: item.isVisible !== undefined ? item.isVisible : true,
+            citationNumber: item.citationNumber || "", // ✅ Citation number from backend
           }));
           setArticles(formatted);
 
@@ -676,6 +677,41 @@ export default function AdminDashboard() {
   };
 
 
+  // ✅ SAVE CITATION NUMBER
+  const saveCiteNumber = async (articleId, citationNumber) => {
+    try {
+      const token = localStorage.getItem("adminToken");
+      const response = await fetch(
+        `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/set-citation`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ citationNumber }),
+        }
+      );
+      const data = await response.json();
+      if (response.ok) {
+        toast.success("Citation number saved!");
+        // Update local article state
+        setArticles((prev) =>
+          prev.map((a) =>
+            a.id === articleId ? { ...a, citationNumber: data.article?.citationNumber || citationNumber } : a
+          )
+        );
+      } else if (response.status === 409) {
+        toast.error(data.message || "This citation number already exists. Use a different one.");
+      } else {
+        toast.error(data.message || "Failed to save citation number.");
+      }
+    } catch (err) {
+      console.error("Citation save error:", err);
+      toast.error("Server error while saving citation number.");
+    }
+  };
+
   const toggleVisibility = async (id, currentVisibility) => {
     try {
       const token = localStorage.getItem("adminToken");
@@ -792,7 +828,7 @@ export default function AdminDashboard() {
           <ArticleTable
             isLoading={isLoading}
             articles={articles}
-            filteredArticles={articles} // Pagination backend se handle ho rahi hai
+            filteredArticles={articles}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
             statusFilter={statusFilter}
@@ -808,6 +844,7 @@ export default function AdminDashboard() {
             setPdfViewMode={setPdfViewMode}
             overrideAndPublish={overrideAndPublish}
             toggleVisibility={toggleVisibility}
+            saveCiteNumber={saveCiteNumber}
             currentPage={currentPage}
             totalPages={totalPages}
             totalItems={totalItems}
