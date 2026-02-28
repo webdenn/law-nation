@@ -9,7 +9,8 @@ export const timelineQuerySchema = z.object({
   search: z.string().optional(),
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
-}).refine(
+}).passthrough() // ✅ Allow unknown query params like `cb` (cache buster)
+  .refine(
   (data) => {
     if (data.startDate && data.endDate) {
       return data.startDate <= data.endDate;
