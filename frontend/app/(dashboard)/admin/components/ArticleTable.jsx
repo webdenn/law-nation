@@ -196,17 +196,17 @@ export default function ArticleTable({
             </div>
 
             {/* Desktop Table View — horizontally scrollable */}
-            <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[1300px]">
-                    <thead className="bg-gray-100 text-[10px] uppercase text-gray-400 font-bold">
+            <div className="hidden lg:block overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300">
+                <table className="w-full text-left border-collapse min-w-[1500px]">
+                    <thead className="bg-gray-50 text-[11px] uppercase text-gray-400 font-bold border-y border-gray-100">
                         <tr>
-                            <th className="p-4">PDF Document &amp; Abstract</th>
-                            <th className="p-4">Author</th>
-                            <th className="p-4">Status</th>
-                            <th className="p-4 text-center">Stage 1 Review</th>
-                            <th className="p-4 text-center">Stage 2 Review</th>
-                            <th className="p-4 text-center">Cite Number</th>
-                            <th className="p-4 text-right">Actions</th>
+                            <th className="p-5 min-w-[320px]">PDF Document &amp; Abstract</th>
+                            <th className="p-5 min-w-[150px]">Author</th>
+                            <th className="p-5 min-w-[160px]">Status</th>
+                            <th className="p-5 text-center min-w-[180px]">Stage 1 Review</th>
+                            <th className="p-5 text-center min-w-[180px]">Stage 2 Review</th>
+                            <th className="p-5 text-center min-w-[220px]">Cite Number</th>
+                            <th className="p-5 text-right min-w-[200px]">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -220,28 +220,30 @@ export default function ArticleTable({
                             filteredArticles.map((art) => (
                                 <tr key={art.id} className="hover:bg-red-50/30 transition-all">
                                     {/* 1. PDF & Abstract */}
-                                    <td className="p-4">
-                                        <p className="font-bold text-gray-800 text-sm">{art.title}</p>
-                                        <button
-                                            onClick={() => setShowAbstract(art)}
-                                            className="text-[10px] text-red-600 font-bold uppercase mt-1 hover:underline"
-                                        >
-                                            View Abstract
-                                        </button>
+                                    <td className="p-5 align-top">
+                                        <div className="max-w-[350px]">
+                                            <p className="font-bold text-gray-900 text-[13px] leading-tight mb-2">{art.title}</p>
+                                            <button
+                                                onClick={() => setShowAbstract(art)}
+                                                className="text-[10px] text-red-600 font-bold uppercase hover:underline inline-flex items-center gap-1"
+                                            >
+                                                View Abstract
+                                            </button>
+                                        </div>
                                     </td>
                                     {/* 2. Author */}
-                                    <td className="p-4">
-                                        <p className="text-sm text-gray-800 font-bold">{art.author}</p>
+                                    <td className="p-5 align-top">
+                                        <p className="text-[13px] text-gray-900 font-semibold">{art.author}</p>
                                     </td>
                                     {/* 3. Status Badge */}
-                                    <td className="p-4">
+                                    <td className="p-5 align-top">
                                         <span
-                                            className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${
+                                            className={`text-[9px] px-2.5 py-1.5 rounded-md font-bold uppercase whitespace-nowrap shadow-sm border border-black/5 ${
                                                 art.status === "Published"
-                                                    ? "bg-green-100 text-green-700"
+                                                    ? "bg-green-100 text-green-800"
                                                     : art.status === "In Review"
-                                                    ? "bg-blue-100 text-blue-700"
-                                                    : "bg-yellow-100 text-yellow-700"
+                                                    ? "bg-blue-100 text-blue-800"
+                                                    : "bg-yellow-50 text-yellow-800 border-yellow-200"
                                             }`}
                                         >
                                             {statusMap[art.status] || art.status}

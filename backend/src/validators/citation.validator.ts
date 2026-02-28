@@ -14,10 +14,8 @@ import { BadRequestError } from "@/utils/http-errors.util.js";
  * - 2026LN(01)A342 ✅
  * - 2026LN(99)A1234 ✅
  * 
- * NO SPACES ALLOWED
  */
-
-const CITATION_REGEX = /^\d{4}LN\(\d{1,2}\)A\d+$/;
+const CITATION_REGEX = /^\d{4} LN\(\d{1,2}\)A\d+$/;
 
 export class CitationValidator {
   /**
@@ -32,7 +30,7 @@ export class CitationValidator {
 
     if (!CITATION_REGEX.test(trimmedCitation)) {
       throw new BadRequestError(
-        'Invalid citation format. Expected format: yyyyLN(XX)AYY (e.g., 2026LN(1)A34) - NO SPACES'
+        'Invalid citation format. Expected: YYYY LN(XX)AYY (e.g., 2026 LN(1)A34)'
       );
     }
   }
