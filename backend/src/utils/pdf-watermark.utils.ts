@@ -143,22 +143,27 @@ export async function addWatermarkToPdf(
     pages.forEach((page, index) => {
       const { width, height } = page.getSize();
 
-      // ✅ Add citation number at top of page for USER role only (in red color)
+      // ✅ Add citation number at top center of page for USER role only (in red color)
       if (citationNumber && userRole === 'USER') {
+        const citationFontSize = 12;
+        // Estimate text width (using 0.6 * fontSize as average char width)
+        const estimatedTextWidth = citationNumber.length * (citationFontSize * 0.6);
+        const citationX = (width - estimatedTextWidth) / 2;
+
         page.drawText(citationNumber, {
-          x: 50,
-          y: height - 30, // 30px from top
-          size: 12,
+          x: citationX,
+          y: height - 25, // 25px from top
+          size: citationFontSize,
           color: rgb(0.8, 0, 0), // Red color
           opacity: 1, // Fully visible
         });
         
-        console.log(`📋 [Watermark] Added citation "${citationNumber}" to page ${index + 1}`);
+        console.log(`📋 [Watermark] Added citation "${citationNumber}" to top center of page ${index + 1}`);
       }
 
       // Add logo in center of page (if loaded)
       if (logoImage) {
-        const logoScale = 0.5; // Scale logo to 50% of original size (increased from 30%)
+        const logoScale = 0.35; // "Medium size" (reduced from 0.5)
         const logoDims = logoImage.scale(logoScale);
 
         // Calculate center position
