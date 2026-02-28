@@ -132,6 +132,11 @@ const RecentArticlesWidget = ({ currentSlug }) => {
           <h4 className="text-sm font-bold text-gray-900 leading-snug group-hover:text-red-700 transition-colors line-clamp-2 mb-1">
             {art.title}
           </h4>
+          {art.citationNumber && (
+            <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider">
+              {art.citationNumber}
+            </span>
+          )}
         </div>
       ))}
     </div>
@@ -326,6 +331,11 @@ export default function ArticlePage({ params }) {
                 <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold tracking-wider uppercase">
                   {article.category || "General"}
                 </span>
+                {article.citationNumber && (
+                  <span className="px-3 py-1 rounded-full bg-red-50 text-red-700 text-xs font-bold tracking-wider uppercase border border-red-100">
+                    {article.citationNumber}
+                  </span>
+                )}
               </div>
 
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-[1.1] mb-8 text-gray-900 wrap-break-word font-serif">

@@ -228,6 +228,7 @@ export class ArticleQueryService {
         authorName: true,
         authorOrganization: true,
         keywords: true,
+        citationNumber: true,
         submittedAt: true,
       },
     });
@@ -265,6 +266,7 @@ export class ArticleQueryService {
         imageUrls: true,
         submittedAt: true,
         approvedAt: true,
+        citationNumber: true,
       },
     });
 
@@ -728,6 +730,7 @@ export class ArticleQueryService {
         authorOrganization: true,
         keywords: true,
         thumbnailUrl: true,
+        citationNumber: true,
         submittedAt: true,
         approvedAt: true,
       },
@@ -776,6 +779,7 @@ export class ArticleQueryService {
         authorOrganization: true,
         keywords: true,
         thumbnailUrl: true,
+        citationNumber: true,
         submittedAt: true,
         approvedAt: true,
         isVisible: true,

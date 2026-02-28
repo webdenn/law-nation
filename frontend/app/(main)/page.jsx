@@ -276,6 +276,11 @@ export default function HomePage() {
                                         )}
 
                                     <div className="space-y-4">
+                                        {item.citationNumber && (
+                                            <span className="inline-block px-2 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-bold uppercase tracking-wider border border-red-100 mb-1">
+                                                {item.citationNumber}
+                                            </span>
+                                        )}
                                         <h3 className="text-xl font-bold text-black leading-snug wrap-break-word overflow-wrap-anywhere">
                                             {item.title}
                                         </h3>

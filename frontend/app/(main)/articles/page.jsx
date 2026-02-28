@@ -449,6 +449,11 @@ function ArticlesContent() {
                 </div>
 
                 <div className="flex flex-col p-6">
+                  {item.citationNumber && (
+                    <span className="inline-block self-start px-2 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-bold uppercase tracking-wider border border-red-100 mb-2">
+                      {item.citationNumber}
+                    </span>
+                  )}
                   <h3 className="text-xl font-bold text-gray-900 mb-3 leading-snug line-clamp-2 group-hover:text-red-700 transition-colors">
                     {item.title}
                   </h3>
