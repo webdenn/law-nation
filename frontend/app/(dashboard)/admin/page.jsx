@@ -64,6 +64,10 @@ export default function AdminDashboard() {
   const [visualDiffBlobUrl, setVisualDiffBlobUrl] = useState(null);
   const [isGeneratingDiff, setIsGeneratingDiff] = useState(false);
 
+  // ✅ PREVIEW BLOB STATE
+  const [previewBlobUrl, setPreviewBlobUrl] = useState(null);
+  const [isFetchingPreview, setIsFetchingPreview] = useState(false);
+
   // ✅ 0. UI STATE (Responsive Sidebar)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -244,6 +248,74 @@ export default function AdminDashboard() {
     }
   }, [selectedArticle?.id, selectedArticle?._id, fetchChangeHistory]);
 
+  // ✅ 5. ADMIN PREVIEW WATERMARK LOGIC
+  useEffect(() => {
+    const fetchWatermarkedPreview = async () => {
+      if (!selectedArticle || pdfViewMode === "visual-diff") return;
+
+      const articleId = selectedArticle.id || selectedArticle._id;
+      if (!articleId) return;
+
+      try {
+        setIsFetchingPreview(true);
+        // Clear old blob to show loading state if needed
+        // setPreviewBlobUrl(null); 
+
+        const token = localStorage.getItem("adminToken");
+        const cb = Date.now(); // Cache buster
+
+        // Use the new backend route: /articles/:id/admin-preview/:versionType
+        const res = await fetch(
+          `${NEXT_PUBLIC_BASE_URL}/articles/${articleId}/admin-preview/${pdfViewMode}?cb=${cb}`,
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to fetch watermarked preview");
+        }
+
+        const blob = await res.blob();
+        if (blob.size < 100) throw new Error("Received invalid PDF blob");
+
+        const url = window.URL.createObjectURL(blob);
+
+        setPreviewBlobUrl(prev => {
+          if (prev) window.URL.revokeObjectURL(prev);
+          return url;
+        });
+      } catch (err) {
+        console.error("Preview fetch error:", err);
+        // Fallback to static URL if watermarking fails (better than nothing)
+        toast.error(`Watermarking failed: ${err.message}. Showing original.`);
+        
+        let fallbackPath = "";
+        if (pdfViewMode === "original") fallbackPath = selectedArticle.originalPdfUrl;
+        else if (pdfViewMode === "admin") fallbackPath = selectedArticle.latestAdminPdfUrl;
+        else if (pdfViewMode === "current") fallbackPath = selectedArticle.currentPdfUrl;
+        else if (pdfViewMode === "editor") fallbackPath = selectedArticle.latestEditorPdfUrl || selectedArticle.editorDocumentUrl;
+        else if (pdfViewMode === "reviewer") fallbackPath = selectedArticle.latestReviewerPdfUrl;
+
+        if (fallbackPath) {
+          const cleanPath = fallbackPath.startsWith("http")
+            ? fallbackPath
+            : `${NEXT_PUBLIC_BASE_URL}/${fallbackPath.replace(/\\/g, "/").replace(/^\//, "")}`;
+          setPreviewBlobUrl(cleanPath);
+        }
+      } finally {
+        setIsFetchingPreview(false);
+      }
+    };
+
+    fetchWatermarkedPreview();
+
+    return () => {
+      // Cleanup happens via revokeObjectURL in setPreviewBlobUrl
+    };
+  }, [selectedArticle?.id, selectedArticle?._id, pdfViewMode, NEXT_PUBLIC_BASE_URL, selectedArticle?.updatedAt]);
+
   // PDF URL Fix Logic (Isse "PDF Not Found" khatam ho jayega)
   // ✅ Corrected Function
   const getPdfUrlToView = () => {
@@ -251,21 +323,7 @@ export default function AdminDashboard() {
 
     if (pdfViewMode === "visual-diff") return visualDiffBlobUrl;
 
-    let path = "";
-    if (pdfViewMode === "original") path = selectedArticle.originalPdfUrl;
-    else if (pdfViewMode === "admin") path = selectedArticle.latestAdminPdfUrl;
-    else if (pdfViewMode === "current") path = selectedArticle.currentPdfUrl;
-    else if (pdfViewMode === "editor") path = selectedArticle.latestEditorPdfUrl || selectedArticle.editorDocumentUrl;
-    else if (pdfViewMode === "reviewer") path = selectedArticle.latestReviewerPdfUrl;
-    else if (pdfViewMode === "track") path = selectedArticle.editorDocumentUrl;
-
-    if (!path) return null;
-
-    const cleanPath = path.startsWith("http")
-      ? path
-      : `${NEXT_PUBLIC_BASE_URL}/${path.replace(/\\/g, "/").replace(/^\//, "")}`;
-
-    return cleanPath;
+    return previewBlobUrl;
   };
 
   // ✅ VISUAL DIFF FUNCTION

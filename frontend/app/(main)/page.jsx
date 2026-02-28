@@ -8,6 +8,13 @@ import { useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
 import BackgroundCarousel from "../components/BackgroundCarousel";
 
+// Small Search Icon for buttons
+const SearchIconSmall = () => (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+    </svg>
+);
+
 export default function HomePage() {
     const router = useRouter();
     const [publishedArticles, setPublishedArticles] = useState([]);
@@ -173,49 +180,87 @@ export default function HomePage() {
                             </div>
 
                             {showAdvanced && (
-                                <div className="space-y-4 border border-neutral-200 rounded-2xl p-4 bg-red-50/70">
-                                    <div className="grid sm:grid-cols-3 gap-4">
+                                <div className="space-y-4 border border-neutral-200 rounded-2xl p-5 bg-red-50/70 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="grid sm:grid-cols-3 gap-6">
+                                        {/* Keywords Search */}
                                         <div className="space-y-1.5">
-                                            <label className="text-sm font-semibold text-gray-700">
-                                                Keywords
+                                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wide ml-1">
+                                                By Keywords
                                             </label>
-                                            <input
-                                                type="text"
-                                                value={filters.keywords}
-                                                onChange={(e) =>
-                                                    updateFilter("keywords", e.target.value)
-                                                }
-                                                placeholder="e.g. law, AI"
-                                                className="w-full bg-white border border-neutral-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-300 outline-none text-sm"
-                                            />
+                                            <div className="flex bg-white border border-neutral-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-red-100 focus-within:border-red-300 shadow-sm transition-all">
+                                                <input
+                                                    type="text"
+                                                    value={filters.keywords}
+                                                    onChange={(e) =>
+                                                        updateFilter("keywords", e.target.value)
+                                                    }
+                                                    placeholder="e.g. law, AI"
+                                                    className="flex-1 bg-transparent px-3 py-2.5 outline-none text-sm"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    disabled={isSearching || !filters.keywords.trim()}
+                                                    onClick={() => fetchArticles("", { ...filters, authors: "", citation: "" })}
+                                                    className="bg-red-700 text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-tighter hover:bg-black transition-all shadow-sm disabled:bg-gray-300 whitespace-nowrap flex items-center gap-1"
+                                                >
+                                                    <SearchIconSmall />
+                                                    Search
+                                                </button>
+                                            </div>
                                         </div>
+
+                                        {/* Author Search */}
                                         <div className="space-y-1.5">
-                                            <label className="text-sm font-semibold text-gray-700">
-                                                Author(s)
+                                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wide ml-1">
+                                                By Author(s)
                                             </label>
-                                            <input
-                                                type="text"
-                                                value={filters.authors}
-                                                onChange={(e) =>
-                                                    updateFilter("authors", e.target.value)
-                                                }
-                                                placeholder="Author name"
-                                                className="w-full bg-white border border-neutral-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-300 outline-none text-sm"
-                                            />
+                                            <div className="flex bg-white border border-neutral-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-red-100 focus-within:border-red-300 shadow-sm transition-all">
+                                                <input
+                                                    type="text"
+                                                    value={filters.authors}
+                                                    onChange={(e) =>
+                                                        updateFilter("authors", e.target.value)
+                                                    }
+                                                    placeholder="Author name"
+                                                    className="flex-1 bg-transparent px-3 py-2.5 outline-none text-sm"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    disabled={isSearching || !filters.authors.trim()}
+                                                    onClick={() => fetchArticles("", { ...filters, keywords: "", citation: "" })}
+                                                    className="bg-red-700 text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-tighter hover:bg-black transition-all shadow-sm disabled:bg-gray-300 whitespace-nowrap flex items-center gap-1"
+                                                >
+                                                    <SearchIconSmall />
+                                                    Search
+                                                </button>
+                                            </div>
                                         </div>
+
+                                        {/* Citation Search */}
                                         <div className="space-y-1.5">
-                                            <label className="text-sm font-semibold text-gray-700">
-                                                Citation Number
+                                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wide ml-1">
+                                                By Citation No.
                                             </label>
-                                            <input
-                                                type="text"
-                                                value={filters.citation}
-                                                onChange={(e) =>
-                                                    updateFilter("citation", e.target.value)
-                                                }
-                                                placeholder="Cite No."
-                                                className="w-full bg-white border border-neutral-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-300 outline-none text-sm"
-                                            />
+                                            <div className="flex bg-white border border-neutral-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-red-100 focus-within:border-red-300 shadow-sm transition-all">
+                                                <input
+                                                    type="text"
+                                                    value={filters.citation}
+                                                    onChange={(e) =>
+                                                        updateFilter("citation", e.target.value)
+                                                    }
+                                                    placeholder="Cite No."
+                                                    className="flex-1 bg-transparent px-3 py-2.5 outline-none text-sm"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    disabled={isSearching || !filters.citation.trim()}
+                                                    onClick={() => fetchArticles("", { ...filters, keywords: "", authors: "" })}
+                                                    className="bg-red-700 text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-tighter hover:bg-black transition-all shadow-sm disabled:bg-gray-300 whitespace-nowrap flex items-center gap-1"
+                                                >
+                                                    <SearchIconSmall />
+                                                    Search
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
