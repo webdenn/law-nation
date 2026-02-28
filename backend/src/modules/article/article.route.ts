@@ -111,6 +111,14 @@ router.get(
   articleController.downloadDiff.bind(articleController)
 );
 
+// NEW: Get watermarked PDF for admin preview (handles any version)
+router.get(
+  "/:id/admin-preview/:versionType",
+  requireAuth,
+  requirePermission("article", "read"),
+  articleController.getAdminWatermarkedPdf.bind(articleController)
+);
+
 // NEW: Download editor's uploaded document
 router.get(
   "/change-logs/:changeLogId/editor-document",

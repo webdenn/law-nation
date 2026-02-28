@@ -1100,6 +1100,83 @@ export class ArticleController {
     }
   }
 
+  // ✅ NEW: Get watermarked PDF for admin preview (handles any version)
+  async getAdminWatermarkedPdf(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = getStringParam(req.params.id, "Article ID");
+      const versionType = getStringParam(req.params.versionType, "Version Type") as 'original' | 'admin' | 'editor' | 'reviewer' | 'current';
+
+      const userName = req.user?.name || 'Admin';
+
+      console.log(`\n💧 [Admin Preview] User "${userName}" requesting watermarked PDF for article ${articleId} (Version: ${versionType})`);
+
+      const userId = req.user!.id;
+      const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
+
+      // Get article and history using the service
+      const { article, changeLogs } = await articleService.getArticleChangeHistory(articleId, userId, userRoles) as any;
+
+      // Determine the path based on versionType
+      let pdfPath = "";
+      if (versionType === "original") {
+        pdfPath = article.originalPdfUrl;
+      } else if (versionType === "admin") {
+        const latestAdminLog = changeLogs.find((log: any) => 
+          (log.role?.toLowerCase() === 'admin' || (log.editedBy as any)?.role?.name?.toLowerCase() === 'admin') && log.pdfUrl
+        );
+        pdfPath = latestAdminLog?.pdfUrl || article.currentPdfUrl;
+      } else if (versionType === "editor") {
+        const latestEditorLog = changeLogs.find((log: any) => 
+          (log.role?.toLowerCase() === 'editor' || (log.editedBy as any)?.role?.name?.toLowerCase() === 'editor') && log.pdfUrl
+        );
+        pdfPath = latestEditorLog?.pdfUrl || article.editorDocumentUrl || "";
+      } else if (versionType === "reviewer") {
+        const latestReviewerLog = changeLogs.find((log: any) => 
+          (log.role?.toLowerCase() === 'reviewer' || (log.editedBy as any)?.role?.name?.toLowerCase() === 'reviewer') && log.pdfUrl
+        );
+        pdfPath = latestReviewerLog?.pdfUrl || "";
+      } else if (versionType === "current") {
+        pdfPath = article.currentPdfUrl;
+      }
+
+      // If requested version path is empty, fallback to current or original
+      if (!pdfPath) {
+        pdfPath = article.currentPdfUrl || article.originalPdfUrl;
+      }
+
+      if (!pdfPath) {
+        throw new BadRequestError(`PDF path for article ${articleId} not found`);
+      }
+
+      console.log(`📂 [Admin Preview] Serving PDF path: ${pdfPath}`);
+
+      // Add watermark to PDF
+      const watermarkedPdf = await addWatermarkToPdf(
+        pdfPath,
+        {
+          userName: `ADMIN - ${userName}`,
+          downloadDate: new Date(),
+          articleTitle: article.title,
+          articleId: articleId,
+          articleSlug: article.slug,
+          frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+        },
+        'ADMIN',
+        article.status,
+        article.citationNumber
+      );
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Length', watermarkedPdf.length.toString());
+
+      console.log(`✅ [Admin Preview] Sending watermarked PDF (${watermarkedPdf.length} bytes)`);
+      res.send(watermarkedPdf);
+    } catch (error) {
+      console.error('❌ [Admin Preview] Failed:', error);
+      next(error);
+    }
+  }
+
   // ✅ NEW: Get specific change log diff
   async getChangeLogDiff(req: AuthRequest, res: Response, next: NextFunction) {
     try {
