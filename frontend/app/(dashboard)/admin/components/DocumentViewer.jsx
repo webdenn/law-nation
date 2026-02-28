@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import MultiDiffViewer from "../MultiDiffViewer";
 
 // Internal DownloadIcon Component
@@ -18,6 +18,96 @@ const DownloadIcon = () => (
         />
     </svg>
 );
+
+// ✅ Citation Editor — always visible in review panel, no status restriction
+function CitationEditor({ article, saveCiteNumber }) {
+    const currentYear = new Date().getFullYear();
+    const [issueNo, setIssueNo] = useState("");
+    const [serialNo, setSerialNo] = useState("");
+    const [isSaving, setIsSaving] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+
+    // Show saved state
+    if (article.citationNumber && !isEditing) {
+        return (
+            <div className="space-y-2">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start justify-between gap-2">
+                    <div>
+                        <p className="text-[10px] text-green-600 font-bold uppercase tracking-wide mb-1">Citation Assigned</p>
+                        <p className="text-sm font-black text-green-800 tracking-tight">{article.citationNumber}</p>
+                    </div>
+                    <button
+                        onClick={() => {
+                            const match = article.citationNumber.match(/^(\d{4}) LN\((\d+)\)A(\d+)$/);
+                            if (match) { setIssueNo(match[2]); setSerialNo(match[3]); }
+                            setIsEditing(true);
+                        }}
+                        className="text-[10px] bg-white border border-green-300 text-green-700 hover:bg-green-100 px-2 py-1 rounded font-bold uppercase transition shrink-0"
+                    >
+                        Edit
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    const preview = issueNo && serialNo ? `${currentYear} LN(${issueNo})A${serialNo}` : null;
+
+    const handleSave = async () => {
+        if (!issueNo.trim() || !serialNo.trim()) return;
+        setIsSaving(true);
+        await saveCiteNumber(article.id, preview);
+        setIsSaving(false);
+        setIsEditing(false);
+    };
+
+    return (
+        <div className="space-y-3">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Format: {currentYear} LN(XX)ANNNNN</p>
+                <div className="flex items-center gap-1 text-xs font-bold text-gray-700 flex-wrap">
+                    <span className="bg-gray-200 px-2 py-1 rounded text-[11px]">{currentYear}</span>
+                    <span className="text-gray-400">LN(</span>
+                    <input
+                        type="text" inputMode="numeric" placeholder="53"
+                        value={issueNo}
+                        onChange={(e) => setIssueNo(e.target.value.replace(/\D/g, ""))}
+                        className="w-12 border-2 border-gray-300 focus:border-red-500 rounded px-2 py-1 text-center text-xs outline-none font-bold transition"
+                    />
+                    <span className="text-gray-400">)A</span>
+                    <input
+                        type="text" inputMode="numeric" placeholder="1234"
+                        value={serialNo}
+                        onChange={(e) => setSerialNo(e.target.value.replace(/\D/g, ""))}
+                        className="w-16 border-2 border-gray-300 focus:border-red-500 rounded px-2 py-1 text-center text-xs outline-none font-bold transition"
+                    />
+                </div>
+                {preview && (
+                    <p className="text-[10px] text-gray-500 mt-2 italic">
+                        Preview: <strong className="text-gray-800 not-italic">{preview}</strong>
+                    </p>
+                )}
+            </div>
+            <div className="flex gap-2">
+                <button
+                    onClick={handleSave}
+                    disabled={!issueNo || !serialNo || isSaving}
+                    className="flex-1 py-2 rounded text-xs font-black uppercase transition-all disabled:bg-gray-200 disabled:text-gray-400 bg-red-600 hover:bg-red-700 text-white"
+                >
+                    {isSaving ? "Saving..." : "Save Citation"}
+                </button>
+                {isEditing && (
+                    <button
+                        onClick={() => setIsEditing(false)}
+                        className="px-3 py-2 rounded text-xs font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 transition"
+                    >
+                        Cancel
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
 
 export default function DocumentViewer({
     selectedArticle,
@@ -39,7 +129,8 @@ export default function DocumentViewer({
     handleAdminUpload,
     isUploading,
     overrideAndPublish,
-    isPublishing
+    isPublishing,
+    saveCiteNumber,
 }) {
     return (
         <>
@@ -281,6 +372,18 @@ export default function DocumentViewer({
                                     >
                                         {isUploading ? "Processing Diff..." : "Upload & Generate Diff"}
                                     </button>
+                                </div>
+
+                                {/* Citation Number Section */}
+                                <div className="pt-0">
+                                    <h3 className="text-sm font-bold text-gray-800 uppercase mb-3 flex items-center gap-2">
+                                        <span>📌</span> Citation Number
+                                    </h3>
+                                    {selectedArticle.citationNumber ? (
+                                        <CitationEditor article={selectedArticle} saveCiteNumber={saveCiteNumber} />
+                                    ) : (
+                                        <CitationEditor article={selectedArticle} saveCiteNumber={saveCiteNumber} />
+                                    )}
                                 </div>
 
                                 {/* Publish Section */}

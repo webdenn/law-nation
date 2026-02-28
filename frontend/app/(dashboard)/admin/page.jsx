@@ -899,6 +899,7 @@ export default function AdminDashboard() {
         isUploading={isUploading}
         overrideAndPublish={overrideAndPublish}
         isPublishing={isPublishing}
+        saveCiteNumber={saveCiteNumber}
       />
 
       <ToastContainer position="top-right" autoClose={3000} theme="colored" />

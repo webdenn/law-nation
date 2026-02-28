@@ -1836,18 +1836,25 @@ export class ArticleController {
   async setCitationNumber(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = getStringParam(req.params.id, "Article ID");
-      const { citationNumber } = req.body;
+
+      // ✅ Guard against undefined body (missing Content-Type: application/json)
+      const body = req.body || {};
+      const { citationNumber } = body;
 
       if (!citationNumber || typeof citationNumber !== 'string') {
-        throw new BadRequestError("citationNumber is required");
+        return res.status(400).json({
+          success: false,
+          message: "Citation number is required. Please provide a valid citation number.",
+        });
       }
 
       // Validate format: YYYY LN(NN...)ANNN...
       const citationRegex = /^\d{4} LN\(\d+\)A\d+$/;
       if (!citationRegex.test(citationNumber.trim())) {
-        throw new BadRequestError(
-          "Invalid citation format. Expected format: YYYY LN(NN)ANNNNN e.g. 2026 LN(53)A1234"
-        );
+        return res.status(400).json({
+          success: false,
+          message: "Invalid citation format. Expected: YYYY LN(NN)ANNNNN — e.g. 2026 LN(53)A1234",
+        });
       }
 
       // Fetch article
@@ -1857,16 +1864,10 @@ export class ArticleController {
       });
 
       if (!article) {
-        throw new BadRequestError("Article not found");
+        return res.status(404).json({ success: false, message: "Article not found." });
       }
 
-      // Only allow when REVIEWER_APPROVED
-      const allowedStatuses = ['REVIEWER_APPROVED', 'PUBLISHED', 'APPROVED'];
-      if (!allowedStatuses.includes(article.status)) {
-        throw new BadRequestError(
-          `Citation can only be set when Stage 2 review is approved (current status: ${article.status})`
-        );
-      }
+      // ✅ No status restriction — admin can set citation at any stage
 
       // Check for duplicates (unique constraint will catch it, but give better message)
       const existing = await prisma.article.findUnique({
