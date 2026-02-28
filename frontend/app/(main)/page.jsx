@@ -29,17 +29,17 @@ export default function HomePage() {
 
     const fetchArticles = async (searchQuery = "", currentFilters = {}) => {
         setIsLoading(true);
-        const hasSearch = searchQuery.trim() || currentFilters.keywords || currentFilters.authors;
+        const hasSearch = searchQuery.trim() || currentFilters.keywords || currentFilters.authors || currentFilters.citation;
         if (hasSearch) setIsSearching(true);
 
         try {
             let url;
             if (hasSearch) {
                 const params = new URLSearchParams();
-                const fallbackQuery = currentFilters.authors || currentFilters.keywords || "all";
-                params.append("q", searchQuery.trim() || fallbackQuery);
+                params.append("q", searchQuery.trim());
                 if (currentFilters.keywords) params.append("keyword", currentFilters.keywords);
                 if (currentFilters.authors) params.append("author", currentFilters.authors);
+                if (currentFilters.citation) params.append("citation", currentFilters.citation);
                 if (currentFilters.category && currentFilters.category !== "all") {
                     params.append("category", currentFilters.category);
                 }
@@ -89,6 +89,7 @@ export default function HomePage() {
     const [filters, setFilters] = useState({
         keywords: "",
         authors: "",
+        citation: "",
         yearFrom: "",
         yearTo: "",
         category: "all",
@@ -150,7 +151,6 @@ export default function HomePage() {
                                         onChange={(e) => setQuery(e.target.value)}
                                         placeholder="Search by title, abstract, keywords, or author"
                                         className="w-full bg-transparent outline-none text-gray-900 placeholder:text-gray-500"
-                                        required
                                     />
                                 </div>
                                 <button
@@ -174,7 +174,7 @@ export default function HomePage() {
 
                             {showAdvanced && (
                                 <div className="space-y-4 border border-neutral-200 rounded-2xl p-4 bg-red-50/70">
-                                    <div className="grid sm:grid-cols-2 gap-4">
+                                    <div className="grid sm:grid-cols-3 gap-4">
                                         <div className="space-y-1.5">
                                             <label className="text-sm font-semibold text-gray-700">
                                                 Keywords
@@ -185,7 +185,7 @@ export default function HomePage() {
                                                 onChange={(e) =>
                                                     updateFilter("keywords", e.target.value)
                                                 }
-                                                placeholder="e.g. constitutional law, AI ethics"
+                                                placeholder="e.g. law, AI"
                                                 className="w-full bg-white border border-neutral-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-300 outline-none text-sm"
                                             />
                                         </div>
@@ -199,7 +199,21 @@ export default function HomePage() {
                                                 onChange={(e) =>
                                                     updateFilter("authors", e.target.value)
                                                 }
-                                                placeholder="Separate multiple authors with commas"
+                                                placeholder="Author name"
+                                                className="w-full bg-white border border-neutral-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-300 outline-none text-sm"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-sm font-semibold text-gray-700">
+                                                Citation Number
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={filters.citation}
+                                                onChange={(e) =>
+                                                    updateFilter("citation", e.target.value)
+                                                }
+                                                placeholder="Cite No."
                                                 className="w-full bg-white border border-neutral-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-300 outline-none text-sm"
                                             />
                                         </div>
