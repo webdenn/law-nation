@@ -393,6 +393,7 @@ export class ArticleService {
       sortOrder?: "asc" | "desc";
       minScore?: number;
       exclude?: string;
+      citation?: string;
       page?: number;
       limit?: number;
     }

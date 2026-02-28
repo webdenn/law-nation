@@ -72,6 +72,31 @@ export class ArticleSearchService {
     const minScoreFilter =
       minScore > 0 ? Prisma.sql`AND relevance >= ${minScore}` : Prisma.empty;
 
+    const relevanceSelect = searchQuery && searchQuery.trim()
+      ? Prisma.sql`ts_rank(
+          to_tsvector('english', 
+            coalesce(title, '') || ' ' || 
+            coalesce(abstract, '') || ' ' || 
+            coalesce(keywords, '') || ' ' ||
+            coalesce(category, '') || ' ' ||
+            coalesce("authorName", '') || ' ' ||
+            coalesce("citationNumber", '')
+          ),
+          plainto_tsquery('english', ${searchQuery})
+        )`
+      : Prisma.sql`1.0`;
+
+    const ftsCondition = searchQuery && searchQuery.trim()
+      ? Prisma.sql`AND to_tsvector('english', 
+          coalesce(title, '') || ' ' || 
+          coalesce(abstract, '') || ' ' || 
+          coalesce(keywords, '') || ' ' ||
+          coalesce(category, '') || ' ' ||
+          coalesce("authorName", '') || ' ' ||
+          coalesce("citationNumber", '')
+        ) @@ plainto_tsquery('english', ${searchQuery})`
+      : Prisma.empty;
+
     let orderByClause;
     switch (sortBy) {
       case "date":
@@ -110,28 +135,11 @@ export class ArticleSearchService {
         "submittedAt",
         "approvedAt",
         "citationNumber",
-        ts_rank(
-          to_tsvector('english', 
-            coalesce(title, '') || ' ' || 
-            coalesce(abstract, '') || ' ' || 
-            coalesce(keywords, '') || ' ' ||
-            coalesce(category, '') || ' ' ||
-            coalesce("authorName", '') || ' ' ||
-            coalesce("citationNumber", '')
-          ),
-          plainto_tsquery('english', ${searchQuery})
-        ) as relevance
+        ${relevanceSelect} as relevance
       FROM "Article"
       WHERE status = 'PUBLISHED'
         AND "isVisible" = true
-        AND to_tsvector('english', 
-          coalesce(title, '') || ' ' || 
-          coalesce(abstract, '') || ' ' || 
-          coalesce(keywords, '') || ' ' ||
-          coalesce(category, '') || ' ' ||
-          coalesce("authorName", '') || ' ' ||
-          coalesce("citationNumber", '')
-        ) @@ plainto_tsquery('english', ${searchQuery})
+        ${ftsCondition}
         ${categoryFilter}
         ${authorFilter}
         ${organizationFilter}
@@ -150,14 +158,7 @@ export class ArticleSearchService {
       FROM "Article"
       WHERE status = 'PUBLISHED'
         AND "isVisible" = true
-        AND to_tsvector('english', 
-          coalesce(title, '') || ' ' || 
-          coalesce(abstract, '') || ' ' || 
-          coalesce(keywords, '') || ' ' ||
-          coalesce(category, '') || ' ' ||
-          coalesce("authorName", '') || ' ' ||
-          coalesce("citationNumber", '')
-        ) @@ plainto_tsquery('english', ${searchQuery})
+        ${ftsCondition}
         ${categoryFilter}
         ${authorFilter}
         ${organizationFilter}

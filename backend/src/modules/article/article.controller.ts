@@ -891,9 +891,7 @@ export class ArticleController {
         citation
       } = req.query;
 
-      if (!q || typeof q !== "string") {
-        throw new BadRequestError("Search query 'q' is required");
-      }
+      const qStr = typeof q === "string" ? q.trim() : "";
 
       const filters: {
         category?: string;
@@ -949,7 +947,7 @@ export class ArticleController {
         filters.citation = citation;
       }
 
-      const result = await articleService.searchArticles(q, filters);
+      const result = await articleService.searchArticles(qStr, filters);
 
       res.json({
         message: "Search completed successfully",
