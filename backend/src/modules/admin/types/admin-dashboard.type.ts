@@ -40,10 +40,13 @@ export interface ArticleTimeline {
   authorName: string;
   abstract?: string;
   assignedEditorId?: string | null;
+  assignedReviewerId?: string | null; // ✅ Added
   originalPdfUrl?: string;
   currentPdfUrl?: string;
-  originalWordUrl?: string | null; // ✅ Added
-  currentWordUrl?: string | null;  // ✅ Added
+  originalWordUrl?: string | null;
+  currentWordUrl?: string | null;
+  citationNumber?: string | null;     // ✅ Added
+  isVisible?: boolean;                // ✅ Added
   timeline: {
     submittedAt: Date;
     assignedAt: Date | null;
