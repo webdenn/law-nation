@@ -10,6 +10,7 @@ import {
 import { resolveToAbsolutePath, fileExistsAtPath } from "@/utils/file-path.utils.js";
 import { extractPdfContent } from "@/utils/pdf-extract.utils.js";
 import { addWatermarkToPdf as addLocalWatermark } from "@/utils/pdf-watermark.utils.js";
+import { addSimpleWatermarkToWord } from "@/utils/word-watermark.utils.js";
 import {
   ensureBothFormats,
   getFileType,
@@ -264,7 +265,8 @@ export class ArticleWorkflowService {
       // Create watermarked DOCX (header/footer style)
       const watermarkedDocxPath = cleanDocxPath.replace(/\.docx$/i, '_watermarked.docx');
       console.log(`💧 [Watermark] Adding DOCX-style watermark (header/footer)`);
-      await adobeService.addWatermarkToDocx(cleanDocxPath, watermarkedDocxPath, watermarkData);
+      const watermarkedBuffer = await addSimpleWatermarkToWord(cleanDocxPath, watermarkData);
+      fs.writeFileSync(watermarkedDocxPath, watermarkedBuffer);
 
       // Create watermarked PDF (overlay/background style) - Apply to clean PDF directly
       const watermarkedPdfPath = cleanPdfPath.replace(/\.pdf$/i, '_watermarked.pdf');
@@ -582,7 +584,8 @@ export class ArticleWorkflowService {
     }
 
     const watermarkedDocxPath = baseLocalPath.replace(/\.docx$/i, '_edited_watermarked.docx');
-    await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
+    const watermarkedBuffer = await addSimpleWatermarkToWord(docxPath, watermarkData);
+    fs.writeFileSync(watermarkedDocxPath, watermarkedBuffer);
 
     // Convert edited DOCX to PDF for preview using Adobe Services
     const pdfPath = baseLocalPath.replace(/\.docx$/i, '_edited.pdf');

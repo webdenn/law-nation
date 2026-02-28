@@ -4,6 +4,7 @@ import path from 'path';
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { AdobeService } from '@/services/adobe.service.js';
+import { addSimpleWatermarkToWord } from './word-watermark.utils.js';
 
 // S3 client for uploading converted files (matches upload.middleware.ts)
 const isLocal = process.env.NODE_ENV === "local";
@@ -265,8 +266,11 @@ export async function convertPdfToWord(
       };
 
       const watermarkedOutputPath = docxAbsolutePath.replace('.docx', '_watermarked.docx');
-      // Pass absolute paths to watermark function, get absolute path back
-      const watermarkedAbsolutePath = await adobeService.addWatermarkToDocx(docxAbsolutePath, watermarkedOutputPath, watermarkData);
+      // Pass absolute paths to watermark function
+      const watermarkedBuffer = await addSimpleWatermarkToWord(docxAbsolutePath, watermarkData);
+      const fsSync = await import('fs');
+      fsSync.writeFileSync(watermarkedOutputPath, watermarkedBuffer);
+      const watermarkedAbsolutePath = watermarkedOutputPath;
 
       console.log(`✅ [Adobe] Watermark added to DOCX file`);
       fileToUploadPath = watermarkedAbsolutePath;
