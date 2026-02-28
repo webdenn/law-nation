@@ -72,15 +72,29 @@ export async function addWatermarkToPdf(
     // 3. Load logo image
     let logoImage: Awaited<ReturnType<typeof pdfDoc.embedPng>> | undefined;
     try {
-      const logoPath = path.join(process.cwd(), 'src', 'assests', 'img', 'logo-bg.png');
-      console.log('🖼️ [Watermark] Loading logo from:', logoPath);
+      // ✅ Handle both "assets" and "assests" typo
+      const possibleLogoPaths = [
+        path.join(process.cwd(), 'src', 'assets', 'img', 'logo-bg.png'),
+        path.join(process.cwd(), 'src', 'assests', 'img', 'logo-bg.png'),
+        path.join(process.cwd(), 'backend', 'src', 'assets', 'img', 'logo-bg.png')
+      ];
 
-      if (fs.existsSync(logoPath)) {
+      let logoPath = "";
+      for (const p of possibleLogoPaths) {
+        if (fs.existsSync(p)) {
+          logoPath = p;
+          break;
+        }
+      }
+
+      if (logoPath) {
+        console.log('🖼️ [Watermark] Loading logo from:', logoPath);
         const logoBytes = fs.readFileSync(logoPath);
         logoImage = await pdfDoc.embedPng(logoBytes);
         console.log('✅ [Watermark] Logo loaded successfully');
       } else {
-        console.warn('⚠️ [Watermark] Logo file not found, skipping logo watermark');
+        console.warn('⚠️ [Watermark] Logo file not found among possible paths, skipping logo watermark');
+        console.log('🔍 [Watermark] Paths checked:', possibleLogoPaths);
       }
     } catch (error) {
       console.warn('⚠️ [Watermark] Failed to load logo, skipping logo watermark:', error);
@@ -163,7 +177,7 @@ export async function addWatermarkToPdf(
 
       // Add logo in center of page (if loaded)
       if (logoImage) {
-        const logoScale = 0.35; // "Medium size" (reduced from 0.5)
+        const logoScale = 0.35; // "Medium size"
         const logoDims = logoImage.scale(logoScale);
 
         // Calculate center position
@@ -176,7 +190,7 @@ export async function addWatermarkToPdf(
           y: logoY,
           width: logoDims.width,
           height: logoDims.height,
-          opacity: 0.09, // 9% opacity - very light (reduced from 15%)
+          opacity: 0.15, // ✅ Increased opacity (from 0.09) for better visibility
         });
       }
 

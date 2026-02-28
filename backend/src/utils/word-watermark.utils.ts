@@ -143,27 +143,27 @@ export async function addSimpleWatermarkToWord(
     // Load company logo
     let logoImageData: Buffer | null = null;
     try {
-      const logoPath = path.join(
-        process.cwd(),
-        "src",
-        "assests",
-        "img",
-        "logo-bg.png"
-      );
-      console.log(`🖼️ [Word Watermark] Loading logo from: ${logoPath}`);
+      // ✅ Handle both "assets" and "assests" typo
+      const possibleLogoPaths = [
+        path.join(process.cwd(), "src", "assets", "img", "logo-bg.png"),
+        path.join(process.cwd(), "src", "assests", "img", "logo-bg.png"),
+        path.join(process.cwd(), "backend", "src", "assets", "img", "logo-bg.png")
+      ];
 
-      if (
-        await fs
-          .access(logoPath)
-          .then(() => true)
-          .catch(() => false)
-      ) {
+      let logoPath = "";
+      for (const p of possibleLogoPaths) {
+        if (await fs.access(p).then(() => true).catch(() => false)) {
+          logoPath = p;
+          break;
+        }
+      }
+
+      if (logoPath) {
+        console.log(`🖼️ [Word Watermark] Loading logo from: ${logoPath}`);
         logoImageData = await fs.readFile(logoPath);
-        console.log(
-          `✅ [Word Watermark] Logo loaded successfully (${logoImageData.length} bytes)`
-        );
+        console.log(`✅ [Word Watermark] Logo loaded successfully (${logoImageData.length} bytes)`);
       } else {
-        console.warn(`⚠️ [Word Watermark] Logo file not found, skipping logo`);
+        console.warn(`⚠️ [Word Watermark] Logo file not found among possible paths, skipping logo`);
       }
     } catch (error: any) {
       console.warn(`⚠️ [Word Watermark] Failed to load logo:`, error?.message);
