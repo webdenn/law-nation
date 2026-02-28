@@ -18,6 +18,7 @@ export class ArticleSearchService {
       sortOrder?: "asc" | "desc";
       minScore?: number;
       exclude?: string;
+      citation?: string;
       page?: number;
       limit?: number;
     }
@@ -62,6 +63,10 @@ export class ArticleSearchService {
           abstract ILIKE ${"%" + filters.exclude + "%"} OR
           keywords ILIKE ${"%" + filters.exclude + "%"}
         )`
+      : Prisma.empty;
+    
+    const citationFilter = filters.citation
+      ? Prisma.sql`AND "citationNumber" ILIKE ${"%" + filters.citation + "%"}`
       : Prisma.empty;
 
     const minScoreFilter =
@@ -133,6 +138,7 @@ export class ArticleSearchService {
         ${keywordFilter}
         ${dateFilter}
         ${excludeFilter}
+        ${citationFilter}
         ${minScoreFilter}
       ${orderByClause}
       LIMIT ${limit}
@@ -158,6 +164,7 @@ export class ArticleSearchService {
         ${keywordFilter}
         ${dateFilter}
         ${excludeFilter}
+        ${citationFilter}
         ${minScoreFilter}
     `;
 
@@ -183,6 +190,7 @@ export class ArticleSearchService {
         sortOrder,
         minScore,
         exclude: filters.exclude,
+        citation: filters.citation,
       },
     };
   }

@@ -289,22 +289,26 @@ function ArticlesContent() {
 
   // Initialize from URL
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
+  const [citationTerm, setCitationTerm] = useState(searchParams.get("citation") || "");
 
   // --- Effect: Handle Fetching based on URL ---
   useEffect(() => {
     const query = searchParams.get("q") || "";
+    const citation = searchParams.get("citation") || "";
     setSearchTerm(query);
-    fetchArticles(query);
+    setCitationTerm(citation);
+    fetchArticles(query, citation);
   }, [searchParams]);
 
   // --- Fetch Function ---
-  const fetchArticles = async (query = "") => {
+  const fetchArticles = async (query = "", citation = "") => {
     setLoading(true);
     try {
       let url;
-      if (query.trim()) {
+      if (query.trim() || citation.trim()) {
         const params = new URLSearchParams();
-        params.append("q", query.trim());
+        if (query.trim()) params.append("q", query.trim());
+        if (citation.trim()) params.append("citation", citation.trim());
         url = `${NEXT_PUBLIC_BASE_URL}/articles/search?${params.toString()}`;
       } else {
         url = `${NEXT_PUBLIC_BASE_URL}/articles/published`;
@@ -327,8 +331,13 @@ function ArticlesContent() {
   // --- Handle Search Submit ---
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    if (searchTerm.trim()) {
-      router.push(`/articles?q=${searchTerm.trim()}`);
+    const params = new URLSearchParams();
+    if (searchTerm.trim()) params.append("q", searchTerm.trim());
+    if (citationTerm.trim()) params.append("citation", citationTerm.trim());
+
+    const queryString = params.toString();
+    if (queryString) {
+      router.push(`/articles?${queryString}`);
     } else {
       router.push(`/articles`);
     }
@@ -379,7 +388,36 @@ function ArticlesContent() {
                     type="button"
                     onClick={() => {
                       setSearchTerm("");
-                      router.push("/articles");
+                      const params = new URLSearchParams(searchParams);
+                      params.delete("q");
+                      const dest = params.toString() ? `/articles?${params.toString()}` : "/articles";
+                      router.push(dest);
+                    }}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="relative w-full sm:w-60">
+                <input
+                  type="text"
+                  value={citationTerm}
+                  onChange={(e) => setCitationTerm(e.target.value)}
+                  placeholder="Citation Number..."
+                  className="w-full pl-4 pr-10 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none text-sm shadow-sm"
+                />
+                {/* Clear Button */}
+                {citationTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCitationTerm("");
+                      const params = new URLSearchParams(searchParams);
+                      params.delete("citation");
+                      const dest = params.toString() ? `/articles?${params.toString()}` : "/articles";
+                      router.push(dest);
                     }}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                   >

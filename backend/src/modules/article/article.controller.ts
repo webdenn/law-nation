@@ -887,7 +887,8 @@ export class ArticleController {
         minScore,
         exclude,
         page,
-        limit
+        limit,
+        citation
       } = req.query;
 
       if (!q || typeof q !== "string") {
@@ -905,6 +906,7 @@ export class ArticleController {
         sortOrder?: 'asc' | 'desc';
         minScore?: number;
         exclude?: string;
+        citation?: string;
         page?: number;
         limit?: number;
       } = {
@@ -942,6 +944,9 @@ export class ArticleController {
       }
       if (exclude && typeof exclude === "string") {
         filters.exclude = exclude;
+      }
+      if (citation && typeof citation === "string") {
+        filters.citation = citation;
       }
 
       const result = await articleService.searchArticles(q, filters);
