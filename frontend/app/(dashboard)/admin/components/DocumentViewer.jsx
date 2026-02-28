@@ -21,7 +21,7 @@ const DownloadIcon = () => (
 
 // ✅ Citation Editor — always visible in review panel, no status restriction
 function CitationEditor({ article, saveCiteNumber }) {
-    const currentYear = new Date().getFullYear();
+    const [year, setYear] = useState("");
     const [issueNo, setIssueNo] = useState("");
     const [serialNo, setSerialNo] = useState("");
     const [isSaving, setIsSaving] = useState(false);
@@ -39,7 +39,7 @@ function CitationEditor({ article, saveCiteNumber }) {
                     <button
                         onClick={() => {
                             const match = article.citationNumber.match(/^(\d{4}) LN\((\d+)\)A(\d+)$/);
-                            if (match) { setIssueNo(match[2]); setSerialNo(match[3]); }
+                            if (match) { setYear(match[1]); setIssueNo(match[2]); setSerialNo(match[3]); }
                             setIsEditing(true);
                         }}
                         className="text-[10px] bg-white border border-green-300 text-green-700 hover:bg-green-100 px-2 py-1 rounded font-bold uppercase transition shrink-0"
@@ -51,10 +51,10 @@ function CitationEditor({ article, saveCiteNumber }) {
         );
     }
 
-    const preview = issueNo && serialNo ? `${currentYear} LN(${issueNo})A${serialNo}` : null;
+    const preview = year && issueNo && serialNo ? `${year} LN(${issueNo})A${serialNo}` : null;
 
     const handleSave = async () => {
-        if (!issueNo.trim() || !serialNo.trim()) return;
+        if (!year.trim() || !issueNo.trim() || !serialNo.trim()) return;
         setIsSaving(true);
         await saveCiteNumber(article.id, preview);
         setIsSaving(false);
@@ -64,9 +64,14 @@ function CitationEditor({ article, saveCiteNumber }) {
     return (
         <div className="space-y-3">
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Format: {currentYear} LN(XX)ANNNNN</p>
+                <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Format: YYYY LN(XX)ANNNNN</p>
                 <div className="flex items-center gap-1 text-xs font-bold text-gray-700 flex-wrap">
-                    <span className="bg-gray-200 px-2 py-1 rounded text-[11px]">{currentYear}</span>
+                    <input
+                        type="text" inputMode="numeric" placeholder="2026"
+                        value={year}
+                        onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                        className="w-14 border-2 border-gray-300 focus:border-red-500 rounded px-2 py-1 text-center text-xs outline-none font-bold transition"
+                    />
                     <span className="text-gray-400">LN(</span>
                     <input
                         type="text" inputMode="numeric" placeholder="53"

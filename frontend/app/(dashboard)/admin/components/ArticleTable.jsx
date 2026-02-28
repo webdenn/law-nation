@@ -7,7 +7,7 @@ import Pagination from "../../../components/Pagination";
 
 // ✅ Cite Number Input Component
 function CiteNumberField({ art, saveCiteNumber }) {
-    const currentYear = new Date().getFullYear();
+    const [year, setYear] = useState("");
     const [issueNo, setIssueNo] = useState("");
     const [serialNo, setSerialNo] = useState("");
     const [isSaving, setIsSaving] = useState(false);
@@ -22,9 +22,9 @@ function CiteNumberField({ art, saveCiteNumber }) {
                 </span>
                 <button
                     onClick={() => {
-                        // Pre-fill from saved value: "2026 LN(53)A1234"
                         const match = art.citationNumber.match(/^(\d{4}) LN\((\d+)\)A(\d+)$/);
                         if (match) {
+                            setYear(match[1] || "");
                             setIssueNo(match[2] || "");
                             setSerialNo(match[3] || "");
                         }
@@ -38,12 +38,12 @@ function CiteNumberField({ art, saveCiteNumber }) {
         );
     }
 
-    const previewNumber = issueNo && serialNo
-        ? `${currentYear} LN(${issueNo})A${serialNo}`
+    const previewNumber = year && issueNo && serialNo
+        ? `${year} LN(${issueNo})A${serialNo}`
         : null;
 
     const handleSave = async () => {
-        if (!issueNo.trim() || !serialNo.trim()) return;
+        if (!year.trim() || !issueNo.trim() || !serialNo.trim()) return;
         setIsSaving(true);
         await saveCiteNumber(art.id, previewNumber);
         setIsSaving(false);
@@ -51,9 +51,16 @@ function CiteNumberField({ art, saveCiteNumber }) {
     };
 
     return (
-        <div className="flex flex-col gap-1 min-w-[180px]">
+        <div className="flex flex-col gap-1 min-w-[200px]">
             <div className="flex items-center gap-1 text-[10px] text-gray-500 font-bold">
-                <span className="bg-gray-100 px-1 py-0.5 rounded">{currentYear}</span>
+                <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="2026"
+                    value={year}
+                    onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    className="w-12 border border-gray-300 rounded px-1 py-0.5 text-center text-[10px] outline-none focus:border-red-500"
+                />
                 <span>LN(</span>
                 <input
                     type="text"
@@ -79,7 +86,7 @@ function CiteNumberField({ art, saveCiteNumber }) {
             <div className="flex gap-1 mt-0.5">
                 <button
                     onClick={handleSave}
-                    disabled={!issueNo || !serialNo || isSaving}
+                    disabled={!year || !issueNo || !serialNo || isSaving}
                     className="bg-red-600 disabled:bg-gray-300 text-white text-[9px] font-black px-2 py-1 rounded uppercase hover:bg-red-800 transition"
                 >
                     {isSaving ? "Saving..." : "Save"}
