@@ -397,7 +397,13 @@ export default function DocumentViewer({
                                         Final Decision
                                     </h3>
                                     <button
-                                        onClick={() => overrideAndPublish(selectedArticle.id)}
+                                        onClick={() => {
+                                            if (!selectedArticle.citationNumber) {
+                                                import("react-toastify").then(({ toast }) => toast.error("Please assign a citation number first."));
+                                                return;
+                                            }
+                                            overrideAndPublish(selectedArticle.id, selectedArticle.citationNumber);
+                                        }}
                                         disabled={isPublishing || selectedArticle.status === "Published"}
                                         className={`w-full py-4 text-white rounded font-black shadow-md transition-all uppercase tracking-tight ${isPublishing || selectedArticle.status === "Published"
                                             ? "bg-gray-400 cursor-not-allowed"

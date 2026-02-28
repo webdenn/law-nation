@@ -1020,13 +1020,14 @@ export class ArticleController {
       const articleId = getStringParam(req.params.id, "Article ID");
       const adminId = req.user!.id;
       
-      // ✅ Get citation number from request body
-      const { citationNumber } = req.body;
+      // ✅ Guard against undefined body and get citation number
+      const body = req.body || {};
+      const { citationNumber } = body;
       
       if (!citationNumber || citationNumber.trim() === '') {
         return res.status(400).json({
           success: false,
-          message: 'Citation number is required to publish an article'
+          message: 'Citation number is required to publish an article. Please assign a citation number first.'
         });
       }
 

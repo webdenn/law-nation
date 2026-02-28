@@ -627,7 +627,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const overrideAndPublish = async (id) => {
+  const overrideAndPublish = async (id, citationNumber) => {
     try {
       setIsPublishing(true); // Start Loading
       const token = localStorage.getItem("adminToken");
@@ -646,6 +646,7 @@ export default function AdminDashboard() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
+          body: JSON.stringify({ citationNumber }),
         }
       );
 

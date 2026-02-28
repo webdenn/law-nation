@@ -144,10 +144,14 @@ export default function ArticleTable({
     };
     const [publishingId, setPublishingId] = useState(null);
 
-    const handlePublish = async (id) => {
-        setPublishingId(id);
+    const handlePublish = async (art) => {
+        if (!art.citationNumber) {
+            toast.error("Please assign a citation number first.");
+            return;
+        }
+        setPublishingId(art.id);
         try {
-            await overrideAndPublish(id);
+            await overrideAndPublish(art.id, art.citationNumber);
         } catch (error) {
             console.error("Publishing error:", error);
         } finally {
@@ -280,7 +284,7 @@ export default function ArticleTable({
                                                 Review
                                             </button>
                                             <button
-                                                onClick={() => handlePublish(art.id)}
+                                                onClick={() => handlePublish(art)}
                                                 disabled={art.status === "Published" || publishingId === art.id}
                                                 className={`w-[80px] py-2 rounded text-[10px] font-black transition-colors uppercase text-center ${
                                                     art.status === "Published"
