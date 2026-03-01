@@ -288,31 +288,37 @@ function ArticlesContent() {
   const [loading, setLoading] = useState(true);
 
   // Initialize from URL
-  // Initialize from URL with masking
-  const applyMask = (val) => {
-    if (!val || val === "____ LN(__)A____") return "____ LN(__)A____";
-    const numbers = val.replace(/\D/g, "").slice(0, 10);
-    let result = "____ LN(__)A____";
-    let numIdx = 0;
-    const chars = result.split("");
-    for (let i = 0; i < chars.length; i++) {
-        if (chars[i] === "_" && numIdx < numbers.length) {
-            chars[i] = numbers[numIdx++];
-        }
+  // Helper to extract parts from citation string "Year LN(Vol)A Page"
+  const getCitationParts = (cit) => {
+    if (!cit) return { year: "", vol: "", page: "" };
+    const match = cit.match(/^([^ ]*) LN\(([^)]*)\)A (.*)$/);
+    if (match) {
+        return {
+            year: match[1].replace(/_/g, ""),
+            vol: match[2].replace(/_/g, ""),
+            page: match[3].replace(/_/g, ""),
+        };
     }
-    return chars.join("");
+    return { year: "", vol: "", page: "" };
+  };
+
+  const applyMask = (val) => {
+    // Variable length logic is handled by UI segments now.
+    // This helper will just ensure we return a valid combined string.
+    if (!val) return " LN()A ";
+    return val;
   };
 
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
-  const [citationTerm, setCitationTerm] = useState(applyMask(searchParams.get("citation")));
+  const [citationTerm, setCitationTerm] = useState(searchParams.get("citation") || " LN()A ");
 
   // --- Effect: Handle Fetching based on URL ---
   useEffect(() => {
     const query = searchParams.get("q") || "";
-    const citation = searchParams.get("citation") || "";
+    const citation = searchParams.get("citation") || " LN()A ";
     setSearchTerm(query);
-    setCitationTerm(applyMask(citation));
-    fetchArticles(query, applyMask(citation));
+    setCitationTerm(citation);
+    fetchArticles(query, citation);
   }, [searchParams]);
 
   // --- Fetch Function ---
@@ -320,12 +326,14 @@ function ArticlesContent() {
     setLoading(true);
     try {
       let url;
-      if (query.trim() || (citation.trim() && citation !== "____ LN(__)A____" && /\d/.test(citation))) {
+      const hasNumbers = /\d/.test(citation);
+      if (query.trim() || (citation.trim() && citation !== " LN()A " && hasNumbers)) {
         const params = new URLSearchParams();
         if (query.trim()) params.append("q", query.trim());
-        if (citation.trim() && citation !== "____ LN(__)A____" && /\d/.test(citation)) {
-          // Replace underscores with % for SQL wildcard matching
-          params.append("citation", citation.trim().replace(/_/g, "%"));
+        if (citation.trim() && citation !== " LN()A " && hasNumbers) {
+          // Replace spaces/formatting for SQL wildcard approach if needed
+          const formatted = citation.replace(/_/g, "%");
+          params.append("citation", formatted);
         }
         url = `${NEXT_PUBLIC_BASE_URL}/articles/search?${params.toString()}`;
       } else {
@@ -351,9 +359,11 @@ function ArticlesContent() {
     e.preventDefault();
     const params = new URLSearchParams();
     if (searchTerm.trim()) params.append("q", searchTerm.trim());
-    if (citationTerm.trim() && citationTerm !== "____ LN(__)A____" && /\d/.test(citationTerm)) {
-      // Replace underscores with % for SQL wildcard matching
-      params.append("citation", citationTerm.trim().replace(/_/g, "%"));
+    
+    const hasNumbers = /\d/.test(citationTerm);
+    if (citationTerm.trim() && citationTerm !== " LN()A " && hasNumbers) {
+      const formatted = citationTerm.replace(/_/g, "%");
+      params.append("citation", formatted);
     }
 
     const queryString = params.toString();
@@ -421,31 +431,52 @@ function ArticlesContent() {
                 )}
               </div>
 
-              <div className="relative w-full sm:w-60">
-                <input
-                  type="text"
-                  value={citationTerm}
-                  onChange={(e) => setCitationTerm(applyMask(e.target.value))}
-                  placeholder="____ LN(__)A____"
-                  className="w-full pl-4 pr-10 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none text-sm shadow-sm font-mono"
-                />
-                {/* Clear Button */}
-                {citationTerm && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCitationTerm("____ LN(__)A____");
-                      const params = new URLSearchParams(searchParams);
-                      params.delete("citation");
-                      const dest = params.toString() ? `/articles?${params.toString()}` : "/articles";
-                      router.push(dest);
-                    }}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
+              {(() => {
+                const parts = getCitationParts(citationTerm);
+                const updateCitationPart = (part, value) => {
+                  const val = value.replace(/\D/g, "");
+                  const newParts = { ...parts };
+                  newParts[part] = val;
+                  setCitationTerm(`${newParts.year} LN(${newParts.vol})A ${newParts.page}`);
+                };
+                
+                return (
+                  <div className="relative w-full sm:w-80 flex items-center bg-white border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-red-100 focus-within:border-red-500 overflow-hidden px-2 shadow-sm">
+                    <input
+                      type="text"
+                      value={parts.year}
+                      onChange={(e) => updateCitationPart("year", e.target.value)}
+                      placeholder="____"
+                      className="w-12 bg-transparent py-2.5 outline-none text-sm text-center font-mono"
+                    />
+                    <span className="text-gray-400 text-sm font-mono mx-1">LN(</span>
+                    <input
+                      type="text"
+                      value={parts.vol}
+                      onChange={(e) => updateCitationPart("vol", e.target.value)}
+                      placeholder="__"
+                      className="w-8 bg-transparent py-2.5 outline-none text-sm text-center font-mono"
+                    />
+                    <span className="text-gray-400 text-sm font-mono mx-1">)A</span>
+                    <input
+                      type="text"
+                      value={parts.page}
+                      onChange={(e) => updateCitationPart("page", e.target.value)}
+                      placeholder="____"
+                      className="w-12 bg-transparent py-2.5 outline-none text-sm text-center font-mono"
+                    />
+                    {citationTerm && citationTerm !== " LN()A " && (
+                      <button
+                        type="button"
+                        onClick={() => setCitationTerm(" LN()A ")}
+                        className="ml-auto pr-1 text-gray-400 hover:text-red-500"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
               <button
                 type="submit"
                 className="bg-red-700 hover:bg-red-800 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors text-sm shrink-0"

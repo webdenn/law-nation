@@ -46,12 +46,15 @@ export default function HomePage() {
                 params.append("q", searchQuery.trim());
                 if (currentFilters.keywords) params.append("keyword", currentFilters.keywords);
                 if (currentFilters.authors) params.append("author", currentFilters.authors);
-                if (currentFilters.citation && currentFilters.citation !== "____ LN(__)A____") {
-                    const hasNumbers = /\d/.test(currentFilters.citation);
-                    if (hasNumbers) {
-                        // Replace underscores with % for SQL wildcard matching
-                        params.append("citation", currentFilters.citation.replace(/_/g, "%"));
-                    }
+                if (currentFilters.citation && currentFilters.citation.trim()) {
+                    // Replace underscores with % for SQL wildcard matching
+                    // Format is "Year LN(Vol)A Page"
+                    // We can just replace spaces/chars with % or specific format
+                    const formatted = currentFilters.citation
+                        .replace(" LN(", " LN(")
+                        .replace(")A ", ")A ")
+                        .replace(/_/g, "%");
+                    params.append("citation", formatted);
                 }
                 if (currentFilters.category && currentFilters.category !== "all") {
                     params.append("category", currentFilters.category);
@@ -102,7 +105,7 @@ export default function HomePage() {
     const [filters, setFilters] = useState({
         keywords: "",
         authors: "",
-        citation: "____ LN(__)A____",
+        citation: "",
         yearFrom: "",
         yearTo: "",
         category: "all",
@@ -115,21 +118,42 @@ export default function HomePage() {
     };
 
     const updateFilter = (name, value) => {
-        if (name === "citation") {
-            // Only allow numbers to update the mask
-            const numbers = value.replace(/\D/g, "").slice(0, 10);
-            let result = "____ LN(__)A____";
-            let numIdx = 0;
-            const chars = result.split("");
-            for (let i = 0; i < chars.length; i++) {
-                if (chars[i] === "_" && numIdx < numbers.length) {
-                    chars[i] = numbers[numIdx++];
-                }
-            }
-            value = chars.join("");
-        }
         setFilters((prev) => ({ ...prev, [name]: value }));
     };
+
+    // Helper to extract parts from citation string "Year LN(Vol)A Page"
+    const getCitationParts = (cit) => {
+        if (!cit) return { year: "", vol: "", page: "" };
+        const match = cit.match(/^([^ ]*) LN\(([^)]*)\)A (.*)$/);
+        if (match) {
+            return {
+                year: match[1].replace(/_/g, ""),
+                vol: match[2].replace(/_/g, ""),
+                page: match[3].replace(/_/g, ""),
+            };
+        }
+        return { year: "", vol: "", page: "" };
+    };
+
+    const updateCitationPart = (part, value) => {
+        // Only allow numbers
+        const val = value.replace(/\D/g, "");
+        const parts = getCitationParts(filters.citation);
+        parts[part] = val;
+
+        // Reconstruct string: "Year LN(Vol)A Page"
+        const year = parts.year || "";
+        const vol = parts.vol || "";
+        const page = parts.page || "";
+
+        // We'll store it in a way that backend can ILIKE it easily
+        // If empty, we use underscores to keep the visual structure in the state if needed,
+        // or just store as is. Let's store actual values and reconstruct for UI.
+        const combined = `${year} LN(${vol})A ${page}`;
+        setFilters((prev) => ({ ...prev, citation: combined }));
+    };
+
+    const parts = getCitationParts(filters.citation);
 
     return (
         <div className="min-h-screen bg-white text-gray-900">
@@ -260,21 +284,42 @@ export default function HomePage() {
                                             <label className="text-xs font-bold text-gray-700 uppercase tracking-wide ml-1">
                                                 By Citation No.
                                             </label>
-                                            <div className="flex bg-white border border-neutral-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-red-100 focus-within:border-red-300 shadow-sm transition-all">
+                                            <div className="flex flex-1 items-center bg-gray-50 rounded-xl border border-neutral-200 focus-within:ring-2 focus-within:ring-red-100 focus-within:border-red-300">
                                                 <input
                                                     type="text"
-                                                    value={filters.citation}
-                                                    onChange={(e) =>
-                                                        updateFilter("citation", e.target.value)
-                                                    }
-                                                    placeholder="____ LN(__)A____"
-                                                    className="flex-1 bg-transparent px-3 py-2.5 outline-none text-sm font-mono"
+                                                    value={parts.year}
+                                                    onChange={(e) => updateCitationPart("year", e.target.value)}
+                                                    placeholder="____"
+                                                    className="w-12 bg-transparent py-2.5 outline-none text-sm text-center font-mono"
+                                                />
+                                                <span className="text-gray-400 text-sm font-mono">LN(</span>
+                                                <input
+                                                    type="text"
+                                                    value={parts.vol}
+                                                    onChange={(e) => updateCitationPart("vol", e.target.value)}
+                                                    placeholder="__"
+                                                    className="w-8 bg-transparent py-2.5 outline-none text-sm text-center font-mono"
+                                                />
+                                                <span className="text-gray-400 text-sm font-mono">)A</span>
+                                                <input
+                                                    type="text"
+                                                    value={parts.page}
+                                                    onChange={(e) => updateCitationPart("page", e.target.value)}
+                                                    placeholder="____"
+                                                    className="w-12 bg-transparent py-2.5 outline-none text-sm text-center font-mono"
                                                 />
                                                 <button
                                                     type="button"
-                                                    disabled={isSearching || !filters.citation.trim()}
+                                                    onClick={() => updateFilter("citation", "")}
+                                                    className="p-2 text-gray-400 hover:text-red-500"
+                                                >
+                                                    ✕
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={isSearching || !filters.citation.trim() || filters.citation === " LN()A "}
                                                     onClick={() => fetchArticles("", { ...filters, keywords: "", authors: "" })}
-                                                    className="bg-red-700 text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-tighter hover:bg-black transition-all shadow-sm disabled:bg-gray-300 whitespace-nowrap flex items-center gap-1"
+                                                    className="bg-red-700 text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-tighter hover:bg-black transition-all shadow-sm disabled:bg-gray-300 whitespace-nowrap flex items-center gap-1 rounded-r-xl"
                                                 >
                                                     <SearchIconSmall />
                                                     Search
