@@ -956,7 +956,14 @@ export class ArticleWorkflowService {
     }
 
     // Validate uploaded file is DOCX (reviewers can only upload DOCX)
-    if (!data.presignedUrl.toLowerCase().endsWith('.docx')) {
+    // Check both pdfUrl and presignedUrl, and handle potential query parameters
+    const isWord = (url: string) => {
+      if (!url) return false;
+      const cleanUrl = url.split('?')[0].split('#')[0];
+      return cleanUrl.toLowerCase().endsWith('.docx') || cleanUrl.toLowerCase().endsWith('.doc');
+    };
+
+    if (!isWord(data.pdfUrl) && !isWord(data.presignedUrl)) {
       throw new BadRequestError('Reviewers can only upload DOCX files');
     }
 

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth, optionalAuth } from "@/middlewares/auth.middleware.js";
 import { requirePermission } from "@/middlewares/require-premission.middleware.js";
 import { validateRecaptcha } from "@/middlewares/recaptcha.middleware.js";
-import { uploadDocument, uploadPdfOnly, uploadOptionalPdf, uploadImage, uploadMultipleImages, uploadArticleFiles, uploadEditorFiles, uploadDocxOnly } from "@/middlewares/upload.middleware.js";
+import { uploadDocument, uploadPdfOnly, uploadOptionalPdf, uploadImage, uploadMultipleImages, uploadArticleFiles, uploadEditorFiles, uploadDocxOnly, uploadReviewerDocxOnly } from "@/middlewares/upload.middleware.js";
 import { articleController } from "./article.controller.js";
 import { userPdfDownloadLimiter } from "@/middlewares/rate-limit.middleware.js";
 const router = Router();
@@ -242,7 +242,7 @@ router.patch(
 router.patch(
   "/:id/reviewer-upload",
   requirePermission("article", "write"),
-  uploadDocxOnly, // Reviewers can only upload DOCX files
+  uploadReviewerDocxOnly, // Reviewers can only upload DOCX files
   articleController.reviewerUploadCorrectedDocument.bind(articleController)
 );
 
