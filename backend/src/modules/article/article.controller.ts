@@ -1826,6 +1826,30 @@ export class ArticleController {
       next(error);
     }
   }
+
+  /**
+   * Set citation number for an article
+   * PATCH /api/articles/:id/set-citation
+   */
+  async setCitation(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = req.params.id as string;
+      const { citationNumber } = req.body;
+
+      if (!citationNumber) {
+        throw new BadRequestError("Citation number is required");
+      }
+
+      const result = await articleService.setCitation(articleId, citationNumber);
+
+      res.status(200).json({
+        success: true,
+        ...result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const articleController = new ArticleController();

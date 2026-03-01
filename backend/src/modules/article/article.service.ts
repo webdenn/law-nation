@@ -468,5 +468,9 @@ export class ArticleService {
   async searchByCitation(citationNumber: string) {
     return articleQueryService.searchByCitation(citationNumber);
   }
+
+  async setCitation(articleId: string, citationNumber: string) {
+    return articleWorkflowService.setCitation(articleId, citationNumber);
+  }
 }
 export const articleService = new ArticleService();

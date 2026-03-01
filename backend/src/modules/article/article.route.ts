@@ -318,6 +318,13 @@ router.get(
   articleController.downloadArticlePdf.bind(articleController)
 );
 
+// PROTECTED: Set citation number for an article
+router.patch(
+  "/:id/set-citation",
+  requirePermission("article", "write"),
+  articleController.setCitation.bind(articleController)
+);
+
 // PROTECTED: Get full article details (auth required)
 router.get(
   "/:id",

@@ -1,4 +1,5 @@
 import { prisma } from "@/db/db.js";
+import { CitationValidator } from "@/validators/citation.validator.js";
 import path from "path";
 import fs from "fs";
 import {
@@ -1799,6 +1800,42 @@ export class ArticleWorkflowService {
     }
 
     return { reassignedCount: 0, articleIds: [] };
+  }
+
+  /**
+   * Set citation number for an article
+   */
+  async setCitation(articleId: string, citationNumber: string) {
+    console.log(`📌 [Citation] Request to set citation for article ${articleId}: ${citationNumber}`);
+
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
+
+    // Use shared CitationValidator for format and uniqueness
+    const validCitation = await CitationValidator.validate(citationNumber, articleId);
+
+    const updatedArticle = await prisma.article.update({
+      where: { id: articleId },
+      data: {
+        citationNumber: validCitation,
+      },
+      include: {
+        assignedEditor: true,
+        assignedReviewer: true,
+      },
+    });
+
+    console.log(`✅ [Citation] Citation set successfully for ${articleId}: ${validCitation}`);
+
+    return {
+      message: "Citation number updated successfully",
+      article: updatedArticle,
+    };
   }
 }
 
