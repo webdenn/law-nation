@@ -226,7 +226,7 @@ export default function HomePage() {
                                             <label className="text-xs font-bold text-gray-700 uppercase tracking-wide ml-1">
                                                 By Keywords
                                             </label>
-                                            <div className="flex bg-white border border-neutral-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-red-100 focus-within:border-red-300 shadow-sm transition-all">
+                                            <div className="flex items-center h-[42px] bg-white border border-neutral-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-red-100 focus-within:border-red-300 shadow-sm transition-all">
                                                 <input
                                                     type="text"
                                                     value={filters.keywords}
@@ -240,7 +240,7 @@ export default function HomePage() {
                                                     type="button"
                                                     disabled={isSearching || !filters.keywords.trim()}
                                                     onClick={() => fetchArticles("", { ...filters, authors: "", citation: " LN()A" })}
-                                                    className="w-12 h-full bg-gray-300 text-white flex items-center justify-center hover:bg-gray-400 transition-all disabled:opacity-50"
+                                                    className="shrink-0 w-12 h-full bg-red-700 text-white flex items-center justify-center hover:bg-black transition-all disabled:bg-gray-200 disabled:text-gray-400 border-l border-neutral-100"
                                                 >
                                                     <SearchIconSmall />
                                                 </button>
@@ -252,7 +252,7 @@ export default function HomePage() {
                                             <label className="text-xs font-bold text-gray-700 uppercase tracking-wide ml-1">
                                                 By Author(s)
                                             </label>
-                                            <div className="flex bg-white border border-neutral-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-red-100 focus-within:border-red-300 shadow-sm transition-all">
+                                            <div className="flex items-center h-[42px] bg-white border border-neutral-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-red-100 focus-within:border-red-300 shadow-sm transition-all">
                                                 <input
                                                     type="text"
                                                     value={filters.authors}
@@ -266,7 +266,7 @@ export default function HomePage() {
                                                     type="button"
                                                     disabled={isSearching || !filters.authors.trim()}
                                                     onClick={() => fetchArticles("", { ...filters, keywords: "", citation: " LN()A" })}
-                                                    className="w-12 h-full bg-gray-300 text-white flex items-center justify-center hover:bg-gray-400 transition-all disabled:opacity-50"
+                                                    className="shrink-0 w-12 h-full bg-red-700 text-white flex items-center justify-center hover:bg-black transition-all disabled:bg-gray-200 disabled:text-gray-400 border-l border-neutral-100"
                                                 >
                                                     <SearchIconSmall />
                                                 </button>
