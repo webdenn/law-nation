@@ -1210,7 +1210,7 @@ export const uploadReviewerDocxOnly = (req: Request, res: Response, next: NextFu
       limits: { fileSize: MAX_DOCUMENT_SIZE },
     });
 
-    reviewerUpload.single("document")(req, res, async (err) => {
+    reviewerUpload.single("docx")(req, res, async (err) => {
       if (err) return res.status(400).json({ error: err.message });
       if (!req.file) return res.status(400).json({ error: "DOCX file required for reviewer upload" });
 
@@ -1234,7 +1234,7 @@ export const uploadReviewerDocxOnly = (req: Request, res: Response, next: NextFu
       limits: { fileSize: MAX_DOCUMENT_SIZE },
     });
 
-    reviewerUpload.single("document")(req, res, async (err) => {
+    reviewerUpload.single("docx")(req, res, async (err) => {
       if (err) return res.status(400).json({ error: err.message });
       const file = req.file as Express.Multer.File | undefined;
       if (!file) return res.status(400).json({ error: "DOCX file required for reviewer upload" });
