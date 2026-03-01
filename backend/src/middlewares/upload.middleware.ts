@@ -1166,14 +1166,14 @@ export const uploadDocxOnly = (req: Request, res: Response, next: NextFunction) 
 
       try {
         // CHANGED: uploadBufferToS3
-        const { url, storageKey } = await uploadBufferToS3(
+        const { url, storageKey, presignedUrl } = await uploadBufferToS3(
           file.buffer,
           file.originalname,
           file.mimetype
         );
 
         req.fileUrl = url;
-        req.fileMeta = { url, storageKey };
+        req.fileMeta = { url, storageKey, presignedUrl };
         next();
       } catch (error) {
         console.error('❌ [Upload] DOCX S3 upload failed:', error);
@@ -1241,14 +1241,14 @@ export const uploadReviewerDocxOnly = (req: Request, res: Response, next: NextFu
 
       try {
         // CHANGED: uploadBufferToS3
-        const { url, storageKey } = await uploadBufferToS3(
+        const { url, storageKey, presignedUrl } = await uploadBufferToS3(
           file.buffer,
           file.originalname,
           file.mimetype
         );
 
         req.fileUrl = url;
-        req.fileMeta = { url, storageKey };
+        req.fileMeta = { url, storageKey, presignedUrl };
         next();
       } catch (error) {
         console.error('❌ [Reviewer Upload] DOCX S3 upload failed:', error);

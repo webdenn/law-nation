@@ -13,6 +13,7 @@ import {
 import { createRequire } from "module";
 import { NotFoundError } from "@/utils/http-errors.util.js";
 import { resolveToAbsolutePath, fileExistsAtPath } from "@/utils/file-path.utils.js";
+import { downloadFileToBuffer } from './pdf-extract.utils.js';
 
 // Create require for CommonJS modules (mammoth)
 const require = createRequire(import.meta.url);
@@ -33,21 +34,26 @@ export async function addWatermarkToWord(
   try {
     console.log(`💧 [Word Watermark] Adding watermark to: ${wordPath}`);
 
-    const fullPath = resolveToAbsolutePath(wordPath);
-    console.log(`📂 [Word Watermark] Resolved full path: ${fullPath}`);
+    // ✅ Check if file exists or is a URL
+    let originalBuffer: Buffer;
+    const isUrl = wordPath.startsWith('http://') || wordPath.startsWith('https://');
 
-    // ✅ Check if file exists using utility
-    if (!fileExistsAtPath(wordPath)) {
-      console.error(`❌ [Word Watermark] File not found: ${fullPath}`);
-      throw new NotFoundError(
-        `Document file not found on server: ${path.basename(fullPath)}`
-      );
+    if (isUrl) {
+      console.log(`🌐 [Word Watermark] Downloading from URL: ${wordPath}`);
+      originalBuffer = await downloadFileToBuffer(wordPath);
+    } else {
+      const fullPath = resolveToAbsolutePath(wordPath);
+      console.log(`📂 [Word Watermark] Resolved full path: ${fullPath}`);
+
+      if (!fileExistsAtPath(wordPath)) {
+        console.error(`❌ [Word Watermark] File not found: ${fullPath}`);
+        throw new NotFoundError(
+          `Document file not found on server: ${path.basename(fullPath)}`
+        );
+      }
+      console.log(`✅ [Word Watermark] File exists and is accessible`);
+      originalBuffer = await fs.readFile(fullPath);
     }
-
-    console.log(`✅ [Word Watermark] File exists and is accessible`);
-
-    // Read the original Word file
-    const originalBuffer = await fs.readFile(fullPath);
 
     const watermarkText = `Downloaded by: ${
       watermarkData.userName
@@ -115,21 +121,26 @@ export async function addSimpleWatermarkToWord(
       `💧 [Word Watermark] Adding watermark with logo to: ${wordPath}`
     );
 
-    const fullPath = resolveToAbsolutePath(wordPath);
-    console.log(`📂 [Word Watermark] Resolved full path: ${fullPath}`);
+    // ✅ Check if file exists or is a URL
+    let originalBuffer: Buffer;
+    const isUrl = wordPath.startsWith('http://') || wordPath.startsWith('https://');
 
-    // ✅ Check if file exists using utility
-    if (!fileExistsAtPath(wordPath)) {
-      console.error(`❌ [Word Watermark] File not found: ${fullPath}`);
-      throw new NotFoundError(
-        `Document file not found on server: ${path.basename(fullPath)}`
-      );
+    if (isUrl) {
+      console.log(`🌐 [Word Watermark] Downloading from URL: ${wordPath}`);
+      originalBuffer = await downloadFileToBuffer(wordPath);
+    } else {
+      const fullPath = resolveToAbsolutePath(wordPath);
+      console.log(`📂 [Word Watermark] Resolved full path: ${fullPath}`);
+
+      if (!fileExistsAtPath(wordPath)) {
+        console.error(`❌ [Word Watermark] File not found: ${fullPath}`);
+        throw new NotFoundError(
+          `Document file not found on server: ${path.basename(fullPath)}`
+        );
+      }
+      console.log(`✅ [Word Watermark] File exists and is accessible`);
+      originalBuffer = await fs.readFile(fullPath);
     }
-
-    console.log(`✅ [Word Watermark] File exists and is accessible`);
-
-    // Read the original Word file
-    const originalBuffer = await fs.readFile(fullPath);
 
     // Extract text from original document using mammoth
     const mammoth = require("mammoth");
