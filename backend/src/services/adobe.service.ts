@@ -258,14 +258,14 @@ export class AdobeService {
   private async downloadFile(urlOrPath: string, extension: string): Promise<string> {
     console.log(`🌐 [Adobe Download] Fetching file from URL: ${urlOrPath}`);
 
-    // FIX 1: Encode URL to handle spaces (e.g. "My File.docx" -> "My%20File.docx")
-    // This solves the 400 Bad Request error
-    const encodedUrl = encodeURI(urlOrPath);
+    // ✅ THE FIX: DO NOT use encodeURI() on S3 signed URLs.
+    // Presigned URLs are already encoded and signed; encoding them again breaks the signature.
+    // We only use the URL exactly as provided.
+    const finalUrl = urlOrPath;
 
-    // FIX 2: Send EMPTY headers to strip the "Authorization: Bearer" token
-    // This solves the 403 Forbidden / 400 Unsupported Authorization Type error
-    const response = await fetch(encodedUrl, {
-      headers: {}
+    const response = await fetch(finalUrl, {
+      method: 'GET',
+      headers: {} // Strip any default Authorization headers that might interfere with S3
     });
 
     if (!response.ok) {
