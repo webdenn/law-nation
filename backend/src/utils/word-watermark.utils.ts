@@ -71,9 +71,8 @@ export async function addWatermarkToWord(
       `💡 [Word Watermark] Consider using: docx-templates, officegen, or docxtemplater`
     );
 
-    // For now, return the original buffer
-    // TODO: Implement full watermarking with docx-templates or similar
-    return originalBuffer;
+    // For now, call addSimpleWatermarkToWord for actual watermarking
+    return await addSimpleWatermarkToWord(wordPath, watermarkData);
   } catch (error: any) {
     console.error("❌ [Word Watermark] Failed to add watermark:", error);
 

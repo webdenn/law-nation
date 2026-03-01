@@ -538,75 +538,68 @@ export class AdobeService {
   }
 
   async addWatermarkToDocx(docxPath: string, outputPath: string, watermarkData: any): Promise<string> {
-    this.checkAvailability();
     try {
-      let localPath: string;
-      let tempPath: string | null = null;
+      const { addSimpleWatermarkToWord } = await import('@/utils/word-watermark.utils.js');
+      
+      // Ensure watermarkData has all required fields for the utility
+      const fullWatermarkData = {
+        userName: watermarkData.userName || "Admin",
+        downloadDate: watermarkData.downloadDate || new Date(),
+        articleTitle: watermarkData.articleTitle || "Article",
+        articleId: watermarkData.articleId || "preview",
+        frontendUrl: watermarkData.frontendUrl || process.env.FRONTEND_URL || "http://localhost:3000"
+      };
 
-      if (this.isUrl(docxPath)) {
-        tempPath = await this.downloadFile(docxPath, '.docx');
-        localPath = tempPath;
-      } else {
-        localPath = resolveToAbsolutePath(docxPath);
-      }
-
-      // Adobe SDK lacks direct DOCX watermarking, so we copy it
-      fs.copyFileSync(localPath, outputPath);
-
-      if (tempPath) fs.unlink(tempPath, () => { });
+      const buffer = await addSimpleWatermarkToWord(docxPath, fullWatermarkData);
+      
+      // Write buffer to outputPath
+      await fs.promises.writeFile(resolveToAbsolutePath(outputPath), buffer);
+      
       return outputPath;
     } catch (err: any) {
-      throw new InternalServerError('DOCX watermarking failed');
+      console.error('❌ [AdobeService] DOCX watermarking failed:', err);
+      throw new InternalServerError(`DOCX watermarking failed: ${err.message}`);
     }
   }
 
   async addWatermarkToPdf(pdfPath: string, outputPath: string, watermarkData: any): Promise<string> {
-    this.checkAvailability();
     try {
       const { PDFDocument, rgb, StandardFonts, degrees } = await import('pdf-lib');
-      let localPath: string;
-      let tempPath: string | null = null;
-
+      const { downloadFileToBuffer } = await import('@/utils/pdf-extract.utils.js');
+      
+      let pdfBuffer: Buffer;
       if (this.isUrl(pdfPath)) {
-        tempPath = await this.downloadFile(pdfPath, '.pdf');
-        localPath = tempPath;
+        pdfBuffer = await downloadFileToBuffer(pdfPath);
       } else {
-        localPath = resolveToAbsolutePath(pdfPath);
+        pdfBuffer = await fs.promises.readFile(resolveToAbsolutePath(pdfPath));
       }
 
-      // 1. Upload to Adobe to validate/repair PDF integrity
-      // const inputAsset = await this.pdfServices.upload({
-      //   readStream: fs.createReadStream(localPath),
-      //   mimeType: MimeType.PDF
-      // });
-      // (Just uploading verifies it's a valid PDF structure for Adobe)
-
-      // 2. Apply watermark locally using pdf-lib
-      const pdfBytes = fs.readFileSync(localPath);
-      const pdfDoc = await PDFDocument.load(pdfBytes);
+      const pdfDoc = await PDFDocument.load(pdfBuffer);
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-
       const pages = pdfDoc.getPages();
+      
+      const watermarkText = `${watermarkData.userName || 'Admin'} - ${watermarkData.articleId || 'Article'}`;
+
       for (const page of pages) {
         const { width, height } = page.getSize();
-        // Add watermark diagonally across the page
-        page.drawText(`${watermarkData.userName} - ${watermarkData.articleId}`, {
+        page.drawText(watermarkText, {
           x: width / 4,
           y: height / 2,
           size: 18,
           font,
           color: rgb(0.5, 0.5, 0.5),
           rotate: degrees(45),
-          opacity: 0.5,
+          opacity: 0.3,
         });
       }
+      
       const saved = await pdfDoc.save();
-      fs.writeFileSync(outputPath, saved);
-
-      if (tempPath) fs.unlink(tempPath, () => { });
+      await fs.promises.writeFile(resolveToAbsolutePath(outputPath), saved);
+      
       return outputPath;
     } catch (err: any) {
-      throw new InternalServerError(`Watermarking failed: ${err.message}`);// 
+      console.error('❌ [AdobeService] PDF watermarking failed:', err);
+      throw new InternalServerError(`Watermarking failed: ${err.message}`);
     }
   }
 

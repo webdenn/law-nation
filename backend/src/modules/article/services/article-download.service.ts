@@ -257,11 +257,13 @@ export class ArticleDownloadService {
         id: true,
         title: true,
         status: true,
+        originalPdfUrl: true,
         originalWordUrl: true,
         currentWordUrl: true,
         assignedEditorId: true,
         assignedReviewerId: true,
-        contentType: true
+        contentType: true,
+        originalFileType: true
       }
     });
 
@@ -285,9 +287,9 @@ export class ArticleDownloadService {
 
     const versions = {
       original: {
-        available: !!article.originalWordUrl,
-        url: article.originalWordUrl || '',
-        description: "User's original submission (converted to DOCX if needed)"
+        available: !!(article.originalPdfUrl || article.originalWordUrl),
+        url: article.originalPdfUrl || article.originalWordUrl || '',
+        description: "User's original submission"
       },
       editor: {
         available: false,
@@ -370,37 +372,53 @@ export class ArticleDownloadService {
       const timestamp = Date.now();
       const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `admin-${versionType}-${timestamp}.docx`);
 
-      // Use Adobe service for watermarking
-      const watermarkedPath = await adobeService.addWatermarkToDocx(
-        version.url,
-        tempOutputPath,
-        {
-          ...watermarkData,
-          userName: `ADMIN - ${watermarkData.userName}`,
-          versionType: versionType.toUpperCase()
-        }
-      );
+      // Use Adobe service for watermarking (Ensure PDF for preview)
+      let sourceUrl = version.url;
+      const isDocx = sourceUrl.includes('.docx') || sourceUrl.includes('.doc') || versionType !== 'original'; // Treat others as potentially word
 
-      // Adobe service now returns relative path, convert to absolute for file reading
-      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath)
-        ? watermarkedPath
-        : path.join(process.cwd(), watermarkedPath.startsWith('/')
-          ? watermarkedPath.substring(1)
-          : watermarkedPath);
+      // If it's a DOCX, we ideally want to convert it to PDF or watermark then convert
+      // For simplicity and better preview, we'll try to ensure we have a PDF
+      let finalBuffer: Buffer;
+      
+      if (sourceUrl.includes('.pdf')) {
+        const watermarkedPath = await adobeService.addWatermarkToPdf(
+          sourceUrl,
+          tempOutputPath.replace('.docx', '.pdf'),
+          {
+            ...watermarkData,
+            articleId: articleId
+          }
+        );
+        const fb = await fs.promises.readFile(watermarkedPath);
+        finalBuffer = fb;
+        await fs.promises.unlink(watermarkedPath).catch(() => { });
+      } else {
+        // Docx path - watermark then convert or just conversion fallback
+        const watermarkedPath = await adobeService.addWatermarkToDocx(
+          sourceUrl,
+          tempOutputPath,
+          {
+            ...watermarkData,
+            userName: `ADMIN - ${watermarkData.userName}`,
+            versionType: versionType.toUpperCase()
+          }
+        );
+        
+        // Convert watermarked docx to pdf for previewer
+        const pdfPath = watermarkedPath.replace('.docx', '.pdf');
+        await adobeService.convertDocxToPdf(watermarkedPath, pdfPath);
+        
+        finalBuffer = await fs.promises.readFile(pdfPath);
+        
+        await fs.promises.unlink(watermarkedPath).catch(() => { });
+        await fs.promises.unlink(pdfPath).catch(() => { });
+      }
 
-      // Validate the file exists before trying to read it
-      const fs = await import('fs/promises');
-      await fs.access(absoluteWatermarkedPath); // Check if file exists
-      const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
-
-      // Clean up temp file
-      await fs.unlink(absoluteWatermarkedPath).catch(() => { });
-
-      console.log(`✅ [Admin Download] Watermark added to ${versionType} version successfully`);
+      console.log(`✅ [Admin Download] Watermark added and converted to PDF successfully`);
       return {
-        buffer: watermarkedBuffer,
-        filename: `${versionsInfo.articleTitle}-${versionType}-version.docx`,
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        buffer: finalBuffer,
+        filename: `${versionsInfo.articleTitle}-${versionType}-version.pdf`,
+        mimeType: 'application/pdf'
       };
     } catch (error) {
       console.error(`❌ [Admin Download] Failed to add watermark to ${versionType} version:`, error);
