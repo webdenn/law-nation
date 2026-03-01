@@ -6,7 +6,6 @@ import { articleSearchService } from "./services/article-search.service.js";
 import { articleQueryService } from "./services/article-query.service.js";
 import { articleMediaService } from "./services/article-media.service.js";
 import { adobeService } from "@/services/adobe.service.js";
-import { addSimpleWatermarkToWord } from "@/utils/word-watermark.utils.js";
 import type {
   ArticleSubmissionData,
   ArticleListFilters,
@@ -52,8 +51,7 @@ export class ArticleService {
       };
 
       const watermarkedDocxPath = docxPath.replace('.docx', '_watermarked.docx');
-      const watermarkedBuffer = await addSimpleWatermarkToWord(docxPath, watermarkData);
-      fs.writeFileSync(watermarkedDocxPath, watermarkedBuffer);
+      await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
 
       // Update article with DOCX URL
       await prisma.article.update({
@@ -130,8 +128,7 @@ export class ArticleService {
       };
 
       const watermarkedDocxPath = docxPath.replace('.docx', '_edited_watermarked.docx');
-      const watermarkedBuffer = await addSimpleWatermarkToWord(docxPath, watermarkData);
-      fs.writeFileSync(watermarkedDocxPath, watermarkedBuffer);
+      await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
 
       // 3. Convert to PDF for preview
       const pdfPath = docxPath.replace('.docx', '_edited.pdf');
@@ -396,7 +393,6 @@ export class ArticleService {
       sortOrder?: "asc" | "desc";
       minScore?: number;
       exclude?: string;
-      citation?: string;
       page?: number;
       limit?: number;
     }

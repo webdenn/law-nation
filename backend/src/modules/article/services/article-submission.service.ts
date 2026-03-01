@@ -14,8 +14,6 @@ import {
 } from "@/utils/email.utils.js";
 import { notifyAdminsOfArticleUpload } from "@/utils/admin-notification.utils.js";
 import { adobeService } from "@/services/adobe.service.js";
-import { addSimpleWatermarkToWord } from "@/utils/word-watermark.utils.js";
-import fs from "fs";
 import type {
   ArticleSubmissionData,
   ArticleVerificationMetadata,
@@ -494,8 +492,7 @@ export class ArticleSubmissionService {
       };
 
       const watermarkedDocxPath = docxPath.replace('.docx', '_watermarked.docx');
-      const watermarkedBuffer = await addSimpleWatermarkToWord(docxPath, watermarkData);
-      fs.writeFileSync(watermarkedDocxPath, watermarkedBuffer);
+      await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
 
       // Update article record with DOCX URL
       await prisma.article.update({
@@ -506,6 +503,7 @@ export class ArticleSubmissionService {
       });
 
       // Clean up temporary files
+      const fs = await import('fs');
       if (fs.existsSync(docxPath)) {
         fs.unlinkSync(docxPath);
       }

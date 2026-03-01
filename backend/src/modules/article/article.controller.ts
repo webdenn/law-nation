@@ -887,11 +887,12 @@ export class ArticleController {
         minScore,
         exclude,
         page,
-        limit,
-        citation
+        limit
       } = req.query;
 
-      const qStr = typeof q === "string" ? q.trim() : "";
+      if (!q || typeof q !== "string") {
+        throw new BadRequestError("Search query 'q' is required");
+      }
 
       const filters: {
         category?: string;
@@ -904,7 +905,6 @@ export class ArticleController {
         sortOrder?: 'asc' | 'desc';
         minScore?: number;
         exclude?: string;
-        citation?: string;
         page?: number;
         limit?: number;
       } = {
@@ -943,11 +943,8 @@ export class ArticleController {
       if (exclude && typeof exclude === "string") {
         filters.exclude = exclude;
       }
-      if (citation && typeof citation === "string") {
-        filters.citation = citation;
-      }
 
-      const result = await articleService.searchArticles(qStr, filters);
+      const result = await articleService.searchArticles(q, filters);
 
       res.json({
         message: "Search completed successfully",
@@ -1023,14 +1020,13 @@ export class ArticleController {
       const articleId = getStringParam(req.params.id, "Article ID");
       const adminId = req.user!.id;
       
-      // ✅ Guard against undefined body and get citation number
-      const body = req.body || {};
-      const { citationNumber } = body;
+      // ✅ Get citation number from request body
+      const { citationNumber } = req.body;
       
       if (!citationNumber || citationNumber.trim() === '') {
         return res.status(400).json({
           success: false,
-          message: 'Citation number is required to publish an article. Please assign a citation number first.'
+          message: 'Citation number is required to publish an article'
         });
       }
 
@@ -1096,83 +1092,6 @@ export class ArticleController {
         ...result,
       });
     } catch (error) {
-      next(error);
-    }
-  }
-
-  // ✅ NEW: Get watermarked PDF for admin preview (handles any version)
-  async getAdminWatermarkedPdf(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const articleId = getStringParam(req.params.id, "Article ID");
-      const versionType = getStringParam(req.params.versionType, "Version Type") as 'original' | 'admin' | 'editor' | 'reviewer' | 'current';
-
-      const userName = req.user?.name || 'Admin';
-
-      console.log(`\n💧 [Admin Preview] User "${userName}" requesting watermarked PDF for article ${articleId} (Version: ${versionType})`);
-
-      const userId = req.user!.id;
-      const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
-
-      // Get article and history using the service
-      const { article, changeLogs } = await articleService.getArticleChangeHistory(articleId, userId, userRoles) as any;
-
-      // Determine the path based on versionType
-      let pdfPath = "";
-      if (versionType === "original") {
-        pdfPath = article.originalPdfUrl;
-      } else if (versionType === "admin") {
-        const latestAdminLog = changeLogs.find((log: any) => 
-          (log.role?.toLowerCase() === 'admin' || (log.editedBy as any)?.role?.name?.toLowerCase() === 'admin') && log.pdfUrl
-        );
-        pdfPath = latestAdminLog?.pdfUrl || article.currentPdfUrl;
-      } else if (versionType === "editor") {
-        const latestEditorLog = changeLogs.find((log: any) => 
-          (log.role?.toLowerCase() === 'editor' || (log.editedBy as any)?.role?.name?.toLowerCase() === 'editor') && log.pdfUrl
-        );
-        pdfPath = latestEditorLog?.pdfUrl || article.editorDocumentUrl || "";
-      } else if (versionType === "reviewer") {
-        const latestReviewerLog = changeLogs.find((log: any) => 
-          (log.role?.toLowerCase() === 'reviewer' || (log.editedBy as any)?.role?.name?.toLowerCase() === 'reviewer') && log.pdfUrl
-        );
-        pdfPath = latestReviewerLog?.pdfUrl || "";
-      } else if (versionType === "current") {
-        pdfPath = article.currentPdfUrl;
-      }
-
-      // If requested version path is empty, fallback to current or original
-      if (!pdfPath) {
-        pdfPath = article.currentPdfUrl || article.originalPdfUrl;
-      }
-
-      if (!pdfPath) {
-        throw new BadRequestError(`PDF path for article ${articleId} not found`);
-      }
-
-      console.log(`📂 [Admin Preview] Serving PDF path: ${pdfPath}`);
-
-      // Add watermark to PDF
-      const watermarkedPdf = await addWatermarkToPdf(
-        pdfPath,
-        {
-          userName: `ADMIN - ${userName}`,
-          downloadDate: new Date(),
-          articleTitle: article.title,
-          articleId: articleId,
-          articleSlug: article.slug,
-          frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
-        },
-        'ADMIN',
-        article.status,
-        article.citationNumber
-      );
-
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Length', watermarkedPdf.length.toString());
-
-      console.log(`✅ [Admin Preview] Sending watermarked PDF (${watermarkedPdf.length} bytes)`);
-      res.send(watermarkedPdf);
-    } catch (error) {
-      console.error('❌ [Admin Preview] Failed:', error);
       next(error);
     }
   }
@@ -1904,87 +1823,6 @@ export class ArticleController {
         data: article
       });
     } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * Admin sets citation number on an article
-   * PATCH /api/articles/:id/set-citation
-   * Only allowed when status is REVIEWER_APPROVED
-   * Format: YYYY LN(NN)ANNNNN  e.g. 2026 LN(53)A1234
-   */
-  async setCitationNumber(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const articleId = getStringParam(req.params.id, "Article ID");
-
-      // ✅ Guard against undefined body (missing Content-Type: application/json)
-      const body = req.body || {};
-      const { citationNumber } = body;
-
-      if (!citationNumber || typeof citationNumber !== 'string') {
-        return res.status(400).json({
-          success: false,
-          message: "Citation number is required. Please provide a valid citation number.",
-        });
-      }
-
-      // Validate format: YYYY LN(NN...)ANNN...
-      const citationRegex = /^\d{4} LN\(\d+\)A\d+$/;
-      if (!citationRegex.test(citationNumber.trim())) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid citation format. Expected: YYYY LN(NN)ANNNNN — e.g. 2026 LN(53)A1234",
-        });
-      }
-
-      // Fetch article
-      const article = await prisma.article.findUnique({
-        where: { id: articleId },
-        select: { id: true, status: true, title: true, citationNumber: true },
-      });
-
-      if (!article) {
-        return res.status(404).json({ success: false, message: "Article not found." });
-      }
-
-      // ✅ No status restriction — admin can set citation at any stage
-
-      // Check for duplicates (unique constraint will catch it, but give better message)
-      const existing = await prisma.article.findUnique({
-        where: { citationNumber: citationNumber.trim() },
-        select: { id: true, title: true },
-      });
-
-      if (existing && existing.id !== articleId) {
-        return res.status(409).json({
-          success: false,
-          message: `This citation number already exists. Use a different one. (Used by: "${existing.title}")`,
-        });
-      }
-
-      // Save citation number
-      const updated = await prisma.article.update({
-        where: { id: articleId },
-        data: { citationNumber: citationNumber.trim() },
-        select: { id: true, title: true, citationNumber: true, status: true },
-      });
-
-      console.log(`✅ [Citation] Set citation "${citationNumber}" for article "${article.title}"`);
-
-      return res.json({
-        success: true,
-        message: "Citation number saved successfully",
-        article: updated,
-      });
-    } catch (error: any) {
-      // Handle Prisma unique constraint error
-      if (error?.code === 'P2002' && error?.meta?.target?.includes('citationNumber')) {
-        return res.status(409).json({
-          success: false,
-          message: "This citation number already exists. Use a different one.",
-        });
-      }
       next(error);
     }
   }
