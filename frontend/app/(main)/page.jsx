@@ -48,11 +48,8 @@ export default function HomePage() {
                 if (currentFilters.authors) params.append("author", currentFilters.authors);
                 if (currentFilters.citation && currentFilters.citation.trim()) {
                     // Replace underscores with % for SQL wildcard matching
-                    // Format is "Year LN(Vol)A Page"
-                    // We can just replace spaces/chars with % or specific format
+                    // Format is "Year LN(Vol)APage"
                     const formatted = currentFilters.citation
-                        .replace(" LN(", " LN(")
-                        .replace(")A ", ")A ")
                         .replace(/_/g, "%");
                     params.append("citation", formatted);
                 }
@@ -121,15 +118,15 @@ export default function HomePage() {
         setFilters((prev) => ({ ...prev, [name]: value }));
     };
 
-    // Helper to extract parts from citation string "Year LN(Vol)A Page"
+    // Helper to extract parts from citation string "Year LN(Vol)A Page" or "Year LN(Vol)APage"
     const getCitationParts = (cit) => {
         if (!cit) return { year: "", vol: "", page: "" };
-        const match = cit.match(/^([^ ]*) LN\(([^)]*)\)A (.*)$/);
+        const match = cit.match(/^([^ ]*) LN\(([^)]*)\)A ?(.*)$/);
         if (match) {
             return {
                 year: match[1].replace(/_/g, ""),
                 vol: match[2].replace(/_/g, ""),
-                page: match[3].replace(/_/g, ""),
+                page: match[3].replace(/_/g, "").trim(),
             };
         }
         return { year: "", vol: "", page: "" };
@@ -147,9 +144,8 @@ export default function HomePage() {
         const page = parts.page || "";
 
         // We'll store it in a way that backend can ILIKE it easily
-        // If empty, we use underscores to keep the visual structure in the state if needed,
-        // or just store as is. Let's store actual values and reconstruct for UI.
-        const combined = `${year} LN(${vol})A ${page}`;
+        // Format: "Year LN(Vol)APage" (no space after A to match database)
+        const combined = `${year} LN(${vol})A${page}`;
         setFilters((prev) => ({ ...prev, citation: combined }));
     };
 

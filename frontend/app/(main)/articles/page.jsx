@@ -288,15 +288,15 @@ function ArticlesContent() {
   const [loading, setLoading] = useState(true);
 
   // Initialize from URL
-  // Helper to extract parts from citation string "Year LN(Vol)A Page"
+  // Helper to extract parts from citation string "Year LN(Vol)A Page" or "Year LN(Vol)APage"
   const getCitationParts = (cit) => {
     if (!cit) return { year: "", vol: "", page: "" };
-    const match = cit.match(/^([^ ]*) LN\(([^)]*)\)A (.*)$/);
+    const match = cit.match(/^([^ ]*) LN\(([^)]*)\)A ?(.*)$/);
     if (match) {
         return {
             year: match[1].replace(/_/g, ""),
             vol: match[2].replace(/_/g, ""),
-            page: match[3].replace(/_/g, ""),
+            page: match[3].replace(/_/g, "").trim(),
         };
     }
     return { year: "", vol: "", page: "" };
@@ -310,12 +310,12 @@ function ArticlesContent() {
   };
 
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
-  const [citationTerm, setCitationTerm] = useState(searchParams.get("citation") || " LN()A ");
+  const [citationTerm, setCitationTerm] = useState(searchParams.get("citation") || " LN()A");
 
   // --- Effect: Handle Fetching based on URL ---
   useEffect(() => {
     const query = searchParams.get("q") || "";
-    const citation = searchParams.get("citation") || " LN()A ";
+    const citation = searchParams.get("citation") || " LN()A";
     setSearchTerm(query);
     setCitationTerm(citation);
     fetchArticles(query, citation);
@@ -327,10 +327,10 @@ function ArticlesContent() {
     try {
       let url;
       const hasNumbers = /\d/.test(citation);
-      if (query.trim() || (citation.trim() && citation !== " LN()A " && hasNumbers)) {
+      if (query.trim() || (citation.trim() && citation !== " LN()A" && hasNumbers)) {
         const params = new URLSearchParams();
         if (query.trim()) params.append("q", query.trim());
-        if (citation.trim() && citation !== " LN()A " && hasNumbers) {
+        if (citation.trim() && citation !== " LN()A" && hasNumbers) {
           // Replace spaces/formatting for SQL wildcard approach if needed
           const formatted = citation.replace(/_/g, "%");
           params.append("citation", formatted);
@@ -361,7 +361,7 @@ function ArticlesContent() {
     if (searchTerm.trim()) params.append("q", searchTerm.trim());
     
     const hasNumbers = /\d/.test(citationTerm);
-    if (citationTerm.trim() && citationTerm !== " LN()A " && hasNumbers) {
+    if (citationTerm.trim() && citationTerm !== " LN()A" && hasNumbers) {
       const formatted = citationTerm.replace(/_/g, "%");
       params.append("citation", formatted);
     }
@@ -437,7 +437,8 @@ function ArticlesContent() {
                   const val = value.replace(/\D/g, "");
                   const newParts = { ...parts };
                   newParts[part] = val;
-                  setCitationTerm(`${newParts.year} LN(${newParts.vol})A ${newParts.page}`);
+                  // Format: "Year LN(Vol)APage" (no space after A to match database)
+                  setCitationTerm(`${newParts.year} LN(${newParts.vol})A${newParts.page}`);
                 };
                 
                 return (
@@ -465,10 +466,10 @@ function ArticlesContent() {
                       placeholder="____"
                       className="w-12 bg-transparent py-2.5 outline-none text-sm text-center font-mono"
                     />
-                    {citationTerm && citationTerm !== " LN()A " && (
+                    {citationTerm && citationTerm !== " LN()A" && (
                       <button
                         type="button"
-                        onClick={() => setCitationTerm(" LN()A ")}
+                        onClick={() => setCitationTerm(" LN()A")}
                         className="ml-auto pr-1 text-gray-400 hover:text-red-500"
                       >
                         ✕
