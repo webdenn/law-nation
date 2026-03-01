@@ -324,7 +324,8 @@ function ArticlesContent() {
         const params = new URLSearchParams();
         if (query.trim()) params.append("q", query.trim());
         if (citation.trim() && citation !== "____ LN(__)A____" && /\d/.test(citation)) {
-          params.append("citation", citation.trim());
+          // Replace underscores with % for SQL wildcard matching
+          params.append("citation", citation.trim().replace(/_/g, "%"));
         }
         url = `${NEXT_PUBLIC_BASE_URL}/articles/search?${params.toString()}`;
       } else {
@@ -351,7 +352,8 @@ function ArticlesContent() {
     const params = new URLSearchParams();
     if (searchTerm.trim()) params.append("q", searchTerm.trim());
     if (citationTerm.trim() && citationTerm !== "____ LN(__)A____" && /\d/.test(citationTerm)) {
-      params.append("citation", citationTerm.trim());
+      // Replace underscores with % for SQL wildcard matching
+      params.append("citation", citationTerm.trim().replace(/_/g, "%"));
     }
 
     const queryString = params.toString();

@@ -47,12 +47,10 @@ export default function HomePage() {
                 if (currentFilters.keywords) params.append("keyword", currentFilters.keywords);
                 if (currentFilters.authors) params.append("author", currentFilters.authors);
                 if (currentFilters.citation && currentFilters.citation !== "____ LN(__)A____") {
-                    // Strip mask characters and underscores if needed, or keep as is if backend expects format
-                    // User wants "already ye rhega user bs number fill krega", suggesting backend might handle full string
-                    // But usually, we only want to search if some numbers are filled.
                     const hasNumbers = /\d/.test(currentFilters.citation);
                     if (hasNumbers) {
-                        params.append("citation", currentFilters.citation);
+                        // Replace underscores with % for SQL wildcard matching
+                        params.append("citation", currentFilters.citation.replace(/_/g, "%"));
                     }
                 }
                 if (currentFilters.category && currentFilters.category !== "all") {
