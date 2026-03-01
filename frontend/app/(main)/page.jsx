@@ -240,7 +240,7 @@ export default function HomePage() {
                                                     type="button"
                                                     disabled={isSearching || !filters.keywords.trim()}
                                                     onClick={() => fetchArticles("", { ...filters, authors: "", citation: " LN()A" })}
-                                                    className="shrink-0 w-12 h-full bg-red-700 text-white flex items-center justify-center hover:bg-black transition-all disabled:bg-gray-200 disabled:text-gray-400 border-l border-neutral-100"
+                                                    className="shrink-0 w-12 h-[42px] bg-red-700 text-white flex items-center justify-center hover:bg-black transition-all disabled:bg-gray-200 disabled:text-gray-400 border-l border-neutral-100"
                                                 >
                                                     <SearchIconSmall />
                                                 </button>
@@ -266,7 +266,7 @@ export default function HomePage() {
                                                     type="button"
                                                     disabled={isSearching || !filters.authors.trim()}
                                                     onClick={() => fetchArticles("", { ...filters, keywords: "", citation: " LN()A" })}
-                                                    className="shrink-0 w-12 h-full bg-red-700 text-white flex items-center justify-center hover:bg-black transition-all disabled:bg-gray-200 disabled:text-gray-400 border-l border-neutral-100"
+                                                    className="shrink-0 w-12 h-[42px] bg-red-700 text-white flex items-center justify-center hover:bg-black transition-all disabled:bg-gray-200 disabled:text-gray-400 border-l border-neutral-100"
                                                 >
                                                     <SearchIconSmall />
                                                 </button>

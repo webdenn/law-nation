@@ -891,9 +891,16 @@ export class ArticleController {
         limit
       } = req.query;
 
-      // Allow search if either 'q' or 'citation' is provided
-      if ((!q || typeof q !== "string") && (!citation || typeof citation !== "string")) {
-        throw new BadRequestError("Search query 'q' or 'citation' is required");
+      // Allow search if any query parameter is provided
+      const hasSearchParam = 
+        (q && typeof q === "string") || 
+        (citation && typeof citation === "string") ||
+        (author && typeof author === "string") ||
+        (keyword && typeof keyword === "string") ||
+        (category && typeof category === "string");
+
+      if (!hasSearchParam) {
+        throw new BadRequestError("At least one search parameter ('q', 'citation', 'author', 'keyword', or 'category') is required");
       }
 
       const filters: {
