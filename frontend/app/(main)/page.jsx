@@ -46,7 +46,15 @@ export default function HomePage() {
                 params.append("q", searchQuery.trim());
                 if (currentFilters.keywords) params.append("keyword", currentFilters.keywords);
                 if (currentFilters.authors) params.append("author", currentFilters.authors);
-                if (currentFilters.citation) params.append("citation", currentFilters.citation);
+                if (currentFilters.citation && currentFilters.citation !== "____ LN(__)A____") {
+                    // Strip mask characters and underscores if needed, or keep as is if backend expects format
+                    // User wants "already ye rhega user bs number fill krega", suggesting backend might handle full string
+                    // But usually, we only want to search if some numbers are filled.
+                    const hasNumbers = /\d/.test(currentFilters.citation);
+                    if (hasNumbers) {
+                        params.append("citation", currentFilters.citation);
+                    }
+                }
                 if (currentFilters.category && currentFilters.category !== "all") {
                     params.append("category", currentFilters.category);
                 }
@@ -96,7 +104,7 @@ export default function HomePage() {
     const [filters, setFilters] = useState({
         keywords: "",
         authors: "",
-        citation: "",
+        citation: "____ LN(__)A____",
         yearFrom: "",
         yearTo: "",
         category: "all",
@@ -109,6 +117,19 @@ export default function HomePage() {
     };
 
     const updateFilter = (name, value) => {
+        if (name === "citation") {
+            // Only allow numbers to update the mask
+            const numbers = value.replace(/\D/g, "").slice(0, 10);
+            let result = "____ LN(__)A____";
+            let numIdx = 0;
+            const chars = result.split("");
+            for (let i = 0; i < chars.length; i++) {
+                if (chars[i] === "_" && numIdx < numbers.length) {
+                    chars[i] = numbers[numIdx++];
+                }
+            }
+            value = chars.join("");
+        }
         setFilters((prev) => ({ ...prev, [name]: value }));
     };
 
@@ -248,8 +269,8 @@ export default function HomePage() {
                                                     onChange={(e) =>
                                                         updateFilter("citation", e.target.value)
                                                     }
-                                                    placeholder="Cite No."
-                                                    className="flex-1 bg-transparent px-3 py-2.5 outline-none text-sm"
+                                                    placeholder="____ LN(__)A____"
+                                                    className="flex-1 bg-transparent px-3 py-2.5 outline-none text-sm font-mono"
                                                 />
                                                 <button
                                                     type="button"

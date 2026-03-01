@@ -288,16 +288,31 @@ function ArticlesContent() {
   const [loading, setLoading] = useState(true);
 
   // Initialize from URL
+  // Initialize from URL with masking
+  const applyMask = (val) => {
+    if (!val || val === "____ LN(__)A____") return "____ LN(__)A____";
+    const numbers = val.replace(/\D/g, "").slice(0, 10);
+    let result = "____ LN(__)A____";
+    let numIdx = 0;
+    const chars = result.split("");
+    for (let i = 0; i < chars.length; i++) {
+        if (chars[i] === "_" && numIdx < numbers.length) {
+            chars[i] = numbers[numIdx++];
+        }
+    }
+    return chars.join("");
+  };
+
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
-  const [citationTerm, setCitationTerm] = useState(searchParams.get("citation") || "");
+  const [citationTerm, setCitationTerm] = useState(applyMask(searchParams.get("citation")));
 
   // --- Effect: Handle Fetching based on URL ---
   useEffect(() => {
     const query = searchParams.get("q") || "";
     const citation = searchParams.get("citation") || "";
     setSearchTerm(query);
-    setCitationTerm(citation);
-    fetchArticles(query, citation);
+    setCitationTerm(applyMask(citation));
+    fetchArticles(query, applyMask(citation));
   }, [searchParams]);
 
   // --- Fetch Function ---
@@ -305,10 +320,12 @@ function ArticlesContent() {
     setLoading(true);
     try {
       let url;
-      if (query.trim() || citation.trim()) {
+      if (query.trim() || (citation.trim() && citation !== "____ LN(__)A____" && /\d/.test(citation))) {
         const params = new URLSearchParams();
         if (query.trim()) params.append("q", query.trim());
-        if (citation.trim()) params.append("citation", citation.trim());
+        if (citation.trim() && citation !== "____ LN(__)A____" && /\d/.test(citation)) {
+          params.append("citation", citation.trim());
+        }
         url = `${NEXT_PUBLIC_BASE_URL}/articles/search?${params.toString()}`;
       } else {
         url = `${NEXT_PUBLIC_BASE_URL}/articles/published`;
@@ -333,7 +350,9 @@ function ArticlesContent() {
     e.preventDefault();
     const params = new URLSearchParams();
     if (searchTerm.trim()) params.append("q", searchTerm.trim());
-    if (citationTerm.trim()) params.append("citation", citationTerm.trim());
+    if (citationTerm.trim() && citationTerm !== "____ LN(__)A____" && /\d/.test(citationTerm)) {
+      params.append("citation", citationTerm.trim());
+    }
 
     const queryString = params.toString();
     if (queryString) {
@@ -404,16 +423,16 @@ function ArticlesContent() {
                 <input
                   type="text"
                   value={citationTerm}
-                  onChange={(e) => setCitationTerm(e.target.value)}
-                  placeholder="Citation Number..."
-                  className="w-full pl-4 pr-10 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none text-sm shadow-sm"
+                  onChange={(e) => setCitationTerm(applyMask(e.target.value))}
+                  placeholder="____ LN(__)A____"
+                  className="w-full pl-4 pr-10 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none text-sm shadow-sm font-mono"
                 />
                 {/* Clear Button */}
                 {citationTerm && (
                   <button
                     type="button"
                     onClick={() => {
-                      setCitationTerm("");
+                      setCitationTerm("____ LN(__)A____");
                       const params = new URLSearchParams(searchParams);
                       params.delete("citation");
                       const dest = params.toString() ? `/articles?${params.toString()}` : "/articles";
