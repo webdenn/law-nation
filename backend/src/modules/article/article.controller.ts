@@ -880,6 +880,7 @@ export class ArticleController {
         author,
         organization,
         keyword,
+        citation,
         dateFrom,
         dateTo,
         sortBy,
@@ -890,8 +891,9 @@ export class ArticleController {
         limit
       } = req.query;
 
-      if (!q || typeof q !== "string") {
-        throw new BadRequestError("Search query 'q' is required");
+      // Allow search if either 'q' or 'citation' is provided
+      if ((!q || typeof q !== "string") && (!citation || typeof citation !== "string")) {
+        throw new BadRequestError("Search query 'q' or 'citation' is required");
       }
 
       const filters: {
@@ -907,6 +909,7 @@ export class ArticleController {
         exclude?: string;
         page?: number;
         limit?: number;
+        citation?: string;
       } = {
         page: page ? parseInt(page as string) : 1,
         limit: limit ? parseInt(limit as string) : 20,
@@ -943,8 +946,11 @@ export class ArticleController {
       if (exclude && typeof exclude === "string") {
         filters.exclude = exclude;
       }
+      if (citation && typeof citation === "string") {
+        filters.citation = citation;
+      }
 
-      const result = await articleService.searchArticles(q, filters);
+      const result = await articleService.searchArticles((q as string) || "", filters);
 
       res.json({
         message: "Search completed successfully",
