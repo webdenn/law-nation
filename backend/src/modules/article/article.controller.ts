@@ -1850,6 +1850,44 @@ export class ArticleController {
       next(error);
     }
   }
+
+  /**
+   * Get watermarked PDF preview for admin/editor/reviewer
+   * GET /api/articles/:id/admin-preview/:versionType
+   */
+  async getAdminPreview(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const articleId = req.params.id as string;
+      const versionType = (req.params.versionType || 'current') as any;
+      const userId = req.user.id;
+      const userRoles = (req.user.roles || []).map((r: any) => typeof r === 'string' ? r : r.name);
+
+      // Get watermark data (from user name)
+      const watermarkData = {
+        userName: req.user.name || "Administrator",
+        email: req.user.email,
+        date: new Date().toLocaleDateString()
+      };
+
+      const result = await articleService.getAdminPreview(
+        articleId,
+        versionType,
+        userId,
+        userRoles,
+        watermarkData
+      );
+
+      // result should be { buffer, filename, mimeType }
+      res.setHeader("Content-Type", result.mimeType);
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="${result.filename}"`
+      );
+      res.send(result.buffer);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const articleController = new ArticleController();

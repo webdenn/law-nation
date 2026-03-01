@@ -1076,7 +1076,7 @@ export default function SubmitPaperPage() {
                   <div>
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 sm:p-8 lg:p-12 text-center">
                       <p className="text-sm sm:text-base text-gray-900 mb-2 font-medium">
-                        Drag & drop your file here
+                        Upload your file here
                       </p>
                       <p className="text-xs sm:text-sm text-gray-600 mb-4 sm:mb-6">
                         Supports Only: PDF

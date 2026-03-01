@@ -472,5 +472,9 @@ export class ArticleService {
   async setCitation(articleId: string, citationNumber: string) {
     return articleWorkflowService.setCitation(articleId, citationNumber);
   }
+
+  async getAdminPreview(articleId: string, versionType: any, userId: string, userRoles: string[], watermarkData: any) {
+    return articleDownloadService.downloadAdminVersionWithWatermark(articleId, versionType, userId, userRoles, watermarkData);
+  }
 }
 export const articleService = new ArticleService();
