@@ -111,14 +111,6 @@ router.get(
   articleController.downloadDiff.bind(articleController)
 );
 
-// NEW: Get watermarked PDF for admin preview (handles any version)
-router.get(
-  "/:id/admin-preview/:versionType",
-  requireAuth,
-  requirePermission("article", "read"),
-  articleController.getAdminWatermarkedPdf.bind(articleController)
-);
-
 // NEW: Download editor's uploaded document
 router.get(
   "/change-logs/:changeLogId/editor-document",
@@ -259,13 +251,6 @@ router.patch(
   "/:id/reviewer-approve",
   requirePermission("article", "write"),
   articleController.reviewerApproveArticle.bind(articleController)
-);
-
-// NEW: Admin sets citation number (only after Stage 2 review approved)
-router.patch(
-  "/:id/set-citation",
-  requirePermission("article", "write"),
-  articleController.setCitationNumber.bind(articleController)
 );
 
 // NEW: Reviewer downloads editor's document
