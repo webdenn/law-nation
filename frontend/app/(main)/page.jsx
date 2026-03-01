@@ -321,7 +321,7 @@ export default function HomePage() {
                                                     type="button"
                                                     disabled={isSearching || !filters.citation.trim() || filters.citation === " LN()A"}
                                                     onClick={() => fetchArticles("", { ...filters, keywords: "", authors: "" })}
-                                                    className="h-full bg-red-700 text-white px-5 text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all disabled:bg-gray-200 disabled:text-gray-400 flex items-center gap-2 border-l border-neutral-100"
+                                                    className="shrink-0 h-full bg-red-700 text-white px-5 text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all disabled:bg-gray-200 disabled:text-gray-400 flex items-center gap-2 border-l border-neutral-100"
                                                 >
                                                     <SearchIconSmall />
                                                     <span>Search</span>
