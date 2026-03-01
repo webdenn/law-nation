@@ -239,11 +239,10 @@ export default function HomePage() {
                                                 <button
                                                     type="button"
                                                     disabled={isSearching || !filters.keywords.trim()}
-                                                    onClick={() => fetchArticles("", { ...filters, authors: "", citation: "" })}
-                                                    className="bg-red-700 text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-tighter hover:bg-black transition-all shadow-sm disabled:bg-gray-300 whitespace-nowrap flex items-center gap-1"
+                                                    onClick={() => fetchArticles("", { ...filters, authors: "", citation: " LN()A" })}
+                                                    className="w-12 h-full bg-gray-300 text-white flex items-center justify-center hover:bg-gray-400 transition-all disabled:opacity-50"
                                                 >
                                                     <SearchIconSmall />
-                                                    Search
                                                 </button>
                                             </div>
                                         </div>
@@ -266,11 +265,10 @@ export default function HomePage() {
                                                 <button
                                                     type="button"
                                                     disabled={isSearching || !filters.authors.trim()}
-                                                    onClick={() => fetchArticles("", { ...filters, keywords: "", citation: "" })}
-                                                    className="bg-red-700 text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-tighter hover:bg-black transition-all shadow-sm disabled:bg-gray-300 whitespace-nowrap flex items-center gap-1"
+                                                    onClick={() => fetchArticles("", { ...filters, keywords: "", citation: " LN()A" })}
+                                                    className="w-12 h-full bg-gray-300 text-white flex items-center justify-center hover:bg-gray-400 transition-all disabled:opacity-50"
                                                 >
                                                     <SearchIconSmall />
-                                                    Search
                                                 </button>
                                             </div>
                                         </div>
@@ -321,10 +319,9 @@ export default function HomePage() {
                                                     type="button"
                                                     disabled={isSearching || !filters.citation.trim() || filters.citation === " LN()A"}
                                                     onClick={() => fetchArticles("", { ...filters, keywords: "", authors: "" })}
-                                                    className="shrink-0 h-full bg-red-700 text-white px-5 text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all disabled:bg-gray-200 disabled:text-gray-400 flex items-center gap-2 border-l border-neutral-100"
+                                                    className="shrink-0 w-12 h-full bg-red-700 text-white flex items-center justify-center hover:bg-black transition-all disabled:bg-gray-200 disabled:text-gray-400 border-l border-neutral-100"
                                                 >
                                                     <SearchIconSmall />
-                                                    <span>Search</span>
                                                 </button>
                                             </div>
                                         </div>
