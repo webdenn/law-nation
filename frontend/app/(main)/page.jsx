@@ -46,7 +46,7 @@ export default function HomePage() {
                 params.append("q", searchQuery.trim());
                 if (currentFilters.keywords) params.append("keyword", currentFilters.keywords);
                 if (currentFilters.authors) params.append("author", currentFilters.authors);
-                if (currentFilters.citation && currentFilters.citation.trim()) {
+                if (currentFilters.citation && currentFilters.citation.trim() && currentFilters.citation !== " LN()A" && /\d/.test(currentFilters.citation)) {
                     // Replace underscores with % for SQL wildcard matching
                     // Format is "Year LN(Vol)APage"
                     const formatted = currentFilters.citation
