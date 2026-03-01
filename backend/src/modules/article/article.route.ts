@@ -325,9 +325,16 @@ router.patch(
   articleController.setCitation.bind(articleController)
 );
 
-// PROTECTED: Get watermarked preview for admin/editor
+// PROTECTED: Get watermarked preview for admin/editor (specific version)
 router.get(
-  "/:id/admin-preview/:versionType?",
+  "/:id/admin-preview/:versionType",
+  requirePermission("article", "read"),
+  articleController.getAdminPreview.bind(articleController)
+);
+
+// PROTECTED: Get watermarked preview for admin/editor (current version)
+router.get(
+  "/:id/admin-preview",
   requirePermission("article", "read"),
   articleController.getAdminPreview.bind(articleController)
 );

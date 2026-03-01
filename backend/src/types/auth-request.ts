@@ -8,6 +8,8 @@ import type { Request } from "express";
  */
 export interface AuthUser {
   id: string;
+  name?: string;
+  email?: string;
   // optional convenience: cached role ids or names (if your auth populates it)
   roleIds?: string[];
   roles?: { name: string }[];

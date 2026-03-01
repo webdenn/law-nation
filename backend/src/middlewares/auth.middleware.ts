@@ -58,6 +58,8 @@ export async function requireAuth(
   // Attach to request
   req.user = {
     id: user.id,
+    name: user.name,
+    email: user.email,
     roleIds: user.roles.map((r) => r.roleId),
     roles: user.roles.map((r) => ({ name: r.role.name })),
   };
@@ -137,6 +139,8 @@ export async function optionalAuth(
       // Attach user to request
       req.user = {
         id: user.id,
+        name: user.name,
+        email: user.email,
         roleIds: user.roles.map((r) => r.roleId),
         roles: user.roles.map((r) => ({ name: r.role.name })),
       };
