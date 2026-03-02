@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -34,6 +34,16 @@ export default function PdfViewer({ pdfUrl }) {
   const [scale, setScale] = useState(1.6);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (window.innerWidth < 640) {
+        setScale(0.6);
+      } else if (window.innerWidth < 1024) {
+        setScale(1.0);
+      }
+    }
+  }, []);
 
   const onDocumentLoadSuccess = useCallback(({ numPages }) => {
     setNumPages(numPages);
