@@ -370,32 +370,26 @@ export class ArticleDownloadService {
     try {
       // Generate temporary output path for watermarked file
       const timestamp = Date.now();
-      const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `admin-${versionType}-${timestamp}.docx`);
+      const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      
+      const tempOutputPath = path.join(tempDir, `admin-${versionType}-${timestamp}.pdf`);
 
-      // Use Adobe service for watermarking (Ensure PDF for preview)
       let sourceUrl = version.url;
-      const isDocx = sourceUrl.includes('.docx') || sourceUrl.includes('.doc') || versionType !== 'original'; // Treat others as potentially word
+      const isDocx = sourceUrl.toLowerCase().includes('.docx') || sourceUrl.toLowerCase().includes('.doc');
 
-      // If it's a DOCX, we ideally want to convert it to PDF or watermark then convert
-      // For simplicity and better preview, we'll try to ensure we have a PDF
       let finalBuffer: Buffer;
       
-      if (sourceUrl.includes('.pdf')) {
+      if (isDocx) {
+        console.log(`🔄 [Admin Download] DOCX detected. Converting to intermediate PDF to preserve formatting.`);
+        // 1. Convert original DOCX (high quality) to temporary clean PDF
+        const cleanPdfPath = path.join(tempDir, `clean-${versionType}-${timestamp}.pdf`);
+        await adobeService.convertDocxToPdf(sourceUrl, cleanPdfPath);
+        
+        // 2. Now watermark this high-quality PDF
+        console.log(`💧 [Admin Download] Watermarking the high-quality PDF.`);
         const watermarkedPath = await adobeService.addWatermarkToPdf(
-          sourceUrl,
-          tempOutputPath.replace('.docx', '.pdf'),
-          {
-            ...watermarkData,
-            articleId: articleId
-          }
-        );
-        const fb = await fs.promises.readFile(watermarkedPath);
-        finalBuffer = fb;
-        await fs.promises.unlink(watermarkedPath).catch(() => { });
-      } else {
-        // Docx path - watermark then convert or just conversion fallback
-        const watermarkedPath = await adobeService.addWatermarkToDocx(
-          sourceUrl,
+          cleanPdfPath,
           tempOutputPath,
           {
             ...watermarkData,
@@ -404,14 +398,25 @@ export class ArticleDownloadService {
           }
         );
         
-        // Convert watermarked docx to pdf for previewer
-        const pdfPath = watermarkedPath.replace('.docx', '.pdf');
-        await adobeService.convertDocxToPdf(watermarkedPath, pdfPath);
+        finalBuffer = await fs.promises.readFile(watermarkedPath);
         
-        finalBuffer = await fs.promises.readFile(pdfPath);
-        
+        // Cleanup temp files
+        await fs.promises.unlink(cleanPdfPath).catch(() => { });
         await fs.promises.unlink(watermarkedPath).catch(() => { });
-        await fs.promises.unlink(pdfPath).catch(() => { });
+      } else {
+        // Already a PDF, watermark directly
+        const watermarkedPath = await adobeService.addWatermarkToPdf(
+          sourceUrl,
+          tempOutputPath,
+          {
+            ...watermarkData,
+            articleId: articleId,
+            userName: `ADMIN - ${watermarkData.userName}`,
+            versionType: versionType.toUpperCase()
+          }
+        );
+        finalBuffer = await fs.promises.readFile(watermarkedPath);
+        await fs.promises.unlink(watermarkedPath).catch(() => { });
       }
 
       console.log(`✅ [Admin Download] Watermark added and converted to PDF successfully`);
@@ -423,7 +428,7 @@ export class ArticleDownloadService {
     } catch (error) {
       console.error(`❌ [Admin Download] Failed to add watermark to ${versionType} version:`, error);
 
-      // Fallback to old watermarking method
+      // Fallback to old watermarking method (Word only, formatting might be lost but at least file is served)
       console.log(`🔄 [Fallback] Using local watermarking for ${versionType} version`);
       const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
       const watermarkedBuffer = await addSimpleWatermarkToWord(version.url, {

@@ -136,6 +136,7 @@ export default function DocumentViewer({
     overrideAndPublish,
     isPublishing,
     saveCiteNumber,
+    isFetchingPreview,
 }) {
     return (
         <>
@@ -323,11 +324,24 @@ export default function DocumentViewer({
                         {/* ⚪ 2. MAIN VIEWER */}
                         <div className="flex-1 flex flex-col relative bg-gray-200 p-4 overflow-hidden">
                             <div className="flex-1 bg-white shadow-lg rounded-lg overflow-hidden relative">
+                                {/* Premium Loading Overlay */}
+                                {isFetchingPreview && (
+                                    <div className="absolute inset-0 z-50 bg-white/70 backdrop-blur-[2px] flex items-center justify-center animate-in fade-in duration-200">
+                                        <div className="flex flex-col items-center gap-4 p-8 bg-white shadow-2xl rounded-2xl border border-gray-100 scale-100 animate-in zoom-in-95 duration-200">
+                                            <div className="w-12 h-12 border-4 border-red-100 border-t-red-600 rounded-full animate-spin"></div>
+                                            <div className="space-y-1 text-center">
+                                                <p className="text-sm font-black text-gray-800 uppercase tracking-tight">Generating Preview</p>
+                                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Applying Watermarks...</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {getPdfUrlToView() ? (
                                     <iframe
                                         key={getPdfUrlToView()}
                                         src={getPdfUrlToView()}
-                                        className="w-full h-full border-none"
+                                        className={`w-full h-full border-none transition-opacity duration-300 ${isFetchingPreview ? 'opacity-30' : 'opacity-100'}`}
                                         title="Viewer"
                                     />
                                 ) : (

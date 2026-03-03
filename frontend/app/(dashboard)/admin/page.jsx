@@ -959,6 +959,7 @@ export default function AdminDashboard() {
         overrideAndPublish={overrideAndPublish}
         isPublishing={isPublishing}
         saveCiteNumber={saveCiteNumber}
+        isFetchingPreview={isFetchingPreview}
       />
 
       <ToastContainer position="top-right" autoClose={3000} theme="colored" />
