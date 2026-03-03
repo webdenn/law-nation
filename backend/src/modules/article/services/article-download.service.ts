@@ -260,6 +260,7 @@ export class ArticleDownloadService {
         originalPdfUrl: true,
         originalWordUrl: true,
         currentWordUrl: true,
+        currentPdfUrl: true,
         assignedEditorId: true,
         assignedReviewerId: true,
         contentType: true,
@@ -285,6 +286,15 @@ export class ArticleDownloadService {
       orderBy: { versionNumber: 'asc' }
     });
 
+    const isReviewStage = [
+      "ASSIGNED_TO_REVIEWER",
+      "REVIEWER_EDITING", 
+      "REVIEWER_IN_PROGRESS",
+      "REVIEWER_APPROVED",
+      "PUBLISHED",
+      "APPROVED"
+    ].includes(article.status);
+
     const versions = {
       original: {
         available: !!(article.originalPdfUrl || article.originalWordUrl),
@@ -297,20 +307,19 @@ export class ArticleDownloadService {
         description: "Editor's corrected version"
       },
       reviewer: {
-        available: false,
-        url: '',
+        available: !!article.currentPdfUrl && isReviewStage,
+        url: article.currentPdfUrl || '',
         description: "Reviewer's final version"
       },
       current: {
-        available: !!article.currentWordUrl,
-        url: article.currentWordUrl || '',
+        available: !!(article.currentPdfUrl || article.currentWordUrl),
+        url: article.currentPdfUrl || article.currentWordUrl || '',
         description: "Current published version"
       }
     };
 
-    // Identify editor and reviewer versions from change logs
+    // Identify editor and reviewer versions from change logs if not already handled by pointers
     for (const log of changeLogs) {
-      // For now, we'll identify by the editedBy field and check user type separately
       const editor = await prisma.user.findUnique({
         where: { id: log.editedBy },
         select: { userType: true, name: true }
@@ -318,10 +327,8 @@ export class ArticleDownloadService {
 
       if (editor?.userType === 'EDITOR' && log.status === 'approved') {
         versions.editor.available = true;
-        versions.editor.url = log.newFileUrl;
-      } else if (editor?.userType === 'REVIEWER' && log.status === 'approved') {
-        versions.reviewer.available = true;
-        versions.reviewer.url = log.newFileUrl;
+        // If we are still in editor phase, currentPdfUrl is the highest quality editor version
+        versions.editor.url = (!isReviewStage && article.currentPdfUrl) ? article.currentPdfUrl : log.newFileUrl;
       }
     }
 
