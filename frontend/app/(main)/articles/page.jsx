@@ -97,14 +97,15 @@ function ArticlesContent() {
       const list = data.results || data.articles || [];
       setArticles(list);
       
-      // Update pagination info from backend (using 'total' as per backend services)
+      // Update pagination info from backend (robust mapping)
       if (data.pagination) {
-        setTotalPages(data.pagination.totalPages || 1);
-        setTotalItems(data.pagination.total || list.length);
+        setTotalPages(Number(data.pagination.totalPages) || 1);
+        setTotalItems(Number(data.pagination.total) || list.length);
       } else {
         // Fallback for search or older endpoints
-        setTotalPages(data.totalPages || 1);
-        setTotalItems(data.total || list.length);
+        const total = Number(data.total || data.totalItems || data.totalArticles || list.length);
+        setTotalItems(total);
+        setTotalPages(Math.ceil(total / itemsPerPage) || 1);
       }
     } catch (error) {
       console.error("Error fetching articles:", error);
@@ -281,11 +282,11 @@ function ArticlesContent() {
         ) : articles.length > 0 ? (
           <>
             {/* Article Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
-              {articles.map((item) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start relative z-10">
+              {articles.map((item, idx) => (
                 <Link
-                  href={`/article/${item.slug || item.id}`}
-                  key={item.id}
+                  href={`/article/${item.slug || item.id || item._id}`}
+                  key={item.id || item._id || idx}
                   className="group flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow duration-300"
                 >
                   <div className="relative h-52 overflow-hidden bg-gray-100">
@@ -343,16 +344,18 @@ function ArticlesContent() {
               ))}
             </div>
 
-            {/* Pagination */}
-            <div className="mt-12 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-                totalItems={totalItems}
-                itemsPerPage={itemsPerPage}
-              />
-            </div>
+            {/* Pagination Container */}
+            {totalItems > 0 && (
+              <div className="mt-12 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm relative z-10">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                  totalItems={totalItems}
+                  itemsPerPage={itemsPerPage}
+                />
+              </div>
+            )}
           </>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-dashed border-gray-300">
