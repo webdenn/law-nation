@@ -196,7 +196,7 @@ export async function addWatermarkToPdf(
 
       // Add logo at bottom-right of page for USER role only
       if (logoImage && userRole === 'USER') {
-        const bottomLogoScale = 0.15; // Smaller logo for bottom
+        const bottomLogoScale = 0.08; // Smaller logo for bottom
         const bottomLogoDims = logoImage.scale(bottomLogoScale);
 
         // Calculate bottom-right position (with 20px margin from bottom and right)
