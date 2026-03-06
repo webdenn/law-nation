@@ -320,6 +320,10 @@ export class ArticleService {
   async getArticleWordUrl(articleId: string) {
     return articleDownloadService.getArticleWordUrl(articleId);
   }
+  // NEW: Download public article Word with watermark
+  async downloadArticleWordWithWatermark(articleId: string, watermarkData: any) {
+    return articleDownloadService.downloadArticleWordWithWatermark(articleId, watermarkData);
+  }
 
   // NEW: Get original DOCX URL (converted from user's PDF)
   async getOriginalDocxUrl(articleId: string) {

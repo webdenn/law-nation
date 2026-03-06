@@ -609,10 +609,10 @@ export class ArticleController {
         }
       );
 
-      // Add watermark to Word document (no URLs in DOCX files)
-      console.log(`💧 [Download Word] Adding watermark for USER role (no URLs in DOCX)`);
-      const watermarkedWord = await addSimpleWatermarkToWord(
-        article.currentWordUrl!,
+      // Add watermark to Word document (using high-quality PDF conversion path)
+      console.log(`💧 [Download Word] Adding high-quality watermark via PDF path`);
+      const watermarkedBuffer = await articleService.downloadArticleWordWithWatermark(
+        articleId,
         {
           userName,
           downloadDate: new Date(),
@@ -627,12 +627,12 @@ export class ArticleController {
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Content-Length', watermarkedWord.length.toString());
+      res.setHeader('Content-Length', watermarkedBuffer.length.toString());
 
-      console.log(`✅ [Download Word] Sending watermarked Word file (${watermarkedWord.length} bytes)`);
+      console.log(`✅ [Download Word] Sending watermarked Word file (${watermarkedBuffer.length} bytes)`);
       console.log(`🔗 [Download Word] URL included: false (DOCX files never include URLs - editorial use only)`);
 
-      res.send(watermarkedWord);
+      res.send(watermarkedBuffer);
     } catch (error) {
       console.error('❌ [Download Word] Failed:', error);
       next(error);
@@ -678,15 +678,15 @@ export class ArticleController {
         }
       );
 
-      // Send watermarked DOCX file
+      // Send clean original DOCX file
       const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}_original.docx`;
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', watermarkedDocx.length.toString());
 
-      console.log(`✅ [Download Original DOCX] Sending watermarked original DOCX file (${watermarkedDocx.length} bytes)`);
-      console.log(`🔗 [Download Original DOCX] URL included: false (DOCX files don't include URLs)`);
+      console.log(`✅ [Download Original DOCX] Sending clean original DOCX file (${watermarkedDocx.length} bytes) to ensure perfect formatting`);
+      console.log(`🔗 [Download Original DOCX] URL included: false (DOCX files never include URLs - editorial use only)`);
 
       res.send(watermarkedDocx);
     } catch (error) {
@@ -734,15 +734,15 @@ export class ArticleController {
         }
       );
 
-      // Send watermarked DOCX file
+      // Send clean editor's DOCX file
       const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}_editor_corrected.docx`;
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', watermarkedDocx.length.toString());
 
-      console.log(`✅ [Download Editor DOCX] Sending watermarked editor's DOCX file (${watermarkedDocx.length} bytes)`);
-      console.log(`🔗 [Download Editor DOCX] URL included: false (DOCX files don't include URLs)`);
+      console.log(`✅ [Download Editor DOCX] Sending clean editor corrected DOCX file (${watermarkedDocx.length} bytes) to ensure perfect formatting`);
+      console.log(`🔗 [Download Editor DOCX] URL included: false (DOCX files never include URLs - editorial use only)`);
 
       res.send(watermarkedDocx);
     } catch (error) {

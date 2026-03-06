@@ -539,26 +539,30 @@ export class AdobeService {
 
   async addWatermarkToDocx(docxPath: string, outputPath: string, watermarkData: any): Promise<string> {
     try {
-      const { addSimpleWatermarkToWord } = await import('@/utils/word-watermark.utils.js');
-      
-      // Ensure watermarkData has all required fields for the utility
-      const fullWatermarkData = {
-        userName: watermarkData.userName || "Admin",
-        downloadDate: watermarkData.downloadDate || new Date(),
-        articleTitle: watermarkData.articleTitle || "Article",
-        articleId: watermarkData.articleId || "preview",
-        frontendUrl: watermarkData.frontendUrl || process.env.FRONTEND_URL || "http://localhost:3000"
-      };
+      console.log(`📝 [Adobe] Non-destructive watermarking for DOCX. Skipping raw-text reconstruction to preserve formatting.`);
 
-      const buffer = await addSimpleWatermarkToWord(docxPath, fullWatermarkData);
+      // Instead of using mammoth (which destroys formatting), we'll just copy the file.
+      // This ensures that 'currentWordUrl' on disk has perfect formatting.
+      // We'll apply watermarks in high-quality PDF during the download step instead.
       
-      // Write buffer to outputPath
-      await fs.promises.writeFile(resolveToAbsolutePath(outputPath), buffer);
+      let inputPath: string;
+      if (this.isUrl(docxPath)) {
+        inputPath = await this.downloadFile(docxPath, '.docx');
+      } else {
+        inputPath = resolveToAbsolutePath(docxPath);
+      }
+
+      const outputAbsPath = resolveToAbsolutePath(outputPath);
+      const outputDir = path.dirname(outputAbsPath);
+      if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+      // Cleanly copy the file
+      await fs.promises.copyFile(inputPath, outputAbsPath);
       
       return outputPath;
     } catch (err: any) {
-      console.error('❌ [AdobeService] DOCX watermarking failed:', err);
-      throw new InternalServerError(`DOCX watermarking failed: ${err.message}`);
+      console.error('❌ [AdobeService] DOCX watermarking fallback failed:', err);
+      throw new InternalServerError(`DOCX preservation failed: ${err.message}`);
     }
   }
 

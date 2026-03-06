@@ -198,9 +198,8 @@ export default function DocumentViewer({
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            const url = selectedArticle.originalWordUrl || selectedArticle.originalPdfUrl;
-                                            const type = selectedArticle.originalWordUrl ? "Word" : "PDF";
-                                            handleDownloadFile(url, `Original_${selectedArticle.title}`, type);
+                                            // ✅ Use API for high-quality watermarked original
+                                            handleDownloadFile(`/articles/${selectedArticle.id}/download/original-docx`, `Original_${selectedArticle.title}`, "Word");
                                         }}
                                         className="p-3 text-gray-400 hover:text-red-700 transition"
                                         title="Download Original"
@@ -436,7 +435,7 @@ export default function DocumentViewer({
                                     <button
                                         onClick={() =>
                                             handleDownloadFile(
-                                                selectedArticle.originalWordUrl || selectedArticle.originalPdfUrl,
+                                                `/articles/${selectedArticle.id}/download/original-docx`,
                                                 `Original_${selectedArticle.title}`,
                                                 "Word"
                                             )
@@ -448,7 +447,7 @@ export default function DocumentViewer({
                                     <button
                                         onClick={() =>
                                             handleDownloadFile(
-                                                selectedArticle.currentWordUrl,
+                                                `/articles/${selectedArticle.id}/download/word`,
                                                 `Final_${selectedArticle.title}`,
                                                 "Word"
                                             )
