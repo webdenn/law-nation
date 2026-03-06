@@ -69,7 +69,7 @@ async function repairFormatting() {
         // Update database
         await prisma.article.update({
           where: { id: article.id },
-          data: { currentWordUrl: uploadResult.url },
+          data: { currentWordUrl: uploadResult.url, originalWordUrl: uploadResult.url },
         });
 
         // Cleanup temp file
