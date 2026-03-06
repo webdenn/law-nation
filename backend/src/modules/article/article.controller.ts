@@ -587,7 +587,7 @@ export class ArticleController {
       console.log(`\n📥 [Download Word] User "${userName}" requesting Word for article ${articleId}`);
 
       // Get article Word info with status
-      const article = await articleService.getArticleById(articleId);
+      const article = await articleService.getArticleByIdForAdmin(articleId);
 
       console.log(`📄 [Download Word] Article: "${article.title}"`);
       console.log(`📊 [Download Word] Article status: ${article.status}`);
@@ -660,7 +660,7 @@ export class ArticleController {
       const userName = req.user.name || 'Admin';
 
       // Get article info
-      const article = await articleService.getArticleById(articleId);
+      const article = await articleService.getArticleByIdForAdmin(articleId);
 
       console.log(`📄 [Download Original DOCX] Processing original DOCX: ${originalDocxUrl}`);
       console.log(`👤 [Download Original DOCX] User role: ADMIN (no URL in DOCX watermarks)`);

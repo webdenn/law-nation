@@ -54,6 +54,29 @@ export class ArticleDownloadService {
     return article;
   }
 
+  // NEW: Get Word URL for admin/editor (bypasses PUBLISHED check)
+  async getArticleWordUrlForAdmin(articleId: string) {
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+      select: {
+        currentWordUrl: true,
+        title: true,
+        contentType: true,
+        status: true
+      },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
+
+    if (!article.currentWordUrl) {
+      throw new NotFoundError("Word version not available for this article - document may not have been processed yet");
+    }
+
+    return article;
+  }
+
   // NEW: Get original DOCX URL (converted from user's original PDF)
   async getOriginalDocxUrl(articleId: string) {
     const article = await prisma.article.findUnique({
@@ -107,7 +130,8 @@ export class ArticleDownloadService {
 
   // NEW: Download article Word with high-quality formatting preservation
   async downloadArticleWordWithWatermark(articleId: string, watermarkData: any) {
-    const article = await this.getArticleWordUrl(articleId);
+    // 🔥 FIX: Use Admin version to bypass PUBLISHED check
+    const article = await this.getArticleWordUrlForAdmin(articleId);
 
     if (!article.currentWordUrl) {
       throw new NotFoundError("Word version not available");

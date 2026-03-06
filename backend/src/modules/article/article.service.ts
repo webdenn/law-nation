@@ -411,6 +411,9 @@ export class ArticleService {
   async getArticleById(articleId: string) {
     return articleQueryService.getArticleById(articleId);
   }
+  async getArticleByIdForAdmin(articleId: string) {
+    return articleQueryService.getArticleByIdForAdmin(articleId);
+  }
   async getArticleBySlug(slug: string) {
     return articleQueryService.getArticleBySlug(slug);
   }

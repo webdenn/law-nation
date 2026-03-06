@@ -168,6 +168,29 @@ export class ArticleQueryService {
     return article;
   }
 
+  // NEW: Get article by ID for admin/editor (bypasses status check)
+  async getArticleByIdForAdmin(articleId: string) {
+    const article = await prisma.article.findUnique({
+      where: {
+        id: articleId,
+      },
+      include: {
+        assignedEditor: {
+          select: { id: true, name: true, email: true },
+        },
+        revisions: {
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
+
+    return article;
+  }
+
   //Get article by slug (SEO-friendly URL)
 
   async getArticleBySlug(slug: string) {
