@@ -199,7 +199,7 @@ export default function DocumentViewer({
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             // ✅ Use API for high-quality watermarked original
-                                            handleDownloadFile(`/api/articles/${selectedArticle.id}/download/original-docx`, `Original_${selectedArticle.title}`, "Word");
+                                            handleDownloadFile(`/articles/${selectedArticle.id}/download/original-docx`, `Original_${selectedArticle.title}`, "Word");
                                         }}
                                         className="p-3 text-gray-400 hover:text-red-700 transition"
                                         title="Download Original"
@@ -435,7 +435,7 @@ export default function DocumentViewer({
                                     <button
                                         onClick={() =>
                                             handleDownloadFile(
-                                                `/api/articles/${selectedArticle.id}/download/original-docx`,
+                                                `/articles/${selectedArticle.id}/download/original-docx`,
                                                 `Original_${selectedArticle.title}`,
                                                 "Word"
                                             )
@@ -447,7 +447,7 @@ export default function DocumentViewer({
                                     <button
                                         onClick={() =>
                                             handleDownloadFile(
-                                                `/api/articles/${selectedArticle.id}/download/word`,
+                                                `/articles/${selectedArticle.id}/download/word`,
                                                 `Final_${selectedArticle.title}`,
                                                 "Word"
                                             )

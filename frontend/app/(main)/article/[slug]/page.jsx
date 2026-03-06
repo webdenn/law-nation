@@ -221,7 +221,7 @@ export default function ArticlePage({ params }) {
 
       // ✅ Database ID use karein kyunki slug se download nahi hota
       const res = await fetch(
-        `${NEXT_PUBLIC_BASE_URL}/api/articles/${article.id || article._id}/${endpoint}`,
+        `${NEXT_PUBLIC_BASE_URL}/articles/${article.id || article._id}/${endpoint}`,
         {
           method: "GET",
           headers: {
