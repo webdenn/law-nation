@@ -609,8 +609,8 @@ export class ArticleController {
         }
       );
 
-      // Add watermark to Word document (using high-quality PDF conversion path)
-      console.log(`💧 [Download Word] Adding high-quality watermark via PDF path`);
+      // Serve clean DOCX buffer to ensure 100% formatting preservation
+      console.log(`📄 [Download Word] Serving clean DOCX buffer (formatting preservation mode)`);
       const watermarkedBuffer = await articleService.downloadArticleWordWithWatermark(
         articleId,
         {

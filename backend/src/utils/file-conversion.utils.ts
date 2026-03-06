@@ -250,36 +250,10 @@ export async function convertPdfToWord(
 
     console.log(`✅ [Adobe] PDF to DOCX conversion successful`);
 
-    // ✅ Add watermark to converted Word file using Adobe service
-    console.log(`🔖 [Adobe] Adding watermark to converted DOCX file...`);
-
+    // 🔥 FIX: STOP DESTRUCTIVE WATERMARKING
+    // We serve clean buffers for Word downloads now to ensure 100% formatting.
+    // The previous 'addSimpleWatermarkToWord' was destroying layout/tables.
     let fileToUploadPath = docxAbsolutePath;
-
-    try {
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const watermarkData = {
-        userName: 'LAW NATION',
-        downloadDate: new Date(),
-        articleTitle: 'Converted Document',
-        articleId: 'conversion',
-        frontendUrl,
-      };
-
-      const watermarkedOutputPath = docxAbsolutePath.replace('.docx', '_watermarked.docx');
-      // Pass absolute paths to watermark function
-      const watermarkedBuffer = await addSimpleWatermarkToWord(docxAbsolutePath, watermarkData);
-      const fsSync = await import('fs');
-      fsSync.writeFileSync(watermarkedOutputPath, watermarkedBuffer);
-      const watermarkedAbsolutePath = watermarkedOutputPath;
-
-      console.log(`✅ [Adobe] Watermark added to DOCX file`);
-      fileToUploadPath = watermarkedAbsolutePath;
-
-    } catch (watermarkError) {
-      console.warn(`⚠️ [Adobe] Failed to add watermark to DOCX file:`, watermarkError);
-      // Fallback to non-watermarked version
-      fileToUploadPath = docxAbsolutePath;
-    }
 
     // Save the file via S3 (Prod) or Local Uploads (Dev)
     const result = await saveConvertedFile(
