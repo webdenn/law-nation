@@ -10,6 +10,7 @@
     "start:dev": "tsx watch src/index.ts",
     "build": "tsc && tsc-alias",
     "seed": "tsx src/scripts/admin.seed.ts",
+    "repair-docx": "tsx src/scripts/repair-docx-formatting.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "start": "node dist/index.js"
