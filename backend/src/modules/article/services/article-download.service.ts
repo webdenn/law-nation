@@ -95,39 +95,49 @@ export class ArticleDownloadService {
     try {
       // Generate temporary output path for watermarked file
       const timestamp = Date.now();
-      const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `original-watermarked-${timestamp}.docx`);
+      const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      
+      const tempOutputPath = path.join(tempDir, `original-watermarked-${timestamp}.pdf`);
 
-      // Use Adobe service for watermarking
-      const watermarkedPath = await adobeService.addWatermarkToDocx(
-        article.originalWordUrl,
+      console.log(`🔄 [Adobe] Converting Original DOCX to high-quality PDF to preserve formatting.`);
+      
+      // 1. Convert original DOCX (high quality) to temporary clean PDF
+      const cleanPdfPath = path.join(tempDir, `clean-original-${timestamp}.pdf`);
+      await adobeService.convertDocxToPdf(article.originalWordUrl, cleanPdfPath);
+      
+      // 2. Now watermark this high-quality PDF
+      console.log(`💧 [Adobe] Watermarking the high-quality PDF.`);
+      const watermarkedPath = await adobeService.addWatermarkToPdf(
+        cleanPdfPath,
         tempOutputPath,
-        watermarkData
+        {
+          ...watermarkData,
+          articleTitle: article.title,
+          userName: watermarkData.userName || "User"
+        }
       );
+      
+      const watermarkedBuffer = await fs.promises.readFile(watermarkedPath);
+      
+      // Cleanup temp files
+      await fs.promises.unlink(cleanPdfPath).catch(() => { });
+      await fs.promises.unlink(watermarkedPath).catch(() => { });
 
-      // Adobe service now returns relative path, convert to absolute for file reading
-      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath)
-        ? watermarkedPath
-        : path.join(process.cwd(), watermarkedPath.startsWith('/')
-          ? watermarkedPath.substring(1)
-          : watermarkedPath);
-
-      // Validate the file exists before trying to read it
-      const fs = await import('fs/promises');
-      await fs.access(absoluteWatermarkedPath); // Check if file exists
-      const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
-
-      // Clean up temp file
-      await fs.unlink(absoluteWatermarkedPath).catch(() => { });
-
-      console.log(`✅ [Adobe] Watermark added to original DOCX successfully`);
+      console.log(`✅ [Adobe] Watermark added to original PDF successfully`);
       return watermarkedBuffer;
     } catch (error) {
-      console.error(`❌ [Adobe] Failed to add watermark to original DOCX:`, error);
+      console.error(`❌ [Adobe] Failed to add watermark to original DOCX via PDF path:`, error);
 
-      // Fallback to old watermarking method
-      console.log(`🔄 [Fallback] Using local watermarking for original DOCX`);
-      const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
-      return await addSimpleWatermarkToWord(article.originalWordUrl, watermarkData);
+      // Fallback: If conversion fails, serve original DOCX without watermark to preserve formatting
+      // (Better a clean unwatermarked file than a broken formatted one)
+      console.log(`🔄 [Fallback] Serving original DOCX without watermark to preserve formatting`);
+      const { downloadFileToBuffer } = await import("@/utils/pdf-extract.utils.js");
+      if (article.originalWordUrl.startsWith('http')) {
+        return await downloadFileToBuffer(article.originalWordUrl);
+      } else {
+        return await fs.promises.readFile(resolveToAbsolutePath(article.originalWordUrl));
+      }
     }
   }
 
@@ -207,39 +217,48 @@ export class ArticleDownloadService {
     try {
       // Generate temporary output path for watermarked file
       const timestamp = Date.now();
-      const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `reviewer-watermarked-${timestamp}.docx`);
+      const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      
+      const tempOutputPath = path.join(tempDir, `reviewer-watermarked-${timestamp}.pdf`);
 
-      // Use Adobe service for watermarking
-      const watermarkedPath = await adobeService.addWatermarkToDocx(
-        article.currentWordUrl,
+      console.log(`🔄 [Adobe] Converting Reviewer DOCX to high-quality PDF to preserve formatting.`);
+      
+      // 1. Convert reviewer's DOCX to temporary clean PDF
+      const cleanPdfPath = path.join(tempDir, `clean-reviewer-${timestamp}.pdf`);
+      await adobeService.convertDocxToPdf(article.currentWordUrl, cleanPdfPath);
+      
+      // 2. Now watermark this high-quality PDF
+      console.log(`💧 [Adobe] Watermarking the high-quality PDF.`);
+      const watermarkedPath = await adobeService.addWatermarkToPdf(
+        cleanPdfPath,
         tempOutputPath,
-        watermarkData
+        {
+          ...watermarkData,
+          articleTitle: article.title,
+          userName: watermarkData.userName || "Reviewer"
+        }
       );
+      
+      const watermarkedBuffer = await fs.promises.readFile(watermarkedPath);
+      
+      // Cleanup temp files
+      await fs.promises.unlink(cleanPdfPath).catch(() => { });
+      await fs.promises.unlink(watermarkedPath).catch(() => { });
 
-      // Adobe service now returns relative path, convert to absolute for file reading
-      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath)
-        ? watermarkedPath
-        : path.join(process.cwd(), watermarkedPath.startsWith('/')
-          ? watermarkedPath.substring(1)
-          : watermarkedPath);
-
-      // Validate the file exists before trying to read it
-      const fs = await import('fs/promises');
-      await fs.access(absoluteWatermarkedPath); // Check if file exists
-      const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
-
-      // Clean up temp file
-      await fs.unlink(absoluteWatermarkedPath).catch(() => { });
-
-      console.log(`✅ [Adobe] Watermark added to reviewer's DOCX successfully`);
+      console.log(`✅ [Adobe] Watermark added to reviewer PDF successfully`);
       return watermarkedBuffer;
     } catch (error) {
-      console.error(`❌ [Adobe] Failed to add watermark to reviewer's DOCX:`, error);
+      console.error(`❌ [Adobe] Failed to add watermark to reviewer's DOCX via PDF path:`, error);
 
-      // Fallback to old watermarking method
-      console.log(`🔄 [Fallback] Using local watermarking for reviewer's DOCX`);
-      const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
-      return await addSimpleWatermarkToWord(article.currentWordUrl, watermarkData);
+      // Fallback: Serve reviewer's DOCX without watermark to preserve formatting
+      console.log(`🔄 [Fallback] Serving reviewer's DOCX without watermark to preserve formatting`);
+      const { downloadFileToBuffer } = await import("@/utils/pdf-extract.utils.js");
+      if (article.currentWordUrl.startsWith('http')) {
+        return await downloadFileToBuffer(article.currentWordUrl);
+      } else {
+        return await fs.promises.readFile(resolveToAbsolutePath(article.currentWordUrl));
+      }
     }
   }
 
@@ -524,42 +543,48 @@ export class ArticleDownloadService {
     try {
       // Generate temporary output path for watermarked file
       const timestamp = Date.now();
-      const tempOutputPath = path.join(process.cwd(), 'uploads', 'temp', `admin-watermarked-${timestamp}.docx`);
+      const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      
+      const tempOutputPath = path.join(tempDir, `admin-watermarked-${timestamp}.pdf`);
 
-      // Use Adobe service for watermarking
-      const watermarkedPath = await adobeService.addWatermarkToDocx(
-        articleData.currentWordUrl,
+      console.log(`🔄 [Adobe] Converting Admin DOCX to high-quality PDF to preserve formatting.`);
+      
+      // 1. Convert admin's DOCX to temporary clean PDF
+      const cleanPdfPath = path.join(tempDir, `clean-admin-${timestamp}.pdf`);
+      await adobeService.convertDocxToPdf(articleData.currentWordUrl, cleanPdfPath);
+      
+      // 2. Now watermark this high-quality PDF
+      console.log(`💧 [Adobe] Watermarking the high-quality PDF.`);
+      const watermarkedPath = await adobeService.addWatermarkToPdf(
+        cleanPdfPath,
         tempOutputPath,
         {
           ...watermarkData,
+          articleTitle: articleData.title,
           userName: `ADMIN - ${watermarkData.userName}`
         }
       );
+      
+      const watermarkedBuffer = await fs.promises.readFile(watermarkedPath);
+      
+      // Cleanup temp files
+      await fs.promises.unlink(cleanPdfPath).catch(() => { });
+      await fs.promises.unlink(watermarkedPath).catch(() => { });
 
-      // Adobe service now returns relative path, convert to absolute for file reading
-      const absoluteWatermarkedPath = path.isAbsolute(watermarkedPath)
-        ? watermarkedPath
-        : path.join(process.cwd(), watermarkedPath.startsWith('/')
-          ? watermarkedPath.substring(1)
-          : watermarkedPath);
-
-      // Validate the file exists before trying to read it
-      const fs = await import('fs/promises');
-      await fs.access(absoluteWatermarkedPath); // Check if file exists
-      const watermarkedBuffer = await fs.readFile(absoluteWatermarkedPath);
-
-      // Clean up temp file
-      await fs.unlink(absoluteWatermarkedPath).catch(() => { });
-
-      console.log(`✅ [Adobe] Watermark added to Admin DOCX successfully`);
+      console.log(`✅ [Adobe] Watermark added to admin PDF successfully`);
       return watermarkedBuffer;
     } catch (error) {
-      console.error(`❌ [Adobe] Failed to add watermark to Admin DOCX:`, error);
+      console.error(`❌ [Adobe] Failed to add watermark to Admin DOCX via PDF path:`, error);
 
-      // Fallback to old watermarking method
-      console.log(`🔄 [Fallback] Using local watermarking for Admin DOCX`);
-      const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
-      return await addSimpleWatermarkToWord(articleData.currentWordUrl, watermarkData);
+      // Fallback: Serve admin's DOCX without watermark to preserve formatting
+      console.log(`🔄 [Fallback] Serving admin's DOCX without watermark to preserve formatting`);
+      const { downloadFileToBuffer } = await import("@/utils/pdf-extract.utils.js");
+      if (articleData.currentWordUrl.startsWith('http')) {
+        return await downloadFileToBuffer(articleData.currentWordUrl);
+      } else {
+        return await fs.promises.readFile(resolveToAbsolutePath(articleData.currentWordUrl));
+      }
     }
   }
 
