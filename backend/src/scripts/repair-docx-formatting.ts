@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { prisma } from "../db/db.js";
 import { adobeService } from "../services/adobe.service.js";
 import { uploadToS3 } from "../utils/file-conversion.utils.js";
