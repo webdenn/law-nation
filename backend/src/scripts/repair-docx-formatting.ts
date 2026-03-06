@@ -18,11 +18,7 @@ async function repairFormatting() {
     // 1. Find all articles that have an original PDF
     const articles = await prisma.article.findMany({
       where: {
-        originalPdfUrl: { not: null },
-        OR: [
-          { contentType: "ARTICLE" },
-          { contentType: "DOCUMENT" }
-        ]
+        NOT: { originalPdfUrl: null },
       },
       select: {
         id: true,
