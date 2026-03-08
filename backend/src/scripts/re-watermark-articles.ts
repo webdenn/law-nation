@@ -1,20 +1,24 @@
 import "dotenv/config";
 import { prisma } from "../db/db.js";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { adobeService } from "../services/adobe.service.js";
 import { downloadFileToBuffer } from "../utils/pdf-extract.utils.js";
+import { PDFDocument, PDFName, PDFArray, PDFRef } from "pdf-lib";
 import fs from "fs";
 import path from "path";
-import JSZip from "jszip";
 
 /**
- * RE-WATERMARK SCRIPT v3: Strip watermark images from DOCX then convert to clean PDF.
+ * RE-WATERMARK SCRIPT v4: Direct PDF watermark removal.
  * 
- * Problem: DOCX files have the watermark logo image baked in (from Adobe PDF→DOCX conversion).
- * Solution: Open DOCX as ZIP, remove logo images from word/media/, fix XML references, 
- *           then convert cleaned DOCX → clean PDF.
+ * How it works:
+ * - When pdf-lib adds a watermark via drawImage(), it creates a NEW content stream
+ *   and appends it to the page's Contents array.
+ * - Original PDF content = first stream(s)
+ * - Watermark overlay = last stream(s) added by pdf-lib
+ * - We remove the LAST content stream from each page, stripping the watermark
+ *   while preserving the original document perfectly.
  * 
  * ⚠️ NO DATABASE CHANGES - Only overwrites S3 PDF files in-place.
+ * ⚠️ NO DOCX CONVERSION - Works directly on PDF, no formatting issues.
  */
 
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
@@ -34,176 +38,64 @@ function extractS3Key(url: string): string | null {
 }
 
 /**
- * Remove watermark images from a DOCX file.
- * DOCX is a ZIP file. The watermark logo is stored as an image in word/media/.
- * We remove image references from the document XML and delete the image files.
+ * Remove watermark from a PDF by stripping the last content stream(s) 
+ * added by pdf-lib's drawImage() on each page.
  */
-async function stripWatermarkFromDocx(docxBuffer: Buffer): Promise<Buffer> {
-  const zip = await JSZip.loadAsync(docxBuffer);
+async function stripWatermarkFromPdf(pdfBuffer: Buffer): Promise<Buffer> {
+  const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
+  const pages = pdfDoc.getPages();
 
-  // 1. Find all images in word/media/
-  const mediaFiles = Object.keys(zip.files).filter(
-    (name) => name.startsWith("word/media/") && !zip.files[name].dir
-  );
+  console.log(`   � PDF has ${pages.length} pages`);
 
-  console.log(`   🔍 Found ${mediaFiles.length} media files in DOCX`);
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i];
+    const pageNode = page.node;
 
-  if (mediaFiles.length === 0) {
-    console.log(`   ⚠️ No media files found - returning original DOCX`);
-    return docxBuffer;
-  }
+    // Get the Contents entry (can be a single stream ref or an array of refs)
+    const contentsEntry = pageNode.get(PDFName.of("Contents"));
 
-  // 2. Collect ALL image files to remove (PNG, JPEG, EMF - Adobe may re-encode)
-  const imagesToRemove: string[] = [];
-
-  for (const mediaFile of mediaFiles) {
-    const fileData = await zip.file(mediaFile)?.async("nodebuffer");
-    if (!fileData) continue;
-
-    const ext = mediaFile.toLowerCase();
-    const isImage = ext.endsWith(".png") || ext.endsWith(".jpg") || ext.endsWith(".jpeg") || ext.endsWith(".emf") || ext.endsWith(".wmf");
-    
-    if (isImage) {
-      console.log(`   🖼️ Found image: ${mediaFile} (${(fileData.length / 1024).toFixed(1)} KB)`);
-      imagesToRemove.push(mediaFile);
-    }
-  }
-
-  if (imagesToRemove.length === 0) {
-    console.log(`   ⚠️ No images found to remove`);
-    return docxBuffer;
-  }
-
-  // 3. Find relationship IDs for these images
-  // Check ALL .rels files (document.xml.rels + header*.xml.rels)
-  const imageRelIds: string[] = [];
-  const relsFiles = Object.keys(zip.files).filter(
-    (name) => name.includes("_rels/") && name.endsWith(".rels")
-  );
-
-  for (const relsPath of relsFiles) {
-    const relsFile = zip.file(relsPath);
-    if (!relsFile) continue;
-
-    let relsXml = await relsFile.async("string");
-
-    for (const imgPath of imagesToRemove) {
-      const relativePath = imgPath.replace("word/", "");
-
-      // Find the FULL <Relationship> tag that has this Target, regardless of attribute order
-      const escapedPath = relativePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const fullTagRegex = new RegExp(
-        `<Relationship[^>]*Target="${escapedPath}"[^>]*/>`,
-        "g"
-      );
-      const tagMatch = fullTagRegex.exec(relsXml);
-      if (tagMatch) {
-        // Extract Id from the matched tag (works regardless of attribute order)
-        const idMatch = tagMatch[0].match(/Id="([^"]*)"/);
-        if (idMatch) {
-          imageRelIds.push(idMatch[1]);
-          console.log(`   🔗 Relationship: ${idMatch[1]} → ${relativePath} (in ${relsPath})`);
-        }
+    if (contentsEntry instanceof PDFArray) {
+      const streamCount = contentsEntry.size();
+      
+      if (streamCount > 1) {
+        // pdf-lib appends new content streams at the end
+        // The LAST stream(s) contain the watermark
+        // Keep only the FIRST stream (original content)
+        
+        // Find how many streams were added by watermarking
+        // Typically pdf-lib adds 1 stream per drawImage/drawText call batch
+        // We remove the last stream(s) — anything after the original content
+        
+        // The original PDF typically has 1 content stream
+        // Watermark adds 1-2 more streams (depending on how many elements)
+        // We keep only the first stream
+        const originalStreamRef = contentsEntry.get(0);
+        
+        // Create new array with only the original stream
+        const newContents = pdfDoc.context.obj([originalStreamRef]);
+        pageNode.set(PDFName.of("Contents"), newContents);
+        
+        console.log(`   Page ${i + 1}: Removed ${streamCount - 1} watermark stream(s) (kept 1/${streamCount})`);
+      } else {
+        console.log(`   Page ${i + 1}: Only 1 content stream (may be merged, skipping)`);
       }
-
-      // Remove the relationship entry
-      relsXml = relsXml.replace(fullTagRegex, "");
-    }
-
-    zip.file(relsPath, relsXml);
-  }
-
-  // 4. Remove image references from ALL XML files (document.xml + headers + footers)
-  const xmlFiles = Object.keys(zip.files).filter(
-    (name) => name.startsWith("word/") && name.endsWith(".xml") && !name.includes("_rels/")
-  );
-
-  for (const xmlPath of xmlFiles) {
-    const xmlFile = zip.file(xmlPath);
-    if (!xmlFile) continue;
-
-    let xml = await xmlFile.async("string");
-    let modified = false;
-
-    for (const relId of imageRelIds) {
-      // Remove <w:drawing>...</w:drawing> blocks that reference this relId
-      // Use non-greedy match with [\s\S] for multiline
-      const drawingRegex = new RegExp(
-        `<w:drawing>[\\s\\S]*?r:embed="${relId}"[\\s\\S]*?</w:drawing>`,
-        "g"
-      );
-      const newXml = xml.replace(drawingRegex, "");
-      if (newXml !== xml) {
-        xml = newXml;
-        modified = true;
-        console.log(`   📝 Removed drawing ref to ${relId} in ${xmlPath}`);
-      }
-
-      // Also remove <w:pict> elements (alternative image format)
-      const pictRegex = new RegExp(
-        `<w:pict>[\\s\\S]*?r:id="${relId}"[\\s\\S]*?</w:pict>`,
-        "g"
-      );
-      const newXml2 = xml.replace(pictRegex, "");
-      if (newXml2 !== xml) {
-        xml = newXml2;
-        modified = true;
-        console.log(`   📝 Removed pict ref to ${relId} in ${xmlPath}`);
-      }
-    }
-
-    if (modified) {
-      zip.file(xmlPath, xml);
+    } else if (contentsEntry instanceof PDFRef) {
+      // Single stream reference — content might be merged, can't easily split
+      console.log(`   Page ${i + 1}: Single content stream (merged, skipping)`);
+    } else {
+      console.log(`   Page ${i + 1}: Unknown content type, skipping`);
     }
   }
 
-  // 4b. Remove paragraph borders and frame properties (Adobe conversion artifacts)
-  // These create unwanted boxes around text in the final PDF
-  for (const xmlPath of xmlFiles) {
-    const xmlFile = zip.file(xmlPath);
-    if (!xmlFile) continue;
-
-    let xml = await xmlFile.async("string");
-    const originalXml = xml;
-
-    // Remove paragraph borders: <w:pBdr>...</w:pBdr>
-    xml = xml.replace(/<w:pBdr>[\s\S]*?<\/w:pBdr>/g, "");
-
-    // Remove frame properties: <w:framePr ... />
-    xml = xml.replace(/<w:framePr[^>]*\/>/g, "");
-
-    // Remove text box content borders in shapes
-    xml = xml.replace(/<v:rect[^>]*stroked="t"[^>]*>/g, (match) => 
-      match.replace('stroked="t"', 'stroked="f"')
-    );
-
-    if (xml !== originalXml) {
-      zip.file(xmlPath, xml);
-      console.log(`   📐 Removed borders/frames from ${xmlPath}`);
-    }
-  }
-
-  // 5. Delete the actual image files from the ZIP
-  for (const imgPath of imagesToRemove) {
-    zip.remove(imgPath);
-    console.log(`   🗑️ Deleted: ${imgPath}`);
-  }
-
-  console.log(`   ✅ Stripped ${imagesToRemove.length} watermark images, ${imageRelIds.length} references`);
-
-  // 6. Generate cleaned DOCX
-  const cleanedBuffer = await zip.generateAsync({
-    type: "nodebuffer",
-    compression: "DEFLATE",
-  });
-
-  return cleanedBuffer;
+  // Save the modified PDF
+  const cleanedPdfBytes = await pdfDoc.save();
+  return Buffer.from(cleanedPdfBytes);
 }
 
-
 async function reWatermarkArticles() {
-  console.log("� [Re-Watermark v3] Strip watermark images from DOCX → clean PDF");
-  console.log("⚠️  [Re-Watermark v3] NO DATABASE CHANGES\n");
+  console.log("🚀 [Re-Watermark v4] Direct PDF watermark removal");
+  console.log("📋 Removes last content stream(s) from each page");
+  console.log("⚠️  NO DATABASE CHANGES | NO DOCX CONVERSION\n");
 
   let s3Client: S3Client | null = null;
   if (!isLocal && AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY) {
@@ -224,15 +116,15 @@ async function reWatermarkArticles() {
         title: true,
         slug: true,
         status: true,
+        originalPdfUrl: true,
         currentPdfUrl: true,
-        currentWordUrl: true,
-        originalWordUrl: true,
       },
     });
 
     const toProcess = articles.filter(
       (a: any) =>
-        (a.currentWordUrl || a.originalWordUrl) &&
+        a.originalPdfUrl &&
+        a.originalPdfUrl.length > 0 &&
         a.currentPdfUrl &&
         a.currentPdfUrl.length > 0
     );
@@ -249,24 +141,12 @@ async function reWatermarkArticles() {
     let failCount = 0;
     let skipCount = 0;
 
-    const tempDir = path.join(process.cwd(), "uploads", "temp");
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-
     for (let i = 0; i < toProcess.length; i++) {
       const article = toProcess[i];
       const progress = `[${i + 1}/${toProcess.length}]`;
 
       try {
         console.log(`${progress} 📄 "${article.title}" (${article.id})`);
-
-        const docxUrl = article.currentWordUrl || article.originalWordUrl;
-        if (!docxUrl) {
-          console.log(`${progress} ⏭️ Skipped: No DOCX`);
-          skipCount++;
-          continue;
-        }
 
         const isS3Url = article.currentPdfUrl.startsWith("http");
         let s3Key: string | null = null;
@@ -279,39 +159,28 @@ async function reWatermarkArticles() {
           }
         }
 
-        // 1. Download DOCX
-        console.log(`${progress} 📥 Downloading DOCX...`);
-        let docxBuffer: Buffer;
-        if (docxUrl.startsWith("http://") || docxUrl.startsWith("https://")) {
-          docxBuffer = await downloadFileToBuffer(docxUrl);
+        // 1. Download ORIGINAL PDF (has watermark baked in by upload middleware)
+        console.log(`${progress} 📥 Downloading original PDF...`);
+        let pdfBuffer: Buffer;
+
+        if (article.originalPdfUrl.startsWith("http://") || article.originalPdfUrl.startsWith("https://")) {
+          pdfBuffer = await downloadFileToBuffer(article.originalPdfUrl);
         } else {
-          let filePath = docxUrl;
+          let filePath = article.originalPdfUrl;
           if (filePath.startsWith("/uploads")) {
             filePath = path.join(process.cwd(), filePath);
           }
-          docxBuffer = fs.readFileSync(filePath);
+          pdfBuffer = fs.readFileSync(filePath);
         }
 
-        console.log(`${progress}    DOCX size: ${(docxBuffer.length / 1024).toFixed(1)} KB`);
+        console.log(`${progress}    Original PDF: ${(pdfBuffer.length / 1024).toFixed(1)} KB`);
 
-        // 2. Strip watermark images from DOCX
-        console.log(`${progress} 🧹 Stripping watermark images from DOCX...`);
-        const cleanedDocxBuffer = await stripWatermarkFromDocx(docxBuffer);
-        console.log(`${progress}    Cleaned DOCX size: ${(cleanedDocxBuffer.length / 1024).toFixed(1)} KB`);
-
-        // 3. Save cleaned DOCX to temp
-        const tempDocxPath = path.join(tempDir, `clean-${article.id}-${Date.now()}.docx`);
-        const tempPdfPath = path.join(tempDir, `clean-${article.id}-${Date.now()}.pdf`);
-        fs.writeFileSync(tempDocxPath, cleanedDocxBuffer);
-
-        // 4. Convert cleaned DOCX → clean PDF via Adobe
-        console.log(`${progress} 🔄 Converting cleaned DOCX → PDF via Adobe...`);
-        await adobeService.convertDocxToPdf(tempDocxPath, tempPdfPath);
-
-        const cleanPdfBuffer = fs.readFileSync(tempPdfPath);
+        // 2. Strip watermark by removing last content stream(s) from PDF
+        console.log(`${progress} 🧹 Stripping watermark from PDF...`);
+        const cleanPdfBuffer = await stripWatermarkFromPdf(pdfBuffer);
         console.log(`${progress}    Clean PDF: ${(cleanPdfBuffer.length / 1024).toFixed(1)} KB`);
 
-        // 5. Upload clean PDF to S3
+        // 3. Upload clean PDF to S3 (overwrite currentPdfUrl)
         if (s3Client && s3Key) {
           console.log(`${progress} ☁️ Uploading to S3: ${s3Key}`);
           await s3Client.send(
@@ -332,16 +201,7 @@ async function reWatermarkArticles() {
           console.log(`${progress} ✅ Done (local)!\n`);
         }
 
-        // Cleanup
-        try { fs.unlinkSync(tempDocxPath); } catch {}
-        try { fs.unlinkSync(tempPdfPath); } catch {}
-
         successCount++;
-
-        // Rate limit delay
-        if (i < toProcess.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
       } catch (err: any) {
         console.error(`${progress} ❌ Failed: ${err?.message || err}\n`);
         failCount++;
@@ -349,11 +209,12 @@ async function reWatermarkArticles() {
     }
 
     console.log(`\n${"=".repeat(50)}`);
-    console.log(`🏁 RE-WATERMARK v3 COMPLETE (NO DB CHANGES)`);
+    console.log(`🏁 RE-WATERMARK v4 COMPLETE (NO DB CHANGES)`);
     console.log(`✅ Success: ${successCount}`);
     console.log(`❌ Failed:  ${failCount}`);
     console.log(`⏭️ Skipped: ${skipCount}`);
     console.log(`${"=".repeat(50)}`);
+    console.log(`\n💡 Download controller will add small logo at download time.`);
   } catch (error: any) {
     console.error("❌ Fatal error:", error?.message || error);
   } finally {
