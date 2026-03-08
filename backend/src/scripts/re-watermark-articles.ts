@@ -1,22 +1,24 @@
 import "dotenv/config";
 import { prisma } from "../db/db.js";
-import { addWatermarkToPdf } from "../utils/pdf-watermark.utils.js";
-import { downloadFileToBuffer } from "../utils/pdf-extract.utils.js";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { adobeService } from "../services/adobe.service.js";
+import { downloadFileToBuffer } from "../utils/pdf-extract.utils.js";
 import fs from "fs";
 import path from "path";
 
 /**
- * RE-WATERMARK SCRIPT: Fix old articles that have the big logo baked in.
+ * RE-WATERMARK SCRIPT v2: Fix old articles by generating CLEAN PDFs from DOCX files.
  * 
- * ⚠️ NO DATABASE CHANGES - Only overwrites S3 files in-place.
+ * Why DOCX? Because originalPdfUrl already has the big logo baked in from upload.
+ * DOCX files don't have the baked-in PDF watermark logo.
  * 
- * What it does:
- * 1. Fetches article info from DB (READ ONLY)
- * 2. Downloads the ORIGINAL clean PDF (originalPdfUrl)
- * 3. Applies the NEW small logo watermark (scale 0.08, opacity 0.5)
- * 4. Overwrites the SAME S3 key used by currentPdfUrl
- *    → Database URL stays EXACTLY the same, no DB update needed
+ * Flow:
+ * 1. For each article, get its DOCX file (currentWordUrl or originalWordUrl)
+ * 2. Convert DOCX → clean PDF via Adobe (no watermark)
+ * 3. Upload clean PDF to S3 (overwriting currentPdfUrl)
+ * 4. Download controller will add the small logo at download time
+ * 
+ * ⚠️ NO DATABASE CHANGES - Only overwrites S3 PDF files in-place.
  */
 
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
@@ -28,13 +30,10 @@ const isLocal = process.env.NODE_ENV === "local";
 
 /**
  * Extract the S3 storage key from a full S3 URL.
- * e.g. "https://law-nation.s3.ap-south-1.amazonaws.com/articles/12345.pdf"
- *   → "articles/12345.pdf"
  */
 function extractS3Key(url: string): string | null {
   try {
     const urlObj = new URL(url);
-    // Remove leading slash from pathname
     return urlObj.pathname.startsWith("/") ? urlObj.pathname.slice(1) : urlObj.pathname;
   } catch {
     return null;
@@ -42,8 +41,9 @@ function extractS3Key(url: string): string | null {
 }
 
 async function reWatermarkArticles() {
-  console.log("🚀 [Re-Watermark] Starting re-watermark process for old articles...");
-  console.log("⚠️  [Re-Watermark] NO DATABASE CHANGES - Only S3 file overwrites\n");
+  console.log("🚀 [Re-Watermark v2] Starting DOCX → Clean PDF conversion...");
+  console.log("📋 [Re-Watermark v2] DOCX → PDF → S3 (no baked-in watermark)");
+  console.log("⚠️  [Re-Watermark v2] NO DATABASE CHANGES\n");
 
   // Initialize S3 client
   let s3Client: S3Client | null = null;
@@ -55,13 +55,13 @@ async function reWatermarkArticles() {
         secretAccessKey: AWS_SECRET_ACCESS_KEY,
       },
     });
-    console.log("✅ [Re-Watermark] S3 client initialized\n");
+    console.log("✅ [Re-Watermark v2] S3 client initialized\n");
   } else {
-    console.log("⚠️ [Re-Watermark] Running in local mode (no S3)\n");
+    console.log("⚠️ [Re-Watermark v2] Running in local mode\n");
   }
 
   try {
-    // 1. Fetch all articles (READ ONLY - we won't update anything)
+    // 1. Fetch all articles (READ ONLY)
     const articles = await prisma.article.findMany({
       select: {
         id: true,
@@ -70,23 +70,33 @@ async function reWatermarkArticles() {
         status: true,
         originalPdfUrl: true,
         currentPdfUrl: true,
+        currentWordUrl: true,
+        originalWordUrl: true,
       },
     });
 
-    // Filter: must have originalPdfUrl AND currentPdfUrl
+    // Filter: must have a DOCX source AND a currentPdfUrl to overwrite
     const toProcess = articles.filter(
       (a: any) =>
-        a.originalPdfUrl &&
-        a.originalPdfUrl.length > 0 &&
+        (a.currentWordUrl || a.originalWordUrl) &&
         a.currentPdfUrl &&
         a.currentPdfUrl.length > 0
     );
 
-    console.log(`📊 [Re-Watermark] Total articles: ${articles.length}`);
-    console.log(`🔧 [Re-Watermark] Articles to re-watermark: ${toProcess.length}\n`);
+    console.log(`📊 [Re-Watermark v2] Total articles: ${articles.length}`);
+    console.log(`🔧 [Re-Watermark v2] Articles with DOCX (can fix): ${toProcess.length}`);
+
+    const noDocx = articles.filter(
+      (a: any) => !a.currentWordUrl && !a.originalWordUrl && a.currentPdfUrl
+    );
+    if (noDocx.length > 0) {
+      console.log(`⚠️  [Re-Watermark v2] Articles WITHOUT DOCX (can't fix): ${noDocx.length}`);
+      noDocx.forEach((a: any) => console.log(`   - "${a.title}" (${a.id})`));
+    }
+    console.log("");
 
     if (toProcess.length === 0) {
-      console.log("✅ [Re-Watermark] No articles to process. Exiting.");
+      console.log("✅ [Re-Watermark v2] No articles to process. Exiting.");
       return;
     }
 
@@ -94,96 +104,102 @@ async function reWatermarkArticles() {
     let failCount = 0;
     let skipCount = 0;
 
+    // Ensure temp directory exists
+    const tempDir = path.join(process.cwd(), "uploads", "temp");
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
     for (let i = 0; i < toProcess.length; i++) {
       const article = toProcess[i];
       const progress = `[${i + 1}/${toProcess.length}]`;
 
       try {
         console.log(`${progress} 📄 Processing: "${article.title}" (${article.id})`);
-        console.log(`${progress}    Original PDF: ${article.originalPdfUrl}`);
-        console.log(`${progress}    Current PDF:  ${article.currentPdfUrl}`);
 
-        // 2. Figure out the S3 key of currentPdfUrl (to overwrite)
+        // Pick best DOCX source: prefer currentWordUrl, fallback to originalWordUrl
+        const docxUrl = article.currentWordUrl || article.originalWordUrl;
+        if (!docxUrl) {
+          console.log(`${progress} ⏭️ Skipped: No DOCX available`);
+          skipCount++;
+          continue;
+        }
+
+        console.log(`${progress}    DOCX source: ${docxUrl}`);
+        console.log(`${progress}    Current PDF: ${article.currentPdfUrl}`);
+
+        // Get S3 key to overwrite
         const isS3Url = article.currentPdfUrl.startsWith("http");
         let s3Key: string | null = null;
 
         if (isS3Url) {
           s3Key = extractS3Key(article.currentPdfUrl);
           if (!s3Key) {
-            console.log(`${progress} ⏭️ Skipped: Could not extract S3 key from URL`);
+            console.log(`${progress} ⏭️ Skipped: Could not extract S3 key`);
             skipCount++;
             continue;
           }
-          console.log(`${progress}    S3 Key: ${s3Key}`);
         }
 
-        // 3. Download the ORIGINAL clean PDF (no watermark)
-        console.log(`${progress} 📥 Downloading original clean PDF...`);
-        let originalPdfBuffer: Buffer;
+        // 2. Download DOCX file to temp
+        console.log(`${progress} 📥 Downloading DOCX...`);
+        let docxBuffer: Buffer;
 
-        if (article.originalPdfUrl.startsWith("http://") || article.originalPdfUrl.startsWith("https://")) {
-          originalPdfBuffer = await downloadFileToBuffer(article.originalPdfUrl);
+        if (docxUrl.startsWith("http://") || docxUrl.startsWith("https://")) {
+          docxBuffer = await downloadFileToBuffer(docxUrl);
         } else {
-          let filePath = article.originalPdfUrl;
+          let filePath = docxUrl;
           if (filePath.startsWith("/uploads")) {
             filePath = path.join(process.cwd(), filePath);
           }
-          originalPdfBuffer = fs.readFileSync(filePath);
+          docxBuffer = fs.readFileSync(filePath);
         }
 
-        console.log(`${progress}    Original PDF size: ${(originalPdfBuffer.length / 1024).toFixed(1)} KB`);
+        const tempDocxPath = path.join(tempDir, `fix-${article.id}-${Date.now()}.docx`);
+        const tempPdfPath = path.join(tempDir, `fix-${article.id}-${Date.now()}.pdf`);
+        fs.writeFileSync(tempDocxPath, docxBuffer);
 
-        // 4. Save to temp file for watermarking
-        const tempDir = path.join(process.cwd(), "uploads", "temp");
-        if (!fs.existsSync(tempDir)) {
-          fs.mkdirSync(tempDir, { recursive: true });
-        }
-        const tempFilePath = path.join(tempDir, `rewatermark-${article.id}-${Date.now()}.pdf`);
-        fs.writeFileSync(tempFilePath, originalPdfBuffer);
+        console.log(`${progress}    DOCX size: ${(docxBuffer.length / 1024).toFixed(1)} KB`);
 
-        // 5. Apply NEW watermark with small logo
-        console.log(`${progress} 💧 Applying new small logo watermark...`);
-        const watermarkedBuffer = await addWatermarkToPdf(
-          tempFilePath,
-          {
-            userName: "LAW NATION",
-            downloadDate: new Date(),
-            articleTitle: article.title,
-            articleId: article.id,
-            articleSlug: article.slug || undefined,
-            frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
-          },
-          "ADMIN",
-          "DRAFT"
-        );
+        // 3. Convert DOCX → clean PDF via Adobe (NO watermark!)
+        console.log(`${progress} 🔄 Converting DOCX → clean PDF via Adobe...`);
+        await adobeService.convertDocxToPdf(tempDocxPath, tempPdfPath);
 
-        console.log(`${progress}    Watermarked PDF size: ${(watermarkedBuffer.length / 1024).toFixed(1)} KB`);
+        const cleanPdfBuffer = fs.readFileSync(tempPdfPath);
+        console.log(`${progress}    Clean PDF size: ${(cleanPdfBuffer.length / 1024).toFixed(1)} KB`);
 
-        // 6. Overwrite the SAME S3 file (no database change needed!)
+        // 4. Upload clean PDF to S3 (overwrite same key - no DB change)
         if (s3Client && s3Key) {
-          console.log(`${progress} ☁️ Overwriting S3 file at same key: ${s3Key}`);
+          console.log(`${progress} ☁️ Uploading clean PDF to S3 at: ${s3Key}`);
           await s3Client.send(
             new PutObjectCommand({
               Bucket: S3_BUCKET_ARTICLES,
               Key: s3Key,
-              Body: watermarkedBuffer,
+              Body: cleanPdfBuffer,
               ContentType: "application/pdf",
             })
           );
-          console.log(`${progress} ✅ Done! Overwritten at: ${article.currentPdfUrl}\n`);
+          console.log(`${progress} ✅ Done! Clean PDF at: ${article.currentPdfUrl}\n`);
         } else if (!isS3Url) {
-          // Local mode: overwrite the local file
+          // Local mode
           let localPath = article.currentPdfUrl;
           if (localPath.startsWith("/uploads")) {
             localPath = path.join(process.cwd(), localPath);
           }
-          fs.writeFileSync(localPath, watermarkedBuffer);
-          console.log(`${progress} ✅ Done! Overwritten local file: ${article.currentPdfUrl}\n`);
+          fs.writeFileSync(localPath, cleanPdfBuffer);
+          console.log(`${progress} ✅ Done! Local: ${article.currentPdfUrl}\n`);
         }
 
-        // Cleanup temp file
-        fs.unlinkSync(tempFilePath);
+        // Cleanup temp files
+        try { fs.unlinkSync(tempDocxPath); } catch {}
+        try { fs.unlinkSync(tempPdfPath); } catch {}
+
         successCount++;
+
+        // Small delay to avoid Adobe API rate limits
+        if (i < toProcess.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
       } catch (err: any) {
         console.error(`${progress} ❌ Failed: ${err?.message || err}\n`);
         failCount++;
@@ -191,13 +207,14 @@ async function reWatermarkArticles() {
     }
 
     console.log(`\n${"=".repeat(50)}`);
-    console.log(`🏁 RE-WATERMARK COMPLETE (NO DATABASE CHANGES)`);
+    console.log(`🏁 RE-WATERMARK v2 COMPLETE (NO DATABASE CHANGES)`);
     console.log(`✅ Success: ${successCount}`);
     console.log(`❌ Failed:  ${failCount}`);
     console.log(`⏭️ Skipped: ${skipCount}`);
     console.log(`${"=".repeat(50)}`);
+    console.log(`\n💡 Download controller will add small logo at download time.`);
   } catch (error: any) {
-    console.error("❌ [Re-Watermark] Fatal error:", error?.message || error);
+    console.error("❌ [Re-Watermark v2] Fatal error:", error?.message || error);
   } finally {
     await prisma.$disconnect();
     process.exit(0);

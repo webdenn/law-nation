@@ -175,22 +175,24 @@ export async function addWatermarkToPdf(
         console.log(`📋 [Watermark] Added citation "${citationNumber}" to top center of page ${index + 1}`);
       }
 
-      // Center logo REMOVED from download-time watermark
-      // S3 files already have center logo baked in from upload middleware
-      // Adding another here causes double/triple logos on old articles
-      // if (logoImage) {
-      //   const logoScale = 0.08;
-      //   const logoDims = logoImage.scale(logoScale);
-      //   const logoX = (width - logoDims.width) / 2;
-      //   const logoY = (height - logoDims.height) / 2;
-      //   page.drawImage(logoImage, {
-      //     x: logoX,
-      //     y: logoY,
-      //     width: logoDims.width,
-      //     height: logoDims.height,
-      //     opacity: 0.5,
-      //   });
-      // }
+      // Add logo in center of page (if loaded)
+      if (logoImage) {
+        const logoScale = 0.08; // Same size as bottom logo
+        const logoDims = logoImage.scale(logoScale);
+
+        // Calculate center position
+        const logoX = (width - logoDims.width) / 2;
+        const logoY = (height - logoDims.height) / 2;
+
+        // Draw logo with low opacity
+        page.drawImage(logoImage, {
+          x: logoX,
+          y: logoY,
+          width: logoDims.width,
+          height: logoDims.height,
+          opacity: 0.5, // Same opacity as bottom logo
+        });
+      }
 
       // Add logo at bottom-right of page for USER role only
       if (logoImage && userRole === 'USER') {
