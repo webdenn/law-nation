@@ -46,148 +46,152 @@ async function stripWatermarkFromDocx(docxBuffer: Buffer): Promise<Buffer> {
     (name) => name.startsWith("word/media/") && !zip.files[name].dir
   );
 
-  console.log(`   � Found ${mediaFiles.length} media files in DOCX`);
+  console.log(`   🔍 Found ${mediaFiles.length} media files in DOCX`);
 
   if (mediaFiles.length === 0) {
     console.log(`   ⚠️ No media files found - returning original DOCX`);
     return docxBuffer;
   }
 
-  // 2. Read the logo-bg.png to compare (find logo images by size/content)
-  // We'll remove ALL images that look like the watermark logo
-  // The logo-bg.png is typically a small-medium sized PNG
+  // 2. Collect ALL image files to remove (PNG, JPEG, EMF - Adobe may re-encode)
   const imagesToRemove: string[] = [];
-  const imageRelIds: string[] = [];
 
   for (const mediaFile of mediaFiles) {
     const fileData = await zip.file(mediaFile)?.async("nodebuffer");
     if (!fileData) continue;
 
-    // Check if this is a PNG image (watermark logo is PNG)
-    const isPng = fileData[0] === 0x89 && fileData[1] === 0x50 && fileData[2] === 0x4e && fileData[3] === 0x47;
+    const ext = mediaFile.toLowerCase();
+    const isImage = ext.endsWith(".png") || ext.endsWith(".jpg") || ext.endsWith(".jpeg") || ext.endsWith(".emf") || ext.endsWith(".wmf");
     
-    if (isPng) {
-      console.log(`   🖼️ Found PNG image: ${mediaFile} (${(fileData.length / 1024).toFixed(1)} KB)`);
+    if (isImage) {
+      console.log(`   🖼️ Found image: ${mediaFile} (${(fileData.length / 1024).toFixed(1)} KB)`);
       imagesToRemove.push(mediaFile);
     }
   }
 
   if (imagesToRemove.length === 0) {
-    console.log(`   ⚠️ No PNG images found to remove`);
+    console.log(`   ⚠️ No images found to remove`);
     return docxBuffer;
   }
 
-  // 3. Find relationship IDs for these images in word/_rels/document.xml.rels
-  const relsPath = "word/_rels/document.xml.rels";
-  const relsFile = zip.file(relsPath);
-  
-  if (relsFile) {
+  // 3. Find relationship IDs for these images
+  // Check ALL .rels files (document.xml.rels + header*.xml.rels)
+  const imageRelIds: string[] = [];
+  const relsFiles = Object.keys(zip.files).filter(
+    (name) => name.includes("_rels/") && name.endsWith(".rels")
+  );
+
+  for (const relsPath of relsFiles) {
+    const relsFile = zip.file(relsPath);
+    if (!relsFile) continue;
+
     let relsXml = await relsFile.async("string");
-    
+
     for (const imgPath of imagesToRemove) {
-      // Extract relative path from word/ perspective
       const relativePath = imgPath.replace("word/", "");
-      
-      // Find the relationship ID for this image
-      const relRegex = new RegExp(
-        `<Relationship[^>]*Target="${relativePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*Id="([^"]*)"[^>]*/>`,
+
+      // Find the FULL <Relationship> tag that has this Target, regardless of attribute order
+      const escapedPath = relativePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const fullTagRegex = new RegExp(
+        `<Relationship[^>]*Target="${escapedPath}"[^>]*/>`,
         "g"
       );
-      const match = relRegex.exec(relsXml);
-      if (match) {
-        imageRelIds.push(match[1]);
-        console.log(`   🔗 Found relationship: ${match[1]} → ${relativePath}`);
+      const tagMatch = fullTagRegex.exec(relsXml);
+      if (tagMatch) {
+        // Extract Id from the matched tag (works regardless of attribute order)
+        const idMatch = tagMatch[0].match(/Id="([^"]*)"/);
+        if (idMatch) {
+          imageRelIds.push(idMatch[1]);
+          console.log(`   🔗 Relationship: ${idMatch[1]} → ${relativePath} (in ${relsPath})`);
+        }
       }
 
       // Remove the relationship entry
-      relsXml = relsXml.replace(
-        new RegExp(
-          `<Relationship[^>]*Target="${relativePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*/>`,
-          "g"
-        ),
-        ""
-      );
+      relsXml = relsXml.replace(fullTagRegex, "");
     }
-    
+
     zip.file(relsPath, relsXml);
   }
 
-  // 4. Remove image references from document.xml
-  const docPath = "word/document.xml";
-  const docFile = zip.file(docPath);
-  
-  if (docFile) {
-    let docXml = await docFile.async("string");
-    
-    for (const relId of imageRelIds) {
-      // Remove <w:drawing> elements that reference this image
-      // Pattern: <w:drawing>...<a:blip r:embed="rId..."/>...</w:drawing>
-      const drawingRegex = new RegExp(
-        `<w:drawing>[\\s\\S]*?<a:blip[^>]*r:embed="${relId}"[^>]*/>[\\s\\S]*?</w:drawing>`,
-        "g"
-      );
-      docXml = docXml.replace(drawingRegex, "");
-      
-      // Also try inline pattern
-      const inlineRegex = new RegExp(
-        `<w:drawing>[\\s\\S]*?r:embed="${relId}"[\\s\\S]*?</w:drawing>`,
-        "g"
-      );
-      docXml = docXml.replace(inlineRegex, "");
-    }
-    
-    zip.file(docPath, docXml);
-  }
-
-  // 5. Also check headers (watermarks are often in headers)
-  const headerFiles = Object.keys(zip.files).filter(
-    (name) => name.startsWith("word/header") && name.endsWith(".xml")
+  // 4. Remove image references from ALL XML files (document.xml + headers + footers)
+  const xmlFiles = Object.keys(zip.files).filter(
+    (name) => name.startsWith("word/") && name.endsWith(".xml") && !name.includes("_rels/")
   );
-  
-  for (const headerPath of headerFiles) {
-    const headerFile = zip.file(headerPath);
-    if (!headerFile) continue;
-    
-    let headerXml = await headerFile.async("string");
-    
+
+  for (const xmlPath of xmlFiles) {
+    const xmlFile = zip.file(xmlPath);
+    if (!xmlFile) continue;
+
+    let xml = await xmlFile.async("string");
+    let modified = false;
+
     for (const relId of imageRelIds) {
+      // Remove <w:drawing>...</w:drawing> blocks that reference this relId
+      // Use non-greedy match with [\s\S] for multiline
       const drawingRegex = new RegExp(
         `<w:drawing>[\\s\\S]*?r:embed="${relId}"[\\s\\S]*?</w:drawing>`,
         "g"
       );
-      headerXml = headerXml.replace(drawingRegex, "");
-    }
-    
-    // Also check header-specific rels
-    const headerRelsPath = `word/_rels/${path.basename(headerPath)}.rels`;
-    const headerRelsFile = zip.file(headerRelsPath);
-    if (headerRelsFile) {
-      let headerRelsXml = await headerRelsFile.async("string");
-      for (const imgPath of imagesToRemove) {
-        const relativePath = imgPath.replace("word/", "");
-        headerRelsXml = headerRelsXml.replace(
-          new RegExp(
-            `<Relationship[^>]*Target="${relativePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*/>`,
-            "g"
-          ),
-          ""
-        );
+      const newXml = xml.replace(drawingRegex, "");
+      if (newXml !== xml) {
+        xml = newXml;
+        modified = true;
+        console.log(`   📝 Removed drawing ref to ${relId} in ${xmlPath}`);
       }
-      zip.file(headerRelsPath, headerRelsXml);
+
+      // Also remove <w:pict> elements (alternative image format)
+      const pictRegex = new RegExp(
+        `<w:pict>[\\s\\S]*?r:id="${relId}"[\\s\\S]*?</w:pict>`,
+        "g"
+      );
+      const newXml2 = xml.replace(pictRegex, "");
+      if (newXml2 !== xml) {
+        xml = newXml2;
+        modified = true;
+        console.log(`   📝 Removed pict ref to ${relId} in ${xmlPath}`);
+      }
     }
-    
-    zip.file(headerPath, headerXml);
+
+    if (modified) {
+      zip.file(xmlPath, xml);
+    }
   }
 
-  // 6. Delete the actual image files
+  // 4b. Remove paragraph borders and frame properties (Adobe conversion artifacts)
+  // These create unwanted boxes around text in the final PDF
+  for (const xmlPath of xmlFiles) {
+    const xmlFile = zip.file(xmlPath);
+    if (!xmlFile) continue;
+
+    let xml = await xmlFile.async("string");
+    const originalXml = xml;
+
+    // Remove paragraph borders: <w:pBdr>...</w:pBdr>
+    xml = xml.replace(/<w:pBdr>[\s\S]*?<\/w:pBdr>/g, "");
+
+    // Remove frame properties: <w:framePr ... />
+    xml = xml.replace(/<w:framePr[^>]*\/>/g, "");
+
+    // Remove text box content borders in shapes
+    xml = xml.replace(/<v:rect[^>]*stroked="t"[^>]*>/g, (match) => 
+      match.replace('stroked="t"', 'stroked="f"')
+    );
+
+    if (xml !== originalXml) {
+      zip.file(xmlPath, xml);
+      console.log(`   📐 Removed borders/frames from ${xmlPath}`);
+    }
+  }
+
+  // 5. Delete the actual image files from the ZIP
   for (const imgPath of imagesToRemove) {
     zip.remove(imgPath);
-    console.log(`   🗑️ Removed: ${imgPath}`);
+    console.log(`   🗑️ Deleted: ${imgPath}`);
   }
 
-  console.log(`   ✅ Stripped ${imagesToRemove.length} watermark images`);
+  console.log(`   ✅ Stripped ${imagesToRemove.length} watermark images, ${imageRelIds.length} references`);
 
-  // 7. Generate cleaned DOCX
+  // 6. Generate cleaned DOCX
   const cleanedBuffer = await zip.generateAsync({
     type: "nodebuffer",
     compression: "DEFLATE",
@@ -195,6 +199,7 @@ async function stripWatermarkFromDocx(docxBuffer: Buffer): Promise<Buffer> {
 
   return cleanedBuffer;
 }
+
 
 async function reWatermarkArticles() {
   console.log("� [Re-Watermark v3] Strip watermark images from DOCX → clean PDF");
