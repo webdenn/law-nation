@@ -2,14 +2,21 @@ import "dotenv/config";
 import { prisma } from "../db/db.js";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { downloadFileToBuffer } from "../utils/pdf-extract.utils.js";
+import { PDFDocument, PDFName, PDFDict, PDFRef, PDFStream, PDFRawStream } from "pdf-lib";
 import fs from "fs";
 import path from "path";
 
 /**
- * EMERGENCY RESTORE: Copy originalPdfUrl content back to currentPdfUrl S3 key.
- * This restores articles to their original state (with the old watermark).
+ * RE-WATERMARK SCRIPT v5: Safe image-only removal from PDF.
  * 
- * ⚠️ NO DATABASE CHANGES - Only overwrites S3 PDF files.
+ * How it works:
+ * - PDF stores images as "XObject" resources (separate from text)
+ * - Watermark logo = an Image XObject in the page's resources
+ * - We remove ONLY Image XObjects, leaving text 100% intact
+ * - Text is defined in the content stream using BT/ET operators (untouched)
+ * 
+ * ⚠️ NO DATABASE CHANGES
+ * ⚠️ TEXT IS NEVER TOUCHED - only images are removed
  */
 
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
@@ -28,8 +35,97 @@ function extractS3Key(url: string): string | null {
   }
 }
 
-async function restoreArticles() {
-  console.log("🚨 [EMERGENCY RESTORE] Copying originalPdfUrl → currentPdfUrl");
+/**
+ * Remove ONLY image XObjects from a PDF's page resources.
+ * Text content streams are NEVER modified.
+ */
+async function removeImagesFromPdf(pdfBuffer: Buffer): Promise<Buffer> {
+  const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
+  const pages = pdfDoc.getPages();
+
+  console.log(`   📄 PDF has ${pages.length} pages`);
+
+  let totalRemoved = 0;
+
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i];
+    const resources = page.node.get(PDFName.of("Resources"));
+
+    if (!(resources instanceof PDFDict)) {
+      console.log(`   Page ${i + 1}: No resources dict, skipping`);
+      continue;
+    }
+
+    // Get the XObject subdictionary
+    const xObjectRef = resources.get(PDFName.of("XObject"));
+    if (!xObjectRef) {
+      console.log(`   Page ${i + 1}: No XObjects, skipping`);
+      continue;
+    }
+
+    // Resolve the XObject dictionary
+    let xObjectDict: PDFDict;
+    if (xObjectRef instanceof PDFDict) {
+      xObjectDict = xObjectRef;
+    } else if (xObjectRef instanceof PDFRef) {
+      const resolved = pdfDoc.context.lookup(xObjectRef);
+      if (resolved instanceof PDFDict) {
+        xObjectDict = resolved;
+      } else {
+        console.log(`   Page ${i + 1}: Can't resolve XObject dict, skipping`);
+        continue;
+      }
+    } else {
+      console.log(`   Page ${i + 1}: Unknown XObject type, skipping`);
+      continue;
+    }
+
+    // Find image XObjects to remove
+    const keysToRemove: PDFName[] = [];
+    const entries = xObjectDict.entries();
+
+    for (const [key, value] of entries) {
+      // Resolve the XObject to check its Subtype
+      let xObj: any = value;
+      if (value instanceof PDFRef) {
+        xObj = pdfDoc.context.lookup(value);
+      }
+
+      // Check if it's an Image (Subtype = /Image)
+      if (xObj instanceof PDFDict || xObj instanceof PDFStream || xObj instanceof PDFRawStream) {
+        const dict = xObj instanceof PDFDict ? xObj : (xObj as any).dict;
+        if (dict) {
+          const subtype = dict.get(PDFName.of("Subtype"));
+          if (subtype && subtype.toString() === "/Image") {
+            keysToRemove.push(key as PDFName);
+            console.log(`   Page ${i + 1}: Found Image XObject "${key.toString()}" → will remove`);
+          }
+        }
+      }
+    }
+
+    // Remove image XObjects from the dictionary
+    for (const key of keysToRemove) {
+      xObjectDict.delete(key);
+      totalRemoved++;
+    }
+
+    if (keysToRemove.length > 0) {
+      console.log(`   Page ${i + 1}: Removed ${keysToRemove.length} image(s)`);
+    } else {
+      console.log(`   Page ${i + 1}: No images found`);
+    }
+  }
+
+  console.log(`   ✅ Total images removed: ${totalRemoved}`);
+
+  const cleanedPdfBytes = await pdfDoc.save();
+  return Buffer.from(cleanedPdfBytes);
+}
+
+async function reWatermarkArticles() {
+  console.log("🚀 [Re-Watermark v5] Safe image-only removal from PDF");
+  console.log("📋 Removes Image XObjects only — text is NEVER touched");
   console.log("⚠️  NO DATABASE CHANGES\n");
 
   let s3Client: S3Client | null = null;
@@ -60,7 +156,12 @@ async function restoreArticles() {
         a.currentPdfUrl && a.currentPdfUrl.length > 0
     );
 
-    console.log(`📊 Total: ${articles.length} | To restore: ${toProcess.length}\n`);
+    console.log(`📊 Total: ${articles.length} | To fix: ${toProcess.length}\n`);
+
+    if (toProcess.length === 0) {
+      console.log("✅ No articles to process.");
+      return;
+    }
 
     let successCount = 0;
     let failCount = 0;
@@ -70,7 +171,7 @@ async function restoreArticles() {
       const progress = `[${i + 1}/${toProcess.length}]`;
 
       try {
-        console.log(`${progress} 📄 "${article.title}"`);
+        console.log(`${progress} 📄 "${article.title}" (${article.id})`);
 
         const isS3Url = article.currentPdfUrl.startsWith("http");
         let s3Key: string | null = null;
@@ -79,7 +180,8 @@ async function restoreArticles() {
           if (!s3Key) { failCount++; continue; }
         }
 
-        // Download original PDF (untouched, has all text)
+        // 1. Download original PDF (has text + big watermark image)
+        console.log(`${progress} 📥 Downloading original PDF...`);
         let pdfBuffer: Buffer;
         if (article.originalPdfUrl.startsWith("http://") || article.originalPdfUrl.startsWith("https://")) {
           pdfBuffer = await downloadFileToBuffer(article.originalPdfUrl);
@@ -88,35 +190,43 @@ async function restoreArticles() {
           if (filePath.startsWith("/uploads")) filePath = path.join(process.cwd(), filePath);
           pdfBuffer = fs.readFileSync(filePath);
         }
+        console.log(`${progress}    Size: ${(pdfBuffer.length / 1024).toFixed(1)} KB`);
 
-        // Upload directly to currentPdfUrl S3 key (no processing)
+        // 2. Remove ONLY images from PDF (text stays intact)
+        console.log(`${progress} 🧹 Removing images from PDF (text safe)...`);
+        const cleanPdfBuffer = await removeImagesFromPdf(pdfBuffer);
+        console.log(`${progress}    Clean: ${(cleanPdfBuffer.length / 1024).toFixed(1)} KB`);
+
+        // 3. Upload clean PDF to S3
         if (s3Client && s3Key) {
+          console.log(`${progress} ☁️ Uploading to S3: ${s3Key}`);
           await s3Client.send(new PutObjectCommand({
             Bucket: S3_BUCKET_ARTICLES,
             Key: s3Key,
-            Body: pdfBuffer,
+            Body: cleanPdfBuffer,
             ContentType: "application/pdf",
           }));
-          console.log(`${progress} ✅ Restored (${(pdfBuffer.length / 1024).toFixed(1)} KB)`);
+          console.log(`${progress} ✅ Done!\n`);
         } else if (!isS3Url) {
           let localPath = article.currentPdfUrl;
           if (localPath.startsWith("/uploads")) localPath = path.join(process.cwd(), localPath);
-          fs.writeFileSync(localPath, pdfBuffer);
-          console.log(`${progress} ✅ Restored locally`);
+          fs.writeFileSync(localPath, cleanPdfBuffer);
+          console.log(`${progress} ✅ Done (local)!\n`);
         }
 
         successCount++;
       } catch (err: any) {
-        console.error(`${progress} ❌ Failed: ${err?.message || err}`);
+        console.error(`${progress} ❌ Failed: ${err?.message || err}\n`);
         failCount++;
       }
     }
 
     console.log(`\n${"=".repeat(50)}`);
-    console.log(`🏁 RESTORE COMPLETE`);
+    console.log(`🏁 RE-WATERMARK v5 COMPLETE (NO DB CHANGES)`);
     console.log(`✅ Success: ${successCount}`);
     console.log(`❌ Failed:  ${failCount}`);
     console.log(`${"=".repeat(50)}`);
+    console.log(`\n💡 Download controller will add small logo at download time.`);
   } catch (error: any) {
     console.error("❌ Fatal:", error?.message || error);
   } finally {
@@ -125,4 +235,4 @@ async function restoreArticles() {
   }
 }
 
-restoreArticles();
+reWatermarkArticles();
