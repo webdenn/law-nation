@@ -190,7 +190,7 @@ export async function addWatermarkToPdf(
           y: logoY,
           width: logoDims.width,
           height: logoDims.height,
-          opacity: 0.5, // Same opacity as bottom logo
+          opacity: 0.3, // Lighter than bottom — looks same visually since it's over text
         });
       }
 
