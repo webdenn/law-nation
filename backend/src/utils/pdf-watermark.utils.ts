@@ -166,7 +166,7 @@ export async function addWatermarkToPdf(
 
         page.drawText(citationNumber, {
           x: citationX,
-          y: height - 25, // 25px from top
+          y: height - 55, // Lowered to appear just above the heading
           size: citationFontSize,
           color: rgb(0.8, 0, 0), // Red color
           opacity: 1, // Fully visible
@@ -190,7 +190,7 @@ export async function addWatermarkToPdf(
           y: logoY,
           width: logoDims.width,
           height: logoDims.height,
-          opacity: 0.15, // ✅ Increased opacity (from 0.09) for better visibility
+          opacity: 0.08, // ✅ Increased opacity (from 0.09) for better visibility
         });
       }
 
