@@ -177,7 +177,7 @@ export async function addWatermarkToPdf(
 
       // Add logo in center of page (if loaded)
       if (logoImage) {
-        const logoScale = 0.35; // "Medium size"
+        const logoScale = 0.08; // Same size as bottom logo
         const logoDims = logoImage.scale(logoScale);
 
         // Calculate center position
@@ -190,7 +190,7 @@ export async function addWatermarkToPdf(
           y: logoY,
           width: logoDims.width,
           height: logoDims.height,
-          opacity: 0.02, // ✅ Increased opacity (from 0.09) for better visibility
+          opacity: 0.5, // Same opacity as bottom logo
         });
       }
 
