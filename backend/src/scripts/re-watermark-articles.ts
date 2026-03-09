@@ -180,20 +180,31 @@ async function reWatermarkArticles() {
         }
 
         if (cleanPdfBuffer) {
-          const s3Key = extractS3Key(article.currentPdfUrl);
-          if (s3Key && s3Client) {
-            console.log(`${progress}  📤 Uploading clean version to S3...`);
+          // 1. Update currentPdfUrl (User Side)
+          const currentKey = extractS3Key(article.currentPdfUrl);
+          if (currentKey && s3Client) {
+            console.log(`${progress}  📤 Overwriting Current PDF in S3...`);
             await s3Client.send(new PutObjectCommand({
               Bucket: S3_BUCKET_ARTICLES,
-              Key: s3Key,
+              Key: currentKey,
               Body: cleanPdfBuffer,
               ContentType: "application/pdf",
             }));
-          } else if (!article.currentPdfUrl.startsWith("http")) {
-            let localPath = article.currentPdfUrl;
-            if (localPath.startsWith("/uploads")) localPath = path.join(process.cwd(), localPath);
-            fs.writeFileSync(localPath, cleanPdfBuffer);
           }
+
+          // 2. Update originalPdfUrl (Admin/Review Side)
+          // This fixes the "double logo" in Review Panel
+          const originalKey = extractS3Key(article.originalPdfUrl);
+          if (originalKey && s3Client && originalKey !== currentKey) {
+            console.log(`${progress}  📤 Overwriting Original PDF in S3 (Fixes Review Panel)...`);
+            await s3Client.send(new PutObjectCommand({
+              Bucket: S3_BUCKET_ARTICLES,
+              Key: originalKey,
+              Body: cleanPdfBuffer,
+              ContentType: "application/pdf",
+            }));
+          }
+
           console.log(`${progress}  ✨ Done!\n`);
           successCount++;
         } else {
