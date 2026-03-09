@@ -578,27 +578,93 @@ export class AdobeService {
         pdfBuffer = await fs.promises.readFile(resolveToAbsolutePath(pdfPath));
       }
 
-      const pdfDoc = await PDFDocument.load(pdfBuffer);
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const pdfDoc = await PDFDocument.load(pdfBuffer, {
+        ignoreEncryption: true,
+        throwOnInvalidObject: false
+      });
       const pages = pdfDoc.getPages();
       
-      const watermarkText = `${watermarkData.userName || 'Admin'} - ${watermarkData.articleId || 'Article'}`;
+      // Load logo image (copied logic from pdf-watermark.utils.ts)
+      let logoImage: any | undefined;
+      try {
+        const possibleLogoPaths = [
+          path.join(process.cwd(), 'src', 'assets', 'img', 'logo-bg.png'),
+          path.join(process.cwd(), 'src', 'assests', 'img', 'logo-bg.png'),
+          path.join(process.cwd(), 'backend', 'src', 'assets', 'img', 'logo-bg.png')
+        ];
+
+        let logoPath = "";
+        for (const p of possibleLogoPaths) {
+          if (fs.existsSync(p)) {
+            logoPath = p;
+            break;
+          }
+        }
+
+        if (logoPath) {
+          const logoBytes = fs.readFileSync(logoPath);
+          logoImage = await pdfDoc.embedPng(logoBytes);
+        }
+      } catch (logoError) {
+        console.warn('⚠️ [Adobe Service] Failed to load logo for watermark:', logoError);
+      }
+
+      const watermarkText = `Downloaded from LAW NATION ADMIN on ${new Date().toLocaleDateString('en-GB')}`;
 
       for (const page of pages) {
         const { width, height } = page.getSize();
+        
+        // 1. Add Center Logo
+        if (logoImage) {
+          const logoScale = 0.08; 
+          const logoDims = logoImage.scale(logoScale);
+          page.drawImage(logoImage, {
+            x: (width - logoDims.width) / 2,
+            y: (height - logoDims.height) / 2,
+            width: logoDims.width,
+            height: logoDims.height,
+            opacity: 0.3,
+          });
+        }
+
+        // 2. Add Bottom-Right Logo
+        if (logoImage) {
+          const bottomLogoScale = 0.08;
+          const bottomLogoDims = logoImage.scale(bottomLogoScale);
+          page.drawImage(logoImage, {
+            x: width - bottomLogoDims.width - 20,
+            y: 20,
+            width: bottomLogoDims.width,
+            height: bottomLogoDims.height,
+            opacity: 0.5,
+          });
+        }
+
+        // 3. Add Top-Right Text
+        page.drawText('LAW NATION ADMIN', {
+          x: width - 150,
+          y: height - 30,
+          size: 10,
+          color: rgb(0.7, 0, 0),
+          opacity: 0.5,
+        });
+
+        // 4. Add Bottom-Left Text
         page.drawText(watermarkText, {
-          x: width / 4,
-          y: height / 2,
-          size: 18,
-          font,
+          x: 50,
+          y: 30,
+          size: 8,
           color: rgb(0.5, 0.5, 0.5),
-          rotate: degrees(45),
-          opacity: 0.3,
+          opacity: 0.7,
         });
       }
       
       const saved = await pdfDoc.save();
-      await fs.promises.writeFile(resolveToAbsolutePath(outputPath), saved);
+      const outputAbsPath = resolveToAbsolutePath(outputPath);
+      const outputDir = path.dirname(outputAbsPath);
+      if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+      
+      await fs.promises.writeFile(outputAbsPath, saved);
       
       return outputPath;
     } catch (err: any) {

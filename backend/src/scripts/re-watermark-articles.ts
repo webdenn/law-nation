@@ -37,7 +37,8 @@ function extractS3Key(url: string): string | null {
 
 /**
  * Remove ONLY image XObjects from a PDF's page resources.
- * Text content streams are NEVER modified.
+ * Text content streams are also modified to remove the actual 'Do' (Draw Object) 
+ * commands for those images, preventing "empty boxes".
  */
 async function removeImagesFromPdf(pdfBuffer: Buffer): Promise<Buffer> {
   const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
@@ -104,13 +105,48 @@ async function removeImagesFromPdf(pdfBuffer: Buffer): Promise<Buffer> {
       }
     }
 
-    // Remove image XObjects from the dictionary
-    for (const key of keysToRemove) {
-      xObjectDict.delete(key);
-      totalRemoved++;
-    }
-
     if (keysToRemove.length > 0) {
+      // 1. Remove image XObjects from the dictionary
+      for (const key of keysToRemove) {
+        xObjectDict.delete(key);
+        totalRemoved++;
+      }
+
+      // 2. CRITICAL: Clean the content stream to remove drawing commands for these images
+      // This prevents "empty boxes" from appearing where images were.
+      try {
+        const contents = page.node.get(PDFName.of("Contents"));
+        if (contents) {
+          const contentRefs = Array.isArray(contents) ? (contents as any) : [contents];
+          
+          for (const ref of contentRefs) {
+            const stream = pdfDoc.context.lookup(ref);
+            if (stream instanceof PDFRawStream || stream instanceof PDFStream) {
+              let text = Buffer.from((stream as any).contents).toString("latin1");
+              let modified = false;
+
+              for (const key of keysToRemove) {
+                const name = key.toString(); // e.g. /Im1
+                // Regex to find " /Name Do" or "/Name Do"
+                // The space before / is optional, but Do must follow
+                const regex = new RegExp(`\\s?\\${name}\\s+Do`, "g");
+                if (regex.test(text)) {
+                  text = text.replace(regex, "");
+                  modified = true;
+                }
+              }
+
+              if (modified) {
+                (stream as any).contents = Buffer.from(text, "latin1");
+                console.log(`   Page ${i + 1}: Cleaned content stream (removed image draw commands)`);
+              }
+            }
+          }
+        }
+      } catch (streamErr) {
+        console.warn(`   Page ${i + 1}: Failed to clean content stream:`, streamErr);
+      }
+
       console.log(`   Page ${i + 1}: Removed ${keysToRemove.length} image(s)`);
     } else {
       console.log(`   Page ${i + 1}: No images found`);
@@ -171,7 +207,7 @@ async function reWatermarkArticles() {
       const progress = `[${i + 1}/${toProcess.length}]`;
 
       try {
-        console.log(`${progress} 📄 "${article.title}" (${article.id})`);
+        console.log(`${progress}  "${article.title}" (${article.id})`);
 
         const isS3Url = article.currentPdfUrl.startsWith("http");
         let s3Key: string | null = null;
@@ -181,7 +217,7 @@ async function reWatermarkArticles() {
         }
 
         // 1. Download original PDF (has text + big watermark image)
-        console.log(`${progress} 📥 Downloading original PDF...`);
+        console.log(`${progress}  Downloading original PDF...`);
         let pdfBuffer: Buffer;
         if (article.originalPdfUrl.startsWith("http://") || article.originalPdfUrl.startsWith("https://")) {
           pdfBuffer = await downloadFileToBuffer(article.originalPdfUrl);
@@ -199,36 +235,36 @@ async function reWatermarkArticles() {
 
         // 3. Upload clean PDF to S3
         if (s3Client && s3Key) {
-          console.log(`${progress} ☁️ Uploading to S3: ${s3Key}`);
+          console.log(`${progress}  Uploading to S3: ${s3Key}`);
           await s3Client.send(new PutObjectCommand({
             Bucket: S3_BUCKET_ARTICLES,
             Key: s3Key,
             Body: cleanPdfBuffer,
             ContentType: "application/pdf",
           }));
-          console.log(`${progress} ✅ Done!\n`);
+          console.log(`${progress}  Done!\n`);
         } else if (!isS3Url) {
           let localPath = article.currentPdfUrl;
           if (localPath.startsWith("/uploads")) localPath = path.join(process.cwd(), localPath);
           fs.writeFileSync(localPath, cleanPdfBuffer);
-          console.log(`${progress} ✅ Done (local)!\n`);
+          console.log(`${progress}  Done (local)!\n`);
         }
 
         successCount++;
       } catch (err: any) {
-        console.error(`${progress} ❌ Failed: ${err?.message || err}\n`);
+        console.error(`${progress}  Failed: ${err?.message || err}\n`);
         failCount++;
       }
     }
 
     console.log(`\n${"=".repeat(50)}`);
-    console.log(`🏁 RE-WATERMARK v5 COMPLETE (NO DB CHANGES)`);
-    console.log(`✅ Success: ${successCount}`);
-    console.log(`❌ Failed:  ${failCount}`);
+    console.log(` RE-WATERMARK v5 COMPLETE (NO DB CHANGES)`);
+    console.log(` Success: ${successCount}`);
+    console.log(` Failed:  ${failCount}`);
     console.log(`${"=".repeat(50)}`);
-    console.log(`\n💡 Download controller will add small logo at download time.`);
+    console.log(`\n Download controller will add small logo at download time.`);
   } catch (error: any) {
-    console.error("❌ Fatal:", error?.message || error);
+    console.error(" Fatal:", error?.message || error);
   } finally {
     await prisma.$disconnect();
     process.exit(0);
