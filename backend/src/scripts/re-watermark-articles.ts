@@ -2,20 +2,17 @@ import "dotenv/config";
 import { prisma } from "../db/db.js";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { downloadFileToBuffer } from "../utils/pdf-extract.utils.js";
-import { PDFDocument, PDFName, PDFDict, PDFRef, PDFStream, PDFRawStream, PDFArray } from "pdf-lib";
+import { PDFDocument, PDFName, PDFDict, PDFRef, PDFStream, PDFRawStream } from "pdf-lib";
 import fs from "fs";
 import path from "path";
 import { adobeService } from "../services/adobe.service.js";
 
 /**
- * RE-WATERMARK SCRIPT v6: The Ultimate Clean-up
+ * RE-WATERMARK SCRIPT v8: THE FINAL BOSS
  * 
- * 1. If DOCX exists (originalWordUrl), convert to PDF -> 100% Clean.
- * 2. If only PDF exists, aggressively strip:
- *    - Image XObjects
- *    - Form XObjects
- *    - Annotations (often used for bordered watermarks)
- *    - Content stream 'Do' operators
+ * 1. Overwrites BOTH Current and Original PDFs in S3.
+ * 2. Removes Images, Forms, Patterns, and Annotations.
+ * 3. Prioritizes DOCX-to-PDF recovery.
  */
 
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
@@ -34,9 +31,6 @@ function extractS3Key(url: string): string | null {
   }
 }
 
-/**
- * Aggressively remove images, forms, and annotations.
- */
 async function aggressivelyCleanPdf(pdfBuffer: Buffer): Promise<Buffer> {
   const pdfDoc = await PDFDocument.load(pdfBuffer, { 
     ignoreEncryption: true,
@@ -44,33 +38,19 @@ async function aggressivelyCleanPdf(pdfBuffer: Buffer): Promise<Buffer> {
   });
   const pages = pdfDoc.getPages();
 
-  console.log(`   📄 PDF has ${pages.length} pages`);
-
-  let totalRemoved = 0;
-
   for (let i = 0; i < pages.length; i++) {
     const page = pages[i];
     
     // 1. Remove Annotations (often contains border boxes/links)
-    const annots = page.node.get(PDFName.of("Annots"));
-    if (annots) {
-      page.node.delete(PDFName.of("Annots"));
-      console.log(`   Page ${i + 1}: Removed all Annotations`);
-    }
+    page.node.delete(PDFName.of("Annots"));
 
-    // 2. Remove XObjects (Images/Forms)
+    // 2. Clear Resources (Images, Forms, Patterns)
     const resources = page.node.get(PDFName.of("Resources"));
     if (resources instanceof PDFDict) {
       const xObjectRef = resources.get(PDFName.of("XObject"));
       if (xObjectRef) {
-        let xObjectDict: PDFDict | undefined;
-        if (xObjectRef instanceof PDFDict) xObjectDict = xObjectRef;
-        else if (xObjectRef instanceof PDFRef) {
-          const res = pdfDoc.context.lookup(xObjectRef);
-          if (res instanceof PDFDict) xObjectDict = res;
-        }
-
-        if (xObjectDict) {
+        const xObjectDict = xObjectRef instanceof PDFRef ? pdfDoc.context.lookup(xObjectRef) : xObjectRef;
+        if (xObjectDict instanceof PDFDict) {
           const keysToRemove: PDFName[] = [];
           for (const [key, value] of xObjectDict.entries()) {
             let xObj = value instanceof PDFRef ? pdfDoc.context.lookup(value) : value;
@@ -82,14 +62,9 @@ async function aggressivelyCleanPdf(pdfBuffer: Buffer): Promise<Buffer> {
               }
             }
           }
-
-          for (const key of keysToRemove) {
-            xObjectDict.delete(key);
-            totalRemoved++;
-          }
-
+          for (const key of keysToRemove) xObjectDict.delete(key);
+          
           if (keysToRemove.length > 0) {
-            // Clean Content Streams
             try {
               const contents = page.node.get(PDFName.of("Contents"));
               if (contents) {
@@ -111,10 +86,10 @@ async function aggressivelyCleanPdf(pdfBuffer: Buffer): Promise<Buffer> {
                 }
               }
             } catch (err) { }
-            console.log(`   Page ${i + 1}: Removed ${keysToRemove.length} images/forms`);
           }
         }
       }
+      resources.delete(PDFName.of("Pattern"));
     }
   }
 
@@ -123,7 +98,8 @@ async function aggressivelyCleanPdf(pdfBuffer: Buffer): Promise<Buffer> {
 }
 
 async function reWatermarkArticles() {
-  console.log("🚀 [Re-Watermark v6] Ultimate Clean-up Strategy");
+  console.log("🚀 [Re-Watermark v8] FINAL AGGRESSIVE CLEANUP");
+  console.log("📋 Overwriting BOTH Original and Current PDFs to fix Review Panel.");
   
   let s3Client: S3Client | null = null;
   if (!isLocal && AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY) {
@@ -141,10 +117,10 @@ async function reWatermarkArticles() {
         originalPdfUrl: true,
         currentPdfUrl: true,
         originalWordUrl: true,
-      },
+      }
     });
 
-    console.log(`📊 Total Articles: ${articles.length}\n`);
+    console.log(`📊 Processing ${articles.length} articles...\n`);
 
     let successCount = 0;
     let failCount = 0;
@@ -156,68 +132,49 @@ async function reWatermarkArticles() {
 
       try {
         console.log(`${progress}  "${article.title}"`);
-        
         let cleanPdfBuffer: Buffer | null = null;
 
-        // STRATEGY 1: Use Original DOCX if available (SAFEST)
         if (article.originalWordUrl) {
-          console.log(`${progress}  🔄 Found original DOCX. Re-converting to PDF for 100% clean result...`);
           try {
             const cleanPdfPath = await adobeService.convertDocxToPdf(article.originalWordUrl, tempPath);
             cleanPdfBuffer = fs.readFileSync(cleanPdfPath);
-            console.log(`${progress}  ✅ Re-conversion successful.`);
             if (fs.existsSync(cleanPdfPath)) fs.unlinkSync(cleanPdfPath);
-          } catch (convErr) {
-            console.warn(`${progress}  ⚠️ DOCX conversion failed, falling back to PDF cleaning...`);
-          }
+            console.log("   ✅ DOCX recovery successful");
+          } catch (convErr) { }
         }
 
-        // STRATEGY 2: Aggressive PDF cleaning (FALLBACK)
         if (!cleanPdfBuffer && article.originalPdfUrl) {
-          console.log(`${progress}  🧹 No DOCX or conversion failed. Cleaning original PDF aggressively...`);
           const pdfBuffer = await downloadFileToBuffer(article.originalPdfUrl);
           cleanPdfBuffer = await aggressivelyCleanPdf(pdfBuffer);
+          console.log("   🧹 PDF stripped successfully");
         }
 
         if (cleanPdfBuffer) {
-          // 1. Update currentPdfUrl (User Side)
           const currentKey = extractS3Key(article.currentPdfUrl);
-          if (currentKey && s3Client) {
-            console.log(`${progress}  📤 Overwriting Current PDF in S3...`);
-            await s3Client.send(new PutObjectCommand({
-              Bucket: S3_BUCKET_ARTICLES,
-              Key: currentKey,
-              Body: cleanPdfBuffer,
-              ContentType: "application/pdf",
-            }));
-          }
-
-          // 2. Update originalPdfUrl (Admin/Review Side)
-          // This fixes the "double logo" in Review Panel
           const originalKey = extractS3Key(article.originalPdfUrl);
-          if (originalKey && s3Client && originalKey !== currentKey) {
-            console.log(`${progress}  📤 Overwriting Original PDF in S3 (Fixes Review Panel)...`);
-            await s3Client.send(new PutObjectCommand({
-              Bucket: S3_BUCKET_ARTICLES,
-              Key: originalKey,
-              Body: cleanPdfBuffer,
-              ContentType: "application/pdf",
+
+          if (currentKey && s3Client) {
+            await s3Client.send(new PutObjectCommand({ 
+              Bucket: S3_BUCKET_ARTICLES, Key: currentKey, Body: cleanPdfBuffer, ContentType: "application/pdf" 
             }));
+            console.log("   📤 Current PDF overwritten");
           }
 
-          console.log(`${progress}  ✨ Done!\n`);
+          if (originalKey && s3Client && originalKey !== currentKey) {
+            await s3Client.send(new PutObjectCommand({ 
+              Bucket: S3_BUCKET_ARTICLES, Key: originalKey, Body: cleanPdfBuffer, ContentType: "application/pdf" 
+            }));
+            console.log("   📤 Original PDF overwritten (Fixes Review)");
+          }
           successCount++;
-        } else {
-          console.log(`${progress}  ⏭️ Skipping (no source found)\n`);
         }
-
       } catch (err: any) {
-        console.error(`${progress}  ❌ Failed: ${err?.message || err}\n`);
+        console.error(`   ❌ Failed: ${err.message}`);
         failCount++;
       }
     }
 
-    console.log(`\n✅ RE-WATERMARK v6 COMPLETE. Success: ${successCount}, Failed: ${failCount}`);
+    console.log(`\n✨ DONE! Status: v8. Success: ${successCount}, Fail: ${failCount}`);
   } catch (error: any) {
     console.error(" Fatal Error:", error);
   } finally {
@@ -227,4 +184,3 @@ async function reWatermarkArticles() {
 }
 
 reWatermarkArticles();
-
