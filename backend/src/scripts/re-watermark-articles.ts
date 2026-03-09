@@ -81,39 +81,39 @@ async function removeImagesFromPdf(pdfBuffer: Buffer): Promise<Buffer> {
       continue;
     }
 
-    // Find image XObjects to remove
+    // Find image or form XObjects to remove (watermarks can be either)
     const keysToRemove: PDFName[] = [];
     const entries = xObjectDict.entries();
 
     for (const [key, value] of entries) {
-      // Resolve the XObject to check its Subtype
       let xObj: any = value;
       if (value instanceof PDFRef) {
         xObj = pdfDoc.context.lookup(value);
       }
 
-      // Check if it's an Image (Subtype = /Image)
       if (xObj instanceof PDFDict || xObj instanceof PDFStream || xObj instanceof PDFRawStream) {
         const dict = xObj instanceof PDFDict ? xObj : (xObj as any).dict;
         if (dict) {
           const subtype = dict.get(PDFName.of("Subtype"));
-          if (subtype && subtype.toString() === "/Image") {
+          const subtypeStr = subtype ? subtype.toString() : "";
+          
+          // Remove both Images and Forms (watermarks are often Forms)
+          if (subtypeStr === "/Image" || subtypeStr === "/Form") {
             keysToRemove.push(key as PDFName);
-            console.log(`   Page ${i + 1}: Found Image XObject "${key.toString()}" → will remove`);
+            console.log(`   Page ${i + 1}: Found ${subtypeStr} XObject "${key.toString()}" → will remove`);
           }
         }
       }
     }
 
     if (keysToRemove.length > 0) {
-      // 1. Remove image XObjects from the dictionary
+      // 1. Remove XObjects from the dictionary
       for (const key of keysToRemove) {
         xObjectDict.delete(key);
         totalRemoved++;
       }
 
-      // 2. CRITICAL: Clean the content stream to remove drawing commands for these images
-      // This prevents "empty boxes" from appearing where images were.
+      // 2. CRITICAL: Clean the content stream to remove drawing commands for these objects
       try {
         const contents = page.node.get(PDFName.of("Contents"));
         if (contents) {
@@ -126,19 +126,25 @@ async function removeImagesFromPdf(pdfBuffer: Buffer): Promise<Buffer> {
               let modified = false;
 
               for (const key of keysToRemove) {
-                const name = key.toString(); // e.g. /Im1
-                // Regex to find " /Name Do" or "/Name Do"
-                // The space before / is optional, but Do must follow
-                const regex = new RegExp(`\\s?\\${name}\\s+Do`, "g");
-                if (regex.test(text)) {
-                  text = text.replace(regex, "");
+                const name = key.toString(); // e.g. /Im1 or /Fm1
+                
+                // More aggressive regex to remove the entire drawing operation
+                // Matches: /Name Do, q ... /Name Do ... Q, etc.
+                const doRegex = new RegExp(`\\/[A-Za-z0-9]+\\s+cm\\s+\\${name}\\s+Do`, "g");
+                const simpleDoRegex = new RegExp(`\\${name}\\s+Do`, "g");
+                
+                if (doRegex.test(text)) {
+                  text = text.replace(doRegex, "");
+                  modified = true;
+                } else if (simpleDoRegex.test(text)) {
+                  text = text.replace(simpleDoRegex, "");
                   modified = true;
                 }
               }
 
               if (modified) {
                 (stream as any).contents = Buffer.from(text, "latin1");
-                console.log(`   Page ${i + 1}: Cleaned content stream (removed image draw commands)`);
+                console.log(`   Page ${i + 1}: Cleaned content stream (removed drawing commands)`);
               }
             }
           }
@@ -147,9 +153,9 @@ async function removeImagesFromPdf(pdfBuffer: Buffer): Promise<Buffer> {
         console.warn(`   Page ${i + 1}: Failed to clean content stream:`, streamErr);
       }
 
-      console.log(`   Page ${i + 1}: Removed ${keysToRemove.length} image(s)`);
+      console.log(`   Page ${i + 1}: Removed ${keysToRemove.length} object(s)`);
     } else {
-      console.log(`   Page ${i + 1}: No images found`);
+      console.log(`   Page ${i + 1}: No image/form watermarks found`);
     }
   }
 
