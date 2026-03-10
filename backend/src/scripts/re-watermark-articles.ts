@@ -77,33 +77,72 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
     let changed = false;
 
     for (const entry of zipEntries) {
-      // Watermarks are usually in headers
-      if (entry.entryName.startsWith("word/header") && entry.entryName.endsWith(".xml")) {
-        let content = entry.getData().toString("utf8");
-        
-        // 1. Remove VML Shapes (common Word watermark format)
-        // Look for shapes containing our logo text or common watermark descriptors
-        if (content.includes("LAW NATION") || content.includes("PowerPoint") || content.includes("Word.Document")) {
-          // Remove entire <w:pict> or <v:shape> blocks that look like watermarks
-          const originalContent = content;
-          content = content.replace(/<w:pict>[\s\S]*?<\/w:pict>/g, "");
-          content = content.replace(/<v:shape[\s\S]*?<\/v:shape>/g, "");
+      if (entry.entryName.startsWith("word/") && entry.entryName.endsWith(".xml")) {
+        let content = entry.getData().toString("utf-8");
+        let localModified = false;
+
+        // Strategy A: Resize huge styles (width/height > 100pt etc)
+        const styleRegex = /style="([^"]*)"/gi;
+        content = content.replace(styleRegex, (match, style) => {
+          let newStyle = style;
+          let styleModified = false;
+          const dimRegex = /(width|height)\s*:\s*(\d+\.?\d*)\s*(pt|in|px|cm|mm|)/gi;
           
-          if (content !== originalContent) {
-            zip.updateFile(entry.entryName, Buffer.from(content, "utf8"));
-            changed = true;
-          }
+          newStyle = newStyle.replace(dimRegex, (m, prop, val, unit) => {
+            const v = parseFloat(val);
+            let isGiant = false;
+            if (unit === 'pt' && v > 100) isGiant = true;
+            else if (unit === 'in' && v > 1.3) isGiant = true;
+            else if (unit === 'px' && v > 140) isGiant = true;
+            else if (!unit && v > 1000) isGiant = true;
+
+            if (isGiant) {
+              const newVal = unit === 'in' ? '0.6' : (unit === 'px' ? '60' : '50');
+              styleModified = true;
+              return `${prop}:${newVal}${unit}`;
+            }
+            return m;
+          });
+          if (styleModified) localModified = true;
+          return styleModified ? `style="${newStyle}"` : match;
+        });
+
+        // Strategy B: If content includes "LAW NATION" or "PRIME TIMES", and it's a shape/image, resize it forcibly.
+        if (content.includes("LAW NATION") || content.includes("PRIME TIMES")) {
+           const genericShapeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)("[^>]*>[\s\S]*?(?:LAW NATION|PRIME TIMES)[\s\S]*?<\/(?:v:shape|v:rect|v:image|v:oval)>)/gi;
+           content = content.replace(genericShapeRegex, (match, start, style, end) => {
+              if (!style.includes('width:60pt')) { 
+                localModified = true;
+                const smallStyle = "position:absolute;margin-left:20pt;margin-top:20pt;width:60pt;height:60pt;z-index:251658240;mso-position-horizontal:absolute;mso-position-horizontal-relative:margin;mso-position-vertical:absolute;mso-position-vertical-relative:margin";
+                return `${start}${smallStyle}${end}`;
+              }
+              return match;
+           });
+        }
+
+        // Strategy C: Target elements that are background-relative or page-relative (common for watermarks)
+        if (content.includes('mso-position-vertical-relative:page') || content.includes('mso-position-horizontal-relative:page')) {
+           const pageRelativeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*width\s*:\s*\d+\.?\d*(?:pt|in|px|cm|mm|)[^"]*)("[^>]*>)/gi;
+           content = content.replace(pageRelativeRegex, (match, start, style, end) => {
+              if ((style.includes('relative:page') || style.includes('width:100%') || style.includes('height:100%')) && !style.includes('width:60pt')) {
+                localModified = true;
+                const smallStyle = "position:absolute;margin-left:20pt;margin-top:20pt;width:65pt;height:65pt;z-index:251658240;mso-position-horizontal:absolute;mso-position-horizontal-relative:margin;mso-position-vertical:absolute;mso-position-vertical-relative:margin";
+                return `${start}${smallStyle}${end}`;
+              }
+              return match;
+           });
+        }
+
+        if (localModified) {
+          zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
+          changed = true;
         }
       }
-      
-      // 2. Clear media folder if it contains large background images
-      // (Optional: safer to keep images unless we are sure they are watermarks)
-      // For now, let's stick to header XML cleaning which is targetted.
     }
 
     return changed ? zip.toBuffer() : buffer;
-  } catch (err) {
-    console.error("   ⚠️ DOCX Manual cleaning failed:", err.message);
+  } catch (err: any) {
+    console.error("   ⚠️ DOCX manual cleaning failed:", err.message);
     return buffer;
   }
 }
