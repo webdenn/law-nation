@@ -114,6 +114,23 @@ export async function addWatermarkToWord(
            });
         }
 
+        // Strategy D: Target DrawingML (EMU units) - wp:extent and a:ext
+        // 1 inch = 914400 EMUs. Giant logos are often 5,000,000+.
+        const drawingMLRegex = /<(wp:extent|a:ext)\s+cx="(\d+)"\s+cy="(\d+)"/gi;
+        content = content.replace(drawingMLRegex, (match, tag, cx, cy) => {
+           const valCx = parseInt(cx);
+           const valCy = parseInt(cy);
+           if (valCx > 1000000 || valCy > 1000000) {
+              console.log(`📐 [Word Watermark] Shrinking giant DrawingML ${tag} in ${entry.entryName}: ${cx}x${cy} EMUs`);
+              localModified = true;
+              // Shrink to approx 0.7 inch (640080 EMUs) maintaining aspect ratio
+              const newCx = 640080;
+              const newCy = Math.round(valCy * (newCx / valCx));
+              return `<${tag} cx="${newCx}" cy="${newCy}"`;
+           }
+           return match;
+        });
+
         if (localModified) {
           zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
           modifiedCount++;

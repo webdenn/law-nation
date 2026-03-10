@@ -120,7 +120,7 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
            });
         }
 
-        // Strategy C: Target elements that are background-relative or page-relative (common for watermarks)
+        // Strategy C: Target elements that are background-relative or page-relative
         if (content.includes('mso-position-vertical-relative:page') || content.includes('mso-position-horizontal-relative:page')) {
            const pageRelativeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*width\s*:\s*\d+\.?\d*(?:pt|in|px|cm|mm|)[^"]*)("[^>]*>)/gi;
            content = content.replace(pageRelativeRegex, (match, start, style, end) => {
@@ -132,6 +132,20 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
               return match;
            });
         }
+
+        // Strategy D: Target DrawingML (EMU units) - wp:extent and a:ext
+        const drawingMLRegex = /<(wp:extent|a:ext)\s+cx="(\d+)"\s+cy="(\d+)"/gi;
+        content = content.replace(drawingMLRegex, (match, tag, cx, cy) => {
+           const valCx = parseInt(cx);
+           const valCy = parseInt(cy);
+           if (valCx > 1000000 || valCy > 1000000) {
+              localModified = true;
+              const newCx = 640080; // ~0.7 inch
+              const newCy = Math.round(valCy * (newCx / valCx));
+              return `<${tag} cx="${newCx}" cy="${newCy}"`;
+           }
+           return match;
+        });
 
         if (localModified) {
           zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
