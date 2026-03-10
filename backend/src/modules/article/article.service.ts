@@ -342,7 +342,7 @@ export class ArticleService {
 
   // NEW: Download editor's DOCX with watermark
   async downloadEditorDocxWithWatermark(articleId: string, watermarkData: any) {
-    return articleDownloadService.downloadReviewerDocxWithWatermark(articleId, watermarkData);
+    return articleDownloadService.downloadEditorDocxWithWatermark(articleId, watermarkData);
   }
   // NEW: Get admin DOCX URL
   async getAdminDocxUrl(articleId: string) {

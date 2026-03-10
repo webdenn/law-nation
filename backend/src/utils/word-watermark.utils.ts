@@ -37,33 +37,44 @@ export async function addWatermarkToWord(
       if (entry.entryName.startsWith("word/header") && entry.entryName.endsWith(".xml")) {
         let content = entry.getData().toString("utf-8");
 
-        // 1. Agressively target large watermarks in headers
-        // Word watermarks are typically <v:shape> with a "position:absolute" and large dimensions.
-        // We look for styles that indicate a giant logo (e.g. width/height in hundreds of points)
+        // 1. Target large watermarks in headers robustly
+        // Word watermarks are typically <v:shape> with a style attribute.
+        // We look for any element with a style that has large width/height.
         
-        // Pattern to find v:shape tags used for watermarking
-        // We look for those that have specific attributes often found in watermarks or our current large logo
-        const shapeRegex = /<v:shape[^>]*style="[^"]*width:(\d+\.?\d*)pt;height:(\d+\.?\d*)pt[^"]*"[^>]*>([\s\S]*?)<\/v:shape>/g;
-        
-        const newContent = content.replace(shapeRegex, (match, width, height, inner) => {
-          const w = parseFloat(width);
-          const h = parseFloat(height);
-          
-          // If the logo is huge (greater than 100pt width/height), shrink it to ~50pt
-          if (w > 100 || h > 100) {
-            console.log(`📏 [Word Watermark] Shrinking giant logo from ${w}x${h} to 50x50`);
-            modified = true;
-            // Maintain aspect ratio approximately or force small square
-            const scale = Math.min(50/w, 50/h);
-            const newW = (w * scale).toFixed(2);
-            const newH = (h * scale).toFixed(2);
-            
-            return match.replace(`width:${width}pt;height:${height}pt`, `width:${newW}pt;height:${newH}pt`);
-          }
-          return match;
+        const styleRegex = /style="([^"]*)"/gi;
+        const newContent = content.replace(styleRegex, (match, style) => {
+          let newStyle = style;
+          let styleModified = false;
+
+          // Resize width if huge (>100pt or equivalent)
+          newStyle = newStyle.replace(/(width)\s*:\s*(\d+\.?\d*)\s*(pt|in|px|cm|mm)/gi, (m, prop, val, unit) => {
+            const v = parseFloat(val);
+            if ((unit === 'pt' && v > 100) || (unit === 'in' && v > 1.3) || (unit === 'px' && v > 140)) {
+              styleModified = true;
+              modified = true;
+              const newVal = unit === 'in' ? '0.7' : (unit === 'px' ? '70' : '50');
+              console.log(`📏 [Word Watermark] Resizing giant ${prop}: ${val}${unit} -> ${newVal}${unit}`);
+              return `${prop}:${newVal}${unit}`;
+            }
+            return m;
+          });
+
+          // Resize height if huge (>100pt or equivalent)
+          newStyle = newStyle.replace(/(height)\s*:\s*(\d+\.?\d*)\s*(pt|in|px|cm|mm)/gi, (m, prop, val, unit) => {
+            const v = parseFloat(val);
+            if ((unit === 'pt' && v > 100) || (unit === 'in' && v > 1.3) || (unit === 'px' && v > 140)) {
+              styleModified = true;
+              modified = true;
+              const newVal = unit === 'in' ? '0.7' : (unit === 'px' ? '70' : '50');
+              console.log(`📏 [Word Watermark] Resizing giant ${prop}: ${val}${unit} -> ${newVal}${unit}`);
+              return `${prop}:${newVal}${unit}`;
+            }
+            return m;
+          });
+
+          return styleModified ? `style="${newStyle}"` : match;
         });
 
-        // 2. Also look for <w:pict> blocks that might contain the logo
         if (content !== newContent) {
           zip.updateFile(entry.entryName, Buffer.from(newContent, "utf-8"));
           content = newContent;

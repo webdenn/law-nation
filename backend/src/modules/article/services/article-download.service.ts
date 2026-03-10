@@ -215,17 +215,32 @@ export class ArticleDownloadService {
       throw new NotFoundError("Reviewer's DOCX not available");
     }
 
-    console.log(`📄 [Adobe] Serving clean reviewer DOCX to ensure 100% formatting preservation: ${article.currentWordUrl}`);
+    console.log(`📄 [Word Watermark] Dynamically cleaning and serving reviewer DOCX: ${article.currentWordUrl}`);
 
     try {
-      const { downloadFileToBuffer } = await import("@/utils/pdf-extract.utils.js");
-      if (article.currentWordUrl.startsWith('http')) {
-        return await downloadFileToBuffer(article.currentWordUrl);
-      } else {
-        return await fs.promises.readFile(resolveToAbsolutePath(article.currentWordUrl));
-      }
+      const { addWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
+      return await addWatermarkToWord(article.currentWordUrl, watermarkData);
     } catch (error) {
-      console.error(`❌ [Adobe] Failed to serve reviewer DOCX:`, error);
+      console.error(`❌ [Word Watermark] Failed to serve reviewer DOCX:`, error);
+      throw error;
+    }
+  }
+
+  // NEW: Download editor's DOCX with high-quality formatting preservation
+  async downloadEditorDocxWithWatermark(articleId: string, watermarkData: any) {
+    const article = await this.getEditorDocxUrl(articleId);
+
+    if (!article.currentWordUrl) {
+      throw new NotFoundError("Editor's DOCX not available");
+    }
+
+    console.log(`📄 [Word Watermark] Dynamically cleaning and serving editor DOCX: ${article.currentWordUrl}`);
+
+    try {
+      const { addWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
+      return await addWatermarkToWord(article.currentWordUrl, watermarkData);
+    } catch (error) {
+      console.error(`❌ [Word Watermark] Failed to serve editor DOCX:`, error);
       throw error;
     }
   }
