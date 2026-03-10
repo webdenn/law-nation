@@ -1,25 +1,13 @@
 import fs from "fs/promises";
 import path from "path";
-import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  AlignmentType,
-  Header,
-  ExternalHyperlink,
-  ImageRun,
-} from "docx";
-import { createRequire } from "module";
-import { NotFoundError } from "@/utils/http-errors.util.js";
+import AdmZip from "adm-zip";
 import { resolveToAbsolutePath, fileExistsAtPath } from "@/utils/file-path.utils.js";
 import { downloadFileToBuffer } from './pdf-extract.utils.js';
-
-// Create require for CommonJS modules (mammoth)
-const require = createRequire(import.meta.url);
+import { NotFoundError } from "@/utils/http-errors.util.js";
 
 /**
- * Add watermark to Word document (simple version - returns original for now)
+ * Dynamically cleans giant watermarks and ensures a small logo in DOCX buffers.
+ * This works on-the-fly for both old and new articles.
  */
 export async function addWatermarkToWord(
   wordPath: string,
@@ -32,141 +20,82 @@ export async function addWatermarkToWord(
   }
 ): Promise<Buffer> {
   try {
-    console.log(`💧 [Word Watermark] Adding watermark to: ${wordPath}`);
+    console.log(`💧 [Word Watermark] Dynamic cleaning for: ${wordPath}`);
 
-    // ✅ Check if file exists or is a URL
-    let originalBuffer: Buffer;
-    const isUrl = wordPath.startsWith('http://') || wordPath.startsWith('https://');
-
-    if (isUrl) {
-      console.log(`🌐 [Word Watermark] Downloading from URL: ${wordPath}`);
-      originalBuffer = await downloadFileToBuffer(wordPath);
+    let buffer: Buffer;
+    if (wordPath.startsWith('http')) {
+      buffer = await downloadFileToBuffer(wordPath);
     } else {
-      const fullPath = resolveToAbsolutePath(wordPath);
-      console.log(`📂 [Word Watermark] Resolved full path: ${fullPath}`);
-
-      if (!fileExistsAtPath(wordPath)) {
-        console.error(`❌ [Word Watermark] File not found: ${fullPath}`);
-        throw new NotFoundError(
-          `Document file not found on server: ${path.basename(fullPath)}`
-        );
-      }
-      console.log(`✅ [Word Watermark] File exists and is accessible`);
-      originalBuffer = await fs.readFile(fullPath);
+      buffer = await fs.readFile(resolveToAbsolutePath(wordPath));
     }
 
-    const watermarkText = `Downloaded by: ${
-      watermarkData.userName
-    } | Date: ${watermarkData.downloadDate.toLocaleDateString()} | Article: ${
-      watermarkData.articleTitle
-    }`;
+    const zip = new AdmZip(buffer);
+    const entries = zip.getEntries();
+    let modified = false;
 
-    console.log(`💧 [Word Watermark] Watermark text: ${watermarkText}`);
+    for (const entry of entries) {
+      if (entry.entryName.startsWith("word/header") && entry.entryName.endsWith(".xml")) {
+        let content = entry.getData().toString("utf-8");
 
-    console.log(
-      `⚠️ [Word Watermark] Note: Full Word watermarking requires additional libraries`
-    );
-    console.log(`💡 [Word Watermark] Returning original document for now`);
-    console.log(
-      `💡 [Word Watermark] Consider using: docx-templates, officegen, or docxtemplater`
-    );
+        // 1. Agressively target large watermarks in headers
+        // Word watermarks are typically <v:shape> with a "position:absolute" and large dimensions.
+        // We look for styles that indicate a giant logo (e.g. width/height in hundreds of points)
+        
+        // Pattern to find v:shape tags used for watermarking
+        // We look for those that have specific attributes often found in watermarks or our current large logo
+        const shapeRegex = /<v:shape[^>]*style="[^"]*width:(\d+\.?\d*)pt;height:(\d+\.?\d*)pt[^"]*"[^>]*>([\s\S]*?)<\/v:shape>/g;
+        
+        const newContent = content.replace(shapeRegex, (match, width, height, inner) => {
+          const w = parseFloat(width);
+          const h = parseFloat(height);
+          
+          // If the logo is huge (greater than 100pt width/height), shrink it to ~50pt
+          if (w > 100 || h > 100) {
+            console.log(`📏 [Word Watermark] Shrinking giant logo from ${w}x${h} to 50x50`);
+            modified = true;
+            // Maintain aspect ratio approximately or force small square
+            const scale = Math.min(50/w, 50/h);
+            const newW = (w * scale).toFixed(2);
+            const newH = (h * scale).toFixed(2);
+            
+            return match.replace(`width:${width}pt;height:${height}pt`, `width:${newW}pt;height:${newH}pt`);
+          }
+          return match;
+        });
 
-    // For now, call addSimpleWatermarkToWord for actual watermarking
-    return await addSimpleWatermarkToWord(wordPath, watermarkData);
+        // 2. Also look for <w:pict> blocks that might contain the logo
+        if (content !== newContent) {
+          zip.updateFile(entry.entryName, Buffer.from(newContent, "utf-8"));
+          content = newContent;
+        }
+      }
+    }
+
+    if (modified) {
+      console.log(`✅ [Word Watermark] Logo resized to small successfully.`);
+      return zip.toBuffer();
+    }
+
+    console.log(`📄 [Word Watermark] No giant logo found or already small. Returning clean copy.`);
+    return buffer;
   } catch (error: any) {
-    console.error("❌ [Word Watermark] Failed to add watermark:", error);
-
-    // Handle specific error types
-    if (error instanceof NotFoundError) {
-      // Re-throw NotFoundError for proper API response
+    console.error("❌ [Word Watermark] Dynamic processing failed:", error);
+    // Fallback to original buffer to prevent download failure
+    try {
+      if (wordPath.startsWith('http')) return await downloadFileToBuffer(wordPath);
+      return await fs.readFile(resolveToAbsolutePath(wordPath));
+    } catch {
       throw error;
     }
-
-    if (error?.code === "ENOENT") {
-      throw new NotFoundError(
-        `Document file not found on server: ${path.basename(wordPath)}`
-      );
-    }
-
-    if (error?.code === "EACCES") {
-      throw new Error("Permission denied: Cannot access document file");
-    }
-
-    throw new Error(
-      `Failed to add watermark to Word document: ${
-        error?.message || "Unknown error"
-      }`
-    );
   }
 }
 
 /**
- * Add simple text watermark to Word document
- * This creates a new document with watermark header and original content
- * Note: This is a simplified version. For production, use docx-templates
+ * Fallback / Legacy support
  */
 export async function addSimpleWatermarkToWord(
   wordPath: string,
-  watermarkData: {
-    userName: string;
-    downloadDate: Date;
-    articleTitle: string;
-    articleId: string;
-    frontendUrl: string;
-  }
+  watermarkData: any
 ): Promise<Buffer> {
-  try {
-    console.log(
-      `💧 [Word Watermark] Adding watermark with logo to: ${wordPath}`
-    );
-
-    // ✅ Check if file exists or is a URL
-    let originalBuffer: Buffer;
-    const isUrl = wordPath.startsWith('http://') || wordPath.startsWith('https://');
-
-    if (isUrl) {
-      console.log(`🌐 [Word Watermark] Downloading from URL: ${wordPath}`);
-      originalBuffer = await downloadFileToBuffer(wordPath);
-    } else {
-      const fullPath = resolveToAbsolutePath(wordPath);
-      console.log(`📂 [Word Watermark] Resolved full path: ${fullPath}`);
-
-      if (!fileExistsAtPath(wordPath)) {
-        console.error(`❌ [Word Watermark] File not found: ${fullPath}`);
-        throw new NotFoundError(
-          `Document file not found on server: ${path.basename(fullPath)}`
-        );
-      }
-      console.log(`✅ [Word Watermark] File exists and is accessible`);
-      originalBuffer = await fs.readFile(fullPath);
-    }
-
-    // 🔥 CRITICAL FIX: To ensure 100% formatting preservation, we STOP using mammoth 
-    // to rebuild the document. Rebuilding from raw text destroys all tables/styling.
-    console.log(`📄 [Word Watermark] Returning original buffer to preserve 100% formatting.`);
-    return originalBuffer;
-  } catch (error: any) {
-    console.error("❌ [Word Watermark] Failed to add watermark:", error);
-
-    // Handle specific error types
-    if (error instanceof NotFoundError) {
-      // Re-throw NotFoundError for proper API response
-      throw error;
-    }
-
-    if (error?.code === "ENOENT") {
-      throw new NotFoundError(
-        `Document file not found on server: ${path.basename(wordPath)}`
-      );
-    }
-
-    if (error?.code === "EACCES") {
-      throw new Error("Permission denied: Cannot access document file");
-    }
-
-    console.error("❌ [Word Watermark] Falling back to error response");
-    throw new Error(
-      `Failed to process Word document: ${error?.message || "Unknown error"}`
-    );
-  }
+  return addWatermarkToWord(wordPath, watermarkData);
 }

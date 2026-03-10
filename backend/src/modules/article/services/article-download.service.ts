@@ -113,17 +113,13 @@ export class ArticleDownloadService {
       throw new NotFoundError("Original Word version not available");
     }
 
-    console.log(`📄 [Adobe] Serving clean original DOCX to ensure 100% formatting preservation: ${article.originalWordUrl}`);
+    console.log(`📄 [Word Watermark] Dynamically cleaning and serving original DOCX: ${article.originalWordUrl}`);
 
     try {
-      const { downloadFileToBuffer } = await import("@/utils/pdf-extract.utils.js");
-      if (article.originalWordUrl.startsWith('http')) {
-        return await downloadFileToBuffer(article.originalWordUrl);
-      } else {
-        return await fs.promises.readFile(resolveToAbsolutePath(article.originalWordUrl));
-      }
+      const { addWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
+      return await addWatermarkToWord(article.originalWordUrl, watermarkData);
     } catch (error) {
-      console.error(`❌ [Adobe] Failed to serve original DOCX:`, error);
+      console.error(`❌ [Word Watermark] Failed to serve original DOCX:`, error);
       throw error;
     }
   }
@@ -137,17 +133,13 @@ export class ArticleDownloadService {
       throw new NotFoundError("Word version not available");
     }
 
-    console.log(`📄 [Adobe] Serving clean article DOCX to ensure 100% formatting preservation: ${article.currentWordUrl}`);
+    console.log(`📄 [Word Watermark] Dynamically cleaning and serving article DOCX: ${article.currentWordUrl}`);
 
     try {
-      const { downloadFileToBuffer } = await import("@/utils/pdf-extract.utils.js");
-      if (article.currentWordUrl.startsWith('http')) {
-        return await downloadFileToBuffer(article.currentWordUrl);
-      } else {
-        return await fs.promises.readFile(resolveToAbsolutePath(article.currentWordUrl));
-      }
+      const { addWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
+      return await addWatermarkToWord(article.currentWordUrl, watermarkData);
     } catch (error) {
-      console.error(`❌ [Adobe] Failed to serve article DOCX:`, error);
+      console.error(`❌ [Word Watermark] Failed to serve article DOCX:`, error);
       throw error;
     }
   }
@@ -518,17 +510,13 @@ export class ArticleDownloadService {
       throw new NotFoundError("Admin's DOCX not available");
     }
 
-    console.log(`📄 [Adobe] Serving clean admin DOCX to ensure 100% formatting preservation: ${articleData.currentWordUrl}`);
+    console.log(`📄 [Word Watermark] Dynamically cleaning and serving admin DOCX: ${articleData.currentWordUrl}`);
 
     try {
-      const { downloadFileToBuffer } = await import("@/utils/pdf-extract.utils.js");
-      if (articleData.currentWordUrl.startsWith('http')) {
-        return await downloadFileToBuffer(articleData.currentWordUrl);
-      } else {
-        return await fs.promises.readFile(resolveToAbsolutePath(articleData.currentWordUrl));
-      }
+      const { addWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
+      return await addWatermarkToWord(articleData.currentWordUrl, watermarkData);
     } catch (error) {
-      console.error(`❌ [Adobe] Failed to serve admin DOCX:`, error);
+      console.error(`❌ [Word Watermark] Failed to serve admin DOCX:`, error);
       throw error;
     }
   }
