@@ -20,7 +20,7 @@ export async function addWatermarkToWord(
   }
 ): Promise<Buffer> {
   try {
-    console.log(`💧 [Word Watermark] Dynamic cleaning for: ${wordPath}`);
+    console.log(`💧 [Word Watermark] Ultra-Aggressive cleaning/resizing for: ${wordPath}`);
 
     let buffer: Buffer;
     if (wordPath.startsWith('http')) {
@@ -31,67 +31,106 @@ export async function addWatermarkToWord(
 
     const zip = new AdmZip(buffer);
     const entries = zip.getEntries();
-    let modified = false;
+    let modifiedCount = 0;
 
     for (const entry of entries) {
-      if (entry.entryName.startsWith("word/header") && entry.entryName.endsWith(".xml")) {
+      // Check ALL XML files in the word/ directory (headers, footers, document, etc.)
+      if (entry.entryName.startsWith("word/") && entry.entryName.endsWith(".xml")) {
         let content = entry.getData().toString("utf-8");
+        let localModified = false;
 
-        // 1. Target large watermarks in headers robustly
-        // Word watermarks are typically <v:shape> with a style attribute.
-        // We look for any element with a style that has large width/height.
+        // 1. NUKE elements that are clearly giant watermarks
+        // We look for v:shape, v:rect, v:image, w:pict, w:drawing
         
+        // Strategy A: Replace huge styles
         const styleRegex = /style="([^"]*)"/gi;
-        const newContent = content.replace(styleRegex, (match, style) => {
+        content = content.replace(styleRegex, (match, style) => {
           let newStyle = style;
           let styleModified = false;
 
-          // Resize width if huge (>100pt or equivalent)
-          newStyle = newStyle.replace(/(width)\s*:\s*(\d+\.?\d*)\s*(pt|in|px|cm|mm)/gi, (m, prop, val, unit) => {
+          // Target both width and height with any units (pt, in, px, cm, mm) or just numbers
+          const dimRegex = /(width|height)\s*:\s*(\d+\.?\d*)\s*(pt|in|px|cm|mm|)/gi;
+          
+          newStyle = newStyle.replace(dimRegex, (m, prop, val, unit) => {
             const v = parseFloat(val);
-            if ((unit === 'pt' && v > 100) || (unit === 'in' && v > 1.3) || (unit === 'px' && v > 140)) {
+            let isGiant = false;
+            
+            // Heuristics for "Giant"
+            if (unit === 'pt' && v > 100) isGiant = true;
+            else if (unit === 'in' && v > 1.3) isGiant = true;
+            else if (unit === 'px' && v > 140) isGiant = true;
+            else if (unit === 'cm' && v > 3.5) isGiant = true;
+            else if (unit === 'mm' && v > 35) isGiant = true;
+            else if (!unit && v > 1000) isGiant = true; // Relative units or raw EMU
+
+            if (isGiant) {
+              const newVal = unit === 'in' ? '0.6' : (unit === 'px' ? '60' : (unit === 'cm' ? '1.5' : (unit === 'mm' ? '15' : '40')));
+              console.log(`📏 [Word Watermark] Found giant ${prop} in ${entry.entryName}: ${val}${unit}. Shrinking to ${newVal}${unit}`);
               styleModified = true;
-              modified = true;
-              const newVal = unit === 'in' ? '0.7' : (unit === 'px' ? '70' : '50');
-              console.log(`📏 [Word Watermark] Resizing giant ${prop}: ${val}${unit} -> ${newVal}${unit}`);
+              localModified = true;
               return `${prop}:${newVal}${unit}`;
             }
             return m;
           });
 
-          // Resize height if huge (>100pt or equivalent)
-          newStyle = newStyle.replace(/(height)\s*:\s*(\d+\.?\d*)\s*(pt|in|px|cm|mm)/gi, (m, prop, val, unit) => {
-            const v = parseFloat(val);
-            if ((unit === 'pt' && v > 100) || (unit === 'in' && v > 1.3) || (unit === 'px' && v > 140)) {
-              styleModified = true;
-              modified = true;
-              const newVal = unit === 'in' ? '0.7' : (unit === 'px' ? '70' : '50');
-              console.log(`📏 [Word Watermark] Resizing giant ${prop}: ${val}${unit} -> ${newVal}${unit}`);
-              return `${prop}:${newVal}${unit}`;
-            }
-            return m;
-          });
+          // Special case for watermarks: they often have position:absolute and z-index:-... 
+          // If we see a giant shape, we might also want to force it to top-left or something
+          if (styleModified && style.includes('position:absolute')) {
+             newStyle = newStyle.replace(/mso-position-vertical-relative:[^;]*/g, 'mso-position-vertical-relative:margin');
+             newStyle = newStyle.replace(/mso-position-horizontal-relative:[^;]*/g, 'mso-position-horizontal-relative:margin');
+             // Move to top leftish area
+             if (!newStyle.includes('margin-top')) newStyle += ';margin-top:20pt;margin-left:20pt';
+          }
 
           return styleModified ? `style="${newStyle}"` : match;
         });
 
-        if (content !== newContent) {
-          zip.updateFile(entry.entryName, Buffer.from(newContent, "utf-8"));
-          content = newContent;
+        // Strategy B: If content includes "LAW NATION" or "PRIME TIMES", and it's a shape/image, resize it.
+        if (content.includes("LAW NATION") || content.includes("PRIME TIMES")) {
+           // Target v:shape, v:rect, v:image, v:oval etc.
+           const genericShapeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)("[^>]*>[\s\S]*?(?:LAW NATION|PRIME TIMES)[\s\S]*?<\/(?:v:shape|v:rect|v:image|v:oval)>)/gi;
+           content = content.replace(genericShapeRegex, (match, start, style, end) => {
+              if (!style.includes('width:60pt')) { 
+                console.log(`🎯 [Word Watermark] Forced shrinking logo element in ${entry.entryName} (matched text)`);
+                localModified = true;
+                const smallStyle = "position:absolute;margin-left:20pt;margin-top:20pt;width:60pt;height:60pt;z-index:251658240;mso-position-horizontal:absolute;mso-position-horizontal-relative:margin;mso-position-vertical:absolute;mso-position-vertical-relative:margin";
+                return `${start}${smallStyle}${end}`;
+              }
+              return match;
+           });
+        }
+
+        // Strategy C: Target elements that are background-relative or page-relative (common for watermarks)
+        if (content.includes('mso-position-vertical-relative:page') || content.includes('mso-position-horizontal-relative:page')) {
+           const pageRelativeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*width\s*:\s*\d+\.?\d*(?:pt|in|px|cm|mm|)[^"]*)("[^>]*>)/gi;
+           content = content.replace(pageRelativeRegex, (match, start, style, end) => {
+              if ((style.includes('relative:page') || style.includes('width:100%') || style.includes('height:100%')) && !style.includes('width:60pt')) {
+                console.log(`📡 [Word Watermark] Shrinking page-relative element in ${entry.entryName}`);
+                localModified = true;
+                const smallStyle = "position:absolute;margin-left:20pt;margin-top:20pt;width:65pt;height:65pt;z-index:251658240;mso-position-horizontal:absolute;mso-position-horizontal-relative:margin;mso-position-vertical:absolute;mso-position-vertical-relative:margin";
+                return `${start}${smallStyle}${end}`;
+              }
+              return match;
+           });
+        }
+
+        if (localModified) {
+          zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
+          modifiedCount++;
         }
       }
     }
 
-    if (modified) {
-      console.log(`✅ [Word Watermark] Logo resized to small successfully.`);
+    if (modifiedCount > 0) {
+      console.log(`✅ [Word Watermark] ${modifiedCount} XML files cleaned/resized successfully.`);
       return zip.toBuffer();
     }
 
-    console.log(`📄 [Word Watermark] No giant logo found or already small. Returning clean copy.`);
+    console.log(`📄 [Word Watermark] No giant logo detected in headers or body. Returning original.`);
     return buffer;
   } catch (error: any) {
-    console.error("❌ [Word Watermark] Dynamic processing failed:", error);
-    // Fallback to original buffer to prevent download failure
+    console.error("❌ [Word Watermark] Ultimate cleaning failed:", error);
+    // Fallback to original buffer
     try {
       if (wordPath.startsWith('http')) return await downloadFileToBuffer(wordPath);
       return await fs.readFile(resolveToAbsolutePath(wordPath));
