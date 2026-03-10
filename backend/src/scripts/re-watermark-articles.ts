@@ -107,40 +107,44 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
           return styleModified ? `style="${newStyle}"` : match;
         });
 
-        // Strategy B: If content includes "LAW NATION" or "PRIME TIMES", and it's a shape/image, resize it.
+        // Strategy B: Dual Logo Placement (Center + Bottom-Right)
         if (content.includes("LAW NATION") || content.includes("PRIME TIMES")) {
-           const genericShapeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")/gi;
-           content = content.replace(genericShapeRegex, (match, start, style, end) => {
-              if (match.includes("relative:page") || style.includes("width:") && !style.includes('width:60pt')) {
+           const genericShapeRegex = /(<(v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")([^>]*>)([\s\S]*?)(<\/\2>)/gi;
+           content = content.replace(genericShapeRegex, (match, start, tag, style, quote, mid, inner, end) => {
+              if (match.includes("relative:page") || style.includes("width:") && !style.includes('width:130pt')) {
                 localModified = true;
-                const newStyle = "position:absolute;margin-left:20pt;margin-top:20pt;width:60pt;height:60pt;z-index:251658240;mso-position-horizontal:absolute;mso-position-horizontal-relative:margin;mso-position-vertical:absolute;mso-position-vertical-relative:margin";
-                return `${start}${newStyle}${end}`;
+                const centerStyle = "position:absolute;width:130pt;height:130pt;z-index:251658240;mso-position-horizontal:center;mso-position-horizontal-relative:page;mso-position-vertical:center;mso-position-vertical-relative:page";
+                const centerLogo = `${start}${centerStyle}${quote}${mid}${inner}${end}`;
+                const cornerStyle = "position:absolute;width:75pt;height:75pt;z-index:251658239;mso-position-horizontal:right;mso-position-horizontal-relative:margin;mso-position-vertical:bottom;mso-position-vertical-relative:margin";
+                const cornerLogo = `${start}${cornerStyle}${quote}${mid}${inner}${end}`;
+                return centerLogo + cornerLogo;
               }
               return match;
            });
         }
 
-        // Strategy C: Target elements that are background-relative or page-relative
+        // Strategy C: Target page-relative elements
         if (content.includes('mso-position-vertical-relative:page') || content.includes('mso-position-horizontal-relative:page')) {
-           const pageRelativeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*width\s*:\s*\d+\.?\d*(?:pt|in|px|cm|mm|)[^"]*)(")/gi;
-           content = content.replace(pageRelativeRegex, (match, start, style, end) => {
-              if ((style.includes('relative:page') || style.includes('width:100%') || style.includes('height:100%')) && !style.includes('width:65pt')) {
+           const pageRelativeRegex = /(<(v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*width\s*:\s*\d+\.?\d*(?:pt|in|px|cm|mm|)[^"]*)(")([^>]*>)([\s\S]*?)(<\/\2>)/gi;
+           content = content.replace(pageRelativeRegex, (match, start, tag, style, quote, mid, inner, end) => {
+              if ((style.includes('relative:page') || style.includes('width:100%') || style.includes('height:100%')) && !style.includes('width:130pt')) {
                 localModified = true;
-                const smallStyle = "position:absolute;margin-left:20pt;margin-top:20pt;width:65pt;height:65pt;z-index:251658240;mso-position-horizontal:absolute;mso-position-horizontal-relative:margin;mso-position-vertical:absolute;mso-position-vertical-relative:margin";
-                return `${start}${smallStyle}${end}`;
+                const centerStyle = "position:absolute;width:130pt;height:130pt;z-index:251658240;mso-position-horizontal:center;mso-position-horizontal-relative:page;mso-position-vertical:center;mso-position-vertical-relative:page";
+                const cornerStyle = "position:absolute;width:75pt;height:75pt;z-index:251658239;mso-position-horizontal:right;mso-position-horizontal-relative:margin;mso-position-vertical:bottom;mso-position-vertical-relative:margin";
+                return `${start}${centerStyle}${quote}${mid}${inner}${end}${start}${cornerStyle}${quote}${mid}${inner}${end}`;
               }
               return match;
            });
         }
 
-        // Strategy D: Target DrawingML (EMU units) - CRITICAL FIX for XML tag closure
+        // Strategy D: Target DrawingML (EMU units)
         const drawingMLRegex = /<(wp:extent|a:ext)\s+cx="(\d+)"\s+cy="(\d+)"([^>]*?)(\/?>)/gi;
         content = content.replace(drawingMLRegex, (match, tag, cx, cy, otherAttrs, closing) => {
            const valCx = parseInt(cx);
            const valCy = parseInt(cy);
            if (valCx > 1000000 || valCy > 1000000) {
               localModified = true;
-              const newCx = 640080; // ~0.7 inch
+              const newCx = 1188720; // ~1.3 inch
               const newCy = Math.round(valCy * (newCx / valCx));
               return `<${tag} cx="${newCx}" cy="${newCy}"${otherAttrs}${closing}`;
            }
