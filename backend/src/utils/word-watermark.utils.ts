@@ -87,24 +87,25 @@ export async function addWatermarkToWord(
 
         // Strategy B: If content includes "LAW NATION" or "PRIME TIMES", and it's a shape/image, resize it.
         if (content.includes("LAW NATION") || content.includes("PRIME TIMES")) {
-           // Target v:shape, v:rect, v:image, v:oval etc.
-           const genericShapeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)("[^>]*>[\s\S]*?(?:LAW NATION|PRIME TIMES)[\s\S]*?<\/(?:v:shape|v:rect|v:image|v:oval)>)/gi;
+           // Improved regex to capture the full opening tag and keep it safe
+           const genericShapeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")/gi;
            content = content.replace(genericShapeRegex, (match, start, style, end) => {
-              if (!style.includes('width:60pt')) { 
-                console.log(`🎯 [Word Watermark] Forced shrinking logo element in ${entry.entryName} (matched text)`);
+              // Only apply if it's actually large or part of a watermark structure
+              if (match.includes("mso-position-vertical-relative:page") || style.includes("width:") && !style.includes('width:60pt')) {
+                console.log(`🎯 [Word Watermark] Resizing logo style in ${entry.entryName} (matched via text-context)`);
                 localModified = true;
-                const smallStyle = "position:absolute;margin-left:20pt;margin-top:20pt;width:60pt;height:60pt;z-index:251658240;mso-position-horizontal:absolute;mso-position-horizontal-relative:margin;mso-position-vertical:absolute;mso-position-vertical-relative:margin";
-                return `${start}${smallStyle}${end}`;
+                const newStyle = "position:absolute;margin-left:20pt;margin-top:20pt;width:60pt;height:60pt;z-index:251658240;mso-position-horizontal:absolute;mso-position-horizontal-relative:margin;mso-position-vertical:absolute;mso-position-vertical-relative:margin";
+                return `${start}${newStyle}${end}`;
               }
               return match;
            });
         }
 
-        // Strategy C: Target elements that are background-relative or page-relative (common for watermarks)
+        // Strategy C: Target elements that are background-relative or page-relative
         if (content.includes('mso-position-vertical-relative:page') || content.includes('mso-position-horizontal-relative:page')) {
-           const pageRelativeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*width\s*:\s*\d+\.?\d*(?:pt|in|px|cm|mm|)[^"]*)("[^>]*>)/gi;
+           const pageRelativeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*width\s*:\s*\d+\.?\d*(?:pt|in|px|cm|mm|)[^"]*)(")/gi;
            content = content.replace(pageRelativeRegex, (match, start, style, end) => {
-              if ((style.includes('relative:page') || style.includes('width:100%') || style.includes('height:100%')) && !style.includes('width:60pt')) {
+              if ((style.includes('relative:page') || style.includes('width:100%') || style.includes('height:100%')) && !style.includes('width:65pt')) {
                 console.log(`📡 [Word Watermark] Shrinking page-relative element in ${entry.entryName}`);
                 localModified = true;
                 const smallStyle = "position:absolute;margin-left:20pt;margin-top:20pt;width:65pt;height:65pt;z-index:251658240;mso-position-horizontal:absolute;mso-position-horizontal-relative:margin;mso-position-vertical:absolute;mso-position-vertical-relative:margin";
@@ -114,19 +115,17 @@ export async function addWatermarkToWord(
            });
         }
 
-        // Strategy D: Target DrawingML (EMU units) - wp:extent and a:ext
-        // 1 inch = 914400 EMUs. Giant logos are often 5,000,000+.
-        const drawingMLRegex = /<(wp:extent|a:ext)\s+cx="(\d+)"\s+cy="(\d+)"/gi;
-        content = content.replace(drawingMLRegex, (match, tag, cx, cy) => {
+        // Strategy D: Target DrawingML (EMU units) - CRITICAL FIX for XML tag closure
+        const drawingMLRegex = /<(wp:extent|a:ext)\s+cx="(\d+)"\s+cy="(\d+)"([^>]*?)(\/?>)/gi;
+        content = content.replace(drawingMLRegex, (match, tag, cx, cy, otherAttrs, closing) => {
            const valCx = parseInt(cx);
            const valCy = parseInt(cy);
            if (valCx > 1000000 || valCy > 1000000) {
               console.log(`📐 [Word Watermark] Shrinking giant DrawingML ${tag} in ${entry.entryName}: ${cx}x${cy} EMUs`);
               localModified = true;
-              // Shrink to approx 0.7 inch (640080 EMUs) maintaining aspect ratio
-              const newCx = 640080;
+              const newCx = 640080; // ~0.7 inch
               const newCy = Math.round(valCy * (newCx / valCx));
-              return `<${tag} cx="${newCx}" cy="${newCy}"`;
+              return `<${tag} cx="${newCx}" cy="${newCy}"${otherAttrs}${closing}`;
            }
            return match;
         });

@@ -107,14 +107,14 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
           return styleModified ? `style="${newStyle}"` : match;
         });
 
-        // Strategy B: If content includes "LAW NATION" or "PRIME TIMES", and it's a shape/image, resize it forcibly.
+        // Strategy B: If content includes "LAW NATION" or "PRIME TIMES", and it's a shape/image, resize it.
         if (content.includes("LAW NATION") || content.includes("PRIME TIMES")) {
-           const genericShapeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)("[^>]*>[\s\S]*?(?:LAW NATION|PRIME TIMES)[\s\S]*?<\/(?:v:shape|v:rect|v:image|v:oval)>)/gi;
+           const genericShapeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")/gi;
            content = content.replace(genericShapeRegex, (match, start, style, end) => {
-              if (!style.includes('width:60pt')) { 
+              if (match.includes("relative:page") || style.includes("width:") && !style.includes('width:60pt')) {
                 localModified = true;
-                const smallStyle = "position:absolute;margin-left:20pt;margin-top:20pt;width:60pt;height:60pt;z-index:251658240;mso-position-horizontal:absolute;mso-position-horizontal-relative:margin;mso-position-vertical:absolute;mso-position-vertical-relative:margin";
-                return `${start}${smallStyle}${end}`;
+                const newStyle = "position:absolute;margin-left:20pt;margin-top:20pt;width:60pt;height:60pt;z-index:251658240;mso-position-horizontal:absolute;mso-position-horizontal-relative:margin;mso-position-vertical:absolute;mso-position-vertical-relative:margin";
+                return `${start}${newStyle}${end}`;
               }
               return match;
            });
@@ -122,9 +122,9 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
 
         // Strategy C: Target elements that are background-relative or page-relative
         if (content.includes('mso-position-vertical-relative:page') || content.includes('mso-position-horizontal-relative:page')) {
-           const pageRelativeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*width\s*:\s*\d+\.?\d*(?:pt|in|px|cm|mm|)[^"]*)("[^>]*>)/gi;
+           const pageRelativeRegex = /(<(?:v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*width\s*:\s*\d+\.?\d*(?:pt|in|px|cm|mm|)[^"]*)(")/gi;
            content = content.replace(pageRelativeRegex, (match, start, style, end) => {
-              if ((style.includes('relative:page') || style.includes('width:100%') || style.includes('height:100%')) && !style.includes('width:60pt')) {
+              if ((style.includes('relative:page') || style.includes('width:100%') || style.includes('height:100%')) && !style.includes('width:65pt')) {
                 localModified = true;
                 const smallStyle = "position:absolute;margin-left:20pt;margin-top:20pt;width:65pt;height:65pt;z-index:251658240;mso-position-horizontal:absolute;mso-position-horizontal-relative:margin;mso-position-vertical:absolute;mso-position-vertical-relative:margin";
                 return `${start}${smallStyle}${end}`;
@@ -133,16 +133,16 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
            });
         }
 
-        // Strategy D: Target DrawingML (EMU units) - wp:extent and a:ext
-        const drawingMLRegex = /<(wp:extent|a:ext)\s+cx="(\d+)"\s+cy="(\d+)"/gi;
-        content = content.replace(drawingMLRegex, (match, tag, cx, cy) => {
+        // Strategy D: Target DrawingML (EMU units) - CRITICAL FIX for XML tag closure
+        const drawingMLRegex = /<(wp:extent|a:ext)\s+cx="(\d+)"\s+cy="(\d+)"([^>]*?)(\/?>)/gi;
+        content = content.replace(drawingMLRegex, (match, tag, cx, cy, otherAttrs, closing) => {
            const valCx = parseInt(cx);
            const valCy = parseInt(cy);
            if (valCx > 1000000 || valCy > 1000000) {
               localModified = true;
               const newCx = 640080; // ~0.7 inch
               const newCy = Math.round(valCy * (newCx / valCx));
-              return `<${tag} cx="${newCx}" cy="${newCy}"`;
+              return `<${tag} cx="${newCx}" cy="${newCy}"${otherAttrs}${closing}`;
            }
            return match;
         });
