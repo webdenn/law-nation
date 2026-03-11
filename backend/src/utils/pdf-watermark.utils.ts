@@ -75,10 +75,11 @@ export async function addWatermarkToPdf(
       // --- BULLETPROOF LOGO PATH DISCOVERY ---
       const possibleSubPaths = [
         ['public', 'assets', 'img', 'watermark.png'],
-        ['..', 'public', 'assets', 'img', 'watermark.png'],
         ['backend', 'public', 'assets', 'img', 'watermark.png'],
+        ['..', 'public', 'assets', 'img', 'watermark.png'],
         ['src', 'assets', 'img', 'logo-bg.png'],
         ['src', 'assests', 'img', 'logo-bg.png'],
+        ['backend', 'src', 'assets', 'img', 'logo-bg.png'],
       ];
 
       let logoPath = "";
@@ -95,7 +96,7 @@ export async function addWatermarkToPdf(
         const logoBuffer = fs.readFileSync(logoPath);
         logoImage = await pdfDoc.embedPng(logoBuffer);
       } else {
-        console.warn(`⚠️ [PDF Watermark] Logo NOT found in checked paths. Skipping logo watermarks.`);
+        console.warn(`⚠️ [PDF Watermark] Logo NOT found in checked paths (Checked: ${possibleSubPaths.map(p => p.join('/')).join(', ')}). Skipping logo watermarks.`);
       }
     } catch (error) {
       console.warn('⚠️ [Watermark] Failed to load logo, skipping logo watermark:', error);
@@ -181,10 +182,10 @@ export async function addWatermarkToPdf(
         const logoScale = 0.25; // Large center logo
         const logoDims = logoImage.scale(logoScale);
 
-        // --- REFINED CENTERING MATH ---
-        // Calculate center position using full dimensions to handle offsets
-        const logoX = (width / 2) - (logoDims.width / 2);
-        const logoY = (height / 2) - (logoDims.height / 2);
+        // --- REFINED CENTERING MATH (MediaBox Aware) ---
+        const mediaBox = page.getMediaBox();
+        const logoX = mediaBox.x + (mediaBox.width / 2) - (logoDims.width / 2);
+        const logoY = mediaBox.y + (mediaBox.height / 2) - (logoDims.height / 2);
 
         // Draw logo with low opacity
         page.drawImage(logoImage, {
@@ -200,10 +201,11 @@ export async function addWatermarkToPdf(
       if (logoImage) {
         const bottomLogoScale = 0.08; 
         const bottomLogoDims = logoImage.scale(bottomLogoScale);
+        const mediaBox = page.getMediaBox();
 
-        // Calculate bottom-right position (with 20px margin from bottom and right)
-        const bottomLogoX = width - bottomLogoDims.width - 20;
-        const bottomLogoY = 20;
+        // Calculate bottom-right position relative to MediaBox
+        const bottomLogoX = mediaBox.x + mediaBox.width - bottomLogoDims.width - 20;
+        const bottomLogoY = mediaBox.y + 20;
 
         // Draw bottom-right logo
         page.drawImage(logoImage, {

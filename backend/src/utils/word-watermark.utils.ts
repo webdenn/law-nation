@@ -39,11 +39,9 @@ export async function addWatermarkToWord(
 
     // 1. CENTER WATERMARK STYLE (Behind Text, No Wrapping)
     const centerStyle = [
-      'position:absolute',
       'margin-left:0',
       'margin-top:0',
-      `width:${CENTER_LOGO_SIZE}`,
-      `height:${CENTER_LOGO_SIZE}`,
+      'position:absolute',
       'z-index:-251658240', // Negative so text is on top
       'mso-wrap-edited:f',
       'mso-wrap-distance-left:0',
@@ -55,19 +53,23 @@ export async function addWatermarkToWord(
       'mso-position-vertical:center',
       'mso-position-vertical-relative:page',
       'mso-width-relative:page',
-      'mso-height-relative:page'
+      'mso-height-relative:page',
+      `width:${CENTER_LOGO_SIZE}`,
+      `height:${CENTER_LOGO_SIZE}`,
     ].join(';');
 
     // 2. BOTTOM RIGHT LOGO STYLE
     const cornerStyle = [
       'position:absolute',
+      'margin-left:0',
+      'margin-top:0',
       `width:${CORNER_LOGO_SIZE}`,
       `height:${CORNER_LOGO_SIZE}`,
       'z-index:251659264',
       'mso-position-horizontal:right',
-      'mso-position-horizontal-relative:margin',
+      'mso-position-horizontal-relative:page',
       'mso-position-vertical:bottom',
-      'mso-position-vertical-relative:margin'
+      'mso-position-vertical-relative:page'
     ].join(';');
 
     for (const entry of entries) {

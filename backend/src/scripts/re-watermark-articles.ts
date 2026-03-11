@@ -59,6 +59,8 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
             // ─── CENTER WATERMARK ───
             const centerStyle = `
 position:absolute;
+margin-left:0;
+margin-top:0;
 width:${CENTER_SIZE};
 height:${CENTER_SIZE};
 mso-position-horizontal:center;
@@ -82,13 +84,15 @@ fixed-wm:yes;
             // ─── BOTTOM RIGHT LOGO ───
             const bottomStyle = `
 position:absolute;
+margin-left:0;
+margin-top:0;
 width:${BOTTOM_SIZE};
 height:${BOTTOM_SIZE};
 mso-position-horizontal:right;
 mso-position-horizontal-relative:page;
 mso-position-vertical:bottom;
 mso-position-vertical-relative:page;
-z-index:-251658240;
+z-index:251658241;
 opacity:1;
 fixed-wm:yes;
 `;
@@ -175,7 +179,7 @@ async function reWatermarkArticles() {
           );
         }
 
-        console.log("✅ DOCX Fixed");
+        console.log(" DOCX Fixed");
       } catch (err: any) {
         console.log("❌ Article failed:", err.message);
       }

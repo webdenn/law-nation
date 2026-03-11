@@ -589,10 +589,11 @@ export class AdobeService {
       try {
         const possibleSubPaths = [
           ['public', 'assets', 'img', 'watermark.png'],
-          ['..', 'public', 'assets', 'img', 'watermark.png'],
           ['backend', 'public', 'assets', 'img', 'watermark.png'],
+          ['..', 'public', 'assets', 'img', 'watermark.png'],
           ['src', 'assets', 'img', 'logo-bg.png'],
           ['src', 'assests', 'img', 'logo-bg.png'],
+          ['backend', 'src', 'assets', 'img', 'logo-bg.png'],
         ];
 
         let logoPath = "";
@@ -609,7 +610,7 @@ export class AdobeService {
           const logoBytes = fs.readFileSync(logoPath);
           logoImage = await pdfDoc.embedPng(logoBytes);
         } else {
-          console.warn(`⚠️ [Adobe Service] Logo NOT found in checked paths.`);
+          console.warn(`⚠️ [Adobe Service] Logo NOT found in checked paths (Checked: ${possibleSubPaths.map(p => p.join('/')).join(', ')}).`);
         }
       } catch (logoError) {
         console.warn('⚠️ [Adobe Service] Failed to load logo for watermark:', logoError);
@@ -621,25 +622,27 @@ export class AdobeService {
         const { width, height } = page.getSize();
         
         // 1. Add Center Logo
-        if (logoImage) {
           const logoScale = 0.25; 
           const logoDims = logoImage.scale(logoScale);
+          const mediaBox = page.getMediaBox();
+          
           page.drawImage(logoImage, {
-            x: (width / 2) - (logoDims.width / 2),
-            y: (height / 2) - (logoDims.height / 2),
+            x: mediaBox.x + (mediaBox.width / 2) - (logoDims.width / 2),
+            y: mediaBox.y + (mediaBox.height / 2) - (logoDims.height / 2),
             width: logoDims.width,
             height: logoDims.height,
             opacity: 0.12, // Reduced for large size (Bulletproof)
           });
-        }
 
         // 2. Add Bottom-Right Logo
         if (logoImage) {
           const bottomLogoScale = 0.08; 
           const bottomLogoDims = logoImage.scale(bottomLogoScale);
+          const mediaBox = page.getMediaBox();
+          
           page.drawImage(logoImage, {
-            x: width - bottomLogoDims.width - 20,
-            y: 20,
+            x: mediaBox.x + mediaBox.width - bottomLogoDims.width - 20,
+            y: mediaBox.y + 20,
             width: bottomLogoDims.width,
             height: bottomLogoDims.height,
             opacity: 0.35, // Consistent premium transparency
