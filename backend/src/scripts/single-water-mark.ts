@@ -21,9 +21,9 @@ const WATERMARK_PATH = path.resolve(
   "../../src/assests/img/logo-bg.png"
 );
 
-const WIDTH = "400pt";
-const HEIGHT = "200pt";
-const OPACITY = "0.05";
+const WIDTH = "350pt";
+const HEIGHT = "170pt";
+const OPACITY = "0.03";
 
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
 const S3_BUCKET = process.env.AWS_S3_BUCKET_ARTICLES || "law-nation";
@@ -145,8 +145,8 @@ ${watermarkXML()}
         <v:imagedata
           r:id="rIdWatermark"
           o:title="watermark"
-          gain="0.8"
-          blacklevel="0.90"/>
+          gain="0.5"
+          blacklevel="0.98"/>
       </v:shape>`
       );
 
