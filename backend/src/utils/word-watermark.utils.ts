@@ -33,9 +33,9 @@ export async function addWatermarkToWord(
     const entries = zip.getEntries();
     let modifiedCount = 0;
 
-    // SETTING BOTH TO SAME SIZE AS REQUESTED
-    const CENTER_LOGO_SIZE = "80pt"; 
-    const CORNER_LOGO_SIZE = "80pt";
+    // SETTING BOTH TO SAME GLOBAL SIZE (160pt ≈ 2.2 inches)
+    const CENTER_LOGO_SIZE = "160pt"; 
+    const CORNER_LOGO_SIZE = "160pt";
 
     for (const entry of entries) {
       if (entry.entryName.startsWith("word/") && entry.entryName.endsWith(".xml")) {
