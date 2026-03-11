@@ -3,26 +3,37 @@ import { prisma } from "../db/db.js";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { downloadFileToBuffer } from "../utils/pdf-extract.utils.js";
 import { PDFDocument, PDFName, PDFDict, PDFRef, PDFStream, PDFRawStream } from "pdf-lib";
-import fs from "fs";
-import path from "path";
 import AdmZip from "adm-zip";
 
 /**
- * RE-WATERMARK SCRIPT v11: THE TOTAL CLEANER (NO ADOBE NEEDED)
- * 
- * 1. Overwrites BOTH Current and Original PDFs in S3 (Nuclear Strip).
- * 2. Overwrites BOTH Current and Original DOCX in S3 (Manual ZIP Strip).
- * 3. Removes Images, Forms, Patterns from PDF.
- * 4. Removes Watermark VML/Images from DOCX headers manually.
+ * RE-WATERMARK SCRIPT v12: FIXED CENTER WATERMARK
+ *
+ * Key Fixes:
+ * 1. Proper EMU size for DrawingML (~6 inches = 5486400 EMU)
+ * 2. Correct VML centering relative to PAGE (not margin)
+ * 3. Handles BOTH VML (legacy) and DrawingML (modern) DOCX formats
+ * 4. Lower EMU threshold to catch all watermark shapes
+ * 5. Cleans PDF images/annotations as before
  */
 
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
 const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || "";
 const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || "";
 const S3_BUCKET_ARTICLES = process.env.AWS_S3_BUCKET_ARTICLES || "law-nation";
-
 const isLocal = process.env.NODE_ENV === "local";
 
+// ─── WATERMARK SIZE CONSTANTS ─────────────────────────────────────────────────
+// VML sizes (pt)
+const WM_PT = 400;                    // 400pt ≈ 5.5 inches — large, visible center watermark
+const WM_CENTER = `${WM_PT}pt`;
+const WM_CORNER = "90pt";
+
+// DrawingML sizes (EMU: 1 inch = 914400 EMU)
+const WM_EMU = 5486400;               // ~6 inches in EMU
+const WM_EMU_THRESHOLD = 300000;      // Any shape wider than ~0.33 inch is a candidate
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 function extractS3Key(url: string | null): string | null {
   if (!url) return null;
   try {
@@ -33,19 +44,29 @@ function extractS3Key(url: string | null): string | null {
   }
 }
 
+// ─── PDF CLEANER ─────────────────────────────────────────────────────────────
 async function aggressivelyCleanPdf(pdfBuffer: Buffer): Promise<Buffer> {
-  const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true, throwOnInvalidObject: false });
+  const pdfDoc = await PDFDocument.load(pdfBuffer, {
+    ignoreEncryption: true,
+    throwOnInvalidObject: false,
+  });
+
   pdfDoc.catalog.delete(PDFName.of("OCProperties"));
+
   const pages = pdfDoc.getPages();
   for (const page of pages) {
+    // Remove annotations (links, stamps, watermark annotations)
     page.node.delete(PDFName.of("Annots"));
+
+    // Remove XObject (images), Pattern, ExtGState from resources
     const resources = page.node.get(PDFName.of("Resources"));
     if (resources instanceof PDFDict) {
       resources.delete(PDFName.of("XObject"));
       resources.delete(PDFName.of("Pattern"));
       resources.delete(PDFName.of("ExtGState"));
     }
-    // Content stream scrubbing
+
+    // Scrub "Do" operators from content streams (removes image draw calls)
     try {
       const contents = page.node.get(PDFName.of("Contents"));
       if (contents) {
@@ -54,22 +75,23 @@ async function aggressivelyCleanPdf(pdfBuffer: Buffer): Promise<Buffer> {
           const stream = pdfDoc.context.lookup(ref as PDFRef);
           if (stream instanceof PDFRawStream || stream instanceof PDFStream) {
             let text = Buffer.from((stream as any).contents).toString("latin1");
-            const anyDoRegex = /\/[A-Za-z0-9]+\s+Do/g; 
-            if (anyDoRegex.test(text)) {
-              text = text.replace(anyDoRegex, "");
+            const doRegex = /\/[A-Za-z0-9]+\s+Do/g;
+            if (doRegex.test(text)) {
+              text = text.replace(doRegex, "");
               (stream as any).contents = Buffer.from(text, "latin1");
             }
           }
         }
       }
-    } catch (err) {}
+    } catch (_) {
+      // Ignore individual stream errors
+    }
   }
+
   return Buffer.from(await pdfDoc.save());
 }
 
-/**
- * Strips watermark elements from DOCX manually by editing the internal XML.
- */
+// ─── DOCX CLEANER ────────────────────────────────────────────────────────────
 function cleanDocxBuffer(buffer: Buffer): Buffer {
   try {
     const zip = new AdmZip(buffer);
@@ -77,103 +99,143 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
     let changed = false;
 
     for (const entry of zipEntries) {
-      if (entry.entryName.startsWith("word/") && entry.entryName.endsWith(".xml")) {
-        let content = entry.getData().toString("utf-8");
-        let localModified = false;
+      // Only process XML files inside the word/ folder
+      if (!entry.entryName.startsWith("word/") || !entry.entryName.endsWith(".xml")) {
+        continue;
+      }
 
-        // Strategy A: Resize huge styles (width/height > 100pt etc)
-        const styleRegex = /style="([^"]*)"/gi;
-        content = content.replace(styleRegex, (match, style) => {
-          let newStyle = style;
-          let styleModified = false;
-          const dimRegex = /(width|height)\s*:\s*(\d+\.?\d*)\s*(pt|in|px|cm|mm|)/gi;
-          
-          newStyle = newStyle.replace(dimRegex, (m, prop, val, unit) => {
-            const v = parseFloat(val);
-            let isGiant = false;
-            if (unit === 'pt' && v > 100) isGiant = true;
-            else if (unit === 'in' && v > 1.3) isGiant = true;
-            else if (unit === 'px' && v > 140) isGiant = true;
-            else if (!unit && v > 1000) isGiant = true;
+      let content = entry.getData().toString("utf-8");
+      let localModified = false;
 
-            if (isGiant) {
-              const newVal = unit === 'in' ? '0.6' : (unit === 'px' ? '60' : '50');
-              styleModified = true;
-              return `${prop}:${newVal}${unit}`;
-            }
+      // ── STRATEGY 1: VML shapes (legacy Word format) ──────────────────────
+      // Targets <v:shape>, <v:rect>, <v:image>, <v:oval> with a style attribute
+      const vmlShapeRegex = /<(v:shape|v:rect|v:image|v:oval)(\s[^>]*)?>/gi;
+      content = content.replace(vmlShapeRegex, (match, tag, attrs) => {
+        if (!attrs) return match;
+
+        // Only process shapes that have a style with width/height (likely a logo/watermark)
+        if (!attrs.includes("width") && !attrs.includes("height")) return match;
+
+        // Build the correct center watermark style
+        const centerStyle = [
+          "position:absolute",
+          `width:${WM_CENTER}`,
+          `height:${WM_CENTER}`,
+          "mso-position-horizontal:center",
+          "mso-position-horizontal-relative:page",   // relative to FULL PAGE
+          "mso-position-vertical:center",
+          "mso-position-vertical-relative:page",     // relative to FULL PAGE
+          "mso-wrap-style:none",
+          "z-index:251658240",
+        ].join(";");
+
+        // Replace existing style attribute entirely
+        const newAttrs = attrs.replace(/style="[^"]*"/i, `style="${centerStyle}"`);
+
+        // If no style attr existed at all, inject one
+        const result = newAttrs.includes(`style="${centerStyle}"`)
+          ? `<${tag}${newAttrs}>`
+          : `<${tag}${attrs} style="${centerStyle}">`;
+
+        localModified = true;
+        return result;
+      });
+
+      // ── STRATEGY 2: DrawingML inline/anchor images (modern Word format) ──
+      // wp:extent defines the visual size of the image in EMU
+      const wpExtentRegex = /<wp:extent\s+cx="(\d+)"\s+cy="(\d+)"([^>]*?)\/>/gi;
+      content = content.replace(wpExtentRegex, (match, cx, cy, otherAttrs) => {
+        const valCx = parseInt(cx);
+        const valCy = parseInt(cy);
+        if (valCx > WM_EMU_THRESHOLD || valCy > WM_EMU_THRESHOLD) {
+          localModified = true;
+          // Keep aspect ratio
+          const ratio = valCy / valCx;
+          const newCy = Math.round(WM_EMU * ratio);
+          return `<wp:extent cx="${WM_EMU}" cy="${newCy}"${otherAttrs}/>`;
+        }
+        return match;
+      });
+
+      // a:ext inside pic/spPr defines shape extents
+      const aExtRegex = /<a:ext\s+cx="(\d+)"\s+cy="(\d+)"([^>]*?)\/>/gi;
+      content = content.replace(aExtRegex, (match, cx, cy, otherAttrs) => {
+        const valCx = parseInt(cx);
+        const valCy = parseInt(cy);
+        if (valCx > WM_EMU_THRESHOLD || valCy > WM_EMU_THRESHOLD) {
+          localModified = true;
+          const ratio = valCy / valCx;
+          const newCy = Math.round(WM_EMU * ratio);
+          return `<a:ext cx="${WM_EMU}" cy="${newCy}"${otherAttrs}/>`;
+        }
+        return match;
+      });
+
+      // ── STRATEGY 3: Fix wp:anchor positioning for DrawingML ──────────────
+      // wp:anchor is used for floating images — force it to page-center
+      // simplePos="0" means we control position manually
+      const wpAnchorRegex = /(<wp:anchor\b[^>]*>)([\s\S]*?)(<\/wp:anchor>)/gi;
+      content = content.replace(wpAnchorRegex, (match, open, inner, close) => {
+        // Only touch anchors that contain a large image (already resized above)
+        if (!inner.includes(`cx="${WM_EMU}"`) && !inner.includes("cx=")) return match;
+
+        // Replace posOffset values to center on page
+        // Standard A4 page: width=12240000 EMU, height=15840000 EMU
+        // Center X offset = (12240000 - WM_EMU) / 2 ≈ 3376800
+        // Center Y offset = (15840000 - WM_EMU) / 2 ≈ 5176800
+        let newInner = inner
+          .replace(/<wp:posOffset>(\d+)<\/wp:posOffset>/g, (m: string, val: string, offset: number) => {
+            // First posOffset = horizontal, second = vertical
+            const occurrences = (inner.slice(0, offset).match(/<wp:posOffset>/g) || []).length;
+            if (occurrences === 0) return `<wp:posOffset>3376800</wp:posOffset>`; // X center
+            if (occurrences === 1) return `<wp:posOffset>5176800</wp:posOffset>`; // Y center
             return m;
-          });
-          if (styleModified) localModified = true;
-          return styleModified ? `style="${newStyle}"` : match;
-        });
+          })
+          // Force relative horizontal/vertical anchoring to PAGE
+          .replace(/(<wp:positionH\s+relativeFrom=")[^"]+(")/g, '$1page$2')
+          .replace(/(<wp:positionV\s+relativeFrom=")[^"]+(")/g, '$1page$2');
 
-        // Strategy B: Dual Logo Placement (Center + Bottom-Right)
-        if (content.includes("LAW NATION") || content.includes("PRIME TIMES")) {
-           const genericShapeRegex = /(<(v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")([^>]*>)([\s\S]*?)(<\/\2>)/gi;
-           content = content.replace(genericShapeRegex, (match, start, tag, style, quote, mid, inner, end) => {
-              if (match.includes("relative:page") || style.includes("width:") && !style.includes('width:130pt')) {
-                localModified = true;
-                const centerStyle = "position:absolute;width:130pt;height:130pt;z-index:251658240;mso-position-horizontal:center;mso-position-horizontal-relative:page;mso-position-vertical:center;mso-position-vertical-relative:page";
-                const centerLogo = `${start}${centerStyle}${quote}${mid}${inner}${end}`;
-                const cornerStyle = "position:absolute;width:75pt;height:75pt;z-index:251658239;mso-position-horizontal:right;mso-position-horizontal-relative:margin;mso-position-vertical:bottom;mso-position-vertical-relative:margin";
-                const cornerLogo = `${start}${cornerStyle}${quote}${mid}${inner}${end}`;
-                return centerLogo + cornerLogo;
-              }
-              return match;
-           });
-        }
+        if (newInner !== inner) localModified = true;
+        return `${open}${newInner}${close}`;
+      });
 
-        // Strategy C: Target page-relative elements
-        if (content.includes('mso-position-vertical-relative:page') || content.includes('mso-position-horizontal-relative:page')) {
-           const pageRelativeRegex = /(<(v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*width\s*:\s*\d+\.?\d*(?:pt|in|px|cm|mm|)[^"]*)(")([^>]*>)([\s\S]*?)(<\/\2>)/gi;
-           content = content.replace(pageRelativeRegex, (match, start, tag, style, quote, mid, inner, end) => {
-              if ((style.includes('relative:page') || style.includes('width:100%') || style.includes('height:100%')) && !style.includes('width:130pt')) {
-                localModified = true;
-                const centerStyle = "position:absolute;width:130pt;height:130pt;z-index:251658240;mso-position-horizontal:center;mso-position-horizontal-relative:page;mso-position-vertical:center;mso-position-vertical-relative:page";
-                const cornerStyle = "position:absolute;width:75pt;height:75pt;z-index:251658239;mso-position-horizontal:right;mso-position-horizontal-relative:margin;mso-position-vertical:bottom;mso-position-vertical-relative:margin";
-                return `${start}${centerStyle}${quote}${mid}${inner}${end}${start}${cornerStyle}${quote}${mid}${inner}${end}`;
-              }
-              return match;
-           });
-        }
-
-        // Strategy D: Target DrawingML (EMU units)
-        const drawingMLRegex = /<(wp:extent|a:ext)\s+cx="(\d+)"\s+cy="(\d+)"([^>]*?)(\/?>)/gi;
-        content = content.replace(drawingMLRegex, (match, tag, cx, cy, otherAttrs, closing) => {
-           const valCx = parseInt(cx);
-           const valCy = parseInt(cy);
-           if (valCx > 1000000 || valCy > 1000000) {
-              localModified = true;
-              const newCx = 1188720; // ~1.3 inch
-              const newCy = Math.round(valCy * (newCx / valCx));
-              return `<${tag} cx="${newCx}" cy="${newCy}"${otherAttrs}${closing}`;
-           }
-           return match;
-        });
-
-        if (localModified) {
-          zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
-          changed = true;
-        }
+      if (localModified) {
+        zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
+        changed = true;
+        console.log(`   ✏️  Modified: ${entry.entryName}`);
       }
     }
 
     return changed ? zip.toBuffer() : buffer;
   } catch (err: any) {
-    console.error("   ⚠️ DOCX manual cleaning failed:", err.message);
+    console.error("   ⚠️ DOCX cleaning failed:", err.message);
     return buffer;
   }
 }
 
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function reWatermarkArticles() {
-  console.log("🚀 [Re-Watermark v11] TOTAL PDF & WORD CLEANUP (PRO MAX)");
-  
+  console.log("🚀 [Re-Watermark v12] CENTER WATERMARK FIX — PDF + DOCX");
+
   let s3Client: S3Client | null = null;
-  if (!isLocal && AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY) {
-    s3Client = new S3Client({
-      region: AWS_REGION,
-      credentials: { accessKeyId: AWS_ACCESS_KEY_ID, secretAccessKey: AWS_SECRET_ACCESS_KEY },
-    });
+  const bucketName = S3_BUCKET_ARTICLES;
+  const region = AWS_REGION;
+
+  if (!isLocal) {
+    console.log(`☁️  S3 init (Region: ${region}, Bucket: ${bucketName})`);
+    const s3Config: any = { region };
+    if (AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY) {
+      console.log("🔑 Using credentials from .env");
+      s3Config.credentials = {
+        accessKeyId: AWS_ACCESS_KEY_ID,
+        secretAccessKey: AWS_SECRET_ACCESS_KEY,
+      };
+    } else {
+      console.log("ℹ️  No keys in .env — falling back to IAM Role.");
+    }
+    s3Client = new S3Client(s3Config);
+  } else {
+    console.log("⚠️  NODE_ENV=local — S3 uploads SKIPPED.");
   }
 
   try {
@@ -185,11 +247,10 @@ async function reWatermarkArticles() {
         currentPdfUrl: true,
         originalWordUrl: true,
         currentWordUrl: true,
-      }
+      },
     });
 
-    console.log(`📊 Processing ${articles.length} articles...\n`);
-
+    console.log(`📊 Found ${articles.length} articles\n`);
     let successCount = 0;
 
     for (let i = 0; i < articles.length; i++) {
@@ -197,38 +258,80 @@ async function reWatermarkArticles() {
       const progress = `[${i + 1}/${articles.length}]`;
 
       try {
-        console.log(`${progress}  "${article.title}"`);
+        console.log(`${progress} "${article.title}"`);
 
-        // 1. Clean PDF
+        // ── Clean PDF ──────────────────────────────────────────────────────
         const pdfUrl = article.originalPdfUrl || article.currentPdfUrl;
         if (pdfUrl) {
           const pdfBuffer = await downloadFileToBuffer(pdfUrl);
           const cleanPdf = await aggressivelyCleanPdf(pdfBuffer);
-          
+
           const currentPdfKey = extractS3Key(article.currentPdfUrl);
           const originalPdfKey = extractS3Key(article.originalPdfUrl);
 
           if (s3Client) {
-            if (currentPdfKey) await s3Client.send(new PutObjectCommand({ Bucket: S3_BUCKET_ARTICLES, Key: currentPdfKey, Body: cleanPdf, ContentType: "application/pdf" }));
-            if (originalPdfKey && originalPdfKey !== currentPdfKey) await s3Client.send(new PutObjectCommand({ Bucket: S3_BUCKET_ARTICLES, Key: originalPdfKey, Body: cleanPdf, ContentType: "application/pdf" }));
+            if (currentPdfKey) {
+              await s3Client.send(
+                new PutObjectCommand({
+                  Bucket: bucketName,
+                  Key: currentPdfKey,
+                  Body: cleanPdf,
+                  ContentType: "application/pdf",
+                })
+              );
+              console.log(`   📤 PDF → ${currentPdfKey}`);
+            }
+            if (originalPdfKey && originalPdfKey !== currentPdfKey) {
+              await s3Client.send(
+                new PutObjectCommand({
+                  Bucket: bucketName,
+                  Key: originalPdfKey,
+                  Body: cleanPdf,
+                  ContentType: "application/pdf",
+                })
+              );
+              console.log(`   📤 Original PDF → ${originalPdfKey}`);
+            }
           }
           console.log("   ✅ PDF cleaned");
         }
 
-        // 2. Clean Word (DOCX)
+        // ── Clean DOCX ─────────────────────────────────────────────────────
         const wordUrl = article.originalWordUrl || article.currentWordUrl;
         if (wordUrl) {
           const wordBuffer = await downloadFileToBuffer(wordUrl);
           const cleanWord = cleanDocxBuffer(wordBuffer);
-          
+
           const currentWordKey = extractS3Key(article.currentWordUrl);
           const originalWordKey = extractS3Key(article.originalWordUrl);
 
           if (s3Client) {
-            if (currentWordKey) await s3Client.send(new PutObjectCommand({ Bucket: S3_BUCKET_ARTICLES, Key: currentWordKey, Body: cleanWord, ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
-            if (originalWordKey && originalWordKey !== currentWordKey) await s3Client.send(new PutObjectCommand({ Bucket: S3_BUCKET_ARTICLES, Key: originalWordKey, Body: cleanWord, ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+            if (currentWordKey) {
+              await s3Client.send(
+                new PutObjectCommand({
+                  Bucket: bucketName,
+                  Key: currentWordKey,
+                  Body: cleanWord,
+                  ContentType:
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                })
+              );
+              console.log(`   📤 DOCX → ${currentWordKey}`);
+            }
+            if (originalWordKey && originalWordKey !== currentWordKey) {
+              await s3Client.send(
+                new PutObjectCommand({
+                  Bucket: bucketName,
+                  Key: originalWordKey,
+                  Body: cleanWord,
+                  ContentType:
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                })
+              );
+              console.log(`   📤 Original DOCX → ${originalWordKey}`);
+            }
           }
-          console.log("   ✅ Word cleaned manually");
+          console.log("   ✅ DOCX cleaned");
         }
 
         successCount++;
@@ -237,9 +340,9 @@ async function reWatermarkArticles() {
       }
     }
 
-    console.log(`\n✨ DONE! Status: v11. Success: ${successCount}`);
+    console.log(`\n✨ Done! v12 — Success: ${successCount}/${articles.length}`);
   } catch (error: any) {
-    console.error(" Fatal Error:", error);
+    console.error("Fatal Error:", error);
   } finally {
     await prisma.$disconnect();
     process.exit(0);
