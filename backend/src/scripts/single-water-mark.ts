@@ -21,8 +21,8 @@ const WATERMARK_PATH = path.resolve(
   "../../src/assests/img/logo-bg.png"
 );
 
-const WIDTH = "400pt";
-const HEIGHT = "400pt";
+const WIDTH = "350pt";
+const HEIGHT = "170pt";
 const OPACITY = "0.10";
 
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
