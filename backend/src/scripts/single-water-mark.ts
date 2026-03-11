@@ -4,197 +4,199 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { downloadFileToBuffer } from "../utils/pdf-extract.utils.js";
 import AdmZip from "adm-zip";
 
-// ─── CONFIG ───────────────────────────────────────
+// ───────────────── CONFIG ─────────────────
+
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
-const S3_BUCKET_ARTICLES =
-  process.env.AWS_S3_BUCKET_ARTICLES || "law-nation";
+const S3_BUCKET = process.env.AWS_S3_BUCKET_ARTICLES || "law-nation";
 
-const s3Client = new S3Client({
-  region: AWS_REGION,
-});
+const s3Client = new S3Client({ region: AWS_REGION });
 
-// ─── WATERMARK CONFIG ─────────────────────────────
-const WM_WIDTH = "400pt";
-const WM_HEIGHT = "400pt";
-const WM_OPACITY = "0.10";
+const WATERMARK_TEXT = "LAW NATION";
 
-// ─── WATERMARK TEMPLATE ───────────────────────────
-function buildWatermarkXML() {
+// ───────────────── WATERMARK XML ─────────────────
+
+function buildHeaderXML() {
   return `
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+ xmlns:v="urn:schemas-microsoft-com:vml"
+ xmlns:o="urn:schemas-microsoft-com:office:office">
+
 <w:p>
 <w:r>
 <w:pict>
+
 <v:shape id="law-nation-watermark"
- type="#_x0000_t75"
+ type="#_x0000_t136"
  style="position:absolute;
- width:${WM_WIDTH};
- height:${WM_HEIGHT};
+ width:450pt;
+ height:450pt;
  mso-position-horizontal:center;
  mso-position-horizontal-relative:page;
  mso-position-vertical:center;
  mso-position-vertical-relative:page;
- opacity:${WM_OPACITY};
- z-index:251658240">
+ rotation:315;
+ opacity:0.1;
+ z-index:-251654144">
+
+<v:textpath
+ style="font-family:Calibri;font-size:48pt"
+ string="${WATERMARK_TEXT}"/>
 
 </v:shape>
+
 </w:pict>
 </w:r>
 </w:p>
+
+</w:hdr>
 `;
 }
 
-// ─── DOCX WATERMARK INJECTION ─────────────────────
-function injectCenterWatermark(buffer: Buffer) {
+// ───────────────── DOCX WATERMARK ENGINE ─────────────────
+
+function injectWatermark(buffer: Buffer) {
+
   const zip = new AdmZip(buffer);
+
   const entries = zip.getEntries();
 
-  let modifiedXML = "";
-
   console.log("📦 DOCX Entries:");
-  entries.forEach((e) => console.log("   ", e.entryName));
+  entries.forEach(e => console.log("   ", e.entryName));
 
-  for (const entry of entries) {
-    if (!entry.entryName.startsWith("word/header")) continue;
+  // Create header1.xml if missing
+  if (!zip.getEntry("word/header1.xml")) {
 
-    console.log("📄 Header found:", entry.entryName);
+    console.log("⚠ No header found → creating header1.xml");
 
-    let xml = entry.getData().toString("utf-8");
-
-    const watermarkXML = buildWatermarkXML();
-
-    if (xml.includes("law-nation-watermark")) {
-      console.log("⚠ Watermark already exists");
-      return {
-        buffer,
-        modifiedFile: null,
-      };
-    }
-
-    xml = xml.replace("</w:hdr>", watermarkXML + "\n</w:hdr>");
-
-    zip.updateFile(entry.entryName, Buffer.from(xml, "utf-8"));
-
-    modifiedXML = entry.entryName;
-
-    console.log("✅ Watermark injected into:", entry.entryName);
-
-    break;
+    zip.addFile(
+      "word/header1.xml",
+      Buffer.from(buildHeaderXML(), "utf8")
+    );
   }
 
-  if (!modifiedXML) {
-    console.log("⚠ No header found, injecting into document.xml");
+  // Update relationships
+  const relPath = "word/_rels/document.xml.rels";
+  const relEntry = zip.getEntry(relPath);
 
-    const entry = zip.getEntry("word/document.xml");
+  let relXML = relEntry.getData().toString("utf8");
 
-    if (!entry) {
-      console.log("❌ document.xml not found");
-      return {
-        buffer,
-        modifiedFile: null,
-      };
-    }
+  if (!relXML.includes("header1.xml")) {
 
-    let xml = entry.getData().toString("utf-8");
+    const newRel = `
+<Relationship Id="rId999"
+ Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header"
+ Target="header1.xml"/>`;
 
-    const watermarkXML = buildWatermarkXML();
+    relXML = relXML.replace("</Relationships>", newRel + "\n</Relationships>");
 
-    xml = xml.replace("</w:body>", watermarkXML + "\n</w:body>");
+    zip.updateFile(relPath, Buffer.from(relXML));
 
-    zip.updateFile("word/document.xml", Buffer.from(xml, "utf-8"));
-
-    modifiedXML = "word/document.xml";
-
-    console.log("✅ Watermark injected into document.xml");
+    console.log("✅ Relationship added → header1.xml");
   }
 
-  return {
-    buffer: zip.toBuffer(),
-    modifiedFile: modifiedXML,
-  };
+  // Attach header to document
+  const docEntry = zip.getEntry("word/document.xml");
+
+  let docXML = docEntry.getData().toString("utf8");
+
+  if (!docXML.includes("headerReference")) {
+
+    const headerRef = `<w:headerReference w:type="default" r:id="rId999"/>`;
+
+    docXML = docXML.replace(
+      "<w:sectPr>",
+      `<w:sectPr>${headerRef}`
+    );
+
+    zip.updateFile("word/document.xml", Buffer.from(docXML));
+
+    console.log("✅ Header attached to document section");
+  }
+
+  return zip.toBuffer();
 }
 
-// ─── MAIN SCRIPT ──────────────────────────────────
-async function applyWatermark() {
-  console.log("💧 [Apply Center Watermark Script]");
+// ───────────────── MAIN SCRIPT ─────────────────
+
+async function run() {
+
+  console.log("💧 [DOCX Watermark Injection Script]");
 
   const search = process.argv[2];
 
   let articles;
 
   if (search) {
-    console.log(`🔍 Searching article: "${search}"`);
+
+    console.log("🔍 Searching:", search);
 
     articles = await prisma.article.findMany({
       where: {
         title: {
           contains: search,
-          mode: "insensitive",
-        },
-      },
+          mode: "insensitive"
+        }
+      }
     });
 
-    if (articles.length === 0) {
-      console.log("❌ No article found");
-      process.exit(0);
-    }
   } else {
-    console.log("📚 Processing ALL articles");
+
     articles = await prisma.article.findMany();
+
   }
 
   console.log("Total articles:", articles.length);
 
   for (let i = 0; i < articles.length; i++) {
+
     const article = articles[i];
 
-    console.log(
-      `\n[${i + 1}/${articles.length}] ${article.title}`
-    );
+    console.log(`\n[${i+1}/${articles.length}] ${article.title}`);
 
     try {
-      const wordUrl =
-        article.originalWordUrl || article.currentWordUrl;
 
-      if (!wordUrl) {
+      const url =
+        article.originalWordUrl ||
+        article.currentWordUrl;
+
+      if (!url) {
         console.log("⚠ No DOCX found");
         continue;
       }
 
-      console.log("📥 Downloading DOCX:", wordUrl);
+      console.log("📥 Downloading:", url);
 
-      const wordBuffer = await downloadFileToBuffer(wordUrl);
+      const buffer = await downloadFileToBuffer(url);
 
-      const { buffer: newBuffer, modifiedFile } =
-        injectCenterWatermark(wordBuffer);
+      const newBuffer = injectWatermark(buffer);
 
-      if (!modifiedFile) {
-        console.log("⚠ Nothing modified");
-        continue;
-      }
+      const key = new URL(url).pathname.slice(1);
 
-      const key = new URL(wordUrl).pathname.slice(1);
-
-      console.log("🛠 Modified XML:", modifiedFile);
-      console.log("📤 Uploading to S3 key:", key);
+      console.log("📤 Uploading to S3:", key);
 
       await s3Client.send(
         new PutObjectCommand({
-          Bucket: S3_BUCKET_ARTICLES,
+          Bucket: S3_BUCKET,
           Key: key,
           Body: newBuffer,
           ContentType:
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         })
       );
 
       console.log("✅ DOCX watermark uploaded");
-    } catch (err: any) {
+
+    } catch (err:any) {
+
       console.log("❌ Error:", err.message);
+
     }
   }
 
   console.log("\n🎉 Script finished");
+
   process.exit(0);
 }
 
-applyWatermark();
+run();
