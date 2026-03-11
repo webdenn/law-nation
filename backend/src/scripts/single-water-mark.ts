@@ -9,12 +9,12 @@ import { downloadFileToBuffer } from "../utils/pdf-extract.utils.js";
 
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-/* ───────────────── PATH FIX FOR ESM ───────────────── */
+/* ESM dirname fix */
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* ───────────────── CONFIG ───────────────── */
+/* CONFIG */
 
 const WATERMARK_PATH = path.resolve(
   __dirname,
@@ -26,26 +26,26 @@ const S3_BUCKET = process.env.AWS_S3_BUCKET_ARTICLES || "law-nation";
 
 const s3 = new S3Client({ region: AWS_REGION });
 
-/* ───────────────── WATERMARK XML ───────────────── */
+/* WATERMARK XML */
 
-function buildWatermarkXML() {
+function watermarkXML() {
   return `
 <w:p>
 <w:r>
 <w:pict>
 <v:shape id="law-nation-watermark"
- type="#_x0000_t75"
- style="
- position:absolute;
- width:420pt;
- height:420pt;
- mso-position-horizontal:center;
- mso-position-horizontal-relative:page;
- mso-position-vertical:center;
- mso-position-vertical-relative:page;
- rotation:315;
- opacity:0.15;
- z-index:-251658752">
+type="#_x0000_t75"
+style="
+position:absolute;
+width:420pt;
+height:420pt;
+mso-position-horizontal:center;
+mso-position-horizontal-relative:page;
+mso-position-vertical:center;
+mso-position-vertical-relative:page;
+rotation:315;
+opacity:0.15;
+z-index:-251658752">
 
 <v:imagedata r:id="rIdWatermark"/>
 
@@ -56,11 +56,9 @@ function buildWatermarkXML() {
 `;
 }
 
-/* ───────────────── DOCX WATERMARK FUNCTION ───────────────── */
+/* APPLY WATERMARK */
 
 function applyWatermark(buffer) {
-
-  console.log("\n📦 Opening DOCX...");
 
   const zip = new AdmZip(buffer);
 
@@ -69,173 +67,160 @@ function applyWatermark(buffer) {
   console.log("\n📂 DOCX FILE STRUCTURE:");
   entries.forEach(e => console.log("   ", e.entryName));
 
-  if (!fs.existsSync(WATERMARK_PATH)) {
-    console.log("❌ Watermark image not found:", WATERMARK_PATH);
-    process.exit(1);
-  }
-
-  console.log("\n🖼 Watermark image located:", WATERMARK_PATH);
+  /* INSERT IMAGE */
 
   const img = fs.readFileSync(WATERMARK_PATH);
 
   zip.addFile("word/media/logo-bg.png", img);
 
-  console.log("✅ Image inserted → word/media/logo-bg.png");
+  console.log("✅ Image inserted");
 
-  /* FIND ALL HEADERS */
+  /* HEADER */
 
-  const headers = entries.filter(e =>
-    e.entryName.startsWith("word/header")
-  );
+  let headerEntry = zip.getEntry("word/header1.xml");
 
-  if (!headers.length) {
+  if (!headerEntry) {
 
-    console.log("⚠ No header files detected");
+    console.log("⚠ No header found → creating header1.xml");
 
-    const headerXML = `
+    const header = `
 <w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
- xmlns:v="urn:schemas-microsoft-com:vml"
- xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+xmlns:v="urn:schemas-microsoft-com:vml"
+xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
 
-${buildWatermarkXML()}
+${watermarkXML()}
 
 </w:hdr>
 `;
 
-    zip.addFile("word/header1.xml", Buffer.from(headerXML));
-
-    console.log("✅ Created header1.xml");
+    zip.addFile("word/header1.xml", Buffer.from(header));
 
   } else {
 
-    console.log("\n📄 Headers detected:", headers.length);
+    console.log("📄 Header detected");
 
-    headers.forEach(header => {
+    let xml = headerEntry.getData().toString();
 
-      console.log("➡ Processing:", header.entryName);
+    if (!xml.includes("law-nation-watermark")) {
 
-      let xml = header.getData().toString();
+      xml = xml.replace("</w:hdr>", watermarkXML() + "\n</w:hdr>");
 
-      if (xml.includes("law-nation-watermark")) {
+      zip.updateFile("word/header1.xml", Buffer.from(xml));
 
-        console.log("⚠ Watermark already exists in", header.entryName);
+      console.log("✅ Watermark injected");
 
-      } else {
+    } else {
 
-        xml = xml.replace(
-          "</w:hdr>",
-          buildWatermarkXML() + "\n</w:hdr>"
-        );
+      console.log("⚠ Watermark already present");
 
-        zip.updateFile(header.entryName, Buffer.from(xml));
-
-        console.log("✅ Watermark injected into", header.entryName);
-
-      }
-
-    });
+    }
 
   }
 
-  /* RELATIONSHIP */
+  /* HEADER IMAGE RELATIONSHIP */
 
-  const relXML = `
+  const headerRel = `
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship
- Id="rIdWatermark"
- Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
- Target="media/logo-bg.png"/>
+Id="rIdWatermark"
+Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+Target="media/logo-bg.png"/>
 </Relationships>
 `;
 
   zip.addFile(
     "word/_rels/header1.xml.rels",
-    Buffer.from(relXML)
+    Buffer.from(headerRel)
   );
 
-  console.log("\n🔗 Relationship created");
+  console.log("🔗 Header image relationship added");
+
+  /* LINK HEADER TO DOCUMENT */
+
+  const documentXML = zip.getEntry("word/document.xml");
+
+  let doc = documentXML.getData().toString();
+
+  if (!doc.includes("headerReference")) {
+
+    console.log("⚠ Header not linked → fixing document.xml");
+
+    doc = doc.replace(
+      "</w:sectPr>",
+      `
+<w:headerReference w:type="default" r:id="rIdHeader1"/>
+</w:sectPr>`
+    );
+
+    zip.updateFile("word/document.xml", Buffer.from(doc));
+
+  }
+
+  /* ADD HEADER RELATIONSHIP */
+
+  const relEntry = zip.getEntry("word/_rels/document.xml.rels");
+
+  let relXML = relEntry.getData().toString();
+
+  if (!relXML.includes("header1.xml")) {
+
+    console.log("🔗 Adding header relationship");
+
+    relXML = relXML.replace(
+      "</Relationships>",
+      `
+<Relationship
+Id="rIdHeader1"
+Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header"
+Target="header1.xml"/>
+</Relationships>`
+    );
+
+    zip.updateFile(
+      "word/_rels/document.xml.rels",
+      Buffer.from(relXML)
+    );
+
+  }
 
   return zip.toBuffer();
 }
 
-/* ───────────────── MAIN SCRIPT ───────────────── */
+/* MAIN */
 
 async function main() {
 
-  console.log("\n💧 LAW NATION DOCX WATERMARK SCRIPT\n");
+  console.log("\n💧 WATERMARK SCRIPT\n");
 
-  console.log("📍 Script path:", __dirname);
-  console.log("🖼 Watermark path:", WATERMARK_PATH);
-
-  if (!fs.existsSync(WATERMARK_PATH)) {
-
-    console.log("❌ Watermark image missing");
-
-    process.exit(1);
-
-  }
-
-  console.log("✅ Watermark image verified");
+  console.log("🖼 Watermark:", WATERMARK_PATH);
 
   const search = process.argv[2];
 
-  if (!search) {
-
-    console.log("❌ Please provide article title");
-
-    process.exit(0);
-
-  }
-
-  console.log("\n🔍 Searching article:", search);
-
   const articles = await prisma.article.findMany({
     where: {
-      title: {
-        contains: search,
-        mode: "insensitive"
-      }
+      title: { contains: search, mode: "insensitive" }
     }
   });
 
   console.log("📚 Articles found:", articles.length);
 
-  if (!articles.length) process.exit(0);
-
-  for (let i = 0; i < articles.length; i++) {
-
-    const article = articles[i];
-
-    console.log(`\n📄 Processing ${i + 1}/${articles.length}`);
-
-    console.log("Title:", article.title);
+  for (const article of articles) {
 
     try {
 
-      const wordUrl =
+      const url =
         article.originalWordUrl || article.currentWordUrl;
 
-      if (!wordUrl) {
+      console.log("\n📄 Article:", article.title);
+      console.log("⬇ Downloading DOCX");
 
-        console.log("⚠ DOCX URL missing");
-
-        continue;
-
-      }
-
-      console.log("🌐 DOCX URL:", wordUrl);
-
-      console.log("⬇ Downloading DOCX...");
-
-      const buffer = await downloadFileToBuffer(wordUrl);
-
-      console.log("✅ Download complete");
+      const buffer = await downloadFileToBuffer(url);
 
       const modified = applyWatermark(buffer);
 
-      const key = new URL(wordUrl).pathname.slice(1);
+      const key = new URL(url).pathname.slice(1);
 
-      console.log("\n📤 Uploading modified DOCX to S3");
+      console.log("📤 Uploading to S3");
 
       await s3.send(
         new PutObjectCommand({
@@ -247,7 +232,7 @@ async function main() {
         })
       );
 
-      console.log("🎉 Upload success");
+      console.log("🎉 Watermark applied");
 
     } catch (err) {
 
@@ -259,7 +244,6 @@ async function main() {
 
   console.log("\n✅ Script finished\n");
 
-  process.exit(0);
 }
 
 main();
