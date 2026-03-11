@@ -6,8 +6,8 @@ import { downloadFileToBuffer } from './pdf-extract.utils.js';
 import { NotFoundError } from "@/utils/http-errors.util.js";
 
 /**
- * Dynamically cleans giant watermarks and ensures a small logo in DOCX buffers.
- * This works on-the-fly for both old and new articles.
+ * Centered Watermark + Bottom Right Logo for DOCX.
+ * Text floats OVER the centered watermark.
  */
 export async function addWatermarkToWord(
   wordPath: string,
@@ -20,7 +20,7 @@ export async function addWatermarkToWord(
   }
 ): Promise<Buffer> {
   try {
-    console.log(`💧 [Word Watermark] Ultra-Robust cleaning/resizing for: ${wordPath}`);
+    console.log(`💧 [Word Watermark] Applying Dual-Logo Layout for: ${wordPath}`);
 
     let buffer: Buffer;
     if (wordPath.startsWith('http')) {
@@ -33,108 +33,80 @@ export async function addWatermarkToWord(
     const entries = zip.getEntries();
     let modifiedCount = 0;
 
-    // REFINED SIZES
-    const CENTER_LOGO_SIZE = "320pt"; 
-    const CORNER_LOGO_SIZE = "80pt";
+    // SIZES
+    const CENTER_LOGO_SIZE = "350pt"; 
+    const CORNER_LOGO_SIZE = "70pt";
+
+    // 1. CENTER WATERMARK STYLE (Behind Text, No Wrapping)
+    const centerStyle = [
+      'position:absolute',
+      'margin-left:0',
+      'margin-top:0',
+      `width:${CENTER_LOGO_SIZE}`,
+      `height:${CENTER_LOGO_SIZE}`,
+      'z-index:-251658240', // Negative so text is on top
+      'mso-wrap-edited:f',
+      'mso-wrap-distance-left:0',
+      'mso-wrap-distance-top:0',
+      'mso-wrap-distance-right:0',
+      'mso-wrap-distance-bottom:0',
+      'mso-position-horizontal:center',
+      'mso-position-horizontal-relative:page',
+      'mso-position-vertical:center',
+      'mso-position-vertical-relative:page',
+      'mso-width-relative:page',
+      'mso-height-relative:page'
+    ].join(';');
+
+    // 2. BOTTOM RIGHT LOGO STYLE
+    const cornerStyle = [
+      'position:absolute',
+      `width:${CORNER_LOGO_SIZE}`,
+      `height:${CORNER_LOGO_SIZE}`,
+      'z-index:251659264',
+      'mso-position-horizontal:right',
+      'mso-position-horizontal-relative:margin',
+      'mso-position-vertical:bottom',
+      'mso-position-vertical-relative:margin'
+    ].join(';');
 
     for (const entry of entries) {
       if (entry.entryName.startsWith("word/") && entry.entryName.endsWith(".xml")) {
         let content = entry.getData().toString("utf-8");
         let localModified = false;
 
-        // --- STEP 1: Fix existing Giant/Misplaced Logos (Old Articles) ---
-        const styleRegex = /style="([^"]*)"/gi;
-        content = content.replace(styleRegex, (match, style) => {
-          let newStyle = style;
-          let styleModified = false;
+        // Pattern to find image shapes (VML)
+        if (content.includes("word/media/image") || content.includes("logo")) {
+           const shapeRegex = /(<(v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")([^>]*>)([\s\S]*?)(<\/\2>)/gi;
+           
+           content = content.replace(shapeRegex, (match, start, tag, style, quote, mid, inner, end) => {
+              // Prevent infinite loop if already processed
+              if (style.includes('mso-position-horizontal:center')) return match;
 
-          // Detect giant dimensions (threshold reduced to catch 160pt+ logos)
-          const dimRegex = /(width|height)\s*:\s*(\d+\.?\d*)\s*(pt|in|px|cm|mm|)/gi;
-          newStyle = newStyle.replace(dimRegex, (m, prop, val, unit) => {
-            const v = parseFloat(val);
-            let isGiant = false;
-            
-            if (unit === 'pt' && v > 120) isGiant = true;
-            else if (unit === 'in' && v > 1.6) isGiant = true;
-            else if (unit === 'px' && v > 160) isGiant = true;
-            else if (unit === 'cm' && v > 4.2) isGiant = true;
-            else if (unit === 'mm' && v > 42) isGiant = true;
-            else if (!unit && v > 1000) isGiant = true;
-
-            if (isGiant) {
-              styleModified = true;
               localModified = true;
-              return `${prop}:${CENTER_LOGO_SIZE}`;
-            }
-            return m;
-          });
+              
+              // Injection: 1 Center Watermark + 1 Bottom Right Logo
+              const centerWatermark = `${start}${centerStyle}${quote}${mid}${inner}${end}`;
+              const cornerLogo = `${start}${cornerStyle}${quote}${mid}${inner}${end}`;
 
-          // FORCE Centering if it was a giant logo or it's positioned absolutely
-          if (styleModified || (style.includes('position:absolute') && !style.includes('mso-position-horizontal:right'))) {
-             // WIPE OUT ALL POSITIONING AND MARGINS (Bulletproof)
-             newStyle = newStyle.replace(/(margin|left|top|right|bottom|mso-position|mso-margin)[^;]*/gi, '');
-             
-             // Inject bulletproof centering
-             const centeringAttributes = [
-               'position:absolute',
-               `width:${CENTER_LOGO_SIZE}`,
-               `height:${CENTER_LOGO_SIZE}`,
-               'mso-position-horizontal:center',
-               'mso-position-horizontal-relative:page',
-               'mso-position-vertical:center',
-               'mso-position-vertical-relative:page',
-               'z-index:251658240'
-             ];
-
-             // Merge into style (clean join)
-             newStyle = centeringAttributes.join(';') + ';' + newStyle.replace(/;+/g, ';');
-             styleModified = true;
-             localModified = true;
-          }
-
-          return styleModified ? `style="${newStyle}"` : match;
-        });
-
-        // --- STEP 2: Dual Logo Injection ---
-        if (content.includes("LAW NATION") || content.includes("PRIME TIMES") || content.includes("logo") || content.includes("watermark") || content.includes("word/media/image")) {
-           const genericShapeRegex = /(<(v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")([^>]*>)([\s\S]*?)(<\/\2>)/gi;
-           content = content.replace(genericShapeRegex, (match, start, tag, style, quote, mid, inner, end) => {
-              // Avoid re-processing if already applied our precise size
-              if (style.includes(`width:${CENTER_LOGO_SIZE}`) && style.includes('mso-position-horizontal:center')) {
-                return match;
-              }
-
-              if (match.includes("relative:page") || style.includes("width:") || match.includes("image")) {
-                console.log(`🎯 [Word Watermark] Injecting Dual-Logo centered pattern in ${entry.entryName}`);
-                localModified = true;
-                
-                const centerStyle = `position:absolute;width:${CENTER_LOGO_SIZE};height:${CENTER_LOGO_SIZE};z-index:251658240;mso-position-horizontal:center;mso-position-horizontal-relative:page;mso-position-vertical:center;mso-position-vertical-relative:page`;
-                const centerLogo = `${start}${centerStyle}${quote}${mid}${inner}${end}`;
-
-                const cornerStyle = `position:absolute;width:${CORNER_LOGO_SIZE};height:${CORNER_LOGO_SIZE};z-index:251658239;mso-position-horizontal:right;mso-position-horizontal-relative:margin;mso-position-vertical:bottom;mso-position-vertical-relative:margin`;
-                const cornerLogo = `${start}${cornerStyle}${quote}${mid}${inner}${end}`;
-
-                return centerLogo + cornerLogo;
-              }
-              return match;
+              return centerWatermark + cornerLogo;
            });
         }
 
-        // --- STEP 3: Fallback for DrawingML (EMU units) ---
-        const drawingMLRegex = /<(wp:extent|a:ext)\s+cx="(\d+)"\s+cy="(\d+)"([^>]*?)(\/?>)/gi;
-        content = content.replace(drawingMLRegex, (match, tag, cx, cy, otherAttrs, closing) => {
-           const valCx = parseInt(cx);
-           const valCy = parseInt(cy);
-           if (valCx > 1500000 || valCy > 1500000) { 
-              console.log(`📐 [Word Watermark] Resizing giant DrawingML ${tag} in ${entry.entryName}`);
-              localModified = true;
-              // 4064000 EMU ≈ 320pt (approx 4.4 inches)
-              const newCx = 4064000; 
-              const newCy = Math.round(valCy * (newCx / valCx));
-              return `<${tag} cx="${newCx}" cy="${newCy}"${otherAttrs}${closing}`;
-           }
-           return match;
-        });
+        // --- DrawingML (Modern Word) Fix for centering ---
+        if (content.includes("<wp:anchor")) {
+            localModified = true;
+            // Force center alignment for modern XML containers
+            content = content.replace(/<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/gi, 
+              `<wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>`);
+            content = content.replace(/<wp:positionV\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionV>/gi, 
+              `<wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>`);
+            
+            // Ensure "Behind Text" wrapping for the center logo
+            if (!content.includes("<wp:wrapNone/>")) {
+                content = content.replace(/<wp:wrapSquare[^>]*\/>/gi, "<wp:wrapNone/>");
+            }
+        }
 
         if (localModified) {
           zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
@@ -144,14 +116,13 @@ export async function addWatermarkToWord(
     }
 
     if (modifiedCount > 0) {
-      console.log(`✅ [Word Watermark] ${modifiedCount} XML files cleaned/centered successfully.`);
+      console.log(`✅ [Word Watermark] Created center-behind layout with bottom-right logo.`);
       return zip.toBuffer();
     }
 
-    console.log(`📄 [Word Watermark] No identifiable watermark found to transform. Returning original.`);
     return buffer;
   } catch (error: any) {
-    console.error("❌ [Word Watermark] Failed to process document:", error);
+    console.error("❌ [Word Watermark] Critical Failure:", error);
     try {
       if (wordPath.startsWith('http')) return await downloadFileToBuffer(wordPath);
       return await fs.readFile(resolveToAbsolutePath(wordPath));
@@ -161,12 +132,6 @@ export async function addWatermarkToWord(
   }
 }
 
-/**
- * Fallback / Legacy support
- */
-export async function addSimpleWatermarkToWord(
-  wordPath: string,
-  watermarkData: any
-): Promise<Buffer> {
+export async function addSimpleWatermarkToWord(wordPath: string, watermarkData: any): Promise<Buffer> {
   return addWatermarkToWord(wordPath, watermarkData);
 }
