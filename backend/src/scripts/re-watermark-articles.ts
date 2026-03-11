@@ -57,7 +57,7 @@ async function aggressivelyCleanPdf(pdfBuffer: Buffer): Promise<Buffer> {
   return Buffer.from(await pdfDoc.save());
 }
 
-// ─── DOCX FIX ENGINE ───────────────────────────────────────────────
+// ─── DOCX FIX ENGINE (v19: Single Center + Solid Bottom) ─────────────
 function cleanDocxBuffer(buffer: Buffer): Buffer {
   try {
     const zip = new AdmZip(buffer);
@@ -71,35 +71,42 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
       let content = entry.getData().toString("utf-8");
       let localModified = false;
 
+      // 1. Wipe out any existing modern anchors (DrawingML) to prevent extra logos
+      if (content.includes("<wp:anchor")) {
+        content = content.replace(/<wp:anchor[\s\S]*?<\/wp:anchor>/gi, "");
+        localModified = true;
+      }
+
+      // 2. VML Logic: Har image ko handle karna aur redundant hatana
       const vmlRegex = /(<(v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")([^>]*>)([\s\S]*?)(<\/\2>)/gi;
 
       if (content.includes("v:shape") || content.includes("word/media")) {
-        let shapeIndex = 0;
+        let isMainLogoProcessed = false;
+
         content = content.replace(vmlRegex, (match, start, tag, style, quote, mid, inner, end) => {
           if (style.includes("processed-fixed")) return match;
-          shapeIndex++;
+          
           localModified = true;
-          let newStart = start.replace(/id="[^"]*"/i, `id="wm_${shapeIndex}"`);
 
-          if (shapeIndex === 1) { // Center
+          // Agar ye pehli image mili hai, to isi ko watermark aur bottom logo mein badal do
+          if (!isMainLogoProcessed) {
+            isMainLogoProcessed = true;
+
+            // Center Watermark Style (Bada aur Light)
             const centerStyle = `position:absolute;width:${WM_CENTER_SIZE};height:${WM_CENTER_SIZE};z-index:-251658240;mso-position-horizontal:center;mso-position-horizontal-relative:page;mso-position-vertical:center;mso-position-vertical-relative:page;opacity:${WM_OPACITY};filter:alpha(opacity=${parseFloat(WM_OPACITY) * 100});processed-fixed:yes;`;
-            return `${newStart}${centerStyle}${quote}${mid}${inner}${end}`;
-          }
-          if (shapeIndex === 2) { // Bottom Right
-            const bottomStyle = `position:absolute;width:${WM_BOTTOM_SIZE};height:${WM_BOTTOM_SIZE};z-index:251659264;mso-position-horizontal:right;mso-position-horizontal-relative:page;mso-position-vertical:bottom;mso-position-vertical-relative:page;opacity:1;processed-fixed:yes;`;
-            return `${newStart}${bottomStyle}${quote}${mid}${inner}${end}`;
-          }
-          return match;
-        });
-      }
+            const centerPart = `${start}${centerStyle}${quote}${mid}${inner}${end}`;
 
-      if (content.includes("<wp:anchor")) {
-        localModified = true;
-        content = content.replace(/<wp:positionH[^>]*>[\s\S]*?<\/wp:positionH>/gi, "");
-        content = content.replace(/<wp:positionV[^>]*>[\s\S]*?<\/wp:positionV>/gi, "");
-        if (!content.includes("<wp:wrapNone/>")) {
-          content = content.replace(/<wp:wrapSquare[^>]*\/>|<wp:wrapTight[^>]*\/>/gi, "<wp:wrapNone/>");
-        }
+            // Bottom Right Logo Style (Chota aur Solid)
+            const bottomStyle = `position:absolute;width:${WM_BOTTOM_SIZE};height:${WM_BOTTOM_SIZE};z-index:251659264;mso-position-horizontal:right;mso-position-horizontal-relative:page;mso-position-vertical:bottom;mso-position-vertical-relative:page;opacity:1;processed-fixed:yes;`;
+            const bottomPart = `${start.replace(/id="[^"]*"/i, 'id="wm_footer_final"')}${bottomStyle}${quote}${mid}${inner}${end}`;
+
+            // Dono ko merge karke return karo
+            return centerPart + bottomPart;
+          }
+
+          // Baaki jitni bhi extra images (chota logo etc.) milti hain, unhe delete (empty string) kar do
+          return ""; 
+        });
       }
 
       if (localModified) {
@@ -116,50 +123,50 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
 
 // ─── MAIN EXECUTION ──────────────────────────────────────────────────────────
 async function reWatermarkArticles() {
-  console.log("🚀 [Re-Watermark v16] AGGRESSIVE CLEANING & NEW LOGO SYNC");
+  console.log("🚀 [Re-Watermark v19] Clean Center + Bottom Logo Fixed");
   const s3Client = isLocal ? null : new S3Client({ region: AWS_REGION });
 
   try {
     const articles = await prisma.article.findMany();
     for (let i = 0; i < articles.length; i++) {
-       const article = articles[i];
-       console.log(`[${i+1}/${articles.length}] Processing: ${article.title}`);
+        const article = articles[i];
+        console.log(`[${i+1}/${articles.length}] Processing: ${article.title}`);
 
-       try {
-         // 1. Clean PDF
-         const pdfUrl = article.originalPdfUrl || article.currentPdfUrl;
-         if (pdfUrl) {
-           const pdfBuffer = await downloadFileToBuffer(pdfUrl);
-           const cleanPdf = await aggressivelyCleanPdf(pdfBuffer);
-           const key = article.currentPdfUrl ? new URL(article.currentPdfUrl).pathname.slice(1) : null;
-           if (s3Client && key) {
-             await s3Client.send(new PutObjectCommand({
-               Bucket: S3_BUCKET_ARTICLES,
-               Key: key,
-               Body: cleanPdf,
-               ContentType: "application/pdf",
-             }));
-             console.log("   ✅ PDF Cleaned on S3");
-           }
-         }
+        try {
+          // 1. Clean PDF
+          const pdfUrl = article.originalPdfUrl || article.currentPdfUrl;
+          if (pdfUrl) {
+            const pdfBuffer = await downloadFileToBuffer(pdfUrl);
+            const cleanPdf = await aggressivelyCleanPdf(pdfBuffer);
+            const key = article.currentPdfUrl ? new URL(article.currentPdfUrl).pathname.slice(1) : null;
+            if (s3Client && key) {
+              await s3Client.send(new PutObjectCommand({
+                Bucket: S3_BUCKET_ARTICLES,
+                Key: key,
+                Body: cleanPdf,
+                ContentType: "application/pdf",
+              }));
+              console.log("   ✅ PDF Scrubbed");
+            }
+          }
 
-         // 2. Clean DOCX
-         const wordUrl = article.originalWordUrl || article.currentWordUrl;
-         if (wordUrl) {
-           const wordBuffer = await downloadFileToBuffer(wordUrl);
-           const cleanWord = cleanDocxBuffer(wordBuffer);
-           const key = article.currentWordUrl ? new URL(article.currentWordUrl).pathname.slice(1) : null;
-           if (s3Client && key) {
-             await s3Client.send(new PutObjectCommand({
-               Bucket: S3_BUCKET_ARTICLES,
-               Key: key,
-               Body: cleanWord,
-               ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-             }));
-             console.log("   ✅ DOCX Cleaned on S3");
-           }
-         }
-       } catch (err: any) { console.error(`   ❌ Failed: ${err.message}`); }
+          // 2. Clean DOCX
+          const wordUrl = article.originalWordUrl || article.currentWordUrl;
+          if (wordUrl) {
+            const wordBuffer = await downloadFileToBuffer(wordUrl);
+            const cleanWord = cleanDocxBuffer(wordBuffer);
+            const key = article.currentWordUrl ? new URL(article.currentWordUrl).pathname.slice(1) : null;
+            if (s3Client && key) {
+              await s3Client.send(new PutObjectCommand({
+                Bucket: S3_BUCKET_ARTICLES,
+                Key: key,
+                Body: cleanWord,
+                ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              }));
+              console.log("   ✅ DOCX Cleaned (Double Logo Removed)");
+            }
+          }
+        } catch (err: any) { console.error(`   ❌ Failed: ${err.message}`); }
     }
   } catch (e) { console.error(e); } finally { process.exit(0); }
 }
