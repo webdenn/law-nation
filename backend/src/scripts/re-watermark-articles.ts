@@ -6,32 +6,20 @@ import { PDFDocument, PDFName, PDFDict, PDFRef, PDFStream, PDFRawStream } from "
 import AdmZip from "adm-zip";
 
 /**
- * RE-WATERMARK SCRIPT v12: FIXED CENTER WATERMARK
- *
- * Key Fixes:
- * 1. Proper EMU size for DrawingML (~6 inches = 5486400 EMU)
- * 2. Correct VML centering relative to PAGE (not margin)
- * 3. Handles BOTH VML (legacy) and DrawingML (modern) DOCX formats
- * 4. Lower EMU threshold to catch all watermark shapes
- * 5. Cleans PDF images/annotations as before
+ * RE-WATERMARK SCRIPT v13: STAGE 1 & 2 FIX
+ * - Fixed: Center Watermark + Bottom Right Logo for DOCX
+ * - Fixed: Transparency for center watermark (0.12 opacity)
+ * - Fixed: PDF scrubbing logic remains for clean visuals
  */
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
-const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || "";
-const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || "";
 const S3_BUCKET_ARTICLES = process.env.AWS_S3_BUCKET_ARTICLES || "law-nation";
 const isLocal = process.env.NODE_ENV === "local";
 
 // ─── WATERMARK SIZE CONSTANTS ─────────────────────────────────────────────────
-// VML sizes (pt)
-const WM_PT = 320;                    // 320pt ≈ 4.4 inches — Double size for visibility
-const WM_CENTER = `${WM_PT}pt`;
-const WM_CORNER = "80pt";              // Smaller corner size
-
-// DrawingML sizes (EMU: 1 inch = 914400 EMU)
-const WM_EMU = 4064000;               // ~4.4 inches in EMU (Matching 320pt)
-const WM_EMU_THRESHOLD = 300000;      // Any shape wider than ~0.33 inch is a candidate
+const CENTER_SIZE_PT = "350pt"; 
+const BOTTOM_SIZE_PT = "75pt";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function extractS3Key(url: string | null): string | null {
@@ -39,59 +27,27 @@ function extractS3Key(url: string | null): string | null {
   try {
     const urlObj = new URL(url);
     return urlObj.pathname.startsWith("/") ? urlObj.pathname.slice(1) : urlObj.pathname;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-// ─── PDF CLEANER ─────────────────────────────────────────────────────────────
+// ─── PDF CLEANER (Aggrssive Scrubbing) ───────────────────────────────────────
 async function aggressivelyCleanPdf(pdfBuffer: Buffer): Promise<Buffer> {
-  const pdfDoc = await PDFDocument.load(pdfBuffer, {
-    ignoreEncryption: true,
-    throwOnInvalidObject: false,
-  });
-
+  const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
   pdfDoc.catalog.delete(PDFName.of("OCProperties"));
-
   const pages = pdfDoc.getPages();
   for (const page of pages) {
-    // Remove annotations (links, stamps, watermark annotations)
     page.node.delete(PDFName.of("Annots"));
-
-    // Remove XObject (images), Pattern, ExtGState from resources
     const resources = page.node.get(PDFName.of("Resources"));
     if (resources instanceof PDFDict) {
       resources.delete(PDFName.of("XObject"));
       resources.delete(PDFName.of("Pattern"));
       resources.delete(PDFName.of("ExtGState"));
     }
-
-    // Scrub "Do" operators from content streams (removes image draw calls)
-    try {
-      const contents = page.node.get(PDFName.of("Contents"));
-      if (contents) {
-        const contentRefs = Array.isArray(contents) ? contents : [contents];
-        for (const ref of contentRefs) {
-          const stream = pdfDoc.context.lookup(ref as PDFRef);
-          if (stream instanceof PDFRawStream || stream instanceof PDFStream) {
-            let text = Buffer.from((stream as any).contents).toString("latin1");
-            const doRegex = /\/[A-Za-z0-9]+\s+Do/g;
-            if (doRegex.test(text)) {
-              text = text.replace(doRegex, "");
-              (stream as any).contents = Buffer.from(text, "latin1");
-            }
-          }
-        }
-      }
-    } catch (_) {
-      // Ignore individual stream errors
-    }
   }
-
   return Buffer.from(await pdfDoc.save());
 }
 
-// ─── DOCX CLEANER ────────────────────────────────────────────────────────────
+// ─── DOCX CLEANER (Stage 1 & 2 Center + Bottom Fix) ──────────────────────────
 function cleanDocxBuffer(buffer: Buffer): Buffer {
   try {
     const zip = new AdmZip(buffer);
@@ -99,250 +55,110 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
     let changed = false;
 
     for (const entry of zipEntries) {
-      // Only process XML files inside the word/ folder
-      if (!entry.entryName.startsWith("word/") || !entry.entryName.endsWith(".xml")) {
-        continue;
-      }
+      if (!entry.entryName.startsWith("word/") || !entry.entryName.endsWith(".xml")) continue;
 
       let content = entry.getData().toString("utf-8");
       let localModified = false;
 
-      // ── STRATEGY 1: VML shapes (legacy Word format) ──────────────────────
-      // Targets <v:shape>, <v:rect>, <v:image>, <v:oval> with a style attribute
-      const vmlShapeRegex = /<(v:shape|v:rect|v:image|v:oval)(\s[^>]*)?>/gi;
-      content = content.replace(vmlShapeRegex, (match, tag, attrs) => {
-        if (!attrs) return match;
+      // --- STRATEGY 1: VML Shapes (Legacy/Stages) ---
+      // Hum har image/shape ko Center Watermark + Bottom Logo mein convert karenge
+      const vmlRegex = /(<(v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")([^>]*>)([\s\S]*?)(<\/\2>)/gi;
+      
+      if (content.includes("v:shape") || content.includes("word/media/image")) {
+        content = content.replace(vmlRegex, (match, start, tag, style, quote, mid, inner, end) => {
+          if (style.includes("processed-wm")) return match;
 
-        // Only process shapes that have a style with width/height (likely a logo/watermark)
-        if (!attrs.includes("width") && !attrs.includes("height")) return match;
+          localModified = true;
+          // Center Watermark Style
+          const centerStyle = `position:absolute;width:${CENTER_SIZE_PT};height:${CENTER_SIZE_PT};z-index:-251658240;mso-position-horizontal:center;mso-position-horizontal-relative:page;mso-position-vertical:center;mso-position-vertical-relative:page;opacity:0.12;filter:alpha(opacity=12);processed-wm:yes;`;
+          const centerLogo = `${start}${centerStyle}${quote}${mid}${inner}${end}`;
 
-        // Build the correct center watermark style
-        const centerStyle = [
-          "position:absolute",
-          `width:${WM_CENTER}`,
-          `height:${WM_CENTER}`,
-          "mso-position-horizontal:center",
-          "mso-position-horizontal-relative:page",   // relative to FULL PAGE
-          "mso-position-vertical:center",
-          "mso-position-vertical-relative:page",     // relative to FULL PAGE
-          "mso-wrap-style:none",
-          "z-index:251658240",
-        ].join(";");
+          // Bottom Right Logo Style
+          const bottomStyle = `position:absolute;width:${BOTTOM_SIZE_PT};height:${BOTTOM_SIZE_PT};z-index:251659264;mso-position-horizontal:right;mso-position-horizontal-relative:margin;mso-position-vertical:bottom;mso-position-vertical-relative:margin;processed-wm:yes;`;
+          const bottomLogo = `${start}${bottomStyle}${quote}${mid}${inner}${end}`;
 
-        // Replace existing style attribute entirely
-        const newAttrs = attrs.replace(/style="[^"]*"/i, `style="${centerStyle}"`);
+          return centerLogo + bottomLogo;
+        });
+      }
 
-        // If no style attr existed at all, inject one
-        const result = newAttrs.includes(`style="${centerStyle}"`)
-          ? `<${tag}${newAttrs}>`
-          : `<${tag}${attrs} style="${centerStyle}">`;
-
+      // --- STRATEGY 2: DrawingML (Modern Word) Positioning ---
+      if (content.includes("<wp:anchor")) {
         localModified = true;
-        return result;
-      });
-
-      // ── STRATEGY 2: DrawingML inline/anchor images (modern Word format) ──
-      // wp:extent defines the visual size of the image in EMU
-      const wpExtentRegex = /<wp:extent\s+cx="(\d+)"\s+cy="(\d+)"([^>]*?)\/>/gi;
-      content = content.replace(wpExtentRegex, (match, cx, cy, otherAttrs) => {
-        const valCx = parseInt(cx);
-        const valCy = parseInt(cy);
-        if (valCx > WM_EMU_THRESHOLD || valCy > WM_EMU_THRESHOLD) {
-          localModified = true;
-          // Keep aspect ratio
-          const ratio = valCy / valCx;
-          const newCy = Math.round(WM_EMU * ratio);
-          return `<wp:extent cx="${WM_EMU}" cy="${newCy}"${otherAttrs}/>`;
+        content = content.replace(/<wp:positionH[^>]*>[\s\S]*?<\/wp:positionH>/gi, 
+          `<wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>`);
+        content = content.replace(/<wp:positionV[^>]*>[\s\S]*?<\/wp:positionV>/gi, 
+          `<wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>`);
+        
+        if (!content.includes("<wp:wrapNone/>")) {
+          content = content.replace(/<wp:wrapSquare[^>]*\/>/gi, "<wp:wrapNone/>");
         }
-        return match;
-      });
-
-      // a:ext inside pic/spPr defines shape extents
-      const aExtRegex = /<a:ext\s+cx="(\d+)"\s+cy="(\d+)"([^>]*?)\/>/gi;
-      content = content.replace(aExtRegex, (match, cx, cy, otherAttrs) => {
-        const valCx = parseInt(cx);
-        const valCy = parseInt(cy);
-        if (valCx > WM_EMU_THRESHOLD || valCy > WM_EMU_THRESHOLD) {
-          localModified = true;
-          const ratio = valCy / valCx;
-          const newCy = Math.round(WM_EMU * ratio);
-          return `<a:ext cx="${WM_EMU}" cy="${newCy}"${otherAttrs}/>`;
-        }
-        return match;
-      });
-
-      // ── STRATEGY 3: Fix wp:anchor positioning for DrawingML ──────────────
-      // wp:anchor is used for floating images — force it to page-center
-      // simplePos="0" means we control position manually
-      const wpAnchorRegex = /(<wp:anchor\b[^>]*>)([\s\S]*?)(<\/wp:anchor>)/gi;
-      content = content.replace(wpAnchorRegex, (match, open, inner, close) => {
-        // Only touch anchors that contain a large image (already resized above)
-        if (!inner.includes(`cx="${WM_EMU}"`) && !inner.includes("cx=")) return match;
-
-        // Replace posOffset values to center on page
-        // Standard A4 page: width=12240000 EMU, height=15840000 EMU
-        // Center X offset = (12240000 - WM_EMU) / 2 ≈ 3376800
-        // Center Y offset = (15840000 - WM_EMU) / 2 ≈ 5176800
-        let newInner = inner
-          .replace(/<wp:posOffset>(\d+)<\/wp:posOffset>/g, (m: string, val: string, offset: number) => {
-            // First posOffset = horizontal, second = vertical
-            const occurrences = (inner.slice(0, offset).match(/<wp:posOffset>/g) || []).length;
-            if (occurrences === 0) return `<wp:posOffset>3376800</wp:posOffset>`; // X center
-            if (occurrences === 1) return `<wp:posOffset>5176800</wp:posOffset>`; // Y center
-            return m;
-          })
-          // Force relative horizontal/vertical anchoring to PAGE
-          .replace(/(<wp:positionH\s+relativeFrom=")[^"]+(")/g, '$1page$2')
-          .replace(/(<wp:positionV\s+relativeFrom=")[^"]+(")/g, '$1page$2');
-
-        if (newInner !== inner) localModified = true;
-        return `${open}${newInner}${close}`;
-      });
+      }
 
       if (localModified) {
         zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
         changed = true;
-        console.log(`   ✏️  Modified: ${entry.entryName}`);
       }
     }
-
     return changed ? zip.toBuffer() : buffer;
   } catch (err: any) {
-    console.error("   ⚠️ DOCX cleaning failed:", err.message);
+    console.error("⚠️ DOCX cleaning failed:", err.message);
     return buffer;
   }
 }
 
-// ─── MAIN ─────────────────────────────────────────────────────────────────────
+// ─── MAIN EXECUTION ──────────────────────────────────────────────────────────
 async function reWatermarkArticles() {
-  console.log("🚀 [Re-Watermark v12] CENTER WATERMARK FIX — PDF + DOCX");
+  console.log("🚀 [Re-Watermark v13] STAGE 1 & 2 FIX — Center + Bottom");
 
-  let s3Client: S3Client | null = null;
-  const bucketName = S3_BUCKET_ARTICLES;
-  const region = AWS_REGION;
-
-  if (!isLocal) {
-    console.log(`☁️  S3 init (Region: ${region}, Bucket: ${bucketName})`);
-    const s3Config: any = { region };
-    if (AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY) {
-      console.log("🔑 Using credentials from .env");
-      s3Config.credentials = {
-        accessKeyId: AWS_ACCESS_KEY_ID,
-        secretAccessKey: AWS_SECRET_ACCESS_KEY,
-      };
-    } else {
-      console.log("ℹ️  No keys in .env — falling back to IAM Role.");
-    }
-    s3Client = new S3Client(s3Config);
-  } else {
-    console.log("⚠️  NODE_ENV=local — S3 uploads SKIPPED.");
-  }
+  const s3Client = isLocal ? null : new S3Client({ region: AWS_REGION });
 
   try {
-    const articles = await prisma.article.findMany({
-      select: {
-        id: true,
-        title: true,
-        originalPdfUrl: true,
-        currentPdfUrl: true,
-        originalWordUrl: true,
-        currentWordUrl: true,
-      },
-    });
-
-    console.log(`📊 Found ${articles.length} articles\n`);
-    let successCount = 0;
+    const articles = await prisma.article.findMany();
+    console.log(`📊 Total Articles: ${articles.length}`);
 
     for (let i = 0; i < articles.length; i++) {
       const article = articles[i];
-      const progress = `[${i + 1}/${articles.length}]`;
+      console.log(`[${i + 1}/${articles.length}] Processing: ${article.title}`);
 
       try {
-        console.log(`${progress} "${article.title}"`);
-
-        // ── Clean PDF ──────────────────────────────────────────────────────
+        // PDF Handling
         const pdfUrl = article.originalPdfUrl || article.currentPdfUrl;
         if (pdfUrl) {
           const pdfBuffer = await downloadFileToBuffer(pdfUrl);
           const cleanPdf = await aggressivelyCleanPdf(pdfBuffer);
-
-          const currentPdfKey = extractS3Key(article.currentPdfUrl);
-          const originalPdfKey = extractS3Key(article.originalPdfUrl);
-
-          if (s3Client) {
-            if (currentPdfKey) {
-              await s3Client.send(
-                new PutObjectCommand({
-                  Bucket: bucketName,
-                  Key: currentPdfKey,
-                  Body: cleanPdf,
-                  ContentType: "application/pdf",
-                })
-              );
-              console.log(`   📤 PDF → ${currentPdfKey}`);
-            }
-            if (originalPdfKey && originalPdfKey !== currentPdfKey) {
-              await s3Client.send(
-                new PutObjectCommand({
-                  Bucket: bucketName,
-                  Key: originalPdfKey,
-                  Body: cleanPdf,
-                  ContentType: "application/pdf",
-                })
-              );
-              console.log(`   📤 Original PDF → ${originalPdfKey}`);
-            }
+          const key = extractS3Key(article.currentPdfUrl);
+          if (s3Client && key) {
+            await s3Client.send(new PutObjectCommand({
+              Bucket: S3_BUCKET_ARTICLES,
+              Key: key,
+              Body: cleanPdf,
+              ContentType: "application/pdf",
+            }));
           }
-          console.log("   ✅ PDF cleaned");
         }
 
-        // ── Clean DOCX ─────────────────────────────────────────────────────
+        // DOCX Handling (Stage Fix Applied Here)
         const wordUrl = article.originalWordUrl || article.currentWordUrl;
         if (wordUrl) {
           const wordBuffer = await downloadFileToBuffer(wordUrl);
           const cleanWord = cleanDocxBuffer(wordBuffer);
-
-          const currentWordKey = extractS3Key(article.currentWordUrl);
-          const originalWordKey = extractS3Key(article.originalWordUrl);
-
-          if (s3Client) {
-            if (currentWordKey) {
-              await s3Client.send(
-                new PutObjectCommand({
-                  Bucket: bucketName,
-                  Key: currentWordKey,
-                  Body: cleanWord,
-                  ContentType:
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                })
-              );
-              console.log(`   📤 DOCX → ${currentWordKey}`);
-            }
-            if (originalWordKey && originalWordKey !== currentWordKey) {
-              await s3Client.send(
-                new PutObjectCommand({
-                  Bucket: bucketName,
-                  Key: originalWordKey,
-                  Body: cleanWord,
-                  ContentType:
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                })
-              );
-              console.log(`   📤 Original DOCX → ${originalWordKey}`);
-            }
+          const key = extractS3Key(article.currentWordUrl);
+          if (s3Client && key) {
+            await s3Client.send(new PutObjectCommand({
+              Bucket: S3_BUCKET_ARTICLES,
+              Key: key,
+              Body: cleanWord,
+              ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            }));
           }
-          console.log("   ✅ DOCX cleaned");
         }
-
-        successCount++;
+        console.log("   ✅ Success");
       } catch (err: any) {
         console.error(`   ❌ Failed: ${err.message}`);
       }
     }
-
-    console.log(`\n✨ Done! v12 — Success: ${successCount}/${articles.length}`);
   } catch (error: any) {
-    console.error("Fatal Error:", error);
+    console.error("Fatal:", error);
   } finally {
     await prisma.$disconnect();
     process.exit(0);
