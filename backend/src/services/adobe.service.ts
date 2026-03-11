@@ -587,23 +587,29 @@ export class AdobeService {
       // Load logo image (copied logic from pdf-watermark.utils.ts)
       let logoImage: any | undefined;
       try {
-        const possibleLogoPaths = [
-          path.join(process.cwd(), 'src', 'assets', 'img', 'logo-bg.png'),
-          path.join(process.cwd(), 'src', 'assests', 'img', 'logo-bg.png'),
-          path.join(process.cwd(), 'backend', 'src', 'assets', 'img', 'logo-bg.png')
+        const possibleSubPaths = [
+          ['public', 'assets', 'img', 'watermark.png'],
+          ['..', 'public', 'assets', 'img', 'watermark.png'],
+          ['backend', 'public', 'assets', 'img', 'watermark.png'],
+          ['src', 'assets', 'img', 'logo-bg.png'],
+          ['src', 'assests', 'img', 'logo-bg.png'],
         ];
 
         let logoPath = "";
-        for (const p of possibleLogoPaths) {
-          if (fs.existsSync(p)) {
-            logoPath = p;
+        for (const subPath of possibleSubPaths) {
+          const fullPath = path.join(process.cwd(), ...subPath);
+          if (fs.existsSync(fullPath)) {
+            logoPath = fullPath;
             break;
           }
         }
 
         if (logoPath) {
+          console.log(`✅ [Adobe Service] Logo found at: ${logoPath}`);
           const logoBytes = fs.readFileSync(logoPath);
           logoImage = await pdfDoc.embedPng(logoBytes);
+        } else {
+          console.warn(`⚠️ [Adobe Service] Logo NOT found in checked paths.`);
         }
       } catch (logoError) {
         console.warn('⚠️ [Adobe Service] Failed to load logo for watermark:', logoError);
@@ -616,27 +622,27 @@ export class AdobeService {
         
         // 1. Add Center Logo
         if (logoImage) {
-          const logoScale = 0.25; // Large center logo (Refined)
+          const logoScale = 0.25; 
           const logoDims = logoImage.scale(logoScale);
           page.drawImage(logoImage, {
-            x: (width - logoDims.width) / 2,
-            y: (height - logoDims.height) / 2,
+            x: (width / 2) - (logoDims.width / 2),
+            y: (height / 2) - (logoDims.height / 2),
             width: logoDims.width,
             height: logoDims.height,
-            opacity: 0.15, // Subtle for large size
+            opacity: 0.12, // Reduced for large size (Bulletproof)
           });
         }
 
         // 2. Add Bottom-Right Logo
         if (logoImage) {
-          const bottomLogoScale = 0.08; // Small consistent bottom logo
+          const bottomLogoScale = 0.08; 
           const bottomLogoDims = logoImage.scale(bottomLogoScale);
           page.drawImage(logoImage, {
             x: width - bottomLogoDims.width - 20,
             y: 20,
             width: bottomLogoDims.width,
             height: bottomLogoDims.height,
-            opacity: 0.4, // Standard bottom logo visibility
+            opacity: 0.35, // Consistent premium transparency
           });
         }
 

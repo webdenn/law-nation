@@ -72,29 +72,30 @@ export async function addWatermarkToPdf(
     // 3. Load logo image
     let logoImage: Awaited<ReturnType<typeof pdfDoc.embedPng>> | undefined;
     try {
-      // ✅ Handle both "assets" and "assests" typo
-      const possibleLogoPaths = [
-        path.join(process.cwd(), 'src', 'assets', 'img', 'logo-bg.png'),
-        path.join(process.cwd(), 'src', 'assests', 'img', 'logo-bg.png'),
-        path.join(process.cwd(), 'backend', 'src', 'assets', 'img', 'logo-bg.png')
+      // --- BULLETPROOF LOGO PATH DISCOVERY ---
+      const possibleSubPaths = [
+        ['public', 'assets', 'img', 'watermark.png'],
+        ['..', 'public', 'assets', 'img', 'watermark.png'],
+        ['backend', 'public', 'assets', 'img', 'watermark.png'],
+        ['src', 'assets', 'img', 'logo-bg.png'],
+        ['src', 'assests', 'img', 'logo-bg.png'],
       ];
 
       let logoPath = "";
-      for (const p of possibleLogoPaths) {
-        if (fs.existsSync(p)) {
-          logoPath = p;
+      for (const subPath of possibleSubPaths) {
+        const fullPath = path.join(process.cwd(), ...subPath);
+        if (fs.existsSync(fullPath)) {
+          logoPath = fullPath;
           break;
         }
       }
 
       if (logoPath) {
-        console.log('🖼️ [Watermark] Loading logo from:', logoPath);
-        const logoBytes = fs.readFileSync(logoPath);
-        logoImage = await pdfDoc.embedPng(logoBytes);
-        console.log('✅ [Watermark] Logo loaded successfully');
+        console.log(`✅ [PDF Watermark] Logo found at: ${logoPath}`);
+        const logoBuffer = fs.readFileSync(logoPath);
+        logoImage = await pdfDoc.embedPng(logoBuffer);
       } else {
-        console.warn('⚠️ [Watermark] Logo file not found among possible paths, skipping logo watermark');
-        console.log('🔍 [Watermark] Paths checked:', possibleLogoPaths);
+        console.warn(`⚠️ [PDF Watermark] Logo NOT found in checked paths. Skipping logo watermarks.`);
       }
     } catch (error) {
       console.warn('⚠️ [Watermark] Failed to load logo, skipping logo watermark:', error);
@@ -180,9 +181,10 @@ export async function addWatermarkToPdf(
         const logoScale = 0.25; // Large center logo
         const logoDims = logoImage.scale(logoScale);
 
-        // Calculate center position
-        const logoX = (width - logoDims.width) / 2;
-        const logoY = (height - logoDims.height) / 2;
+        // --- REFINED CENTERING MATH ---
+        // Calculate center position using full dimensions to handle offsets
+        const logoX = (width / 2) - (logoDims.width / 2);
+        const logoY = (height / 2) - (logoDims.height / 2);
 
         // Draw logo with low opacity
         page.drawImage(logoImage, {
@@ -190,13 +192,13 @@ export async function addWatermarkToPdf(
           y: logoY,
           width: logoDims.width,
           height: logoDims.height,
-          opacity: 0.15, // Subtle for large size
+          opacity: 0.12, // Reduced for large size (Bulletproof)
         });
       }
 
-      // Add logo at bottom-right of page for ALL roles (Fixed ADMIN/EDITOR/REVIEWER)
+      // --- FORCED ROLES FOR BOTTOM LOGO ---
       if (logoImage) {
-        const bottomLogoScale = 0.08; // Small consistent bottom logo
+        const bottomLogoScale = 0.08; 
         const bottomLogoDims = logoImage.scale(bottomLogoScale);
 
         // Calculate bottom-right position (with 20px margin from bottom and right)
@@ -209,7 +211,7 @@ export async function addWatermarkToPdf(
           y: bottomLogoY,
           width: bottomLogoDims.width,
           height: bottomLogoDims.height,
-          opacity: 0.4, // Standard bottom logo visibility
+          opacity: 0.35, // Premium transparency
         });
       }
 

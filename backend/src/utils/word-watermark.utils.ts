@@ -71,8 +71,8 @@ export async function addWatermarkToWord(
 
           // FORCE Centering if it was a giant logo or it's positioned absolutely
           if (styleModified || (style.includes('position:absolute') && !style.includes('mso-position-horizontal:right'))) {
-             // Wipe out old positioning
-             newStyle = newStyle.replace(/margin-(top|left|right|bottom):[^;]*/g, 'margin-$1:0pt');
+             // WIPE OUT ALL POSITIONING AND MARGINS (Bulletproof)
+             newStyle = newStyle.replace(/(margin|left|top|right|bottom|mso-position|mso-margin)[^;]*/gi, '');
              
              // Inject bulletproof centering
              const centeringAttributes = [
@@ -86,16 +86,8 @@ export async function addWatermarkToWord(
                'z-index:251658240'
              ];
 
-             // Merge into style
-             centeringAttributes.forEach(attr => {
-                const key = attr.split(':')[0];
-                if (newStyle.includes(key)) {
-                    const regex = new RegExp(`${key}:[^;]*`, 'g');
-                    newStyle = newStyle.replace(regex, attr);
-                } else {
-                    newStyle += ';' + attr;
-                }
-             });
+             // Merge into style (clean join)
+             newStyle = centeringAttributes.join(';') + ';' + newStyle.replace(/;+/g, ';');
              styleModified = true;
              localModified = true;
           }
