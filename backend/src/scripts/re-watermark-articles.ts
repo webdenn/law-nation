@@ -19,7 +19,6 @@ const isLocal = process.env.NODE_ENV === "local";
 
 // ─── WATERMARK SETTINGS ─────────────────────────────
 const WM_CENTER_SIZE = "350pt";
-const WM_BOTTOM_SIZE = "85pt";
 const WM_OPACITY = "0.10";
 
 // ─── PDF CLEANER ────────────────────────────────────
@@ -97,6 +96,7 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
           let newStyle = style;
 
           if (shapeIndex === 1) {
+            // Sirf center watermark rakho
             newStyle +=
               `;position:absolute;width:${WM_CENTER_SIZE};height:${WM_CENTER_SIZE};` +
               `mso-position-horizontal:center;mso-position-horizontal-relative:page;` +
@@ -106,16 +106,13 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
               ) * 100});`;
 
             localModified = true;
+            return `${start}${newStyle}${quote}${mid}${inner}${end}`;
           }
 
           if (shapeIndex === 2) {
-            newStyle +=
-              `;position:absolute;width:${WM_BOTTOM_SIZE};height:${WM_BOTTOM_SIZE};` +
-              `mso-position-horizontal:right;mso-position-horizontal-relative:page;` +
-              `mso-position-vertical:bottom;mso-position-vertical-relative:page;` +
-              `opacity:1;`;
-
+            // Chota bottom logo hata do
             localModified = true;
+            return "";
           }
 
           return `${start}${newStyle}${quote}${mid}${inner}${end}`;
