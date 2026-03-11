@@ -616,7 +616,7 @@ export class AdobeService {
         
         // 1. Add Center Logo
         if (logoImage) {
-          const logoScale = 0.04; // Reduced from 0.07 for consistency
+          const logoScale = 0.05; // Set to same as bottom (0.05)
           const logoDims = logoImage.scale(logoScale);
           page.drawImage(logoImage, {
             x: (width - logoDims.width) / 2,
@@ -629,7 +629,7 @@ export class AdobeService {
 
         // 2. Add Bottom-Right Logo
         if (logoImage) {
-          const bottomLogoScale = 0.05; // Reduced from 0.07 for consistency
+          const bottomLogoScale = 0.05; // Consistent 0.05 scale
           const bottomLogoDims = logoImage.scale(bottomLogoScale);
           page.drawImage(logoImage, {
             x: width - bottomLogoDims.width - 20,
