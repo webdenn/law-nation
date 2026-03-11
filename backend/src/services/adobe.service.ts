@@ -616,27 +616,27 @@ export class AdobeService {
         
         // 1. Add Center Logo
         if (logoImage) {
-          const logoScale = 0.12; // Increased to 0.12 for global visibility
+          const logoScale = 0.25; // Large center logo (Refined)
           const logoDims = logoImage.scale(logoScale);
           page.drawImage(logoImage, {
             x: (width - logoDims.width) / 2,
             y: (height - logoDims.height) / 2,
             width: logoDims.width,
             height: logoDims.height,
-            opacity: 0.3,
+            opacity: 0.15, // Subtle for large size
           });
         }
 
         // 2. Add Bottom-Right Logo
         if (logoImage) {
-          const bottomLogoScale = 0.12; // Consistent 0.12 scale
+          const bottomLogoScale = 0.08; // Small consistent bottom logo
           const bottomLogoDims = logoImage.scale(bottomLogoScale);
           page.drawImage(logoImage, {
             x: width - bottomLogoDims.width - 20,
             y: 20,
             width: bottomLogoDims.width,
             height: bottomLogoDims.height,
-            opacity: 0.5,
+            opacity: 0.4, // Standard bottom logo visibility
           });
         }
 

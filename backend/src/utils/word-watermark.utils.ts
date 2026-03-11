@@ -33,9 +33,9 @@ export async function addWatermarkToWord(
     const entries = zip.getEntries();
     let modifiedCount = 0;
 
-    // SETTING BOTH TO SAME GLOBAL SIZE (160pt ≈ 2.2 inches)
-    const CENTER_LOGO_SIZE = "160pt"; 
-    const CORNER_LOGO_SIZE = "160pt";
+    // REFINED SIZES
+    const CENTER_LOGO_SIZE = "320pt"; 
+    const CORNER_LOGO_SIZE = "80pt";
 
     for (const entry of entries) {
       if (entry.entryName.startsWith("word/") && entry.entryName.endsWith(".xml")) {
@@ -48,7 +48,7 @@ export async function addWatermarkToWord(
           let newStyle = style;
           let styleModified = false;
 
-          // Detect giant dimensions
+          // Detect giant dimensions (threshold reduced to catch 160pt+ logos)
           const dimRegex = /(width|height)\s*:\s*(\d+\.?\d*)\s*(pt|in|px|cm|mm|)/gi;
           newStyle = newStyle.replace(dimRegex, (m, prop, val, unit) => {
             const v = parseFloat(val);
@@ -64,7 +64,6 @@ export async function addWatermarkToWord(
             if (isGiant) {
               styleModified = true;
               localModified = true;
-              // Return standard size
               return `${prop}:${CENTER_LOGO_SIZE}`;
             }
             return m;
@@ -91,10 +90,10 @@ export async function addWatermarkToWord(
              centeringAttributes.forEach(attr => {
                 const key = attr.split(':')[0];
                 if (newStyle.includes(key)) {
-                   const regex = new RegExp(`${key}:[^;]*`, 'g');
-                   newStyle = newStyle.replace(regex, attr);
+                    const regex = new RegExp(`${key}:[^;]*`, 'g');
+                    newStyle = newStyle.replace(regex, attr);
                 } else {
-                   newStyle += ';' + attr;
+                    newStyle += ';' + attr;
                 }
              });
              styleModified = true;
@@ -104,7 +103,7 @@ export async function addWatermarkToWord(
           return styleModified ? `style="${newStyle}"` : match;
         });
 
-        // --- STEP 2: Dual Logo Injection for Articles with identifiable keywords ---
+        // --- STEP 2: Dual Logo Injection ---
         if (content.includes("LAW NATION") || content.includes("PRIME TIMES") || content.includes("logo") || content.includes("watermark") || content.includes("word/media/image")) {
            const genericShapeRegex = /(<(v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")([^>]*>)([\s\S]*?)(<\/\2>)/gi;
            content = content.replace(genericShapeRegex, (match, start, tag, style, quote, mid, inner, end) => {
@@ -137,8 +136,8 @@ export async function addWatermarkToWord(
            if (valCx > 1500000 || valCy > 1500000) { 
               console.log(`📐 [Word Watermark] Resizing giant DrawingML ${tag} in ${entry.entryName}`);
               localModified = true;
-              // 1828800 EMU ≈ 2 inches ≈ 144pt
-              const newCx = 1828800; 
+              // 4064000 EMU ≈ 320pt (approx 4.4 inches)
+              const newCx = 4064000; 
               const newCy = Math.round(valCy * (newCx / valCx));
               return `<${tag} cx="${newCx}" cy="${newCy}"${otherAttrs}${closing}`;
            }

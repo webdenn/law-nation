@@ -177,7 +177,7 @@ export async function addWatermarkToPdf(
 
       // Add logo in center of page (if loaded)
       if (logoImage) {
-        const logoScale = 0.12; // Increased to 0.12 for global visible look
+        const logoScale = 0.25; // Large center logo
         const logoDims = logoImage.scale(logoScale);
 
         // Calculate center position
@@ -190,13 +190,13 @@ export async function addWatermarkToPdf(
           y: logoY,
           width: logoDims.width,
           height: logoDims.height,
-          opacity: 0.3, 
+          opacity: 0.15, // Subtle for large size
         });
       }
 
-      // Add logo at bottom-right of page for USER and ADMIN roles
-      if (logoImage && (userRole === 'USER' || userRole === 'ADMIN')) {
-        const bottomLogoScale = 0.12; // Consistent 0.12 scale
+      // Add logo at bottom-right of page for ALL roles (Fixed ADMIN/EDITOR/REVIEWER)
+      if (logoImage) {
+        const bottomLogoScale = 0.08; // Small consistent bottom logo
         const bottomLogoDims = logoImage.scale(bottomLogoScale);
 
         // Calculate bottom-right position (with 20px margin from bottom and right)
@@ -209,7 +209,7 @@ export async function addWatermarkToPdf(
           y: bottomLogoY,
           width: bottomLogoDims.width,
           height: bottomLogoDims.height,
-          opacity: 0.5, // More visible at bottom
+          opacity: 0.4, // Standard bottom logo visibility
         });
       }
 

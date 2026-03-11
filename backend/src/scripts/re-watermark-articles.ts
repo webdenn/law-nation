@@ -25,12 +25,12 @@ const isLocal = process.env.NODE_ENV === "local";
 
 // ─── WATERMARK SIZE CONSTANTS ─────────────────────────────────────────────────
 // VML sizes (pt)
-const WM_PT = 160;                    // 160pt ≈ 2.2 inches — Consistent global center watermark
+const WM_PT = 320;                    // 320pt ≈ 4.4 inches — Double size for visibility
 const WM_CENTER = `${WM_PT}pt`;
-const WM_CORNER = "160pt";             // Matching corner size for consistency
+const WM_CORNER = "80pt";              // Smaller corner size
 
 // DrawingML sizes (EMU: 1 inch = 914400 EMU)
-const WM_EMU = 2032000;               // ~2.2 inches in EMU (Matching 160pt)
+const WM_EMU = 4064000;               // ~4.4 inches in EMU (Matching 320pt)
 const WM_EMU_THRESHOLD = 300000;      // Any shape wider than ~0.33 inch is a candidate
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
