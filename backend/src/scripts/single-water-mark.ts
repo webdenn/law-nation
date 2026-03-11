@@ -27,12 +27,12 @@ const S3_BUCKET = process.env.AWS_S3_BUCKET_ARTICLES || "law-nation";
 const s3 = new S3Client({ region: AWS_REGION });
 
 /* WATERMARK XML
-   KEY FIXES vs old version:
-   - Removed CSS "opacity" from style (Word ignores it)
-   - Using o:opacity="0.1f" on <v:imagedata> — this is the CORRECT way
-   - blacklevel="22938f" lightens the image tone significantly
-   - width/height reduced to 300pt (from 420pt) to match Image 2 look
-   - Added proper XML declaration and all required VML namespaces in header
+   FIXES:
+   - NO rotation (horizontal watermark as requested)
+   - width:250pt height:100pt — wide landscape ratio, not square
+   - o:opacity="0.08f" — very faint, barely visible
+   - blacklevel="46000f" — heavily lightened image tone
+   - Centered on page
 */
 
 function watermarkXML() {
@@ -46,20 +46,19 @@ function watermarkXML() {
       <v:shape id="law-nation-watermark"
         type="#_x0000_t75"
         style="position:absolute;
-               width:300pt;
-               height:300pt;
+               width:250pt;
+               height:100pt;
                mso-position-horizontal:center;
                mso-position-horizontal-relative:page;
                mso-position-vertical:center;
                mso-position-vertical-relative:page;
-               rotation:315;
                z-index:-251658752"
         fillcolor="none"
         stroked="f">
         <v:imagedata r:id="rIdWatermark"
                      o:title="watermark"
-                     o:opacity="0.1f"
-                     blacklevel="22938f"/>
+                     o:opacity="0.08f"
+                     blacklevel="46000f"/>
       </v:shape>
     </w:pict>
   </w:r>
@@ -132,28 +131,27 @@ ${watermarkXML()}
 
     } else {
 
-      console.log("⚠ Watermark already present — updating opacity/size");
+      console.log("⚠ Watermark already present — updating");
 
-      /* Replace the entire old shape with updated one */
+      /* Replace entire old shape with corrected one */
       xml = xml.replace(
         /<v:shape id="law-nation-watermark"[\s\S]*?<\/v:shape>/,
         `<v:shape id="law-nation-watermark"
         type="#_x0000_t75"
         style="position:absolute;
-               width:300pt;
-               height:300pt;
+               width:250pt;
+               height:100pt;
                mso-position-horizontal:center;
                mso-position-horizontal-relative:page;
                mso-position-vertical:center;
                mso-position-vertical-relative:page;
-               rotation:315;
                z-index:-251658752"
         fillcolor="none"
         stroked="f">
         <v:imagedata r:id="rIdWatermark"
                      o:title="watermark"
-                     o:opacity="0.1f"
-                     blacklevel="22938f"/>
+                     o:opacity="0.08f"
+                     blacklevel="46000f"/>
       </v:shape>`
       );
 
