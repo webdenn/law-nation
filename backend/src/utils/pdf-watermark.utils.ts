@@ -177,7 +177,7 @@ export async function addWatermarkToPdf(
 
       // Add logo in center of page (if loaded)
       if (logoImage) {
-        const logoScale = 0.07; 
+        const logoScale = 0.04; // Reduced from 0.07 for better look
         const logoDims = logoImage.scale(logoScale);
 
         // Calculate center position
@@ -196,7 +196,7 @@ export async function addWatermarkToPdf(
 
       // Add logo at bottom-right of page for USER and ADMIN roles
       if (logoImage && (userRole === 'USER' || userRole === 'ADMIN')) {
-        const bottomLogoScale = 0.07; // Consistent scale for all versions
+        const bottomLogoScale = 0.05; // Reduced from 0.07 for consistent look
         const bottomLogoDims = logoImage.scale(bottomLogoScale);
 
         // Calculate bottom-right position (with 20px margin from bottom and right)

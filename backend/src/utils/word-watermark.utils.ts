@@ -33,9 +33,9 @@ export async function addWatermarkToWord(
     const entries = zip.getEntries();
     let modifiedCount = 0;
 
-    // CENTER_LOGO_SIZE: 220pt ≈ 3.0 inches (Na jyada chota, na jyada bada)
-    const CENTER_LOGO_SIZE = "220pt"; 
-    const CORNER_LOGO_SIZE = "90pt";
+    // CENTER_LOGO_SIZE: 80pt ≈ 1.1 inches (Reduced from 220pt for better look)
+    const CENTER_LOGO_SIZE = "80pt"; 
+    const CORNER_LOGO_SIZE = "60pt";
 
     for (const entry of entries) {
       if (entry.entryName.startsWith("word/") && entry.entryName.endsWith(".xml")) {
