@@ -110,9 +110,14 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
           }
 
           if (shapeIndex === 2) {
-            // Chota bottom logo hata do
+            // Chota logo hide karo - XML valid rakhne ke liye display:none aur width/height:0
+            newStyle = newStyle
+              .replace(/width:[^;"]*/gi, "width:0pt")
+              .replace(/height:[^;"]*/gi, "height:0pt");
+            newStyle += `;display:none;visibility:hidden;opacity:0;`;
+
             localModified = true;
-            return "";
+            return `${start}${newStyle}${quote}${mid}${inner}${end}`;
           }
 
           return `${start}${newStyle}${quote}${mid}${inner}${end}`;
