@@ -23,7 +23,7 @@ const WATERMARK_PATH = path.resolve(
 
 const WIDTH = "350pt";
 const HEIGHT = "170pt";
-const OPACITY = "0.10";
+const OPACITY = "0.07";
 
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
 const S3_BUCKET = process.env.AWS_S3_BUCKET_ARTICLES || "law-nation";
