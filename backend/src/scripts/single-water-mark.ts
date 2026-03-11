@@ -1,5 +1,4 @@
 import "dotenv/config";
-// just wanna test this file
 import fs from "fs";
 import path from "path";
 import AdmZip from "adm-zip";
