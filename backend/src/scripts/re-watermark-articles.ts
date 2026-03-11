@@ -2,7 +2,14 @@ import "dotenv/config";
 import { prisma } from "../db/db.js";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { downloadFileToBuffer } from "../utils/pdf-extract.utils.js";
-import { PDFDocument, PDFName, PDFDict, PDFRef, PDFStream, PDFRawStream } from "pdf-lib";
+import {
+  PDFDocument,
+  PDFName,
+  PDFDict,
+  PDFRef,
+  PDFStream,
+  PDFRawStream,
+} from "pdf-lib";
 import AdmZip from "adm-zip";
 
 // ─── CONFIG ─────────────────────────────────────────
@@ -17,7 +24,6 @@ const WM_OPACITY = "0.10";
 
 // ─── PDF CLEANER ────────────────────────────────────
 async function aggressivelyCleanPdf(pdfBuffer: Buffer): Promise<Buffer> {
-
   const pdfDoc = await PDFDocument.load(pdfBuffer, {
     ignoreEncryption: true,
     throwOnInvalidObject: false,
@@ -28,7 +34,6 @@ async function aggressivelyCleanPdf(pdfBuffer: Buffer): Promise<Buffer> {
   const pages = pdfDoc.getPages();
 
   for (const page of pages) {
-
     page.node.delete(PDFName.of("Annots"));
 
     const resources = page.node.get(PDFName.of("Resources"));
@@ -40,34 +45,26 @@ async function aggressivelyCleanPdf(pdfBuffer: Buffer): Promise<Buffer> {
     }
 
     try {
-
       const contents = page.node.get(PDFName.of("Contents"));
 
       if (contents) {
-
         const contentRefs = Array.isArray(contents) ? contents : [contents];
 
         for (const ref of contentRefs) {
-
           const stream = pdfDoc.context.lookup(ref as PDFRef);
 
           if (stream instanceof PDFRawStream || stream instanceof PDFStream) {
-
             let text = Buffer.from((stream as any).contents).toString("latin1");
 
             const doRegex = /\/[A-Za-z0-9]+\s+Do/g;
 
             if (doRegex.test(text)) {
-
               text = text.replace(doRegex, "");
-
               (stream as any).contents = Buffer.from(text, "latin1");
-
             }
           }
         }
       }
-
     } catch (_) {}
   }
 
@@ -76,18 +73,13 @@ async function aggressivelyCleanPdf(pdfBuffer: Buffer): Promise<Buffer> {
 
 // ─── DOCX FIX ENGINE ───────────────────────────────
 function cleanDocxBuffer(buffer: Buffer): Buffer {
-
   try {
-
     const zip = new AdmZip(buffer);
     const entries = zip.getEntries();
     let changed = false;
 
     for (const entry of entries) {
-
-      // IMPORTANT FIX: only modify document.xml
-      if (entry.entryName !== "word/document.xml")
-        continue;
+      if (entry.entryName !== "word/document.xml") continue;
 
       let content = entry.getData().toString("utf-8");
       let localModified = false;
@@ -95,93 +87,73 @@ function cleanDocxBuffer(buffer: Buffer): Buffer {
       const vmlRegex =
         /(<(v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")([^>]*>)([\s\S]*?)(<\/\2>)/gi;
 
-      if (content.includes("v:shape")) {
+      let shapeIndex = 0;
 
-        let shapeIndex = 0;
+      content = content.replace(
+        vmlRegex,
+        (match, start, tag, style, quote, mid, inner, end) => {
+          shapeIndex++;
 
-        content = content.replace(
-          vmlRegex,
-          (match, start, tag, style, quote, mid, inner, end) => {
+          let newStyle = style;
 
-            if (style.includes("processed-fixed"))
-              return match;
+          if (shapeIndex === 1) {
+            newStyle +=
+              `;position:absolute;width:${WM_CENTER_SIZE};height:${WM_CENTER_SIZE};` +
+              `mso-position-horizontal:center;mso-position-horizontal-relative:page;` +
+              `mso-position-vertical:center;mso-position-vertical-relative:page;` +
+              `opacity:${WM_OPACITY};filter:alpha(opacity=${parseFloat(
+                WM_OPACITY
+              ) * 100});`;
 
-            shapeIndex++;
             localModified = true;
-
-            let newStart = start.replace(/id="[^"]*"/i, `id="wm_${shapeIndex}"`);
-
-            // CENTER WATERMARK
-            if (shapeIndex === 1) {
-
-              const centerStyle =
-                `position:absolute;width:${WM_CENTER_SIZE};height:${WM_CENTER_SIZE};z-index:-251658240;` +
-                `mso-position-horizontal:center;mso-position-horizontal-relative:page;` +
-                `mso-position-vertical:center;mso-position-vertical-relative:page;` +
-                `opacity:${WM_OPACITY};filter:alpha(opacity=${parseFloat(WM_OPACITY) * 100});processed-fixed:yes;`;
-
-              return `${newStart}${centerStyle}${quote}${mid}${inner}${end}`;
-            }
-
-            // BOTTOM RIGHT LOGO
-            if (shapeIndex === 2) {
-
-              const bottomStyle =
-                `position:absolute;width:${WM_BOTTOM_SIZE};height:${WM_BOTTOM_SIZE};z-index:251659264;` +
-                `mso-position-horizontal:right;mso-position-horizontal-relative:page;` +
-                `mso-position-vertical:bottom;mso-position-vertical-relative:page;` +
-                `opacity:1;processed-fixed:yes;`;
-
-              return `${newStart}${bottomStyle}${quote}${mid}${inner}${end}`;
-            }
-
-            return match;
           }
-        );
-      }
+
+          if (shapeIndex === 2) {
+            newStyle +=
+              `;position:absolute;width:${WM_BOTTOM_SIZE};height:${WM_BOTTOM_SIZE};` +
+              `mso-position-horizontal:right;mso-position-horizontal-relative:page;` +
+              `mso-position-vertical:bottom;mso-position-vertical-relative:page;` +
+              `opacity:1;`;
+
+            localModified = true;
+          }
+
+          return `${start}${newStyle}${quote}${mid}${inner}${end}`;
+        }
+      );
 
       if (localModified) {
-
         zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
         changed = true;
-
       }
     }
 
     return changed ? zip.toBuffer() : buffer;
-
   } catch (err: any) {
-
     console.error("DOCX Fix Error:", err.message);
     return buffer;
-
   }
 }
 
 // ─── MAIN SCRIPT ───────────────────────────────────
 async function reWatermarkArticles() {
-
-  console.log("🚀 [Re-Watermark v17] Fixed Double Logo Issue");
+  console.log("🚀 [Re-Watermark Stable Version]");
 
   const s3Client = isLocal ? null : new S3Client({ region: AWS_REGION });
 
   try {
-
     const articles = await prisma.article.findMany();
 
     for (let i = 0; i < articles.length; i++) {
-
       const article = articles[i];
 
-      console.log(`[${i + 1}/${articles.length}] Processing: ${article.title}`);
+      console.log(`[${i + 1}/${articles.length}] ${article.title}`);
 
       try {
-
-        // CLEAN PDF
+        // PDF CLEAN
         const pdfUrl = article.originalPdfUrl || article.currentPdfUrl;
 
         if (pdfUrl) {
-
           const pdfBuffer = await downloadFileToBuffer(pdfUrl);
           const cleanPdf = await aggressivelyCleanPdf(pdfBuffer);
 
@@ -190,7 +162,6 @@ async function reWatermarkArticles() {
             : null;
 
           if (s3Client && key) {
-
             await s3Client.send(
               new PutObjectCommand({
                 Bucket: S3_BUCKET_ARTICLES,
@@ -200,15 +171,14 @@ async function reWatermarkArticles() {
               })
             );
 
-            console.log("   ✅ PDF Cleaned");
+            console.log("✅ PDF Cleaned");
           }
         }
 
-        // CLEAN DOCX
+        // DOCX CLEAN
         const wordUrl = article.originalWordUrl || article.currentWordUrl;
 
         if (wordUrl) {
-
           const wordBuffer = await downloadFileToBuffer(wordUrl);
           const cleanWord = cleanDocxBuffer(wordBuffer);
 
@@ -217,7 +187,6 @@ async function reWatermarkArticles() {
             : null;
 
           if (s3Client && key) {
-
             await s3Client.send(
               new PutObjectCommand({
                 Bucket: S3_BUCKET_ARTICLES,
@@ -228,15 +197,13 @@ async function reWatermarkArticles() {
               })
             );
 
-            console.log("   ✅ DOCX Cleaned");
+            console.log("✅ DOCX Cleaned");
           }
         }
-
       } catch (err: any) {
-        console.error(`   ❌ Failed: ${err.message}`);
+        console.error("❌ Failed:", err.message);
       }
     }
-
   } catch (e) {
     console.error(e);
   } finally {
