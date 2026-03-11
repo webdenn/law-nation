@@ -109,9 +109,33 @@ export default function HomePage() {
         sort: "relevance",
     });
 
-    const handleSubmit = async (e) => {
+    const getSearchUrl = (searchQuery = "", currentFilters = {}) => {
+        const params = new URLSearchParams();
+        const trimmedQuery = searchQuery.trim();
+        if (trimmedQuery) params.append("q", trimmedQuery);
+        
+        if (currentFilters.keywords) params.append("keyword", currentFilters.keywords);
+        if (currentFilters.authors) params.append("author", currentFilters.authors);
+        if (currentFilters.citation && currentFilters.citation.trim() && currentFilters.citation !== " LN()A" && /\d/.test(currentFilters.citation)) {
+            const formatted = currentFilters.citation.replace(/_/g, "%");
+            params.append("citation", formatted);
+        }
+        if (currentFilters.category && currentFilters.category !== "all") {
+            params.append("category", currentFilters.category);
+        }
+        
+        return `/articles${params.toString() ? `?${params.toString()}` : ""}`;
+    };
+
+    const handleSubmit = (e) => {
         e.preventDefault();
-        await fetchArticles(query, filters);
+        router.push(getSearchUrl(query, filters));
+    };
+
+    const handleAdvancedSearch = (searchType, value) => {
+        const newFilters = { ...filters, keywords: "", authors: "", citation: " LN()A" };
+        newFilters[searchType] = value;
+        router.push(getSearchUrl("", newFilters));
     };
 
     const updateFilter = (name, value) => {
@@ -239,7 +263,7 @@ export default function HomePage() {
                                                 <button
                                                     type="button"
                                                     disabled={isSearching || !filters.keywords.trim()}
-                                                    onClick={() => fetchArticles("", { ...filters, authors: "", citation: " LN()A" })}
+                                                    onClick={() => handleAdvancedSearch("keywords", filters.keywords)}
                                                     className="shrink-0 w-12 h-[42px] bg-red-700 text-white flex items-center justify-center hover:bg-black transition-all disabled:bg-gray-200 disabled:text-gray-400 border-l border-neutral-100"
                                                 >
                                                     <SearchIconSmall />
@@ -265,7 +289,7 @@ export default function HomePage() {
                                                 <button
                                                     type="button"
                                                     disabled={isSearching || !filters.authors.trim()}
-                                                    onClick={() => fetchArticles("", { ...filters, keywords: "", citation: " LN()A" })}
+                                                    onClick={() => handleAdvancedSearch("authors", filters.authors)}
                                                     className="shrink-0 w-12 h-[42px] bg-red-700 text-white flex items-center justify-center hover:bg-black transition-all disabled:bg-gray-200 disabled:text-gray-400 border-l border-neutral-100"
                                                 >
                                                     <SearchIconSmall />
@@ -318,7 +342,7 @@ export default function HomePage() {
                                                 <button
                                                     type="button"
                                                     disabled={isSearching || !filters.citation.trim() || filters.citation === " LN()A"}
-                                                    onClick={() => fetchArticles("", { ...filters, keywords: "", authors: "" })}
+                                                    onClick={() => handleAdvancedSearch("citation", filters.citation)}
                                                     className="shrink-0 w-12 h-full bg-red-700 text-white flex items-center justify-center hover:bg-black transition-all disabled:bg-gray-200 disabled:text-gray-400 border-l border-neutral-100"
                                                 >
                                                     <SearchIconSmall />

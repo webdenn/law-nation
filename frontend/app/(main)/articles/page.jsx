@@ -54,22 +54,28 @@ function ArticlesContent() {
 
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
   const [citationTerm, setCitationTerm] = useState(searchParams.get("citation") || " LN()A");
+  const [keywordTerm, setKeywordTerm] = useState(searchParams.get("keyword") || "");
+  const [authorTerm, setAuthorTerm] = useState(searchParams.get("author") || "");
 
   // --- Effect: Handle Fetching based on URL ---
   useEffect(() => {
     const query = searchParams.get("q") || "";
     const citation = searchParams.get("citation") || " LN()A";
+    const keyword = searchParams.get("keyword") || "";
+    const author = searchParams.get("author") || "";
     const page = parseInt(searchParams.get("page")) || 1;
     
     setSearchTerm(query);
     setCitationTerm(citation);
+    setKeywordTerm(keyword);
+    setAuthorTerm(author);
     setCurrentPage(page);
     
-    fetchArticles(query, citation, page);
+    fetchArticles({ query, citation, keyword, author, page });
   }, [searchParams]);
 
   // --- Fetch Function ---
-  const fetchArticles = async (query = "", citation = "", page = 1) => {
+  const fetchArticles = async ({ query = "", citation = "", keyword = "", author = "", page = 1 }) => {
     setLoading(true);
     try {
       let url;
@@ -79,8 +85,12 @@ function ArticlesContent() {
       params.append("page", page);
       params.append("limit", itemsPerPage);
 
-      if (query.trim() || (citation.trim() && citation !== " LN()A" && hasNumbers)) {
+      const hasSearch = query.trim() || (citation.trim() && citation !== " LN()A" && hasNumbers) || keyword.trim() || author.trim();
+
+      if (hasSearch) {
         if (query.trim()) params.append("q", query.trim());
+        if (keyword.trim()) params.append("keyword", keyword.trim());
+        if (author.trim()) params.append("author", author.trim());
         if (citation.trim() && citation !== " LN()A" && hasNumbers) {
           const formatted = citation.replace(/_/g, "%");
           params.append("citation", formatted);
