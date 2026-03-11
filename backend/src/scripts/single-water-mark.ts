@@ -9,31 +9,28 @@ import { downloadFileToBuffer } from "../utils/pdf-extract.utils.js";
 
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-/* ESM dirname fix */
+/* ───────────────── ESM dirname fix ───────────────── */
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* CONFIG */
+/* ───────────────── CONFIG ───────────────── */
 
 const WATERMARK_PATH = path.resolve(
   __dirname,
   "../../src/assests/img/logo-bg.png"
 );
 
+const WIDTH = "400pt";
+const HEIGHT = "400pt";
+const OPACITY = "0.10";
+
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
 const S3_BUCKET = process.env.AWS_S3_BUCKET_ARTICLES || "law-nation";
 
 const s3 = new S3Client({ region: AWS_REGION });
 
-/* WATERMARK XML
-   FIXES:
-   - NO rotation (horizontal watermark as requested)
-   - width:250pt height:100pt — wide landscape ratio, not square
-   - o:opacity="0.08f" — very faint, barely visible
-   - blacklevel="46000f" — heavily lightened image tone
-   - Centered on page
-*/
+/* ───────────────── WATERMARK XML ───────────────── */
 
 function watermarkXML() {
   return `
@@ -46,19 +43,23 @@ function watermarkXML() {
       <v:shape id="law-nation-watermark"
         type="#_x0000_t75"
         style="position:absolute;
-               width:250pt;
-               height:100pt;
+               width:${WIDTH};
+               height:${HEIGHT};
                mso-position-horizontal:center;
                mso-position-horizontal-relative:page;
                mso-position-vertical:center;
                mso-position-vertical-relative:page;
+               opacity:${OPACITY};
                z-index:-251658752"
-        fillcolor="none"
+        filled="t"
         stroked="f">
-        <v:imagedata r:id="rIdWatermark"
-                     o:title="watermark"
-                     o:opacity="0.08f"
-                     blacklevel="46000f"/>
+
+        <v:imagedata
+          r:id="rIdWatermark"
+          o:title="watermark"
+          gain="0.8"
+          blacklevel="0.90"/>
+
       </v:shape>
     </w:pict>
   </w:r>
@@ -66,7 +67,7 @@ function watermarkXML() {
 `;
 }
 
-/* APPLY WATERMARK */
+/* ───────────────── APPLY WATERMARK ───────────────── */
 
 function applyWatermark(buffer) {
 
@@ -83,7 +84,7 @@ function applyWatermark(buffer) {
 
   zip.addFile("word/media/logo-bg.png", img);
 
-  console.log("✅ Image inserted");
+  console.log("✅ Watermark image inserted");
 
   /* HEADER */
 
@@ -100,9 +101,10 @@ function applyWatermark(buffer) {
        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
        xmlns:v="urn:schemas-microsoft-com:vml"
        xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-       xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
        mc:Ignorable="w14">
+
 ${watermarkXML()}
+
 </w:hdr>`;
 
     zip.addFile("word/header1.xml", Buffer.from(header));
@@ -112,14 +114,6 @@ ${watermarkXML()}
     console.log("📄 Header detected");
 
     let xml = headerEntry.getData().toString();
-
-    /* Ensure VML + office namespaces exist */
-    if (!xml.includes('xmlns:v=')) {
-      xml = xml.replace(
-        '<w:hdr ',
-        '<w:hdr xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
-      );
-    }
 
     if (!xml.includes("law-nation-watermark")) {
 
@@ -131,27 +125,28 @@ ${watermarkXML()}
 
     } else {
 
-      console.log("⚠ Watermark already present — updating");
+      console.log("⚠ Watermark already exists — updating");
 
-      /* Replace entire old shape with corrected one */
       xml = xml.replace(
         /<v:shape id="law-nation-watermark"[\s\S]*?<\/v:shape>/,
         `<v:shape id="law-nation-watermark"
         type="#_x0000_t75"
         style="position:absolute;
-               width:250pt;
-               height:100pt;
+               width:${WIDTH};
+               height:${HEIGHT};
                mso-position-horizontal:center;
                mso-position-horizontal-relative:page;
                mso-position-vertical:center;
                mso-position-vertical-relative:page;
+               opacity:${OPACITY};
                z-index:-251658752"
-        fillcolor="none"
+        filled="t"
         stroked="f">
-        <v:imagedata r:id="rIdWatermark"
-                     o:title="watermark"
-                     o:opacity="0.08f"
-                     blacklevel="46000f"/>
+        <v:imagedata
+          r:id="rIdWatermark"
+          o:title="watermark"
+          gain="0.8"
+          blacklevel="0.90"/>
       </v:shape>`
       );
 
@@ -175,7 +170,7 @@ ${watermarkXML()}
 
   zip.addFile("word/_rels/header1.xml.rels", Buffer.from(headerRel));
 
-  console.log("🔗 Header image relationship added");
+  console.log("🔗 Header relationship added");
 
   /* LINK HEADER TO DOCUMENT */
 
@@ -197,7 +192,7 @@ ${watermarkXML()}
 
   }
 
-  /* ADD HEADER RELATIONSHIP TO DOCUMENT */
+  /* DOCUMENT RELATIONSHIP */
 
   const relEntry = zip.getEntry("word/_rels/document.xml.rels");
 
@@ -223,7 +218,7 @@ ${watermarkXML()}
   return zip.toBuffer();
 }
 
-/* MAIN */
+/* ───────────────── MAIN SCRIPT ───────────────── */
 
 async function main() {
 
