@@ -568,7 +568,7 @@ export class AdobeService {
 
   async addWatermarkToPdf(pdfPath: string, outputPath: string, watermarkData: any): Promise<string> {
     try {
-      const { PDFDocument, rgb, StandardFonts, degrees } = await import('pdf-lib');
+      const { PDFDocument } = await import('pdf-lib');
       const { downloadFileToBuffer } = await import('@/utils/pdf-extract.utils.js');
       
       let pdfBuffer: Buffer;
@@ -616,56 +616,39 @@ export class AdobeService {
         console.warn('⚠️ [Adobe Service] Failed to load logo for watermark:', logoError);
       }
 
-      const watermarkText = `Downloaded from LAW NATION ADMIN on ${new Date().toLocaleDateString('en-GB')}`;
-
       for (const page of pages) {
-        const { width, height } = page.getSize();
+        const mediaBox = page.getMediaBox();
+        const { width: pageW, height: pageH } = mediaBox;
+        const pageX = mediaBox.x;
+        const pageY = mediaBox.y;
         
         // 1. Add Center Logo
+        if (logoImage) {
           const logoScale = 0.25; 
           const logoDims = logoImage.scale(logoScale);
-          const mediaBox = page.getMediaBox();
           
           page.drawImage(logoImage, {
-            x: mediaBox.x + (mediaBox.width / 2) - (logoDims.width / 2),
-            y: mediaBox.y + (mediaBox.height / 2) - (logoDims.height / 2),
+            x: pageX + (pageW / 2) - (logoDims.width / 2),
+            y: pageY + (pageH / 2) - (logoDims.height / 2),
             width: logoDims.width,
             height: logoDims.height,
-            opacity: 0.12, // Reduced for large size (Bulletproof)
+            opacity: 0.12,
           });
+        }
 
         // 2. Add Bottom-Right Logo
         if (logoImage) {
           const bottomLogoScale = 0.08; 
           const bottomLogoDims = logoImage.scale(bottomLogoScale);
-          const mediaBox = page.getMediaBox();
           
           page.drawImage(logoImage, {
-            x: mediaBox.x + mediaBox.width - bottomLogoDims.width - 20,
-            y: mediaBox.y + 20,
+            x: pageX + pageW - bottomLogoDims.width - 20,
+            y: pageY + 20,
             width: bottomLogoDims.width,
             height: bottomLogoDims.height,
-            opacity: 0.35, // Consistent premium transparency
+            opacity: 0.35,
           });
         }
-
-        // 3. Add Top-Right Text
-        page.drawText('LAW NATION ADMIN', {
-          x: width - 150,
-          y: height - 30,
-          size: 10,
-          color: rgb(0.7, 0, 0),
-          opacity: 0.5,
-        });
-
-        // 4. Add Bottom-Left Text
-        page.drawText(watermarkText, {
-          x: 50,
-          y: 30,
-          size: 8,
-          color: rgb(0.5, 0.5, 0.5),
-          opacity: 0.7,
-        });
       }
       
       const saved = await pdfDoc.save();
