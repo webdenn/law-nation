@@ -26,32 +26,43 @@ const S3_BUCKET = process.env.AWS_S3_BUCKET_ARTICLES || "law-nation";
 
 const s3 = new S3Client({ region: AWS_REGION });
 
-/* WATERMARK XML */
+/* WATERMARK XML
+   KEY FIXES vs old version:
+   - Removed CSS "opacity" from style (Word ignores it)
+   - Using o:opacity="0.1f" on <v:imagedata> — this is the CORRECT way
+   - blacklevel="22938f" lightens the image tone significantly
+   - width/height reduced to 300pt (from 420pt) to match Image 2 look
+   - Added proper XML declaration and all required VML namespaces in header
+*/
 
 function watermarkXML() {
   return `
 <w:p>
-<w:r>
-<w:pict>
-<v:shape id="law-nation-watermark"
-type="#_x0000_t75"
-style="
-position:absolute;
-width:420pt;
-height:420pt;
-mso-position-horizontal:center;
-mso-position-horizontal-relative:page;
-mso-position-vertical:center;
-mso-position-vertical-relative:page;
-rotation:315;
-opacity:0.15;
-z-index:-251658752">
-
-<v:imagedata r:id="rIdWatermark"/>
-
-</v:shape>
-</w:pict>
-</w:r>
+  <w:pPr>
+    <w:jc w:val="center"/>
+  </w:pPr>
+  <w:r>
+    <w:pict>
+      <v:shape id="law-nation-watermark"
+        type="#_x0000_t75"
+        style="position:absolute;
+               width:300pt;
+               height:300pt;
+               mso-position-horizontal:center;
+               mso-position-horizontal-relative:page;
+               mso-position-vertical:center;
+               mso-position-vertical-relative:page;
+               rotation:315;
+               z-index:-251658752"
+        fillcolor="none"
+        stroked="f">
+        <v:imagedata r:id="rIdWatermark"
+                     o:title="watermark"
+                     o:opacity="0.1f"
+                     blacklevel="22938f"/>
+      </v:shape>
+    </w:pict>
+  </w:r>
 </w:p>
 `;
 }
@@ -83,15 +94,17 @@ function applyWatermark(buffer) {
 
     console.log("⚠ No header found → creating header1.xml");
 
-    const header = `
-<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-xmlns:v="urn:schemas-microsoft-com:vml"
-xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-
+    const header = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+       xmlns:o="urn:schemas-microsoft-com:office:office"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+       xmlns:v="urn:schemas-microsoft-com:vml"
+       xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+       xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+       mc:Ignorable="w14">
 ${watermarkXML()}
-
-</w:hdr>
-`;
+</w:hdr>`;
 
     zip.addFile("word/header1.xml", Buffer.from(header));
 
@@ -100,6 +113,14 @@ ${watermarkXML()}
     console.log("📄 Header detected");
 
     let xml = headerEntry.getData().toString();
+
+    /* Ensure VML + office namespaces exist */
+    if (!xml.includes('xmlns:v=')) {
+      xml = xml.replace(
+        '<w:hdr ',
+        '<w:hdr xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
+      );
+    }
 
     if (!xml.includes("law-nation-watermark")) {
 
@@ -111,7 +132,34 @@ ${watermarkXML()}
 
     } else {
 
-      console.log("⚠ Watermark already present");
+      console.log("⚠ Watermark already present — updating opacity/size");
+
+      /* Replace the entire old shape with updated one */
+      xml = xml.replace(
+        /<v:shape id="law-nation-watermark"[\s\S]*?<\/v:shape>/,
+        `<v:shape id="law-nation-watermark"
+        type="#_x0000_t75"
+        style="position:absolute;
+               width:300pt;
+               height:300pt;
+               mso-position-horizontal:center;
+               mso-position-horizontal-relative:page;
+               mso-position-vertical:center;
+               mso-position-vertical-relative:page;
+               rotation:315;
+               z-index:-251658752"
+        fillcolor="none"
+        stroked="f">
+        <v:imagedata r:id="rIdWatermark"
+                     o:title="watermark"
+                     o:opacity="0.1f"
+                     blacklevel="22938f"/>
+      </v:shape>`
+      );
+
+      zip.updateFile("word/header1.xml", Buffer.from(xml));
+
+      console.log("✅ Watermark updated");
 
     }
 
@@ -119,19 +167,15 @@ ${watermarkXML()}
 
   /* HEADER IMAGE RELATIONSHIP */
 
-  const headerRel = `
+  const headerRel = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship
-Id="rIdWatermark"
-Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
-Target="media/logo-bg.png"/>
-</Relationships>
-`;
+  <Relationship
+    Id="rIdWatermark"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+    Target="media/logo-bg.png"/>
+</Relationships>`;
 
-  zip.addFile(
-    "word/_rels/header1.xml.rels",
-    Buffer.from(headerRel)
-  );
+  zip.addFile("word/_rels/header1.xml.rels", Buffer.from(headerRel));
 
   console.log("🔗 Header image relationship added");
 
@@ -147,8 +191,7 @@ Target="media/logo-bg.png"/>
 
     doc = doc.replace(
       "</w:sectPr>",
-      `
-<w:headerReference w:type="default" r:id="rIdHeader1"/>
+      `<w:headerReference w:type="default" r:id="rIdHeader1"/>
 </w:sectPr>`
     );
 
@@ -156,7 +199,7 @@ Target="media/logo-bg.png"/>
 
   }
 
-  /* ADD HEADER RELATIONSHIP */
+  /* ADD HEADER RELATIONSHIP TO DOCUMENT */
 
   const relEntry = zip.getEntry("word/_rels/document.xml.rels");
 
@@ -168,18 +211,14 @@ Target="media/logo-bg.png"/>
 
     relXML = relXML.replace(
       "</Relationships>",
-      `
-<Relationship
-Id="rIdHeader1"
-Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header"
-Target="header1.xml"/>
+      `  <Relationship
+    Id="rIdHeader1"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header"
+    Target="header1.xml"/>
 </Relationships>`
     );
 
-    zip.updateFile(
-      "word/_rels/document.xml.rels",
-      Buffer.from(relXML)
-    );
+    zip.updateFile("word/_rels/document.xml.rels", Buffer.from(relXML));
 
   }
 
