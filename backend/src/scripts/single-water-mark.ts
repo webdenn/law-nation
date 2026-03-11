@@ -23,7 +23,7 @@ const WATERMARK_PATH = path.resolve(
 
 const WIDTH = "350pt";
 const HEIGHT = "170pt";
-const OPACITY = "0.03";
+const OPACITY = "0.05";
 
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
 const S3_BUCKET = process.env.AWS_S3_BUCKET_ARTICLES || "law-nation";
@@ -57,7 +57,7 @@ function watermarkXML() {
         <v:imagedata
           r:id="rIdWatermark"
           o:title="watermark"
-          gain="0.8"
+          gain="0.6"
           blacklevel="0.90"/>
 
       </v:shape>
