@@ -374,83 +374,48 @@ export class ArticleDownloadService {
       throw new NotFoundError(`${versionType} version not available for this article`);
     }
 
-    console.log(`💧 [Admin Download] Adding watermark to ${versionType} version: ${version.url}`);
+    // Serve the file as-is — watermark is already embedded from the upload/conversion stage.
+    // Do NOT add another watermark here; doing so stamps a second one on top.
+    console.log(`📄 [Admin Preview] Serving ${versionType} version without re-watermarking: ${version.url}`);
 
     try {
-      // Generate temporary output path for watermarked file
-      const timestamp = Date.now();
-      const tempDir = path.join(process.cwd(), 'uploads', 'temp');
-      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-      
-      const tempOutputPath = path.join(tempDir, `admin-${versionType}-${timestamp}.pdf`);
-
-      let sourceUrl = version.url;
-      const isDocx = sourceUrl.toLowerCase().includes('.docx') || sourceUrl.toLowerCase().includes('.doc');
+      const sourceUrl = version.url;
+      const isDocx = sourceUrl.toLowerCase().split('?')[0].endsWith('.docx') ||
+                     sourceUrl.toLowerCase().split('?')[0].endsWith('.doc');
 
       let finalBuffer: Buffer;
-      
+
       if (isDocx) {
-        console.log(`🔄 [Admin Download] DOCX detected. Converting to intermediate PDF to preserve formatting.`);
-        // 1. Convert original DOCX (high quality) to temporary clean PDF
-        const cleanPdfPath = path.join(tempDir, `clean-${versionType}-${timestamp}.pdf`);
+        // DOCX → convert to PDF for in-browser viewing, no watermark added
+        console.log(`🔄 [Admin Preview] Converting DOCX to PDF for preview (no watermark added)`);
+        const timestamp = Date.now();
+        const tempDir = path.join(process.cwd(), 'uploads', 'temp');
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        const cleanPdfPath = path.join(tempDir, `admin-preview-${versionType}-${timestamp}.pdf`);
+
         await adobeService.convertDocxToPdf(sourceUrl, cleanPdfPath);
-        
-        // 2. Now watermark this high-quality PDF
-        console.log(`💧 [Admin Download] Watermarking the high-quality PDF.`);
-        const watermarkedPath = await adobeService.addWatermarkToPdf(
-          cleanPdfPath,
-          tempOutputPath,
-          {
-            ...watermarkData,
-            userName: `ADMIN - ${watermarkData.userName}`,
-            versionType: versionType.toUpperCase()
-          }
-        );
-        
-        finalBuffer = await fs.promises.readFile(watermarkedPath);
-        
-        // Cleanup temp files
+        finalBuffer = await fs.promises.readFile(cleanPdfPath);
         await fs.promises.unlink(cleanPdfPath).catch(() => { });
-        await fs.promises.unlink(watermarkedPath).catch(() => { });
       } else {
-        // Already a PDF, watermark directly
-        const watermarkedPath = await adobeService.addWatermarkToPdf(
-          sourceUrl,
-          tempOutputPath,
-          {
-            ...watermarkData,
-            articleId: articleId,
-            userName: `ADMIN - ${watermarkData.userName}`,
-            versionType: versionType.toUpperCase()
-          }
-        );
-        finalBuffer = await fs.promises.readFile(watermarkedPath);
-        await fs.promises.unlink(watermarkedPath).catch(() => { });
+        // Already a PDF — read and serve directly
+        const { downloadFileToBuffer } = await import('@/utils/pdf-extract.utils.js');
+        if (sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://')) {
+          finalBuffer = await downloadFileToBuffer(sourceUrl);
+        } else {
+          const { resolveToAbsolutePath } = await import('@/utils/file-path.utils.js');
+          finalBuffer = await fs.promises.readFile(resolveToAbsolutePath(sourceUrl));
+        }
       }
 
-      console.log(`✅ [Admin Download] Watermark added and converted to PDF successfully`);
+      console.log(`✅ [Admin Preview] Serving ${versionType} version (${finalBuffer.length} bytes)`);
       return {
         buffer: finalBuffer,
         filename: `${versionsInfo.articleTitle}-${versionType}-version.pdf`,
         mimeType: 'application/pdf'
       };
     } catch (error) {
-      console.error(`❌ [Admin Download] Failed to add watermark to ${versionType} version:`, error);
-
-      // Fallback to old watermarking method (Word only, formatting might be lost but at least file is served)
-      console.log(`🔄 [Fallback] Using local watermarking for ${versionType} version`);
-      const { addSimpleWatermarkToWord } = await import("@/utils/word-watermark.utils.js");
-      const watermarkedBuffer = await addSimpleWatermarkToWord(version.url, {
-        ...watermarkData,
-        userName: `ADMIN - ${watermarkData.userName}`,
-        versionType: versionType.toUpperCase()
-      });
-
-      return {
-        buffer: watermarkedBuffer,
-        filename: `${versionsInfo.articleTitle}-${versionType}-version.docx`,
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      };
+      console.error(`❌ [Admin Preview] Failed to serve ${versionType} version:`, error);
+      throw error;
     }
   }
 
