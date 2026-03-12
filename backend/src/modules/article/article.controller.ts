@@ -539,47 +539,28 @@ export class ArticleController {
       );
 
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
-      const isNormalUser = !userRoles.some((r: string) =>
-        ['admin', 'ADMIN', 'editor', 'EDITOR', 'reviewer', 'REVIEWER'].includes(r)
-      );
-
       console.log(`👤 [Download PDF] User roles   : ${JSON.stringify(userRoles)}`);
-      console.log(`👤 [Download PDF] isNormalUser : ${isNormalUser}`);
       console.log(`📂 [Download PDF] currentPdfUrl: ${article.currentPdfUrl}`);
       console.log(`📊 [Download PDF] article.status: ${article.status}`);
       console.log(`🔖 [Download PDF] citationNumber: ${article.citationNumber || '(none)'}`);
       console.log(`🔗 [Download PDF] slug          : ${article.slug || '(none)'}`);
       console.log(`🌐 [Download PDF] FRONTEND_URL  : ${process.env.FRONTEND_URL || '(not set)'}`);
 
-      let pdfBuffer: Buffer;
       const pdfUrl = article.currentPdfUrl;
 
-      if (isNormalUser) {
-        // Normal user download: append copyright notice + clickable link only.
-        // The stored PDF already contains the logo watermark — we never re-add it.
-        console.log(`💧 [Download PDF] Normal user download — appending copyright + link only`);
-        pdfBuffer = await addCopyrightAndLinkToPdf(
-          pdfUrl,
-          {
-            articleId: articleId,
-            articleSlug: article.slug,
-            frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
-            citationNumber: article.citationNumber,
-          },
-          article.status
-        );
-      } else {
-        // Admin / Editor / Reviewer: serve stored PDF as-is (watermark already embedded).
-        console.log(`📄 [Download PDF] Staff download — serving stored PDF as-is`);
-        if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
-          const { downloadFileToBuffer } = await import('@/utils/pdf-extract.utils.js');
-          pdfBuffer = await downloadFileToBuffer(pdfUrl);
-        } else {
-          const { resolveToAbsolutePath } = await import('@/utils/file-path.utils.js');
-          const fsPromises = await import('fs/promises');
-          pdfBuffer = await fsPromises.readFile(resolveToAbsolutePath(pdfUrl));
-        }
-      }
+      // Always append copyright notice + clickable link for every download via this endpoint.
+      // No logo is added — the stored PDF already carries it from the upload stage.
+      console.log(`💧 [Download PDF] Appending copyright + link for user "${userName}"`);
+      const pdfBuffer = await addCopyrightAndLinkToPdf(
+        pdfUrl,
+        {
+          articleId: articleId,
+          articleSlug: article.slug,
+          frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+          citationNumber: article.citationNumber,
+        },
+        article.status
+      );
 
       const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
 
