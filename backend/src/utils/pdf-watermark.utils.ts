@@ -60,19 +60,17 @@ export async function addWatermarkToPdf(
 
     // 2. Load PDF document
     console.log('📖 [Watermark] Loading PDF document...');
-    // const pdfDoc = await PDFDocument.load(pdfBytes);
     const pdfDoc = await PDFDocument.load(pdfBytes, {
       ignoreEncryption: true,        // Bypasses "Owner Restrictions" in legal PDFs
       throwOnInvalidObject: false    // Prevents crashing on minor structural errors
     });
     const pages = pdfDoc.getPages();
 
-    console.log(`� [Watermark] PDF has ${pages.length} pages`);
+    console.log(`📄 [Watermark] PDF has ${pages.length} pages`);
 
-    // 3. Load logo image
+    // 3. Load logo image — bulletproof path discovery
     let logoImage: Awaited<ReturnType<typeof pdfDoc.embedPng>> | undefined;
     try {
-      // --- BULLETPROOF LOGO PATH DISCOVERY ---
       const possibleSubPaths = [
         ['public', 'assets', 'img', 'watermark.png'],
         ['backend', 'public', 'assets', 'img', 'watermark.png'],
@@ -82,7 +80,7 @@ export async function addWatermarkToPdf(
         ['backend', 'src', 'assets', 'img', 'logo-bg.png'],
       ];
 
-      let logoPath = "";
+      let logoPath = '';
       for (const subPath of possibleSubPaths) {
         const fullPath = path.join(process.cwd(), ...subPath);
         if (fs.existsSync(fullPath)) {
@@ -95,21 +93,24 @@ export async function addWatermarkToPdf(
         console.log(`✅ [PDF Watermark] Logo found at: ${logoPath}`);
         const logoBuffer = fs.readFileSync(logoPath);
         logoImage = await pdfDoc.embedPng(logoBuffer);
+        console.log('✅ [Watermark] Logo loaded successfully');
       } else {
-        console.warn(`⚠️ [PDF Watermark] Logo NOT found in checked paths (Checked: ${possibleSubPaths.map(p => p.join('/')).join(', ')}). Skipping logo watermarks.`);
+        console.warn(
+          `⚠️ [PDF Watermark] Logo NOT found in checked paths ` +
+          `(Checked: ${possibleSubPaths.map(p => p.join('/')).join(', ')}). Skipping logo watermarks.`
+        );
       }
     } catch (error) {
       console.warn('⚠️ [Watermark] Failed to load logo, skipping logo watermark:', error);
     }
 
-    // 4. Prepare watermark text based on user role
+    // 4. Prepare watermark variables based on user role and article status
     const dateStr = options.downloadDate.toLocaleDateString('en-GB', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
     });
 
-    // Determine role text for logging (no longer drawn)
     const roleMap: Record<string, string> = {
       'EDITOR': 'LAW NATION EDITOR',
       'REVIEWER': 'LAW NATION REVIEWER',
@@ -117,10 +118,27 @@ export async function addWatermarkToPdf(
       'USER': 'LAW NATION'
     };
     const roleText = roleMap[userRole] || 'LAW NATION';
-    const includeUrl = false; // Effectively disabled as per user request
-    const watermarkText = ""; // Removed as per user request
 
-    console.log('[Watermark] Watermarking for role:', roleText);
+    let includeUrl = false;
+    let articleUrl = '';
+    let linkText = '';
+    let noteText = '';
+
+    if (userRole === 'USER' && articleStatus === 'PUBLISHED') {
+      // End user downloading published article — include URL
+      includeUrl = true;
+      articleUrl = options.articleSlug
+        ? `${options.frontendUrl}/article/${options.articleSlug}`
+        : `${options.frontendUrl}/articles/${options.articleId}`;
+      linkText = `Download From: ${articleUrl}`;
+      noteText = `(Login required for full article)`;
+
+      console.log('[Watermark] User download - URL included');
+      console.log('[Watermark] Article URL:', articleUrl);
+    } else {
+      console.log('[Watermark] Editorial/unpublished - No URL included');
+      console.log('[Watermark] Role text:', roleText);
+    }
 
     // 5. Add watermark to each page
     console.log('✍️ [Watermark] Adding watermark to all pages...');
@@ -131,7 +149,7 @@ export async function addWatermarkToPdf(
       const pageX = mediaBox.x;
       const pageY = mediaBox.y;
 
-      // ✅ Add citation number at top center of page for USER role only (in red color)
+      // ── Citation number at top center (USER role only, red) ──────────────
       if (citationNumber && userRole === 'USER') {
         const citationFontSize = 12;
         const estimatedTextWidth = citationNumber.length * (citationFontSize * 0.6);
@@ -139,16 +157,18 @@ export async function addWatermarkToPdf(
 
         page.drawText(citationNumber, {
           x: citationX,
-          y: pageY + pageH - 55, 
+          y: pageY + pageH - 55,
           size: citationFontSize,
           color: rgb(0.8, 0, 0),
           opacity: 1,
         });
+
+        console.log(`📋 [Watermark] Added citation "${citationNumber}" to page ${index + 1}`);
       }
 
-      // 1. Add Center Logo
+      // ── Center logo (all roles) ───────────────────────────────────────────
       if (logoImage) {
-        const logoScale = 0.25; 
+        const logoScale = 0.25;
         const logoDims = logoImage.scale(logoScale);
 
         page.drawImage(logoImage, {
@@ -160,9 +180,9 @@ export async function addWatermarkToPdf(
         });
       }
 
-      // 2. Add Bottom-Right Logo
+      // ── Bottom-right logo (all roles) ────────────────────────────────────
       if (logoImage) {
-        const bottomLogoScale = 0.08; 
+        const bottomLogoScale = 0.08;
         const bottomLogoDims = logoImage.scale(bottomLogoScale);
 
         page.drawImage(logoImage, {
@@ -170,11 +190,91 @@ export async function addWatermarkToPdf(
           y: pageY + 20,
           width: bottomLogoDims.width,
           height: bottomLogoDims.height,
-          opacity: 0.35, 
+          opacity: 0.35,
         });
       }
 
-      // Copyright and links removed as per user request
+      // ── Copyright notice at bottom center (USER role only) ───────────────
+      if (userRole === 'USER') {
+        const copyrightText = '© Law Nation Prime Times Journal. All rights reserved.';
+        const copyrightFontSize = 8;
+
+        const textWidth = copyrightText.length * (copyrightFontSize * 0.5);
+        const copyrightX = pageX + (pageW - textWidth) / 2;
+
+        page.drawText(copyrightText, {
+          x: copyrightX,
+          y: pageY + 10,
+          size: copyrightFontSize,
+          color: rgb(0.4, 0.4, 0.4),
+          opacity: 0.8,
+        });
+
+        if (index === 0) {
+          console.log(`© [Watermark] Added copyright notice to all pages`);
+        }
+      }
+
+      // ── Clickable download link (USER + PUBLISHED only) ──────────────────
+      if (includeUrl) {
+        console.log(`[Watermark] Adding clickable link to page ${index + 1}`);
+
+        // Blue link text
+        page.drawText(linkText, {
+          x: pageX + 50,
+          y: pageY + 30,
+          size: 9,
+          color: rgb(0, 0, 0.8),
+        });
+
+        // Gray note text
+        page.drawText(noteText, {
+          x: pageX + 50,
+          y: pageY + 15,
+          size: 7,
+          color: rgb(0.5, 0.5, 0.5),
+        });
+
+        // Clickable link annotation
+        const linkWidth = linkText.length * 5.5;
+        const linkAnnotation = pdfDoc.context.obj({
+          Type: 'Annot',
+          Subtype: 'Link',
+          Rect: [
+            pageX + 50,
+            pageY + 28,
+            Math.min(pageX + 50 + linkWidth, pageX + pageW - 50),
+            pageY + 42,
+          ],
+          Border: [0, 0, 0],
+          C: [0, 0, 1],
+          A: {
+            S: 'URI',
+            URI: PDFString.of(articleUrl),
+          },
+        });
+
+        const linkAnnotationRef = pdfDoc.context.register(linkAnnotation);
+
+        // Preserve existing annotations
+        const existingAnnots = page.node.get(PDFName.of('Annots'));
+        let annotsArray: any[];
+
+        if (existingAnnots && existingAnnots instanceof Array) {
+          annotsArray = [...existingAnnots, linkAnnotationRef];
+          console.log(`📎 [Watermark] Preserved ${existingAnnots.length} existing annotations on page ${index + 1}`);
+        } else if (existingAnnots) {
+          annotsArray = [existingAnnots, linkAnnotationRef];
+          console.log(`📎 [Watermark] Preserved 1 existing annotation on page ${index + 1}`);
+        } else {
+          annotsArray = [linkAnnotationRef];
+        }
+
+        page.node.set(PDFName.of('Annots'), pdfDoc.context.obj(annotsArray));
+        console.log(`✅ [Watermark] Clickable link added to page ${index + 1}`);
+      } else {
+        console.log(`❌ [Watermark] No clickable link added to page ${index + 1} (editorial user or unpublished article)`);
+      }
     });
 
     console.log(`✅ [Watermark] Watermark added to ${pages.length} pages`);
@@ -182,7 +282,7 @@ export async function addWatermarkToPdf(
       console.log(`✅ [Watermark] Logo watermark added to center of all pages`);
     }
     if (includeUrl) {
-      console.log(`✅ [Watermark] Clickable link added to first page`);
+      console.log(`✅ [Watermark] Clickable link added to all pages`);
     }
 
     // 6. Save watermarked PDF
