@@ -538,39 +538,32 @@ export class ArticleController {
         }
       );
 
-      // Determine user role for watermarking
-      const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
-      const watermarkRole = userRoles.includes('reviewer') ? 'REVIEWER' :
-        userRoles.includes('editor') ? 'EDITOR' : 'USER';
+      // Serve the stored PDF as-is — the watermark is already embedded from the initial
+      // upload stage (addUploadWatermark) or from the DOCX→PDF conversion.
+      // Do NOT add another watermark here; doing so would create double watermarks.
+      console.log(`📄 [Download PDF] Serving stored PDF (watermark already embedded)`);
 
-      // Add watermark to PDF with role-based URL inclusion and TEXT
-      console.log(`💧 [Download PDF] Adding watermark for ${watermarkRole} role`);
-      const watermarkedPdf = await addWatermarkToPdf(
-        article.currentPdfUrl,
-        {
-          userName,
-          downloadDate: new Date(),
-          articleTitle: article.title,
-          articleId: articleId,
-          articleSlug: article.slug,
-          frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
-        },
-        watermarkRole,    // Pass dynamic role so "LAW NATION REVIEWER" text appears
-        article.status,   // Article status - URL only for PUBLISHED
-        article.citationNumber // ✅ Pass citation number for USER PDFs
-      );
+      let pdfBuffer: Buffer;
+      const pdfUrl = article.currentPdfUrl;
 
-      // Send watermarked PDF
+      if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
+        const { downloadFileToBuffer } = await import('@/utils/pdf-extract.utils.js');
+        pdfBuffer = await downloadFileToBuffer(pdfUrl);
+      } else {
+        const { resolveToAbsolutePath } = await import('@/utils/file-path.utils.js');
+        const fsPromises = await import('fs/promises');
+        pdfBuffer = await fsPromises.readFile(resolveToAbsolutePath(pdfUrl));
+      }
+
       const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Content-Length', watermarkedPdf.length.toString());
+      res.setHeader('Content-Length', pdfBuffer.length.toString());
 
-      console.log(`✅ [Download PDF] Sending watermarked PDF (${watermarkedPdf.length} bytes)`);
-      console.log(`🔗 [Download PDF] URL included: ${article.status === 'PUBLISHED'}`);
+      console.log(`✅ [Download PDF] Sending PDF (${pdfBuffer.length} bytes)`);
 
-      res.send(watermarkedPdf);
+      res.send(pdfBuffer);
     } catch (error) {
       console.error('❌ [Download PDF] Failed:', error);
       next(error);
