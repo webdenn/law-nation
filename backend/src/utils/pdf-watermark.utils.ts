@@ -526,7 +526,7 @@ export async function addWatermarkToPdf(
           height: logoDims.height,
           opacity: 0.12, 
         });
-      }
+      } 
 
       // ── Bottom-right logo (all roles) — skipped if PDF already has logo ─
       if (logoImage && !skipLogo) {
