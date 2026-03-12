@@ -461,14 +461,12 @@ export default function ArticlePage({ params }) {
 
             {!isLimited && article.currentPdfUrl && (
               <div className="mt-16 pt-8 border-t border-gray-100 sm:hidden">
-                <a
-                  href={getPdfUrl(article.currentPdfUrl)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center w-full bg-gray-900 text-white text-sm font-bold px-6 py-4 rounded-xl active:scale-95 transition-transform"
+                <button
+                  onClick={() => handleDownload("pdf")}
+                  className="flex items-center justify-center w-full bg-gray-900 text-white text-sm font-bold px-6 py-4 rounded-xl active:scale-95 transition-transform cursor-pointer"
                 >
                   <DownloadIcon /> Download Full PDF
-                </a>
+                </button>
               </div>
             )}
           </main>
