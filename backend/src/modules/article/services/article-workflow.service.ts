@@ -983,8 +983,9 @@ export class ArticleWorkflowService {
       let finalWatermarkedPdfUrl: string;
 
       if (isUrl) {
-        // Production: DOCX is already on S3 — reuse the original URL directly
-        finalWatermarkedDocxUrl = docxPath;
+        // Production: DOCX is already on S3 — use the permanent public URL for storage.
+        // data.pdfUrl holds the permanent URL; docxPath (data.presignedUrl) is temporary.
+        finalWatermarkedDocxUrl = (data as any).pdfUrl || docxPath;
 
         // Still upload the converted PDF to S3
         console.log(`☁️ [Reviewer Upload] Uploading converted PDF to S3...`);

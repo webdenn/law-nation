@@ -118,21 +118,10 @@ export class ArticleService {
         }
       }
 
-      // 2. Add watermark to edited DOCX
-      const watermarkData = {
-        userName: 'LAW NATION EDITOR',
-        downloadDate: new Date(),
-        articleTitle: article.title,
-        articleId: articleId,
-        frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
-      };
-
-      const watermarkedDocxPath = docxPath.replace('.docx', '_edited_watermarked.docx');
-      await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
-
-      // 3. Convert to PDF for preview
-      const pdfPath = docxPath.replace('.docx', '_edited.pdf');
-      await adobeService.convertDocxToPdf(watermarkedDocxPath, pdfPath);
+      // 2. Convert to PDF for preview — no watermark added here, watermark is already
+      // embedded from when the editor originally downloaded the DOCX.
+      const pdfPath = (adobeSafeUrl || docxPath).replace(/\.docx$/i, '_edited.pdf');
+      await adobeService.convertDocxToPdf(adobeSafeUrl || docxPath, pdfPath);
 
       // 4. Extract Text from New PDF
       let newPdfText = "";
@@ -190,10 +179,10 @@ export class ArticleService {
           diffData: formattedDiff as any,
           oldFileUrl: article.currentPdfUrl || "", // Required by schema
           newFileUrl: pdfPath,
-          fileType: 'PDF', // We are comparing and storing PDF representations
-          editorDocumentUrl: watermarkedDocxPath,
+          fileType: 'PDF',
+          editorDocumentUrl: docxPath,
           editorDocumentType: 'DOCX',
-          status: 'approved' // Set as approved/pending
+          status: 'approved'
         }
       });
 
@@ -201,7 +190,7 @@ export class ArticleService {
       await prisma.article.update({
         where: { id: articleId },
         data: {
-          currentWordUrl: watermarkedDocxPath,
+          currentWordUrl: docxPath,
           currentPdfUrl: pdfPath,
           status: 'EDITOR_APPROVED',
         },
