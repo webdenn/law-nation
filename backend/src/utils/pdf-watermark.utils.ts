@@ -776,7 +776,7 @@ export async function addCopyrightAndLinkToPdf(
       }
 
       // Copyright notice at bottom center
-      const copyrightText = '(C) Law Nation Prime Times Journal. All rights reserved.';
+      const copyrightText = '© Law Nation Prime Times Journal. All rights reserved.';
       const copyrightFontSize = 9;
       const textWidth = helvetica.widthOfTextAtSize(copyrightText, copyrightFontSize);
       const copyrightX = (pageW - textWidth) / 2;
