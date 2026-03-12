@@ -592,32 +592,34 @@ async addWatermarkToDocx(docxPath: string, outputPath: string, watermarkData: an
     const zip = new AdmZip(buffer);
 
     for (const entry of zip.getEntries()) {
-      if (entry.entryName.startsWith("word/") && entry.entryName.endsWith(".xml")) {
-        let content = entry.getData().toString("utf-8");
-        let modified = false;
+      // Only process header files — never touch footer or body to avoid duplicating existing logos
+      const isHeaderFile = /^word\/header\d*\.xml$/.test(entry.entryName);
+      if (!isHeaderFile) continue;
 
-        if (content.includes("<wp:anchor")) {
-          modified = true;
+      let content = entry.getData().toString("utf-8");
+      let modified = false;
 
-          content = content.replace(
-            /<wp:anchor[\s\S]*?<\/wp:anchor>/gi,
-            (anchorMatch) => {
-              // All anchors → large center watermark (behind text)
-              return anchorMatch
-                .replace(
-                  /<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
-                  `<wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>`
-                )
-                .replace(
-                  /<wp:positionV\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionV>/i,
-                  `<wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>`
-                )
-                .replace(/<wp:wrapSquare[^>]*\/>/i, "<wp:wrapNone/>");
-            }
-          );
+      if (content.includes("<wp:anchor")) {
+        modified = true;
 
-          zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
-        }
+        content = content.replace(
+          /<wp:anchor[\s\S]*?<\/wp:anchor>/gi,
+          (anchorMatch) => {
+            // All header anchors → large center watermark (behind text)
+            return anchorMatch
+              .replace(
+                /<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
+                `<wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>`
+              )
+              .replace(
+                /<wp:positionV\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionV>/i,
+                `<wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>`
+              )
+              .replace(/<wp:wrapSquare[^>]*\/>/i, "<wp:wrapNone/>");
+          }
+        );
+
+        zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
       }
     }
 

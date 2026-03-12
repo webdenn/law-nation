@@ -58,43 +58,43 @@ export async function addWatermarkToWord(
     ].join(';');
 
     for (const entry of entries) {
-      if (entry.entryName.startsWith("word/") && entry.entryName.endsWith(".xml")) {
-        let content = entry.getData().toString("utf-8");
-        let localModified = false;
+      // Only process header files — never touch footer or body to avoid duplicating existing logos
+      const isHeaderFile = /^word\/header\d*\.xml$/.test(entry.entryName);
+      if (!isHeaderFile) continue;
 
-        // Pattern to find image shapes (VML)
-        if (content.includes("word/media/image") || content.includes("logo")) {
-           const shapeRegex = /(<(v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")([^>]*>)([\s\S]*?)(<\/\2>)/gi;
-           
-           content = content.replace(shapeRegex, (match, start, tag, style, quote, mid, inner, end) => {
-              // Prevent infinite loop if already processed
-              if (style.includes('mso-position-horizontal:center')) return match;
+      let content = entry.getData().toString("utf-8");
+      let localModified = false;
 
-              localModified = true;
-
-              // Large center watermark only (behind text)
-              return `${start}${centerStyle}${quote}${mid}${inner}${end}`;
-           });
-        }
-
-        // --- DrawingML (Modern Word) fix: force all anchors to center ---
-        if (content.includes("<wp:anchor")) {
+      // VML shapes (older Word format) — only in header
+      const shapeRegex = /(<(v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")([^>]*>)([\s\S]*?)(<\/\2>)/gi;
+      if (shapeRegex.test(content)) {
+        content = content.replace(
+          /(<(v:shape|v:rect|v:image|v:oval)[^>]*style=")([^"]*)(")([^>]*>)([\s\S]*?)(<\/\2>)/gi,
+          (match, start, tag, style, quote, mid, inner, end) => {
+            // Already processed — skip
+            if (style.includes('mso-position-horizontal:center')) return match;
             localModified = true;
+            return `${start}${centerStyle}${quote}${mid}${inner}${end}`;
+          }
+        );
+      }
 
-            content = content.replace(/<wp:anchor[\s\S]*?<\/wp:anchor>/gi, (anchorMatch) => {
-              return anchorMatch
-                .replace(/<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
-                  `<wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>`)
-                .replace(/<wp:positionV\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionV>/i,
-                  `<wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>`)
-                .replace(/<wp:wrapSquare[^>]*\/>/i, "<wp:wrapNone/>");
-            });
-        }
+      // DrawingML anchors (modern Word format) — only in header
+      if (content.includes("<wp:anchor")) {
+        localModified = true;
+        content = content.replace(/<wp:anchor[\s\S]*?<\/wp:anchor>/gi, (anchorMatch) => {
+          return anchorMatch
+            .replace(/<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
+              `<wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>`)
+            .replace(/<wp:positionV\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionV>/i,
+              `<wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>`)
+            .replace(/<wp:wrapSquare[^>]*\/>/i, "<wp:wrapNone/>");
+        });
+      }
 
-        if (localModified) {
-          zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
-          modifiedCount++;
-        }
+      if (localModified) {
+        zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
+        modifiedCount++;
       }
     }
 
