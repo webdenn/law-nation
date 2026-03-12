@@ -2,7 +2,7 @@ import type { Response, NextFunction } from "express";
 import type { AuthRequest } from "@/types/auth-request.js";
 import { articleService } from "./article.service.js";
 import { BadRequestError, ForbiddenError } from "@/utils/http-errors.util.js";
-import { addWatermarkToPdf } from "@/utils/pdf-watermark.utils.js";
+import { addCopyrightAndLinkToPdf, addWatermarkToPdf } from "@/utils/pdf-watermark.utils.js";
 import { addSimpleWatermarkToWord } from "@/utils/word-watermark.utils.js";
 import { prisma } from "@/db/db.js";
 import { AuditService } from "../audit/services/audit.service.js";
@@ -547,23 +547,18 @@ export class ArticleController {
       const pdfUrl = article.currentPdfUrl;
 
       if (isNormalUser) {
-        // Normal user download: add copyright notice + clickable link.
-        // addWatermarkToPdf detects the existing logo watermark and skips re-adding it;
-        // it only stamps the copyright notice and the clickable article URL.
-        console.log(`💧 [Download PDF] Normal user download — adding copyright + link`);
-        pdfBuffer = await addWatermarkToPdf(
+        // Normal user download: append copyright notice + clickable link only.
+        // The stored PDF already contains the logo watermark — we never re-add it.
+        console.log(`💧 [Download PDF] Normal user download — appending copyright + link only`);
+        pdfBuffer = await addCopyrightAndLinkToPdf(
           pdfUrl,
           {
-            userName,
-            downloadDate: new Date(),
-            articleTitle: article.title,
             articleId: articleId,
             articleSlug: article.slug,
             frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+            citationNumber: article.citationNumber,
           },
-          'USER',
-          article.status,
-          article.citationNumber
+          article.status
         );
       } else {
         // Admin / Editor / Reviewer: serve stored PDF as-is (watermark already embedded).

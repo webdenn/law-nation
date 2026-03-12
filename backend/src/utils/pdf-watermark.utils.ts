@@ -656,3 +656,137 @@ export async function addWatermarkToPdf(
     throw error;
   }
 }
+
+/**
+ * Append only copyright notice + clickable download link to every page of a PDF.
+ * No logo is drawn. Suitable for end-user downloads where the stored PDF is
+ * already clean (no duplicate logo risk).
+ */
+export async function addCopyrightAndLinkToPdf(
+  pdfPath: string,
+  options: {
+    articleId: string;
+    articleSlug?: string;
+    frontendUrl: string;
+    citationNumber?: string;
+  },
+  articleStatus: string = 'PUBLISHED'
+): Promise<Buffer> {
+  console.log('\n[CopyrightLink] Adding copyright + link to PDF...');
+
+  let pdfBytes: Buffer;
+
+  if (pdfPath.startsWith('http://') || pdfPath.startsWith('https://')) {
+    pdfBytes = await downloadFileToBuffer(pdfPath);
+  } else {
+    let filePath = pdfPath;
+    if (pdfPath.startsWith('/uploads')) {
+      filePath = path.join(process.cwd(), pdfPath);
+    }
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`PDF file not found: ${filePath}`);
+    }
+    pdfBytes = fs.readFileSync(filePath);
+  }
+
+  const pdfDoc = await PDFDocument.load(pdfBytes, {
+    ignoreEncryption: true,
+    throwOnInvalidObject: false,
+  });
+  const pages = pdfDoc.getPages();
+
+  const includeUrl = articleStatus === 'PUBLISHED';
+  const articleUrl = options.articleSlug
+    ? `${options.frontendUrl}/article/${options.articleSlug}`
+    : `${options.frontendUrl}/articles/${options.articleId}`;
+  const linkText = `Download From: ${articleUrl}`;
+  const noteText = `(Login required for full article)`;
+
+  pages.forEach((page, index) => {
+    const mediaBox = page.getMediaBox();
+    const { width: pageW, height: pageH } = mediaBox;
+    const pageX = mediaBox.x;
+    const pageY = mediaBox.y;
+
+    // Citation number at top center (red)
+    if (options.citationNumber) {
+      const citationFontSize = 12;
+      const estimatedTextWidth = options.citationNumber.length * (citationFontSize * 0.6);
+      const citationX = pageX + (pageW - estimatedTextWidth) / 2;
+      page.drawText(options.citationNumber, {
+        x: citationX,
+        y: pageY + pageH - 55,
+        size: citationFontSize,
+        color: rgb(0.8, 0, 0),
+        opacity: 1,
+      });
+    }
+
+    // Copyright notice at bottom center
+    const copyrightText = '© Law Nation Prime Times Journal. All rights reserved.';
+    const copyrightFontSize = 8;
+    const textWidth = copyrightText.length * (copyrightFontSize * 0.5);
+    page.drawText(copyrightText, {
+      x: pageX + (pageW - textWidth) / 2,
+      y: pageY + 10,
+      size: copyrightFontSize,
+      color: rgb(0.4, 0.4, 0.4),
+      opacity: 0.8,
+    });
+
+    // Clickable download link
+    if (includeUrl) {
+      page.drawText(linkText, {
+        x: pageX + 50,
+        y: pageY + 30,
+        size: 9,
+        color: rgb(0, 0, 0.8),
+      });
+
+      page.drawText(noteText, {
+        x: pageX + 50,
+        y: pageY + 15,
+        size: 7,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+
+      const linkWidth = linkText.length * 5.5;
+      const linkAnnotation = pdfDoc.context.obj({
+        Type: 'Annot',
+        Subtype: 'Link',
+        Rect: [
+          pageX + 50,
+          pageY + 28,
+          Math.min(pageX + 50 + linkWidth, pageX + pageW - 50),
+          pageY + 42,
+        ],
+        Border: [0, 0, 0],
+        C: [0, 0, 1],
+        A: {
+          S: 'URI',
+          URI: PDFString.of(articleUrl),
+        },
+      });
+
+      const linkAnnotationRef = pdfDoc.context.register(linkAnnotation);
+      const existingAnnots = page.node.get(PDFName.of('Annots'));
+      let annotsArray: any[];
+      if (existingAnnots && existingAnnots instanceof Array) {
+        annotsArray = [...existingAnnots, linkAnnotationRef];
+      } else if (existingAnnots) {
+        annotsArray = [existingAnnots, linkAnnotationRef];
+      } else {
+        annotsArray = [linkAnnotationRef];
+      }
+      page.node.set(PDFName.of('Annots'), pdfDoc.context.obj(annotsArray));
+    }
+
+    if (index === 0) {
+      console.log(`[CopyrightLink] Annotations added (${pages.length} pages)`);
+    }
+  });
+
+  const resultBytes = await pdfDoc.save();
+  console.log('[CopyrightLink] Done.');
+  return Buffer.from(resultBytes);
+}
