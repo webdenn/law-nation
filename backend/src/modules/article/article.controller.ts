@@ -543,6 +543,14 @@ export class ArticleController {
         ['admin', 'ADMIN', 'editor', 'EDITOR', 'reviewer', 'REVIEWER'].includes(r)
       );
 
+      console.log(`👤 [Download PDF] User roles   : ${JSON.stringify(userRoles)}`);
+      console.log(`👤 [Download PDF] isNormalUser : ${isNormalUser}`);
+      console.log(`📂 [Download PDF] currentPdfUrl: ${article.currentPdfUrl}`);
+      console.log(`📊 [Download PDF] article.status: ${article.status}`);
+      console.log(`🔖 [Download PDF] citationNumber: ${article.citationNumber || '(none)'}`);
+      console.log(`🔗 [Download PDF] slug          : ${article.slug || '(none)'}`);
+      console.log(`🌐 [Download PDF] FRONTEND_URL  : ${process.env.FRONTEND_URL || '(not set)'}`);
+
       let pdfBuffer: Buffer;
       const pdfUrl = article.currentPdfUrl;
 

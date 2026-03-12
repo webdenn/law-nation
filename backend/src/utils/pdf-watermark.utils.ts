@@ -308,7 +308,7 @@
 // 
 
 
-import { PDFDocument, rgb, PDFName, PDFString } from 'pdf-lib';
+import { PDFDocument, rgb, PDFName, PDFString, StandardFonts } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
 import { downloadFileToBuffer } from './pdf-extract.utils.js';
@@ -672,121 +672,176 @@ export async function addCopyrightAndLinkToPdf(
   },
   articleStatus: string = 'PUBLISHED'
 ): Promise<Buffer> {
-  console.log('\n[CopyrightLink] Adding copyright + link to PDF...');
+  console.log('\n========== [CopyrightLink] START ==========');
+  console.log(`[CopyrightLink] PDF path     : ${pdfPath}`);
+  console.log(`[CopyrightLink] Article ID   : ${options.articleId}`);
+  console.log(`[CopyrightLink] Article slug : ${options.articleSlug || '(none)'}`);
+  console.log(`[CopyrightLink] Article status: ${articleStatus}`);
+  console.log(`[CopyrightLink] Frontend URL : ${options.frontendUrl}`);
+  console.log(`[CopyrightLink] Citation     : ${options.citationNumber || '(none)'}`);
 
-  let pdfBytes: Buffer;
+  try {
+    // ── 1. Load raw PDF bytes ────────────────────────────────────────────────
+    let pdfBytes: Buffer;
 
-  if (pdfPath.startsWith('http://') || pdfPath.startsWith('https://')) {
-    pdfBytes = await downloadFileToBuffer(pdfPath);
-  } else {
-    let filePath = pdfPath;
-    if (pdfPath.startsWith('/uploads')) {
-      filePath = path.join(process.cwd(), pdfPath);
-    }
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`PDF file not found: ${filePath}`);
-    }
-    pdfBytes = fs.readFileSync(filePath);
-  }
-
-  const pdfDoc = await PDFDocument.load(pdfBytes, {
-    ignoreEncryption: true,
-    throwOnInvalidObject: false,
-  });
-  const pages = pdfDoc.getPages();
-
-  const includeUrl = articleStatus === 'PUBLISHED';
-  const articleUrl = options.articleSlug
-    ? `${options.frontendUrl}/article/${options.articleSlug}`
-    : `${options.frontendUrl}/articles/${options.articleId}`;
-  const linkText = `Download From: ${articleUrl}`;
-  const noteText = `(Login required for full article)`;
-
-  pages.forEach((page, index) => {
-    const mediaBox = page.getMediaBox();
-    const { width: pageW, height: pageH } = mediaBox;
-    const pageX = mediaBox.x;
-    const pageY = mediaBox.y;
-
-    // Citation number at top center (red)
-    if (options.citationNumber) {
-      const citationFontSize = 12;
-      const estimatedTextWidth = options.citationNumber.length * (citationFontSize * 0.6);
-      const citationX = pageX + (pageW - estimatedTextWidth) / 2;
-      page.drawText(options.citationNumber, {
-        x: citationX,
-        y: pageY + pageH - 55,
-        size: citationFontSize,
-        color: rgb(0.8, 0, 0),
-        opacity: 1,
-      });
-    }
-
-    // Copyright notice at bottom center
-    const copyrightText = '© Law Nation Prime Times Journal. All rights reserved.';
-    const copyrightFontSize = 8;
-    const textWidth = copyrightText.length * (copyrightFontSize * 0.5);
-    page.drawText(copyrightText, {
-      x: pageX + (pageW - textWidth) / 2,
-      y: pageY + 10,
-      size: copyrightFontSize,
-      color: rgb(0.4, 0.4, 0.4),
-      opacity: 0.8,
-    });
-
-    // Clickable download link
-    if (includeUrl) {
-      page.drawText(linkText, {
-        x: pageX + 50,
-        y: pageY + 30,
-        size: 9,
-        color: rgb(0, 0, 0.8),
-      });
-
-      page.drawText(noteText, {
-        x: pageX + 50,
-        y: pageY + 15,
-        size: 7,
-        color: rgb(0.5, 0.5, 0.5),
-      });
-
-      const linkWidth = linkText.length * 5.5;
-      const linkAnnotation = pdfDoc.context.obj({
-        Type: 'Annot',
-        Subtype: 'Link',
-        Rect: [
-          pageX + 50,
-          pageY + 28,
-          Math.min(pageX + 50 + linkWidth, pageX + pageW - 50),
-          pageY + 42,
-        ],
-        Border: [0, 0, 0],
-        C: [0, 0, 1],
-        A: {
-          S: 'URI',
-          URI: PDFString.of(articleUrl),
-        },
-      });
-
-      const linkAnnotationRef = pdfDoc.context.register(linkAnnotation);
-      const existingAnnots = page.node.get(PDFName.of('Annots'));
-      let annotsArray: any[];
-      if (existingAnnots && existingAnnots instanceof Array) {
-        annotsArray = [...existingAnnots, linkAnnotationRef];
-      } else if (existingAnnots) {
-        annotsArray = [existingAnnots, linkAnnotationRef];
-      } else {
-        annotsArray = [linkAnnotationRef];
+    if (pdfPath.startsWith('http://') || pdfPath.startsWith('https://')) {
+      console.log('[CopyrightLink] Source: remote URL — downloading...');
+      pdfBytes = await downloadFileToBuffer(pdfPath);
+      console.log(`[CopyrightLink] Downloaded ${pdfBytes.length} bytes from URL`);
+    } else {
+      let filePath = pdfPath;
+      if (pdfPath.startsWith('/uploads')) {
+        filePath = path.join(process.cwd(), pdfPath);
+        console.log(`[CopyrightLink] Resolved /uploads path to: ${filePath}`);
       }
-      page.node.set(PDFName.of('Annots'), pdfDoc.context.obj(annotsArray));
+      console.log(`[CopyrightLink] Source: local file — ${filePath}`);
+      if (!fs.existsSync(filePath)) {
+        console.error(`[CopyrightLink] ❌ File NOT found at: ${filePath}`);
+        throw new Error(`PDF file not found: ${filePath}`);
+      }
+      pdfBytes = fs.readFileSync(filePath);
+      console.log(`[CopyrightLink] Read ${pdfBytes.length} bytes from disk`);
     }
 
-    if (index === 0) {
-      console.log(`[CopyrightLink] Annotations added (${pages.length} pages)`);
-    }
-  });
+    // ── 2. Parse PDF ─────────────────────────────────────────────────────────
+    console.log('[CopyrightLink] Parsing PDF document...');
+    const pdfDoc = await PDFDocument.load(pdfBytes, {
+      ignoreEncryption: true,
+      throwOnInvalidObject: false,
+    });
+    const pages = pdfDoc.getPages();
+    console.log(`[CopyrightLink] PDF parsed OK — ${pages.length} page(s)`);
 
-  const resultBytes = await pdfDoc.save();
-  console.log('[CopyrightLink] Done.');
-  return Buffer.from(resultBytes);
+    // ── 3. Embed fonts (required by pdf-lib for reliable text drawing) ───────
+    console.log('[CopyrightLink] Embedding Helvetica font...');
+    const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    console.log('[CopyrightLink] Fonts embedded OK');
+
+    // ── 4. Build URL / text values ───────────────────────────────────────────
+    const includeUrl = articleStatus === 'PUBLISHED';
+    const articleUrl = options.articleSlug
+      ? `${options.frontendUrl}/article/${options.articleSlug}`
+      : `${options.frontendUrl}/articles/${options.articleId}`;
+    const linkText = `Download From: ${articleUrl}`;
+    const noteText = `(Login required for full article)`;
+
+    console.log(`[CopyrightLink] includeUrl   : ${includeUrl}`);
+    console.log(`[CopyrightLink] Article URL  : ${articleUrl}`);
+    console.log(`[CopyrightLink] Link text    : ${linkText}`);
+
+    // ── 5. Stamp each page ───────────────────────────────────────────────────
+    console.log('[CopyrightLink] Stamping pages...');
+
+    for (let index = 0; index < pages.length; index++) {
+      const page = pages[index];
+      const mediaBox = page.getMediaBox();
+      const { width: pageW, height: pageH } = mediaBox;
+      const pageX = mediaBox.x;
+      const pageY = mediaBox.y;
+
+      console.log(`[CopyrightLink]   Page ${index + 1}/${pages.length} — size ${pageW.toFixed(0)}x${pageH.toFixed(0)}, origin (${pageX.toFixed(0)}, ${pageY.toFixed(0)})`);
+
+      // Citation number at top center (red)
+      if (options.citationNumber) {
+        const citationFontSize = 12;
+        const estimatedTextWidth = helveticaBold.widthOfTextAtSize(options.citationNumber, citationFontSize);
+        const citationX = pageX + (pageW - estimatedTextWidth) / 2;
+        console.log(`[CopyrightLink]   → Drawing citation "${options.citationNumber}" at (${citationX.toFixed(0)}, ${(pageY + pageH - 55).toFixed(0)})`);
+        page.drawText(options.citationNumber, {
+          x: citationX,
+          y: pageY + pageH - 55,
+          size: citationFontSize,
+          font: helveticaBold,
+          color: rgb(0.8, 0, 0),
+          opacity: 1,
+        });
+      }
+
+      // Copyright notice at bottom center
+      const copyrightText = '(C) Law Nation Prime Times Journal. All rights reserved.';
+      const copyrightFontSize = 8;
+      const textWidth = helvetica.widthOfTextAtSize(copyrightText, copyrightFontSize);
+      const copyrightX = pageX + (pageW - textWidth) / 2;
+      console.log(`[CopyrightLink]   → Drawing copyright at (${copyrightX.toFixed(0)}, ${(pageY + 10).toFixed(0)})`);
+      page.drawText(copyrightText, {
+        x: copyrightX,
+        y: pageY + 10,
+        size: copyrightFontSize,
+        font: helvetica,
+        color: rgb(0.4, 0.4, 0.4),
+        opacity: 0.8,
+      });
+
+      // Clickable download link
+      if (includeUrl) {
+        console.log(`[CopyrightLink]   → Drawing link text at (${(pageX + 50).toFixed(0)}, ${(pageY + 30).toFixed(0)})`);
+        page.drawText(linkText, {
+          x: pageX + 50,
+          y: pageY + 30,
+          size: 9,
+          font: helvetica,
+          color: rgb(0, 0, 0.8),
+        });
+
+        page.drawText(noteText, {
+          x: pageX + 50,
+          y: pageY + 15,
+          size: 7,
+          font: helvetica,
+          color: rgb(0.5, 0.5, 0.5),
+        });
+
+        const linkWidth = helvetica.widthOfTextAtSize(linkText, 9);
+        const linkAnnotation = pdfDoc.context.obj({
+          Type: 'Annot',
+          Subtype: 'Link',
+          Rect: [
+            pageX + 50,
+            pageY + 28,
+            Math.min(pageX + 50 + linkWidth, pageX + pageW - 50),
+            pageY + 42,
+          ],
+          Border: [0, 0, 0],
+          C: [0, 0, 1],
+          A: {
+            S: 'URI',
+            URI: PDFString.of(articleUrl),
+          },
+        });
+
+        const linkAnnotationRef = pdfDoc.context.register(linkAnnotation);
+        const existingAnnots = page.node.get(PDFName.of('Annots'));
+        let annotsArray: any[];
+        if (existingAnnots && existingAnnots instanceof Array) {
+          annotsArray = [...existingAnnots, linkAnnotationRef];
+        } else if (existingAnnots) {
+          annotsArray = [existingAnnots, linkAnnotationRef];
+        } else {
+          annotsArray = [linkAnnotationRef];
+        }
+        page.node.set(PDFName.of('Annots'), pdfDoc.context.obj(annotsArray));
+        console.log(`[CopyrightLink]   → Clickable link annotation added`);
+      } else {
+        console.log(`[CopyrightLink]   → Skipping link (article not PUBLISHED)`);
+      }
+    }
+
+    // ── 6. Save ──────────────────────────────────────────────────────────────
+    console.log('[CopyrightLink] Saving PDF...');
+    const resultBytes = await pdfDoc.save();
+    const resultBuffer = Buffer.from(resultBytes);
+
+    console.log(`[CopyrightLink] Original size : ${pdfBytes.length} bytes`);
+    console.log(`[CopyrightLink] Final size    : ${resultBuffer.length} bytes`);
+    console.log(`[CopyrightLink] Size delta    : +${((resultBuffer.length - pdfBytes.length) / 1024).toFixed(2)} KB`);
+    console.log('========== [CopyrightLink] END (success) ==========\n');
+
+    return resultBuffer;
+  } catch (error: unknown) {
+    console.error('========== [CopyrightLink] END (FAILED) ==========');
+    console.error('[CopyrightLink] Error:', error instanceof Error ? error.message : String(error));
+    console.error('[CopyrightLink] Stack:', error instanceof Error ? error.stack : 'no stack');
+    throw error;
+  }
 }
