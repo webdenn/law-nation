@@ -538,7 +538,7 @@ export class ArticleController {
         }
       );
 
-      const userRoles = req.user!.roles?.map((role: { name: string }) => r.name) || [];
+      const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
       const isNormalUser = !userRoles.some((r: string) =>
         ['admin', 'ADMIN', 'editor', 'EDITOR', 'reviewer', 'REVIEWER'].includes(r)
       );
