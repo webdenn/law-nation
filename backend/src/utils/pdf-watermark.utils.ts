@@ -735,22 +735,39 @@ export async function addCopyrightAndLinkToPdf(
 
     for (let index = 0; index < pages.length; index++) {
       const page = pages[index];
-      const mediaBox = page.getMediaBox();
-      const { width: pageW, height: pageH } = mediaBox;
-      const pageX = mediaBox.x;
-      const pageY = mediaBox.y;
 
-      console.log(`[CopyrightLink]   Page ${index + 1}/${pages.length} — size ${pageW.toFixed(0)}x${pageH.toFixed(0)}, origin (${pageX.toFixed(0)}, ${pageY.toFixed(0)})`);
+      // getSize() respects CropBox and always gives (width, height) from (0,0)
+      // This is the safe, visible coordinate space — never use getMediaBox() for drawing
+      const { width: pageW, height: pageH } = page.getSize();
+
+      console.log(`[CopyrightLink]   Page ${index + 1}/${pages.length} — visible size ${pageW.toFixed(0)}x${pageH.toFixed(0)}`);
+
+      // Footer band positions (all relative to 0,0 = bottom-left of visible page)
+      // 65 pt from bottom = well inside the visible margin on all PDF viewers
+      const FOOTER_TOP = 65;      // top of footer band
+      const LINK_Y     = 52;      // "Download From:" line
+      const NOTE_Y     = 38;      // "(Login required)" line
+      const COPYRIGHT_Y = 24;     // copyright line
+      const LINE_Y      = 70;     // thin separator line above footer
+
+      // Separator line
+      page.drawLine({
+        start: { x: 40, y: LINE_Y },
+        end:   { x: pageW - 40, y: LINE_Y },
+        thickness: 0.5,
+        color: rgb(0.7, 0.7, 0.7),
+        opacity: 0.6,
+      });
 
       // Citation number at top center (red)
       if (options.citationNumber) {
         const citationFontSize = 12;
         const estimatedTextWidth = helveticaBold.widthOfTextAtSize(options.citationNumber, citationFontSize);
-        const citationX = pageX + (pageW - estimatedTextWidth) / 2;
-        console.log(`[CopyrightLink]   → Drawing citation "${options.citationNumber}" at (${citationX.toFixed(0)}, ${(pageY + pageH - 55).toFixed(0)})`);
+        const citationX = (pageW - estimatedTextWidth) / 2;
+        console.log(`[CopyrightLink]   → Drawing citation "${options.citationNumber}" at (${citationX.toFixed(0)}, ${(pageH - 45).toFixed(0)})`);
         page.drawText(options.citationNumber, {
           x: citationX,
-          y: pageY + pageH - 55,
+          y: pageH - 45,
           size: citationFontSize,
           font: helveticaBold,
           color: rgb(0.8, 0, 0),
@@ -760,36 +777,36 @@ export async function addCopyrightAndLinkToPdf(
 
       // Copyright notice at bottom center
       const copyrightText = '(C) Law Nation Prime Times Journal. All rights reserved.';
-      const copyrightFontSize = 8;
+      const copyrightFontSize = 9;
       const textWidth = helvetica.widthOfTextAtSize(copyrightText, copyrightFontSize);
-      const copyrightX = pageX + (pageW - textWidth) / 2;
-      console.log(`[CopyrightLink]   → Drawing copyright at (${copyrightX.toFixed(0)}, ${(pageY + 10).toFixed(0)})`);
+      const copyrightX = (pageW - textWidth) / 2;
+      console.log(`[CopyrightLink]   → Drawing copyright at (${copyrightX.toFixed(0)}, ${COPYRIGHT_Y})`);
       page.drawText(copyrightText, {
         x: copyrightX,
-        y: pageY + 10,
+        y: COPYRIGHT_Y,
         size: copyrightFontSize,
         font: helvetica,
-        color: rgb(0.4, 0.4, 0.4),
-        opacity: 0.8,
+        color: rgb(0.3, 0.3, 0.3),
+        opacity: 1,
       });
 
       // Clickable download link
       if (includeUrl) {
-        console.log(`[CopyrightLink]   → Drawing link text at (${(pageX + 50).toFixed(0)}, ${(pageY + 30).toFixed(0)})`);
+        console.log(`[CopyrightLink]   → Drawing link text at (40, ${LINK_Y})`);
         page.drawText(linkText, {
-          x: pageX + 50,
-          y: pageY + 30,
+          x: 40,
+          y: LINK_Y,
           size: 9,
           font: helvetica,
           color: rgb(0, 0, 0.8),
         });
 
         page.drawText(noteText, {
-          x: pageX + 50,
-          y: pageY + 15,
-          size: 7,
+          x: 40,
+          y: NOTE_Y,
+          size: 8,
           font: helvetica,
-          color: rgb(0.5, 0.5, 0.5),
+          color: rgb(0.4, 0.4, 0.4),
         });
 
         const linkWidth = helvetica.widthOfTextAtSize(linkText, 9);
@@ -797,10 +814,10 @@ export async function addCopyrightAndLinkToPdf(
           Type: 'Annot',
           Subtype: 'Link',
           Rect: [
-            pageX + 50,
-            pageY + 28,
-            Math.min(pageX + 50 + linkWidth, pageX + pageW - 50),
-            pageY + 42,
+            40,
+            LINK_Y - 2,
+            Math.min(40 + linkWidth, pageW - 40),
+            LINK_Y + 12,
           ],
           Border: [0, 0, 0],
           C: [0, 0, 1],
