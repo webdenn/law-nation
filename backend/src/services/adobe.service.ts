@@ -537,34 +537,129 @@ export class AdobeService {
     }
   }
 
-  async addWatermarkToDocx(docxPath: string, outputPath: string, watermarkData: any): Promise<string> {
-    try {
-      console.log(`📝 [Adobe] Non-destructive watermarking for DOCX. Skipping raw-text reconstruction to preserve formatting.`);
+  // async addWatermarkToDocx(docxPath: string, outputPath: string, watermarkData: any): Promise<string> {
+  //   try {
+  //     console.log(`📝 [Adobe] Non-destructive watermarking for DOCX. Skipping raw-text reconstruction to preserve formatting.`);
 
-      // Instead of using mammoth (which destroys formatting), we'll just copy the file.
-      // This ensures that 'currentWordUrl' on disk has perfect formatting.
-      // We'll apply watermarks in high-quality PDF during the download step instead.
+  //     // Instead of using mammoth (which destroys formatting), we'll just copy the file.
+  //     // This ensures that 'currentWordUrl' on disk has perfect formatting.
+  //     // We'll apply watermarks in high-quality PDF during the download step instead.
       
-      let inputPath: string;
-      if (this.isUrl(docxPath)) {
-        inputPath = await this.downloadFile(docxPath, '.docx');
-      } else {
-        inputPath = resolveToAbsolutePath(docxPath);
-      }
+  //     let inputPath: string;
+  //     if (this.isUrl(docxPath)) {
+  //       inputPath = await this.downloadFile(docxPath, '.docx');
+  //     } else {
+  //       inputPath = resolveToAbsolutePath(docxPath);
+  //     }
 
-      const outputAbsPath = resolveToAbsolutePath(outputPath);
-      const outputDir = path.dirname(outputAbsPath);
-      if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+  //     const outputAbsPath = resolveToAbsolutePath(outputPath);
+  //     const outputDir = path.dirname(outputAbsPath);
+  //     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-      // Cleanly copy the file
-      await fs.promises.copyFile(inputPath, outputAbsPath);
+  //     // Cleanly copy the file
+  //     await fs.promises.copyFile(inputPath, outputAbsPath);
       
-      return outputPath;
-    } catch (err: any) {
-      console.error('❌ [AdobeService] DOCX watermarking fallback failed:', err);
-      throw new InternalServerError(`DOCX preservation failed: ${err.message}`);
+  //     return outputPath;
+  //   } catch (err: any) {
+  //     console.error('❌ [AdobeService] DOCX watermarking fallback failed:', err);
+  //     throw new InternalServerError(`DOCX preservation failed: ${err.message}`);
+  //   }
+  // }
+
+// updated code with claude
+
+
+async addWatermarkToDocx(docxPath: string, outputPath: string, watermarkData: any): Promise<string> {
+  try {
+    console.log(`📝 [Adobe] Applying watermark to DOCX...`);
+
+    let inputPath: string;
+    let tempPath: string | null = null;
+
+    if (this.isUrl(docxPath)) {
+      tempPath = await this.downloadFile(docxPath, '.docx');
+      inputPath = tempPath;
+    } else {
+      inputPath = resolveToAbsolutePath(docxPath);
     }
+
+    const outputAbsPath = resolveToAbsolutePath(outputPath);
+    const outputDir = path.dirname(outputAbsPath);
+    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+    // ✅ Use AdmZip to fix anchor positions directly
+    const buffer = await fs.promises.readFile(inputPath);
+    const zip = new AdmZip(buffer);
+
+    for (const entry of zip.getEntries()) {
+      if (entry.entryName.startsWith("word/") && entry.entryName.endsWith(".xml")) {
+        let content = entry.getData().toString("utf-8");
+        let modified = false;
+
+        if (content.includes("<wp:anchor")) {
+          modified = true;
+          let anchorIndex = 0;
+
+          content = content.replace(
+            /<wp:anchor[\s\S]*?<\/wp:anchor>/gi,
+            (anchorMatch) => {
+              anchorIndex++;
+
+              if (anchorIndex === 1) {
+                // ✅ First anchor = center watermark (behind text)
+                return anchorMatch
+                  .replace(
+                    /<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
+                    `<wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>`
+                  )
+                  .replace(
+                    /<wp:positionV\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionV>/i,
+                    `<wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>`
+                  )
+                  .replace(/<wp:wrapSquare[^>]*\/>/i, "<wp:wrapNone/>");
+              }
+
+              if (anchorIndex === 2) {
+                // ✅ Second anchor = bottom-right logo, explicitly set right+bottom
+                return anchorMatch
+                  .replace(
+                    /<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
+                    `<wp:positionH relativeFrom="page"><wp:align>right</wp:align></wp:positionH>`
+                  )
+                  .replace(
+                    /<wp:positionV\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionV>/i,
+                    `<wp:positionV relativeFrom="page"><wp:align>bottom</wp:align></wp:positionV>`
+                  );
+              }
+
+              // ✅ All other anchors — leave untouched
+              return anchorMatch;
+            }
+          );
+
+          zip.updateFile(entry.entryName, Buffer.from(content, "utf-8"));
+        }
+      }
+    }
+
+    await fs.promises.writeFile(outputAbsPath, zip.toBuffer());
+
+    if (tempPath) fs.unlink(tempPath, () => {});
+    console.log(`✅ [Adobe] DOCX watermark applied successfully`);
+    return outputPath;
+
+  } catch (err: any) {
+    console.error('❌ [AdobeService] DOCX watermarking failed:', err);
+    throw new InternalServerError(`DOCX watermarking failed: ${err.message}`);
   }
+}
+
+
+
+
+
+
+
 
   async addWatermarkToPdf(pdfPath: string, outputPath: string, watermarkData: any): Promise<string> {
     try {
