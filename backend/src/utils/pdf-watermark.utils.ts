@@ -313,87 +313,19 @@ import fs from 'fs';
 import path from 'path';
 import { downloadFileToBuffer } from './pdf-extract.utils.js';
 
+const LN_WATERMARK_FLAG = 'LN_WATERMARKED';
+
 /**
  * Detect if a PDF already has a watermark applied by this system.
- * Checks for known watermark fingerprints in page content streams.
+ * Uses a custom metadata flag written into the PDF Info dictionary at watermark time.
  */
-async function isPdfAlreadyWatermarked(pdfDoc: PDFDocument): Promise<boolean> {
-  const WATERMARK_FINGERPRINTS = [
-    'Law Nation Prime Times Journal',  // copyright text
-    'Download From:',                   // link text
-    'LAW NATION',                        // role text
-    'Login required for full article',  // note text
-  ];
-
+function isPdfAlreadyWatermarked(pdfDoc: PDFDocument): boolean {
   try {
-    const pages = pdfDoc.getPages();
-
-    for (const page of pages) {
-      // Check page content stream for watermark text
-      const contentStream = page.node.get(PDFName.of('Contents'));
-      if (!contentStream) continue;
-
-      // Get raw content bytes and convert to string for text search
-      const context = pdfDoc.context;
-      let contentBytes: Uint8Array | null = null;
-
-      try {
-        // Handle both single stream and array of streams
-        const contentsRef = page.node.get(PDFName.of('Contents'));
-        if (contentsRef) {
-          // Try to get the raw content as string via page content
-          const rawContent = page.doc?.context?.lookupMaybe
-            ? null
-            : null;
-
-          // Alternative: check annotations for our clickable link
-          const annotsRef = page.node.get(PDFName.of('Annots'));
-          if (annotsRef) {
-            const annotsStr = String(annotsRef);
-            if (annotsStr.includes('URI') || annotsStr.includes('/article/')) {
-              console.log('[Watermark] Detected existing link annotation — PDF already watermarked');
-              return true;
-            }
-          }
-        }
-      } catch {
-        // ignore lookup errors
-      }
-
-      // Check page content stream as raw string (works for uncompressed streams)
-      try {
-        const pageDict = page.node;
-        const contentsObj = pageDict.get(PDFName.of('Contents'));
-        if (contentsObj) {
-          const contentsString = contentsObj.toString();
-          for (const fingerprint of WATERMARK_FINGERPRINTS) {
-            if (contentsString.includes(fingerprint)) {
-              console.log(`[Watermark] Found fingerprint "${fingerprint}" — PDF already watermarked`);
-              return true;
-            }
-          }
-        }
-      } catch {
-        // ignore
-      }
+    const keywords = pdfDoc.getKeywords();
+    if (keywords && keywords.includes(LN_WATERMARK_FLAG)) {
+      console.log('[Watermark] Found LN_WATERMARKED metadata flag — PDF already watermarked');
+      return true;
     }
-
-    // Deep check: serialize the full PDF context and scan for fingerprints
-    // This catches text even in compressed or indirect object streams
-    try {
-      const pdfBytes = await pdfDoc.save({ useObjectStreams: false });
-      const pdfString = Buffer.from(pdfBytes).toString('latin1'); // latin1 preserves byte values
-
-      for (const fingerprint of WATERMARK_FINGERPRINTS) {
-        if (pdfString.includes(fingerprint)) {
-          console.log(`[Watermark] Found fingerprint in raw PDF bytes: "${fingerprint}" — already watermarked`);
-          return true;
-        }
-      }
-    } catch (e) {
-      console.warn('[Watermark] Could not do deep scan for watermark fingerprint:', e);
-    }
-
     return false;
   } catch (error) {
     console.warn('[Watermark] Watermark detection failed, assuming not watermarked:', error);
@@ -469,12 +401,10 @@ export async function addWatermarkToPdf(
 
     // ── 2a. DUPLICATE WATERMARK CHECK ────────────────────────────────────────
     console.log('🔍 [Watermark] Checking if PDF is already watermarked...');
-    const alreadyWatermarked = await isPdfAlreadyWatermarked(pdfDoc);
-
-    if (alreadyWatermarked) {
+    if (isPdfAlreadyWatermarked(pdfDoc)) {
       console.log('⚠️  [Watermark] PDF already contains a watermark — skipping watermark application');
       console.log('🏁 [Watermark] Returning original PDF bytes unchanged\n');
-      return pdfBytes; // Return original without re-watermarking
+      return pdfBytes;
     }
 
     console.log('✅ [Watermark] No existing watermark found — proceeding with watermarking');
@@ -692,7 +622,17 @@ export async function addWatermarkToPdf(
       console.log(`✅ [Watermark] Clickable link added to all pages`);
     }
 
-    // 6. Save watermarked PDF
+    // 6. Stamp watermark metadata flag so duplicate detection works on future calls
+    const existingKeywords = pdfDoc.getKeywords() ?? '';
+    const keywordList = existingKeywords
+      ? existingKeywords.split(/\s+/).filter(Boolean)
+      : [];
+    if (!keywordList.includes(LN_WATERMARK_FLAG)) {
+      keywordList.push(LN_WATERMARK_FLAG);
+    }
+    pdfDoc.setKeywords(keywordList);
+
+    // 7. Save watermarked PDF
     console.log('💾 [Watermark] Saving watermarked PDF...');
     const watermarkedBytes = await pdfDoc.save();
     const buffer = Buffer.from(watermarkedBytes);
