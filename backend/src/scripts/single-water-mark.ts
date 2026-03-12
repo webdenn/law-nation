@@ -21,9 +21,13 @@ const WATERMARK_PATH = path.resolve(
   "../../src/assests/img/logo-bg.png"
 );
 
-const WIDTH = "350pt";
-const HEIGHT = "170pt";
-const OPACITY = "0.04";
+// DrawingML dimensions in EMU (1pt = 12700 EMU)
+const WIDTH_EMU  = 4445000;  // 350pt
+const HEIGHT_EMU = 2159000;  // 170pt
+
+// Opacity for <a:alphaModFix>: 0–100000 (100000 = fully opaque)
+// 15000 = 15 % → clearly visible but dim
+const OPACITY_AMT = "15000";
 
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
 const S3_BUCKET = process.env.AWS_S3_BUCKET_ARTICLES || "law-nation";
@@ -32,39 +36,56 @@ const s3 = new S3Client({ region: AWS_REGION });
 
 /* ───────────────── WATERMARK XML ───────────────── */
 
+/**
+ * DrawingML watermark — renders correctly in both Microsoft Word AND Google Docs.
+ * VML (<w:pict>/<v:shape>) is a legacy MS-only format that Google Docs ignores entirely.
+ * <wp:anchor behindDoc="1"> places the image behind text; <a:alphaModFix> dims it.
+ */
 function watermarkXML() {
-  return `
-<w:p>
-  <w:pPr>
-    <w:jc w:val="center"/>
-  </w:pPr>
+  return `<w:p>
+  <w:pPr><w:jc w:val="center"/></w:pPr>
   <w:r>
-    <w:pict>
-      <v:shape id="law-nation-watermark"
-        type="#_x0000_t75"
-        style="position:absolute;
-               width:${WIDTH};
-               height:${HEIGHT};
-               mso-position-horizontal:center;
-               mso-position-horizontal-relative:page;
-               mso-position-vertical:center;
-               mso-position-vertical-relative:page;
-               opacity:${OPACITY};
-               z-index:-251658752"
-        filled="t"
-        stroked="f">
-
-        <v:imagedata
-          r:id="rIdWatermark"
-          o:title="watermark"
-          gain="0.8"
-          blacklevel="0.90"/>
-
-      </v:shape>
-    </w:pict>
+    <w:drawing>
+      <wp:anchor
+          distT="0" distB="0" distL="0" distR="0"
+          simplePos="0"
+          relativeHeight="251658240"
+          behindDoc="1"
+          locked="0"
+          layoutInCell="1"
+          allowOverlap="1">
+        <wp:simplePos x="0" y="0"/>
+        <wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>
+        <wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>
+        <wp:extent cx="${WIDTH_EMU}" cy="${HEIGHT_EMU}"/>
+        <wp:effectExtent l="0" t="0" r="0" b="0"/>
+        <wp:wrapNone/>
+        <wp:docPr id="1" name="law-nation-watermark"/>
+        <wp:cNvGraphicFramePr/>
+        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+            <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+              <pic:nvPicPr>
+                <pic:cNvPr id="0" name="law-nation-watermark"/>
+                <pic:cNvPicPr/>
+              </pic:nvPicPr>
+              <pic:blipFill>
+                <a:blip r:embed="rIdWatermark">
+                  <a:alphaModFix amt="${OPACITY_AMT}"/>
+                </a:blip>
+                <a:stretch><a:fillRect/></a:stretch>
+              </pic:blipFill>
+              <pic:spPr>
+                <a:xfrm><a:off x="0" y="0"/><a:ext cx="${WIDTH_EMU}" cy="${HEIGHT_EMU}"/></a:xfrm>
+                <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+              </pic:spPr>
+            </pic:pic>
+          </a:graphicData>
+        </a:graphic>
+      </wp:anchor>
+    </w:drawing>
   </w:r>
-</w:p>
-`;
+</w:p>`;
 }
 
 /* ───────────────── APPLY WATERMARK ───────────────── */
@@ -97,9 +118,8 @@ function applyWatermark(buffer) {
     const header = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:hdr xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-       xmlns:o="urn:schemas-microsoft-com:office:office"
        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-       xmlns:v="urn:schemas-microsoft-com:vml"
+       xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
        xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
        mc:Ignorable="w14">
 
@@ -115,6 +135,11 @@ ${watermarkXML()}
 
     let xml = headerEntry.getData().toString();
 
+    // Ensure wp namespace is declared (needed for DrawingML anchor)
+    if (!xml.includes('xmlns:wp=')) {
+      xml = xml.replace(/<w:hdr /, '<w:hdr xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ');
+    }
+
     if (!xml.includes("law-nation-watermark")) {
 
       xml = xml.replace("</w:hdr>", watermarkXML() + "\n</w:hdr>");
@@ -125,30 +150,10 @@ ${watermarkXML()}
 
     } else {
 
-      console.log("⚠ Watermark already exists — updating");
+      console.log("⚠ Watermark already exists — replacing with DrawingML version");
 
-      xml = xml.replace(
-        /<v:shape id="law-nation-watermark"[\s\S]*?<\/v:shape>/,
-        `<v:shape id="law-nation-watermark"
-        type="#_x0000_t75"
-        style="position:absolute;
-               width:${WIDTH};
-               height:${HEIGHT};
-               mso-position-horizontal:center;
-               mso-position-horizontal-relative:page;
-               mso-position-vertical:center;
-               mso-position-vertical-relative:page;
-               opacity:${OPACITY};
-               z-index:-251658752"
-        filled="t"
-        stroked="f">
-        <v:imagedata
-          r:id="rIdWatermark"
-          o:title="watermark"
-          gain="0.8"
-          blacklevel="0.90"/>
-      </v:shape>`
-      );
+      // Replace the entire <w:p> containing the old watermark (handles both VML and DrawingML)
+      xml = xml.replace(/<w:p>[\s\S]*?law-nation-watermark[\s\S]*?<\/w:p>/, watermarkXML());
 
       zip.updateFile("word/header1.xml", Buffer.from(xml));
 
