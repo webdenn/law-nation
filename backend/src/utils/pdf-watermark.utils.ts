@@ -524,7 +524,7 @@ export async function addWatermarkToPdf(
           y: pageY + (pageH / 2) - (logoDims.height / 2),
           width: logoDims.width,
           height: logoDims.height,
-          opacity: 0.12,
+          opacity: 0.12, 
         });
       }
 
