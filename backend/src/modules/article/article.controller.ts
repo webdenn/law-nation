@@ -538,21 +538,44 @@ export class ArticleController {
         }
       );
 
-      // Serve the stored PDF as-is — the watermark is already embedded from the initial
-      // upload stage (addUploadWatermark) or from the DOCX→PDF conversion.
-      // Do NOT add another watermark here; doing so would create double watermarks.
-      console.log(`📄 [Download PDF] Serving stored PDF (watermark already embedded)`);
+      const userRoles = req.user!.roles?.map((role: { name: string }) => r.name) || [];
+      const isNormalUser = !userRoles.some((r: string) =>
+        ['admin', 'ADMIN', 'editor', 'EDITOR', 'reviewer', 'REVIEWER'].includes(r)
+      );
 
       let pdfBuffer: Buffer;
       const pdfUrl = article.currentPdfUrl;
 
-      if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
-        const { downloadFileToBuffer } = await import('@/utils/pdf-extract.utils.js');
-        pdfBuffer = await downloadFileToBuffer(pdfUrl);
+      if (isNormalUser) {
+        // Normal user download: add copyright notice + clickable link.
+        // addWatermarkToPdf detects the existing logo watermark and skips re-adding it;
+        // it only stamps the copyright notice and the clickable article URL.
+        console.log(`💧 [Download PDF] Normal user download — adding copyright + link`);
+        pdfBuffer = await addWatermarkToPdf(
+          pdfUrl,
+          {
+            userName,
+            downloadDate: new Date(),
+            articleTitle: article.title,
+            articleId: articleId,
+            articleSlug: article.slug,
+            frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+          },
+          'USER',
+          article.status,
+          article.citationNumber
+        );
       } else {
-        const { resolveToAbsolutePath } = await import('@/utils/file-path.utils.js');
-        const fsPromises = await import('fs/promises');
-        pdfBuffer = await fsPromises.readFile(resolveToAbsolutePath(pdfUrl));
+        // Admin / Editor / Reviewer: serve stored PDF as-is (watermark already embedded).
+        console.log(`📄 [Download PDF] Staff download — serving stored PDF as-is`);
+        if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
+          const { downloadFileToBuffer } = await import('@/utils/pdf-extract.utils.js');
+          pdfBuffer = await downloadFileToBuffer(pdfUrl);
+        } else {
+          const { resolveToAbsolutePath } = await import('@/utils/file-path.utils.js');
+          const fsPromises = await import('fs/promises');
+          pdfBuffer = await fsPromises.readFile(resolveToAbsolutePath(pdfUrl));
+        }
       }
 
       const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;

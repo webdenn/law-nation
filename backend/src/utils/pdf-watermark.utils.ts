@@ -401,13 +401,20 @@ export async function addWatermarkToPdf(
 
     // ── 2a. DUPLICATE WATERMARK CHECK ────────────────────────────────────────
     console.log('🔍 [Watermark] Checking if PDF is already watermarked...');
+    let skipLogo = false;
     if (isPdfAlreadyWatermarked(pdfDoc)) {
-      console.log('⚠️  [Watermark] PDF already contains a watermark — skipping watermark application');
-      console.log('🏁 [Watermark] Returning original PDF bytes unchanged\n');
-      return pdfBytes;
+      if (userRole !== 'USER') {
+        // Admin/Editor/Reviewer: PDF already has logo watermark — return unchanged
+        console.log('⚠️  [Watermark] PDF already contains a watermark — skipping for non-user role');
+        console.log('🏁 [Watermark] Returning original PDF bytes unchanged\n');
+        return pdfBytes;
+      }
+      // USER role: logo already present — skip logo but still stamp copyright notice + clickable link
+      console.log('⚠️  [Watermark] PDF already watermarked — skipping logo, adding copyright + link for user');
+      skipLogo = true;
+    } else {
+      console.log('✅ [Watermark] No existing watermark found — proceeding with full watermarking');
     }
-
-    console.log('✅ [Watermark] No existing watermark found — proceeding with watermarking');
     // ─────────────────────────────────────────────────────────────────────────
 
     // 3. Load logo image — bulletproof path discovery
@@ -507,8 +514,8 @@ export async function addWatermarkToPdf(
         console.log(`📋 [Watermark] Added citation "${citationNumber}" to page ${index + 1}`);
       }
 
-      // ── Center logo (all roles) ───────────────────────────────────────────
-      if (logoImage) {
+      // ── Center logo (all roles) — skipped if PDF already has logo ──────
+      if (logoImage && !skipLogo) {
         const logoScale = 0.25;
         const logoDims = logoImage.scale(logoScale);
 
@@ -521,8 +528,8 @@ export async function addWatermarkToPdf(
         });
       }
 
-      // ── Bottom-right logo (all roles) ────────────────────────────────────
-      if (logoImage) {
+      // ── Bottom-right logo (all roles) — skipped if PDF already has logo ─
+      if (logoImage && !skipLogo) {
         const bottomLogoScale = 0.08;
         const bottomLogoDims = logoImage.scale(bottomLogoScale);
 
