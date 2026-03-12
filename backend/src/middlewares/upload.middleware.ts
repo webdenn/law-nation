@@ -666,40 +666,34 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
           
           if (ext === '.docx' || ext === '.doc') {
             console.log('[Editor Upload Local] Converting DOCX to PDF for preview...');
-            
+
             try {
               const { adobeService } = await import('../services/adobe.service.js');
               const pdfFilePath = docFilePath.replace(/\.(docx|doc)$/i, '.pdf');
-              
+
               await adobeService.convertDocxToPdf(docFilePath, pdfFilePath);
-              console.log('[Editor Upload Local] DOCX converted to PDF successfully');
-              
-              const watermarkedBuffer = await addUploadWatermark(pdfFilePath, 'application/pdf');
-              fs.writeFileSync(pdfFilePath, watermarkedBuffer);
-              
+              console.log('[Editor Upload Local] DOCX converted to PDF — no new watermark added (watermark already embedded from original upload)');
+
+              // Do NOT watermark here — DOCX already carries the watermark from when
+              // the editor downloaded it. Adding a new one would cause double watermarks.
               fs.unlinkSync(docFilePath);
-              
+
               const pdfFilename = docFile.filename.replace(/\.(docx|doc)$/i, '.pdf');
-              
+
               req.fileMeta = {
                 url: `/uploads/pdfs/${pdfFilename}`,
                 storageKey: pdfFilename
               };
-              
-              console.log('✅ [Editor Upload Local] PDF watermarked successfully');
             } catch (conversionError) {
-              console.error('❌ [Editor Upload Local] DOCX to PDF conversion failed:', conversionError);
-              const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
-              fs.writeFileSync(docFilePath, watermarkedBuffer);
+              console.error('❌ [Editor Upload Local] DOCX to PDF conversion failed, using DOCX as fallback:', conversionError);
+              // Keep the original DOCX as-is without adding a watermark
               req.fileMeta = {
                 url: `/uploads/pdfs/${docFile.filename}`,
                 storageKey: docFile.filename
               };
-              console.log('[Editor Upload Local] Uploaded watermarked DOCX as fallback');
             }
           } else {
-            const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
-            fs.writeFileSync(docFilePath, watermarkedBuffer);
+            // Plain PDF upload (not a DOCX re-upload) — skip watermarking to be consistent
             req.fileMeta = {
               url: `/uploads/pdfs/${docFile.filename}`,
               storageKey: docFile.filename
@@ -711,13 +705,10 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
 
         if (files.editorDocument && files.editorDocument[0]) {
           const editorDocFile = files.editorDocument[0];
-          const editorDocFilePath = path.join(process.cwd(), 'uploads/editor-docs/', editorDocFile.filename);
           const ext = path.extname(editorDocFile.originalname).toLowerCase();
           const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
 
-          const watermarkedBuffer = await addUploadWatermark(editorDocFilePath, editorDocFile.mimetype);
-          fs.writeFileSync(editorDocFilePath, watermarkedBuffer);
-
+          // No watermark added — secondary editor document stored as-is
           req.body.editorDocumentUrl = `/uploads/editor-docs/${editorDocFile.filename}`;
           req.body.editorDocumentType = docType;
         }
@@ -783,29 +774,29 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
 
           if (ext === '.docx' || ext === '.doc') {
             console.log('[Editor Upload] Converting DOCX to PDF for preview...');
-            
+
             try {
               const { adobeService } = await import('../services/adobe.service.js');
               const pdfTempPath = tempFilePath.replace(/\.(docx|doc)$/i, '.pdf');
-              
+
               await adobeService.convertDocxToPdf(tempFilePath, pdfTempPath);
-              console.log('[Editor Upload] DOCX converted to PDF successfully');
-              
-              uploadBuffer = await addUploadWatermark(pdfTempPath, 'application/pdf');
-              
+              console.log('[Editor Upload] DOCX converted to PDF — no new watermark added (watermark already embedded from original upload)');
+
+              // Do NOT watermark here — DOCX already carries the watermark from when
+              // the editor downloaded it. Adding a new one would cause double watermarks.
+              uploadBuffer = fs.readFileSync(pdfTempPath);
               fs.unlinkSync(pdfTempPath);
-              
+
               finalFilename = (docFile.originalname || docFile.filename).replace(/\.(docx|doc)$/i, '.pdf');
               finalMimetype = 'application/pdf';
-              
-              console.log('✅ [Editor Upload] PDF watermarked successfully');
             } catch (conversionError) {
-              console.error('[Editor Upload] DOCX to PDF conversion failed:', conversionError);
-              uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
-              console.log('[Editor Upload] Uploaded watermarked DOCX as fallback');
+              console.error('[Editor Upload] DOCX to PDF conversion failed, using DOCX as fallback:', conversionError);
+              // Keep original DOCX buffer as-is without watermarking
+              uploadBuffer = fs.readFileSync(tempFilePath);
             }
           } else {
-            uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
+            // Plain PDF upload — store as-is without adding a new watermark
+            uploadBuffer = fs.readFileSync(tempFilePath);
           }
           fs.unlinkSync(tempFilePath);
 
@@ -830,12 +821,13 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
           const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(editorDocFile.originalname)}`);
           fs.writeFileSync(tempFilePath, editorDocFile.buffer);
 
-          const watermarkedBuffer = await addUploadWatermark(tempFilePath, editorDocFile.mimetype);
+          // No watermark added — secondary editor document stored as-is
+          const editorDocBuffer = fs.readFileSync(tempFilePath);
           fs.unlinkSync(tempFilePath);
 
           // CHANGED: uploadBufferToS3
           const { url } = await uploadBufferToS3(
-            watermarkedBuffer,
+            editorDocBuffer,
             editorDocFile.originalname,
             editorDocFile.mimetype,
             'pdf'
