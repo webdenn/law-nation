@@ -606,7 +606,7 @@ async addWatermarkToDocx(docxPath: string, outputPath: string, watermarkData: an
               anchorIndex++;
 
               if (anchorIndex === 1) {
-                // ✅ First anchor = center watermark (behind text)
+                // First anchor = large center watermark (behind text)
                 return anchorMatch
                   .replace(
                     /<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
@@ -620,7 +620,7 @@ async addWatermarkToDocx(docxPath: string, outputPath: string, watermarkData: an
               }
 
               if (anchorIndex === 2) {
-                // ✅ Second anchor = bottom-right logo, explicitly set right+bottom
+                // Second anchor = small bottom-right corner logo
                 return anchorMatch
                   .replace(
                     /<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
@@ -632,7 +632,7 @@ async addWatermarkToDocx(docxPath: string, outputPath: string, watermarkData: an
                   );
               }
 
-              // ✅ All other anchors — leave untouched
+              // All other anchors — leave untouched
               return anchorMatch;
             }
           );
