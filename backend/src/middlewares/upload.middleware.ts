@@ -4,8 +4,6 @@ import path from "path";
 import fs from "fs";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"; // CHANGED: AWS SDK
 import type { Request, Response, NextFunction } from "express";
-import { addWatermarkToPdf } from "@/utils/pdf-watermark.utils.js";
-import { addSimpleWatermarkToWord } from "@/utils/word-watermark.utils.js";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { StringValidation } from "zod/v3";
 
@@ -263,42 +261,6 @@ const s3MemoryImage = multer({
   limits: { fileSize: MAX_IMAGE_SIZE },
 });
 
-// ---------- WATERMARK HELPER (UNCHANGED) ----------
-async function addUploadWatermark(
-  filePath: string,
-  mimetype: string
-): Promise<Buffer> {
-  console.log(`💧 [Upload Watermark] Adding watermark to: ${filePath}`);
-
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-  const watermarkData = {
-    userName: 'LAW NATION',
-    downloadDate: new Date(),
-    articleTitle: 'Uploaded Document',
-    articleId: 'upload',
-    frontendUrl,
-  };
-
-  try {
-    if (mimetype === 'application/pdf') {
-      console.log(`📄 [Upload Watermark] Processing PDF for upload...`);
-      return await addWatermarkToPdf(filePath, watermarkData, 'ADMIN', 'DRAFT');
-    } else if (
-      mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-      mimetype === 'application/msword'
-    ) {
-      console.log(`📝 [Upload Watermark] Processing Word document...`);
-      return await addSimpleWatermarkToWord(filePath, watermarkData);
-    } else {
-      console.warn(`⚠️ [Upload Watermark] Unsupported file type: ${mimetype}`);
-      return fs.readFileSync(filePath);
-    }
-  } catch (error) {
-    console.error(`❌ [Upload Watermark] Failed to add watermark:`, error);
-    return fs.readFileSync(filePath);
-  }
-}
-
 // ---------- S3 UPLOAD HELPER (REPLACED) ----------
 /**
  * Uploads a buffer to AWS S3 and returns the public URL.
@@ -359,18 +321,12 @@ export const uploadDocument = (req: Request, res: Response, next: NextFunction) 
       try {
         const isLoggedIn = !!(req as any).user?.id;
         const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
-        const tempFilePath = path.join(process.cwd(), directory, req.file.filename);
-
-        // Watermark Logic
-        const watermarkedBuffer = await addUploadWatermark(tempFilePath, req.file.mimetype);
-        fs.writeFileSync(tempFilePath, watermarkedBuffer);
 
         const url = `/${directory}${req.file.filename}`;
         req.fileUrl = url;
         req.fileMeta = { url, storageKey: req.file.filename };
         next();
       } catch (error) {
-        // Fallback Logic
         const isLoggedIn = !!(req as any).user?.id;
         const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
         const url = `/${directory}${req.file.filename}`;
@@ -387,19 +343,8 @@ export const uploadDocument = (req: Request, res: Response, next: NextFunction) 
       if (!file) return res.status(400).json({ error: "Document file required" });
 
       try {
-        // Temp file for watermarking
-        const tempDir = path.join(process.cwd(), 'uploads', 'temp');
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-
-        const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(file.originalname)}`);
-        fs.writeFileSync(tempFilePath, file.buffer);
-
-        const watermarkedBuffer = await addUploadWatermark(tempFilePath, file.mimetype);
-        fs.unlinkSync(tempFilePath);
-
-        // CHANGED: Call uploadBufferToS3
         const { url, storageKey } = await uploadBufferToS3(
-          watermarkedBuffer,
+          file.buffer,
           file.originalname,
           file.mimetype
         );
@@ -408,18 +353,8 @@ export const uploadDocument = (req: Request, res: Response, next: NextFunction) 
         req.fileMeta = { url, storageKey };
         next();
       } catch (error) {
-        console.error('❌ [Upload] Watermark/Upload failed:', error);
-        // Fallback to S3
-        uploadBufferToS3(file.buffer, file.originalname, file.mimetype)
-          .then(({ url, storageKey }) => {
-            req.fileUrl = url;
-            req.fileMeta = { url, storageKey };
-            next();
-          })
-          .catch((e) => {
-            console.error("S3 document upload error:", e);
-            res.status(500).json({ error: "Document upload failed" });
-          });
+        console.error('❌ [Upload] S3 upload failed:', error);
+        res.status(500).json({ error: "Document upload failed" });
       }
     });
   }
@@ -434,9 +369,6 @@ export const uploadPdfOnly = (req: Request, res: Response, next: NextFunction) =
       if (!req.file) return res.status(400).json({ error: "PDF file required" });
 
       try {
-        const tempFilePath = path.join(process.cwd(), 'uploads/pdfs/', req.file.filename);
-        const watermarkedBuffer = await addUploadWatermark(tempFilePath, req.file.mimetype);
-        fs.writeFileSync(tempFilePath, watermarkedBuffer);
         const url = `/uploads/pdfs/${req.file.filename}`;
         req.fileUrl = url;
         req.fileMeta = { url, storageKey: req.file.filename };
@@ -456,17 +388,8 @@ export const uploadPdfOnly = (req: Request, res: Response, next: NextFunction) =
       if (!file) return res.status(400).json({ error: "PDF file required" });
 
       try {
-        const tempDir = path.join(process.cwd(), 'uploads', 'temp');
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-        const tempFilePath = path.join(tempDir, `temp-${Date.now()}.pdf`);
-        fs.writeFileSync(tempFilePath, file.buffer);
-
-        const watermarkedBuffer = await addUploadWatermark(tempFilePath, file.mimetype);
-        fs.unlinkSync(tempFilePath);
-
-        // CHANGED: Call uploadBufferToS3
         const { url, storageKey } = await uploadBufferToS3(
-          watermarkedBuffer,
+          file.buffer,
           file.originalname,
           file.mimetype
         );
@@ -475,17 +398,8 @@ export const uploadPdfOnly = (req: Request, res: Response, next: NextFunction) =
         req.fileMeta = { url, storageKey };
         next();
       } catch (error) {
-        console.error('❌ [Upload] Watermark/Upload failed:', error);
-        uploadBufferToS3(file.buffer, file.originalname, file.mimetype)
-          .then(({ url, storageKey }) => {
-            req.fileUrl = url;
-            req.fileMeta = { url, storageKey };
-            next();
-          })
-          .catch((e) => {
-            console.error("S3 PDF upload error:", e);
-            res.status(500).json({ error: "PDF upload failed" });
-          });
+        console.error('❌ [Upload] S3 PDF upload failed:', error);
+        res.status(500).json({ error: "PDF upload failed" });
       }
     });
   }
@@ -544,22 +458,11 @@ export const uploadOptionalPdf = (req: Request, res: Response, next: NextFunctio
     localUploadDocument.single("pdf")(req, res, async (err: any) => {
       if (err) return res.status(400).json({ error: err.message });
       if (req.file) {
-        try {
-          const isLoggedIn = !!(req as any).user?.id;
-          const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
-          const tempFilePath = path.join(process.cwd(), directory, req.file.filename);
-          const watermarkedBuffer = await addUploadWatermark(tempFilePath, req.file.mimetype);
-          fs.writeFileSync(tempFilePath, watermarkedBuffer);
-          const url = `/${directory}${req.file.filename}`;
-          req.fileUrl = url;
-          req.fileMeta = { url, storageKey: req.file.filename };
-        } catch (error) {
-          const isLoggedIn = !!(req as any).user?.id;
-          const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
-          const url = `/${directory}${req.file.filename}`;
-          req.fileUrl = url;
-          req.fileMeta = { url, storageKey: req.file.filename };
-        }
+        const isLoggedIn = !!(req as any).user?.id;
+        const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
+        const url = `/${directory}${req.file.filename}`;
+        req.fileUrl = url;
+        req.fileMeta = { url, storageKey: req.file.filename };
       }
       next();
     });
@@ -574,18 +477,8 @@ export const uploadOptionalPdf = (req: Request, res: Response, next: NextFunctio
       }
 
       try {
-        const tempDir = path.join(process.cwd(), 'uploads', 'temp');
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-
-        const tempFilePath = path.join(tempDir, `temp-${Date.now()}.pdf`);
-        fs.writeFileSync(tempFilePath, file.buffer);
-
-        const watermarkedBuffer = await addUploadWatermark(tempFilePath, file.mimetype);
-        fs.unlinkSync(tempFilePath);
-
-        // CHANGED: uploadBufferToS3
         const { url, storageKey, presignedUrl } = await uploadBufferToS3(
-          watermarkedBuffer,
+          file.buffer,
           file.originalname,
           file.mimetype
         );
@@ -594,17 +487,8 @@ export const uploadOptionalPdf = (req: Request, res: Response, next: NextFunctio
         req.fileMeta = { url, storageKey, presignedUrl };
         next();
       } catch (error) {
-        console.error('❌ [Upload] Watermark/Upload failed:', error);
-        uploadBufferToS3(file.buffer, file.originalname, file.mimetype)
-          .then(({ url, storageKey }) => {
-            req.fileUrl = url;
-            req.fileMeta = { url, storageKey };
-            next();
-          })
-          .catch((e) => {
-            console.error("S3 PDF upload error:", e);
-            res.status(500).json({ error: "PDF upload failed" });
-          });
+        console.error('❌ [Upload] S3 PDF upload failed:', error);
+        res.status(500).json({ error: "PDF upload failed" });
       }
     });
   }
@@ -674,9 +558,6 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
               await adobeService.convertDocxToPdf(docFilePath, pdfFilePath);
               console.log('[Editor Upload Local] DOCX converted to PDF successfully');
               
-              const watermarkedBuffer = await addUploadWatermark(pdfFilePath, 'application/pdf');
-              fs.writeFileSync(pdfFilePath, watermarkedBuffer);
-              
               fs.unlinkSync(docFilePath);
               
               const pdfFilename = docFile.filename.replace(/\.(docx|doc)$/i, '.pdf');
@@ -686,20 +567,16 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
                 storageKey: pdfFilename
               };
               
-              console.log('✅ [Editor Upload Local] PDF watermarked successfully');
+              console.log('✅ [Editor Upload Local] PDF stored without watermark');
             } catch (conversionError) {
               console.error('❌ [Editor Upload Local] DOCX to PDF conversion failed:', conversionError);
-              const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
-              fs.writeFileSync(docFilePath, watermarkedBuffer);
               req.fileMeta = {
                 url: `/uploads/pdfs/${docFile.filename}`,
                 storageKey: docFile.filename
               };
-              console.log('[Editor Upload Local] Uploaded watermarked DOCX as fallback');
+              console.log('[Editor Upload Local] Uploaded clean DOCX as fallback');
             }
           } else {
-            const watermarkedBuffer = await addUploadWatermark(docFilePath, docFile.mimetype);
-            fs.writeFileSync(docFilePath, watermarkedBuffer);
             req.fileMeta = {
               url: `/uploads/pdfs/${docFile.filename}`,
               storageKey: docFile.filename
@@ -711,12 +588,8 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
 
         if (files.editorDocument && files.editorDocument[0]) {
           const editorDocFile = files.editorDocument[0];
-          const editorDocFilePath = path.join(process.cwd(), 'uploads/editor-docs/', editorDocFile.filename);
           const ext = path.extname(editorDocFile.originalname).toLowerCase();
           const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
-
-          const watermarkedBuffer = await addUploadWatermark(editorDocFilePath, editorDocFile.mimetype);
-          fs.writeFileSync(editorDocFilePath, watermarkedBuffer);
 
           req.body.editorDocumentUrl = `/uploads/editor-docs/${editorDocFile.filename}`;
           req.body.editorDocumentType = docType;
@@ -791,21 +664,21 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
               await adobeService.convertDocxToPdf(tempFilePath, pdfTempPath);
               console.log('[Editor Upload] DOCX converted to PDF successfully');
               
-              uploadBuffer = await addUploadWatermark(pdfTempPath, 'application/pdf');
+              uploadBuffer = fs.readFileSync(pdfTempPath);
               
               fs.unlinkSync(pdfTempPath);
               
               finalFilename = (docFile.originalname || docFile.filename).replace(/\.(docx|doc)$/i, '.pdf');
               finalMimetype = 'application/pdf';
               
-              console.log('✅ [Editor Upload] PDF watermarked successfully');
+              console.log('✅ [Editor Upload] PDF stored without watermark');
             } catch (conversionError) {
               console.error('[Editor Upload] DOCX to PDF conversion failed:', conversionError);
-              uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
-              console.log('[Editor Upload] Uploaded watermarked DOCX as fallback');
+              uploadBuffer = docFile.buffer;
+              console.log('[Editor Upload] Uploaded clean DOCX as fallback');
             }
           } else {
-            uploadBuffer = await addUploadWatermark(tempFilePath, docFile.mimetype);
+            uploadBuffer = docFile.buffer;
           }
           fs.unlinkSync(tempFilePath);
 
@@ -826,16 +699,8 @@ export const uploadEditorFiles = (req: Request, res: Response, next: NextFunctio
           const ext = path.extname(editorDocFile.originalname).toLowerCase();
           const docType = (ext === '.docx' || ext === '.doc') ? 'WORD' : 'PDF';
 
-          const tempDir = path.join(process.cwd(), 'uploads', 'temp');
-          const tempFilePath = path.join(tempDir, `temp-${Date.now()}${path.extname(editorDocFile.originalname)}`);
-          fs.writeFileSync(tempFilePath, editorDocFile.buffer);
-
-          const watermarkedBuffer = await addUploadWatermark(tempFilePath, editorDocFile.mimetype);
-          fs.unlinkSync(tempFilePath);
-
-          // CHANGED: uploadBufferToS3
           const { url } = await uploadBufferToS3(
-            watermarkedBuffer,
+            editorDocFile.buffer,
             editorDocFile.originalname,
             editorDocFile.mimetype,
             'pdf'
@@ -1015,9 +880,6 @@ export const uploadArticleFiles = (req: Request, res: Response, next: NextFuncti
         if (files.pdf && files.pdf[0]) {
           const pdfFile = files.pdf[0];
           const directory = isLoggedIn ? 'uploads/pdfs/' : 'uploads/temp/';
-          const pdfFilePath = path.join(process.cwd(), directory, pdfFile.filename);
-          const watermarkedBuffer = await addUploadWatermark(pdfFilePath, pdfFile.mimetype);
-          fs.writeFileSync(pdfFilePath, watermarkedBuffer);
           req.fileMeta = {
             url: `/${directory}${pdfFile.filename}`,
             storageKey: pdfFile.filename
@@ -1083,18 +945,8 @@ export const uploadArticleFiles = (req: Request, res: Response, next: NextFuncti
       try {
         if (files.pdf && files.pdf[0]) {
           const pdfFile = files.pdf[0];
-          const tempDir = path.join(process.cwd(), 'uploads', 'temp');
-          if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-
-          const tempFilePath = path.join(tempDir, `temp-${Date.now()}.pdf`);
-          fs.writeFileSync(tempFilePath, pdfFile.buffer);
-
-          const watermarkedBuffer = await addUploadWatermark(tempFilePath, pdfFile.mimetype);
-          fs.unlinkSync(tempFilePath);
-
-          // CHANGED: uploadBufferToS3
           const { url, storageKey } = await uploadBufferToS3(
-            watermarkedBuffer,
+            pdfFile.buffer,
             pdfFile.originalname,
             pdfFile.mimetype,
             'pdf'

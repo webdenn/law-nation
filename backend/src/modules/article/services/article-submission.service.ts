@@ -482,31 +482,13 @@ export class ArticleSubmissionService {
       const docxPath = pdfPath.replace('.pdf', '.docx');
       await adobeService.convertPdfToDocx(pdfPath, docxPath);
 
-      // 2. Add watermark to DOCX
-      const watermarkData = {
-        userName: 'LAW NATION USER',
-        downloadDate: new Date(),
-        articleTitle: 'Document',
-        articleId: articleId,
-        frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
-      };
-
-      const watermarkedDocxPath = docxPath.replace('.docx', '_watermarked.docx');
-      await adobeService.addWatermarkToDocx(docxPath, watermarkedDocxPath, watermarkData);
-
-      // Update article record with DOCX URL
+      // Update article record with clean DOCX URL (watermark applied dynamically at download time)
       await prisma.article.update({
         where: { id: articleId },
         data: {
-          currentWordUrl: watermarkedDocxPath,
+          currentWordUrl: docxPath,
         },
       });
-
-      // Clean up temporary files
-      const fs = await import('fs');
-      if (fs.existsSync(docxPath)) {
-        fs.unlinkSync(docxPath);
-      }
 
       console.log(`✅ [Document] Adobe processing completed for ${articleId}`);
 
