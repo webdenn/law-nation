@@ -598,42 +598,21 @@ async addWatermarkToDocx(docxPath: string, outputPath: string, watermarkData: an
 
         if (content.includes("<wp:anchor")) {
           modified = true;
-          let anchorIndex = 0;
 
           content = content.replace(
             /<wp:anchor[\s\S]*?<\/wp:anchor>/gi,
             (anchorMatch) => {
-              anchorIndex++;
-
-              if (anchorIndex === 1) {
-                // First anchor = large center watermark (behind text)
-                return anchorMatch
-                  .replace(
-                    /<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
-                    `<wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>`
-                  )
-                  .replace(
-                    /<wp:positionV\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionV>/i,
-                    `<wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>`
-                  )
-                  .replace(/<wp:wrapSquare[^>]*\/>/i, "<wp:wrapNone/>");
-              }
-
-              if (anchorIndex === 2) {
-                // Second anchor = small bottom-right corner logo
-                return anchorMatch
-                  .replace(
-                    /<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
-                    `<wp:positionH relativeFrom="page"><wp:align>right</wp:align></wp:positionH>`
-                  )
-                  .replace(
-                    /<wp:positionV\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionV>/i,
-                    `<wp:positionV relativeFrom="page"><wp:align>bottom</wp:align></wp:positionV>`
-                  );
-              }
-
-              // All other anchors — leave untouched
-              return anchorMatch;
+              // All anchors → large center watermark (behind text)
+              return anchorMatch
+                .replace(
+                  /<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
+                  `<wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>`
+                )
+                .replace(
+                  /<wp:positionV\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionV>/i,
+                  `<wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>`
+                )
+                .replace(/<wp:wrapSquare[^>]*\/>/i, "<wp:wrapNone/>");
             }
           );
 

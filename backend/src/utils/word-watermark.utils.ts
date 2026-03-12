@@ -33,11 +33,10 @@ export async function addWatermarkToWord(
     const entries = zip.getEntries();
     let modifiedCount = 0;
 
-    // SIZES
+    // SIZE
     const CENTER_LOGO_SIZE = "350pt";
-    const CORNER_LOGO_SIZE = "70pt";
 
-    // 1. CENTER WATERMARK STYLE (Behind Text, No Wrapping)
+    // CENTER WATERMARK STYLE (Behind Text, No Wrapping)
     const centerStyle = [
       'margin-left:0',
       'margin-top:0',
@@ -58,20 +57,6 @@ export async function addWatermarkToWord(
       `height:${CENTER_LOGO_SIZE}`,
     ].join(';');
 
-    // 2. BOTTOM RIGHT LOGO STYLE
-    const cornerStyle = [
-      'position:absolute',
-      'margin-left:0',
-      'margin-top:0',
-      `width:${CORNER_LOGO_SIZE}`,
-      `height:${CORNER_LOGO_SIZE}`,
-      'z-index:251659264',
-      'mso-position-horizontal:right',
-      'mso-position-horizontal-relative:page',
-      'mso-position-vertical:bottom',
-      'mso-position-vertical-relative:page'
-    ].join(';');
-
     for (const entry of entries) {
       if (entry.entryName.startsWith("word/") && entry.entryName.endsWith(".xml")) {
         let content = entry.getData().toString("utf-8");
@@ -87,42 +72,22 @@ export async function addWatermarkToWord(
 
               localModified = true;
 
-              // Large center watermark (behind text) + small bottom-right corner logo
-              const centerWatermark = `${start}${centerStyle}${quote}${mid}${inner}${end}`;
-              const cornerLogo = `${start}${cornerStyle}${quote}${mid}${inner}${end}`;
-
-              return centerWatermark + cornerLogo;
+              // Large center watermark only (behind text)
+              return `${start}${centerStyle}${quote}${mid}${inner}${end}`;
            });
         }
 
-        // --- DrawingML (Modern Word) fix ---
+        // --- DrawingML (Modern Word) fix: force all anchors to center ---
         if (content.includes("<wp:anchor")) {
             localModified = true;
-            let anchorIndex = 0;
 
             content = content.replace(/<wp:anchor[\s\S]*?<\/wp:anchor>/gi, (anchorMatch) => {
-              anchorIndex++;
-
-              if (anchorIndex === 1) {
-                // First anchor = large center watermark (behind text)
-                return anchorMatch
-                  .replace(/<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
-                    `<wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>`)
-                  .replace(/<wp:positionV\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionV>/i,
-                    `<wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>`)
-                  .replace(/<wp:wrapSquare[^>]*\/>/i, "<wp:wrapNone/>");
-              }
-
-              if (anchorIndex === 2) {
-                // Second anchor = small bottom-right corner logo
-                return anchorMatch
-                  .replace(/<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
-                    `<wp:positionH relativeFrom="page"><wp:align>right</wp:align></wp:positionH>`)
-                  .replace(/<wp:positionV\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionV>/i,
-                    `<wp:positionV relativeFrom="page"><wp:align>bottom</wp:align></wp:positionV>`);
-              }
-
-              return anchorMatch;
+              return anchorMatch
+                .replace(/<wp:positionH\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionH>/i,
+                  `<wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>`)
+                .replace(/<wp:positionV\s+relativeFrom="[^"]*">([\s\S]*?)<\/wp:positionV>/i,
+                  `<wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>`)
+                .replace(/<wp:wrapSquare[^>]*\/>/i, "<wp:wrapNone/>");
             });
         }
 
