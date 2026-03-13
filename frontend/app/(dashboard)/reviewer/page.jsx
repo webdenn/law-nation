@@ -97,7 +97,7 @@ function ReviewerDashboardContent() {
             } else {
                 // ✅ Consistent Search: Latest Reviewer log
                 changeLog = [...changeHistory]
-                    .sort((a, b) => new Date(b.changedAt || b.createdAt || b.editedAt || 0) - new Date(a.changedAt || a.createdAt || a.editedAt || 0))
+                    .sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))
                     .find(log => (log.role || log.changedBy?.role || "").toUpperCase() === "REVIEWER");
             }
 
@@ -111,8 +111,8 @@ function ReviewerDashboardContent() {
             // Use lastEditorPdf found in fetchChangeHistory or from article field
             let originalPdfUrl = lastEditorPdf || selectedArticle.editorDocumentUrl || selectedArticle.originalPdfUrl;
 
-            // 2. "New" Document = Reviewer's Upload (ALWAYS trust currentPdfUrl; changeLog.pdfUrl can be wrong)
-            const editedPdfUrl = selectedArticle.currentPdfUrl || changeLog?.pdfUrl || changeLog?.documentUrl || changeLog?.correctedPdfUrl;
+            // 2. "New" Document = Reviewer's Upload (Current PDF) or the specific log's PDF
+            const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
 
             if (!originalPdfUrl) throw new Error("Base PDF (Editor/Original) not found");
             if (!editedPdfUrl) throw new Error("Comparison PDF (Reviewer) not found.");
@@ -176,7 +176,7 @@ function ReviewerDashboardContent() {
         } finally {
             setIsGeneratingDiff(false);
         }
-    }, [changeHistory, selectedArticle, lastEditorPdf, isGeneratingDiff, isMobileMenuOpen]);
+    }, [changeHistory, selectedArticle, isGeneratingDiff, isMobileMenuOpen]);
 
     const fetchAssignedArticles = async (reviewerId, token) => {
         try {
