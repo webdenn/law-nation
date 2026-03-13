@@ -148,10 +148,21 @@ const MultiDiffViewer = ({
                 const reviewerLog = findLogByRole('reviewer');
                 const adminLog = findLogByRole('admin');
 
-                // Fallbacks from selectedArticle
-                const currentEditorUrl = editorLog ? getDocUrl(editorLog) : (selectedArticle.editorDocumentUrl || selectedArticle.latestEditorPdfUrl);
-                const currentReviewerUrl = reviewerLog ? getDocUrl(reviewerLog) : selectedArticle.latestReviewerPdfUrl;
-                const currentAdminUrl = adminLog ? getDocUrl(adminLog) : selectedArticle.latestAdminPdfUrl;
+                // Fallbacks from selectedArticle (use known-good currentPdfUrl for reviewer)
+                const currentEditorUrl =
+                    editorLog
+                        ? getDocUrl(editorLog)
+                        : (selectedArticle.editorDocumentUrl || selectedArticle.latestEditorPdfUrl);
+
+                const currentReviewerUrl =
+                    reviewerLog
+                        ? getDocUrl(reviewerLog)
+                        : (selectedArticle.latestReviewerPdfUrl || selectedArticle.currentPdfUrl);
+
+                const currentAdminUrl =
+                    adminLog
+                        ? getDocUrl(adminLog)
+                        : selectedArticle.latestAdminPdfUrl;
 
                 // 3. FETCH TEXTS
                 const editorText = currentEditorUrl ? await fetchText(currentEditorUrl) : "";
