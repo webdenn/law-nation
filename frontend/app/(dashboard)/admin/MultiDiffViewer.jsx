@@ -150,7 +150,7 @@ const MultiDiffViewer = ({
 
                 // Fallbacks from selectedArticle
                 const currentEditorUrl = editorLog ? getDocUrl(editorLog) : (selectedArticle.editorDocumentUrl || selectedArticle.latestEditorPdfUrl);
-                const currentReviewerUrl = reviewerLog ? getDocUrl(reviewerLog) : selectedArticle.latestReviewerPdfUrl;
+                const currentReviewerUrl = selectedArticle.currentPdfUrl || (reviewerLog ? getDocUrl(reviewerLog) : selectedArticle.latestReviewerPdfUrl);
                 const currentAdminUrl = adminLog ? getDocUrl(adminLog) : selectedArticle.latestAdminPdfUrl;
 
                 // 3. FETCH TEXTS
