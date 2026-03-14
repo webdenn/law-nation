@@ -111,8 +111,8 @@ function ReviewerDashboardContent() {
             // Use lastEditorPdf found in fetchChangeHistory or from article field
             let originalPdfUrl = lastEditorPdf || selectedArticle.editorDocumentUrl || selectedArticle.originalPdfUrl;
 
-            // 2. "New" Document = Reviewer's Upload (Current PDF) or the specific log's PDF
-            const editedPdfUrl = changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl || selectedArticle.currentPdfUrl;
+            // 2. "New" Document = Reviewer's Upload (use currentPdfUrl - same as preview; changeLog.pdfUrl is wrong)
+            const editedPdfUrl = selectedArticle.currentPdfUrl || changeLog.pdfUrl || changeLog.documentUrl || changeLog.correctedPdfUrl;
 
             if (!originalPdfUrl) throw new Error("Base PDF (Editor/Original) not found");
             if (!editedPdfUrl) throw new Error("Comparison PDF (Reviewer) not found.");
