@@ -299,44 +299,26 @@ function ArticlesContent() {
                   key={item.id || item._id || idx}
                   className="group flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow duration-300"
                 >
-                  <div className="relative h-52 overflow-hidden bg-gray-100">
-                    {item.thumbnailUrl ? (
-                      <img
-                        src={item.thumbnailUrl.startsWith("http") ? item.thumbnailUrl : `${NEXT_PUBLIC_BASE_URL}${item.thumbnailUrl}`}
-                        alt={item.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        loading="lazy"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-50">
-                        <span className="text-sm font-medium">No Image</span>
-                      </div>
-                    )}
-
-                    {item.category && (
-                      <span className="absolute top-4 left-4 bg-white/95 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-red-700 shadow-sm border border-gray-100">
-                        {item.category}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col p-6">
-                    {item.citationNumber && (
-                      <span className="inline-block self-start px-2 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-bold uppercase tracking-wider border border-red-100 mb-2">
-                        {item.citationNumber}
-                      </span>
-                    )}
-                    <h3 className="text-xl font-bold text-gray-900 mb-3 leading-snug line-clamp-2 group-hover:text-red-700 transition-colors">
+                  <div className="flex flex-col p-6 h-full flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      {item.category && (
+                        <span className="inline-block px-3 py-1 rounded-full text-xs font-bold text-red-700 bg-red-50 border border-red-100">
+                          {item.category}
+                        </span>
+                      )}
+                      {item.citationNumber && (
+                        <span className="inline-block px-2 py-1 rounded bg-red-50 text-red-600 text-[10px] font-bold uppercase tracking-wider border border-red-100">
+                          {item.citationNumber}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-3 leading-snug line-clamp-2 group-hover:text-red-700 transition-colors mt-2">
                       {item.title}
                     </h3>
                     <p className="text-gray-600 text-sm leading-relaxed mb-6 line-clamp-3">
                       {item.abstract || "No description available for this article."}
                     </p>
-                    <div className="mt-6 pt-5 border-t border-gray-100 flex items-center justify-between">
+                    <div className="mt-auto pt-5 border-t border-gray-100 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-bold uppercase">
                           {item.authorName?.charAt(0) || "A"}
