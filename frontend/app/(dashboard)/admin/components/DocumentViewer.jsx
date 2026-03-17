@@ -270,25 +270,29 @@ export default function DocumentViewer({
                                 {/* 4. Reviewer Version */}
                                 <div className={`w-full flex items-center rounded-lg transition-all ${pdfViewMode === "reviewer"
                                     ? "bg-purple-50 ring-1 ring-purple-200"
-                                    : !selectedArticle.latestReviewerPdfUrl ? "" : "hover:bg-purple-50"
+                                    : !(selectedArticle.currentPdfUrl || selectedArticle.latestReviewerPdfUrl) ? "" : "hover:bg-purple-50"
                                     }`}>
                                     <button
                                         onClick={() => setPdfViewMode("reviewer")}
-                                        disabled={!selectedArticle.latestReviewerPdfUrl}
+                                        disabled={!(selectedArticle.currentPdfUrl || selectedArticle.latestReviewerPdfUrl)}
                                         className={`flex-1 text-left px-4 py-3 text-xs font-bold flex items-center gap-3 ${pdfViewMode === "reviewer"
                                             ? "text-purple-700"
-                                            : !selectedArticle.latestReviewerPdfUrl
+                                            : !(selectedArticle.currentPdfUrl || selectedArticle.latestReviewerPdfUrl)
                                                 ? "text-gray-300 cursor-not-allowed"
                                                 : "text-gray-500 hover:text-purple-700"
                                             }`}
                                     >
                                         Stage 2 Review
                                     </button>
-                                    {selectedArticle.latestReviewerPdfUrl && (
+                                    {(selectedArticle.currentPdfUrl || selectedArticle.latestReviewerPdfUrl) && (
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleDownloadFile(selectedArticle.latestReviewerPdfUrl, `Stage_2_Review_Version_${selectedArticle.title}`, "PDF");
+                                                handleDownloadFile(
+                                                    selectedArticle.currentPdfUrl || selectedArticle.latestReviewerPdfUrl,
+                                                    `Stage_2_Review_Version_${selectedArticle.title}`,
+                                                    "PDF"
+                                                );
                                             }}
                                             className="p-3 text-gray-400 hover:text-purple-700 transition"
                                             title="Download Reviewer Version"
