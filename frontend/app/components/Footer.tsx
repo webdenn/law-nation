@@ -79,8 +79,8 @@ export default function Footer() {
           <div className="lg:col-span-2">
             <h3 className="text-slate-900 font-bold text-lg mb-6">Explore</h3>
             <ul className="space-y-3 text-[15px]">
-              <li><Link href="/articles" className="hover:text-red-700 transition-colors">Browse Recent Issues</Link></li>
-              <li><Link href="/latest" className="hover:text-red-700 transition-colors">Latest Reads</Link></li>
+              <li><Link href="/recent-issues" className="hover:text-red-700 transition-colors">Browse Recent Issues</Link></li>
+              <li><Link href="/articles" className="hover:text-red-700 transition-colors">Latest Reads</Link></li>
               <li><Link href="/join-us" className="hover:text-red-700 transition-colors">Join Law Nation </Link></li>
               <li><Link href="/our-team" className="hover:text-red-700 transition-colors">Our Team</Link></li>
             </ul>
