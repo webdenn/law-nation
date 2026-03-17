@@ -316,7 +316,7 @@ export default function Navbar() {
     { name: "Home", link: "/" },
     { name: "Submit a Paper", link: "/submit-paper" },
     { name: "Recent Issues ", link: "/recent-issues" },
-    { name: " Law Nation Prime Talks ", link: "/ Law-Nation-Prime-Talks" },
+    { name: "Law Nation Prime Talks", link: "/prime-talks" },
     { name: "About Us", link: "/about" },
 
 
