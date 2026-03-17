@@ -13,35 +13,53 @@ interface Member {
     specialization?: string;
 }
 
-const TeamCard = ({ member }: { member: Member }) => (
-    <div className="group bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:border-red-100 transition-all duration-300 flex flex-col items-center text-center h-full">
-        <div className="relative w-32 h-32 mb-6">
-            <div className="absolute inset-0 bg-red-600 rounded-full opacity-0 group-hover:opacity-10 transition-opacity duration-300 scale-110"></div>
-            <div className="w-full h-full rounded-full overflow-hidden border-4 border-slate-50 shadow-inner bg-slate-200 flex items-center justify-center">
-                {member.image ? (
-                    <img
-                        src={member.image}
-                        alt={member.name}
-                        className="w-full h-full object-cover"
-                    />
-                ) : (
-                    <span className="text-3xl font-black text-slate-300">{member.name.charAt(0)}</span>
-                )}
+const TeamCard = ({ member }: { member: Member }) => {
+    const [isExpanded, setIsExpanded] = React.useState(false);
+    
+    // Check if the text is long enough to warrant a 'See More' button
+    const isLongText = member.bio && member.bio.length > 150;
+
+    return (
+        <div className={`group bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:border-red-100 transition-all duration-300 flex flex-col items-center text-center ${isExpanded ? 'h-auto' : 'h-full'} relative ${isLongText ? 'pb-12' : ''}`}>
+            <div className="relative w-32 h-32 mb-6 shrink-0">
+                <div className="absolute inset-0 bg-red-600 rounded-full opacity-0 group-hover:opacity-10 transition-opacity duration-300 scale-110"></div>
+                <div className="w-full h-full rounded-full overflow-hidden border-4 border-slate-50 shadow-inner bg-slate-200 flex items-center justify-center">
+                    {member.image ? (
+                        <img
+                            src={member.image}
+                            alt={member.name}
+                            className="w-full h-full object-cover"
+                        />
+                    ) : (
+                        <span className="text-3xl font-black text-slate-300">{member.name.charAt(0)}</span>
+                    )}
+                </div>
             </div>
+
+            <h3 className="text-xl font-bold text-slate-900 mb-1 group-hover:text-red-700 transition-colors shrink-0">
+                {member.name}
+            </h3>
+            <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-4 shrink-0">
+                {member.role}
+            </p>
+
+            <div className="text-sm text-slate-500 leading-relaxed w-full flex-grow">
+                <p className={isExpanded ? "" : "line-clamp-4"}>
+                    {member.bio}
+                </p>
+            </div>
+
+            {isLongText && (
+                <button 
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="absolute bottom-4 left-1/2 -translate-x-1/2 text-red-600 font-bold text-xs uppercase hover:text-red-800 transition-colors"
+                >
+                    {isExpanded ? "Show Less" : "See More"}
+                </button>
+            )}
         </div>
-
-        <h3 className="text-xl font-bold text-slate-900 mb-1 group-hover:text-red-700 transition-colors">
-            {member.name}
-        </h3>
-        <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-4">
-            {member.role}
-        </p>
-
-        <p className="text-sm text-slate-500 leading-relaxed line-clamp-4">
-            {member.bio}
-        </p>
-    </div>
-);
+    );
+};
 
 export default function OurTeamPage() {
     const [teamMembers, setTeamMembers] = React.useState<Member[]>([]);
