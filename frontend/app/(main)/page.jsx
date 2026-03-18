@@ -428,7 +428,7 @@ export default function HomePage() {
                                     Submit Manuscript
                                 </Link>
                                 <Link
-                                    href="/articles" // Updated common path
+                                    href="/recent-issues" // Updated common path
                                     className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-neutral-300 text-black font-semibold hover:border-red-300 transition"
                                 >
                                     Browse Issues
