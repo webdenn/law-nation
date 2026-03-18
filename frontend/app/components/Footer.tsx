@@ -102,7 +102,7 @@ export default function Footer() {
             <h3 className="text-slate-900 font-bold text-lg mb-6">Support</h3>
             <ul className="space-y-3 text-[15px]">
               <li><Link href="/help" className="hover:text-red-700">Help Center</Link></li>
-              <li><Link href="/editorial-board" className="hover:text-red-700">Editorial Board</Link></li>
+              {/* <li><Link href="/editorial-board" className="hover:text-red-700">Editorial Board</Link></li> */}
               <li><Link href="/privacy" className="hover:text-red-700">Privacy Policy</Link></li>
               <li><Link href="/terms" className="hover:text-red-700">Terms of use </Link></li>
             </ul>
