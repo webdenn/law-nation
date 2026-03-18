@@ -21,9 +21,20 @@ export default function HomePage() {
     const [banners, setBanners] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSearching, setIsSearching] = useState(false);
+    const [showDisclaimer, setShowDisclaimer] = useState(false);
+    const [disclaimerAcceptedNow, setDisclaimerAcceptedNow] = useState(false);
 
     const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
     const { user } = useSelector((state) => state.auth);
+
+    useEffect(() => {
+        try {
+            const accepted = localStorage.getItem("ln_disclaimer_accepted") === "true";
+            if (!accepted) setShowDisclaimer(true);
+        } catch {
+            setShowDisclaimer(true);
+        }
+    }, []);
 
     const handleProtectedRead = (item) => {
         const slug = item.slug;
@@ -177,6 +188,62 @@ export default function HomePage() {
 
     return (
         <div className="min-h-screen bg-white text-gray-900">
+            {showDisclaimer && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="ln-disclaimer-title"
+                >
+                    <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-neutral-200">
+                        <div className="p-6 sm:p-8">
+                            <h2 id="ln-disclaimer-title" className="text-2xl font-semibold text-gray-900">
+                                DISCLAIMER
+                            </h2>
+                            <div className="mt-4 text-sm sm:text-base text-gray-700 leading-relaxed space-y-4">
+                                <p>
+                                    The content published on the Law Nation Prime Times Journal (&lsquo;LN&rsquo;) is
+                                    provided solely for informational and educational purposes and does not constitute
+                                    any legal opinion/advice, professional guidance, and/or an endorsement of any kind.
+                                    The articles, analysis, or any other material published on the website should not be
+                                    relied upon as a substitute of legal advice from a qualified legal professional
+                                    licensed in your jurisdiction. LN disclaims all liability for any actions taken
+                                    based on the information provided herein. Users are strongly encouraged to consult
+                                    with a Legal Professional for personalized legal advice.
+                                </p>
+                            </div>
+
+                            <label className="mt-6 flex items-center gap-3 text-sm text-gray-700 select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={disclaimerAcceptedNow}
+                                    onChange={(e) => setDisclaimerAcceptedNow(e.target.checked)}
+                                    className="h-4 w-4 rounded border-gray-300 text-red-700 focus:ring-red-600"
+                                />
+                                I accept the above.
+                            </label>
+
+                            <div className="mt-6 flex items-center justify-end">
+                                <button
+                                    type="button"
+                                    disabled={!disclaimerAcceptedNow}
+                                    onClick={() => {
+                                        try {
+                                            localStorage.setItem("ln_disclaimer_accepted", "true");
+                                        } catch {
+                                            // ignore storage failures
+                                        }
+                                        setShowDisclaimer(false);
+                                    }}
+                                    className="inline-flex items-center justify-center rounded-xl bg-red-700 px-5 py-2.5 text-white font-semibold hover:bg-red-800 transition disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                >
+                                    PROCEED TO WEBSITE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             <section className="relative overflow-hidden">
                 <BackgroundCarousel banners={banners} />
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 relative z-10">
