@@ -138,7 +138,7 @@ export default function GuidelinesPage() {
 
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow transition-shadow">
              <h3 className="text-xl font-bold text-slate-900 mb-3 flex items-center gap-2">Terms and Conditions</h3>
-             <p className="text-slate-600">All submissions to Law Nation are subject to our official Terms and Conditions, which dictate our policies on copyright, originality, and publication. By proceeding with your submission, you agree to these terms, accessible at: <Link href="/terms" className="text-red-700 font-medium hover:text-red-800 hover:underline break-all">www.lawnation.co.in/terms/</Link></p>
+             <p className="text-slate-600">All submissions to Law Nation are subject to our official Terms and Conditions, which dictate our policies on copyright, originality, and publication. By proceeding with your submission, you agree to these terms, accessible at: <Link href="/terms" className="text-red-700 font-medium hover:text-red-800 hover:underline break-all">www.lawnation.co.in/terms/</Link> & <Link href="/terms/author" className="text-red-700 font-medium hover:text-red-800 hover:underline break-all">www.lawnation.co.in/terms/author/</Link></p>
           </div>
 
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow transition-shadow">
