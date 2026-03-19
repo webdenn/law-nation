@@ -1231,7 +1231,7 @@ export default function SubmitPaperPage() {
                         className="mt-1 w-5 h-5 text-red-600 rounded border-gray-300 focus:ring-red-600 flex-shrink-0"
                       />
                       <span className="text-xs sm:text-sm text-gray-700 text-justify leading-relaxed">
-                        I/We declare that the manuscript is an original and
+                        I/We declare that the manuscript is an original, non-AI-generated and
                         previously unpublished work written by me/us. I/We shall
                         be solely responsible for any dispute arising out of
                         my/our manuscript, including issues related to

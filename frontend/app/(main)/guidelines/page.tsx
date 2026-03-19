@@ -80,7 +80,7 @@ export default function GuidelinesPage() {
               </li>
               <li className="flex gap-3">
                 <CheckCircle size={20} className="text-red-700 shrink-0 mt-0.5" />
-                <p>A maximum of 20% similarity index (plagiarism) is permissible; anything beyond shall result in disqualification.</p>
+                <p>The submission should not be AI-generated and a maximum of 20% similarity index (plagiarism) is permissible; anything beyond shall result in disqualification.</p>
               </li>
               <li className="flex gap-3">
                 <CheckCircle size={20} className="text-red-700 shrink-0 mt-0.5" />

@@ -75,7 +75,7 @@ export default function RecentIssuesPage() {
                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.3em]">Monthly Archives</span>
                     </div>
                     <h1 className="text-4xl md:text-6xl font-black text-gray-900 tracking-tight leading-none mb-6">
-                        Recent <span className="text-red-700 italic">Issues</span>
+                        Recent <span className="text-red-700">Issues</span>
                     </h1>
                     <p className="text-gray-500 text-lg font-medium max-w-2xl leading-relaxed">
                         Access our complete library of legal digests, constitutional analysis, and judicial reviews published monthly.
@@ -101,7 +101,7 @@ export default function RecentIssuesPage() {
                                         </div>
 
                                         <Link href={`/issue/${issue.id}`} className="block">
-                                            <h2 className="text-3xl md:text-4xl font-black text-blue-600 underline leading-[1.1] tracking-tight mb-5 hover:text-blue-800 transition-colors">
+                                            <h2 className="text-3xl md:text-4xl font-black text-red-700 underline leading-[1.1] tracking-tight mb-5 hover:text-blue-800 transition-colors">
                                                 {issue.title}
                                             </h2>
                                         </Link>

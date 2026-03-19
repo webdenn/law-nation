@@ -17,7 +17,7 @@ const faqs = [
     a: "Navigate to the login page and click “Forgot Password.” Enter your registered email address, and we will send you a secure link to reset your password."
   },
   {
-    q: "Is Law Nation free to use?",
+    q: "Are there any subscription charges to use Law Nation?",
     a: "Yes. As part of our commitment to accessible legal education and research, we provide a comprehensive repository of open-access legal articles, commentary, and resources completely free of charge to the public."
   },
   {
